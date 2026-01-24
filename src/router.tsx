@@ -4,6 +4,7 @@ import ErrorPage from './pages/Error'
 import Login from './pages/Login'
 import Models from './pages/Models'
 import Settings from './pages/Settings'
+import Skills from './pages/Skills'
 
 export const router = createHashRouter([
   {
@@ -19,6 +20,11 @@ export const router = createHashRouter([
   {
     path: '/models',
     element: <Models />,
+    errorElement: <ErrorPage />,
+  },
+  {
+    path: '/skills',
+    element: <Skills />,
     errorElement: <ErrorPage />,
   },
   {

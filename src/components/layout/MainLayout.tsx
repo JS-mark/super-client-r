@@ -1,4 +1,4 @@
-import { AppstoreOutlined, MessageOutlined, SettingOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, MessageOutlined, RocketOutlined, SettingOutlined } from '@ant-design/icons'
 import { Layout, Menu, theme } from 'antd'
 import * as React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -12,7 +12,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken()
 
-  const selectedKey = location.pathname === '/chat' ? '1' : location.pathname === '/models' ? '2' : '3'
+  const selectedKey = location.pathname === '/chat' ? '1' : location.pathname === '/models' ? '2' : location.pathname === '/skills' ? '3' : '4'
 
   return (
     <Layout className="h-screen">
@@ -39,6 +39,12 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }
             },
             {
               key: '3',
+              icon: <RocketOutlined />,
+              label: 'Skills',
+              onClick: () => navigate('/skills'),
+            },
+            {
+              key: '4',
               icon: <SettingOutlined />,
               label: 'Settings',
               onClick: () => navigate('/settings'),
