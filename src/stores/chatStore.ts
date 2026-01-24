@@ -19,11 +19,11 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>()(
   persist(
-    set => ({
+    (set) => ({
       messages: [],
       isStreaming: false,
-      addMessage: message => set(state => ({ messages: [...state.messages, message] })),
-      updateLastMessage: content =>
+      addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+      updateLastMessage: (content) =>
         set((state) => {
           const lastMsg = state.messages[state.messages.length - 1]
           if (!lastMsg)
@@ -32,7 +32,7 @@ export const useChatStore = create<ChatState>()(
           newMessages[newMessages.length - 1] = { ...lastMsg, content }
           return { messages: newMessages }
         }),
-      setStreaming: streaming => set({ isStreaming: streaming }),
+      setStreaming: (streaming) => set({ isStreaming: streaming }),
       clearMessages: () => set({ messages: [] }),
     }),
     {

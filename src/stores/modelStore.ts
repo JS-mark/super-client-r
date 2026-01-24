@@ -14,7 +14,32 @@ interface ModelState {
 export const useModelStore = create<ModelState>()(
   persist(
     set => ({
-      models: [],
+      models: [
+        {
+          id: 'openai-gpt-4',
+          name: 'GPT-4',
+          provider: 'openai',
+          capabilities: ['chat'],
+          enabled: !!import.meta.env.VITE_OPENAI_API_KEY,
+          config: { apiKey: import.meta.env.VITE_OPENAI_API_KEY },
+        },
+        {
+          id: 'claude-3-opus',
+          name: 'Claude 3 Opus',
+          provider: 'anthropic',
+          capabilities: ['chat'],
+          enabled: !!import.meta.env.VITE_ANTHROPIC_API_KEY,
+          config: { apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY },
+        },
+        {
+          id: 'gemini-pro',
+          name: 'Gemini Pro',
+          provider: 'gemini',
+          capabilities: ['chat'],
+          enabled: !!import.meta.env.VITE_GEMINI_API_KEY,
+          config: { apiKey: import.meta.env.VITE_GEMINI_API_KEY },
+        },
+      ].filter(m => m.enabled),
       activeModelId: null,
       addModel: model => set(state => ({ models: [...state.models, model] })),
       updateModel: (id, updates) =>

@@ -68,7 +68,7 @@ export const McpConfig: React.FC = () => {
             <Input />
           </Form.Item>
           <Form.Item name="url" label="Server URL" rules={[{ required: true }]}>
-            <Input placeholder="http://localhost:8000/mcp" />
+            <Input placeholder={import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/mcp'} />
           </Form.Item>
         </Form>
       </Modal>
