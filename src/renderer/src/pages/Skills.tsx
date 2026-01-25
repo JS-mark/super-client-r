@@ -1,104 +1,202 @@
-import type { Skill } from '../types/skills'
-import { DeleteOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Card, Input, List, Tag } from 'antd'
+import {
+  CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
+  EllipsisOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+  SyncOutlined,
+} from '@ant-design/icons'
+import { Button, Card, Dropdown, Input, List, Tabs, Tag, message } from 'antd'
+import type { MenuProps } from 'antd'
 import * as React from 'react'
 import { MainLayout } from '../components/layout/MainLayout'
 import { useSkillStore } from '../stores/skillStore'
+import type { Skill } from '../types/skills'
 
-const MOCK_MARKET_SKILLS: Skill[] = [
-  {
-    id: 'skill-1',
-    name: 'Python Interpreter',
-    description: 'Execute Python code in a sandboxed environment',
-    version: '1.0.0',
-    author: 'AI Client Team',
-    installed: false,
-  },
-  {
-    id: 'skill-2',
-    name: 'Web Search',
-    description: 'Search the web using Google Search API',
-    version: '1.2.0',
-    author: 'Community',
-    installed: false,
-  },
-]
+const SkillCard: React.FC<{ skill: Skill }> = ({ skill }) => {
+  const {
+    installedSkills,
+    installSkill,
+    uninstallSkill,
+    updateSkill,
+    reinstallSkill,
+    checkUpdate,
+  } = useSkillStore()
+
+  const isInstalled = installedSkills.some((s) => s.id === skill.id)
+  const hasUpdate = checkUpdate(skill.id)
+  const installedVersion = installedSkills.find((s) => s.id === skill.id)?.version
+
+  const handleInstall = () => {
+    installSkill(skill)
+    message.success(`Installed ${skill.name}`)
+  }
+
+  const handleUninstall = () => {
+    uninstallSkill(skill.id)
+    message.success(`Uninstalled ${skill.name}`)
+  }
+
+  const handleUpdate = () => {
+    updateSkill(skill.id)
+    message.success(`Updated ${skill.name}`)
+  }
+
+  const handleReinstall = () => {
+    reinstallSkill(skill.id)
+    message.success(`Reinstalled ${skill.name}`)
+  }
+
+  const moreItems: MenuProps['items'] = [
+    {
+      key: 'reinstall',
+      label: 'Reinstall',
+      icon: <ReloadOutlined />,
+      onClick: handleReinstall,
+    },
+    ...(isInstalled
+      ? [
+          {
+            key: 'uninstall',
+            label: 'Uninstall',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: handleUninstall,
+          },
+        ]
+      : []),
+  ]
+
+  const actions: React.ReactNode[] = []
+
+  if (isInstalled) {
+    if (hasUpdate) {
+      actions.push(
+        <Button key="update" type="primary" size="small" icon={<SyncOutlined />} onClick={handleUpdate}>
+          Update
+        </Button>,
+      )
+    } else {
+      actions.push(
+        <Tag key="installed" icon={<CheckCircleOutlined />} color="success">
+          Installed
+        </Tag>,
+      )
+    }
+  } else {
+    actions.push(
+      <Button key="install" type="primary" size="small" icon={<DownloadOutlined />} onClick={handleInstall}>
+        Install
+      </Button>,
+    )
+  }
+
+  // Add More button
+  actions.push(
+    <Dropdown key="more" menu={{ items: moreItems }} trigger={['click']}>
+      <Button type="text" size="small" icon={<EllipsisOutlined />} />
+    </Dropdown>,
+  )
+
+  return (
+    <Card
+      hoverable
+      className="h-full flex flex-col"
+      actions={actions}
+      title={
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{skill.icon || '🧩'}</span>
+          <span className="truncate" title={skill.name}>{skill.name}</span>
+        </div>
+      }
+      extra={
+        <div className="flex flex-col items-end">
+             <Tag>{skill.version}</Tag>
+             {isInstalled && installedVersion && installedVersion !== skill.version && (
+                 <span className="text-xs text-gray-400 mt-1">Installed: {installedVersion}</span>
+             )}
+        </div>
+      }
+    >
+      <div className="flex flex-col h-32 justify-between">
+        <p className="text-gray-500 line-clamp-3 mb-2 flex-grow">{skill.description}</p>
+        <div className="flex justify-between items-center text-xs text-gray-400 mt-2">
+          <span>By {skill.author}</span>
+          {skill.category && <Tag bordered={false}>{skill.category}</Tag>}
+        </div>
+      </div>
+    </Card>
+  )
+}
 
 const Skills: React.FC = () => {
-  const { skills: installedSkills, installSkill, uninstallSkill } = useSkillStore()
+  const { installedSkills, marketSkills, fetchMarketSkills, isLoading } = useSkillStore()
+  const [searchTerm, setSearchTerm] = React.useState('')
 
-  const isInstalled = (id: string) => installedSkills.some(s => s.id === id)
+  React.useEffect(() => {
+    fetchMarketSkills()
+  }, [fetchMarketSkills])
+
+  const filterSkills = (skills: Skill[]) => {
+    return skills.filter(
+      (s) =>
+        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.description.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+  }
+
+  const items = [
+    {
+      key: 'market',
+      label: 'Market',
+      children: (
+        <List
+          grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4, xxl: 4 }}
+          dataSource={filterSkills(marketSkills)}
+          loading={isLoading}
+          renderItem={(item) => (
+            <List.Item key={item.id}>
+              <SkillCard skill={item} />
+            </List.Item>
+          )}
+        />
+      ),
+    },
+    {
+      key: 'installed',
+      label: `Installed (${installedSkills.length})`,
+      children: (
+        <List
+          grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3, xl: 4, xxl: 4 }}
+          dataSource={filterSkills(installedSkills)}
+          renderItem={(item) => (
+            <List.Item key={item.id}>
+              <SkillCard skill={item} />
+            </List.Item>
+          )}
+        />
+      ),
+    },
+  ]
 
   return (
     <MainLayout>
-      <div className="mb-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Skill Market</h1>
-        <Input
-          prefix={<SearchOutlined />}
-          placeholder="Search skills..."
-          className="w-64"
-        />
+      <div className="flex flex-col h-full">
+        <div className="mb-6 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Skill Center</h1>
+          <Input
+            prefix={<SearchOutlined className="text-gray-400" />}
+            placeholder="Search skills..."
+            className="w-64"
+            allowClear
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <Tabs defaultActiveKey="market" items={items} />
       </div>
-
-      <List
-        grid={{ gutter: 16, column: 3 }}
-        dataSource={MOCK_MARKET_SKILLS}
-        renderItem={item => (
-          <List.Item key={item.id}>
-            <Card
-              title={item.name}
-              extra={<Tag>{item.version}</Tag>}
-              actions={[
-                isInstalled(item.id)
-                  ? (
-                      <Button
-                        key="uninstall"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => uninstallSkill(item.id)}
-                      >
-                        Uninstall
-                      </Button>
-                    )
-                  : (
-                      <Button
-                        key="install"
-                        type="primary"
-                        icon={<DownloadOutlined />}
-                        onClick={() => installSkill(item)}
-                      >
-                        Install
-                      </Button>
-                    ),
-              ]}
-            >
-              <p className="h-12 overflow-hidden text-gray-500">{item.description}</p>
-              <div className="mt-4 text-xs text-gray-400">
-                By
-                {item.author}
-              </div>
-            </Card>
-          </List.Item>
-        )}
-      />
-
-      <h2 className="text-xl font-bold mt-8 mb-4">Installed Skills</h2>
-      <List
-        dataSource={installedSkills}
-        renderItem={item => (
-          <List.Item
-            key={item.id}
-            actions={[
-              <Button key="uninstall" danger icon={<DeleteOutlined />} onClick={() => uninstallSkill(item.id)}>Uninstall</Button>,
-            ]}
-          >
-            <List.Item.Meta
-              title={item.name}
-              description={item.description}
-            />
-          </List.Item>
-        )}
-      />
     </MainLayout>
   )
 }
