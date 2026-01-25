@@ -84,6 +84,7 @@ export const ModelList: React.FC = () => {
       <Drawer
         title={editingModel ? 'Edit Model' : 'Add Model'}
         width={400}
+        styles={{ body: { paddingBottom: 80 } }}
         onClose={() => setIsDrawerOpen(false)}
         open={isDrawerOpen}
         extra={(

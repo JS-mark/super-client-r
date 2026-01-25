@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.19",
     "@anthropic-ai/sdk": "^0.71.2",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "antd": "^6.2.1",
@@ -22,6 +23,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.3.0",
     "tailwind-merge": "^3.0.2",
+    "zod": "4.3.6",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

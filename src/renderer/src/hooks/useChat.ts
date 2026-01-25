@@ -1,10 +1,11 @@
-import { message } from 'antd'
+import { App } from 'antd'
 import { useState } from 'react'
 import { ClaudeService } from '../services/llm/claude'
 import { useChatStore } from '../stores/chatStore'
 import { useModelStore } from '../stores/modelStore'
 
 export function useChat() {
+  const { message } = App.useApp()
   const { messages, isStreaming, addMessage, updateLastMessage, setStreaming, clearMessages } = useChatStore()
   const { models } = useModelStore()
   const [input, setInput] = useState('')

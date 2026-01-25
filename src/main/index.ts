@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
+import { setupAgentHandlers } from './services/agent'
 
 // Disable sandbox for local development to avoid "Operation not permitted" errors
 app.commandLine.appendSwitch('no-sandbox')
@@ -34,6 +35,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  setupAgentHandlers()
   createWindow()
 
   app.on('activate', () => {
