@@ -18,7 +18,7 @@ export const useModelStore = create<ModelState>()(
         {
           id: 'openai-gpt-4',
           name: 'GPT-4',
-          provider: 'openai',
+          provider: 'openai' as const,
           capabilities: ['chat'],
           enabled: !!import.meta.env.VITE_OPENAI_API_KEY,
           config: { apiKey: import.meta.env.VITE_OPENAI_API_KEY },
@@ -26,7 +26,7 @@ export const useModelStore = create<ModelState>()(
         {
           id: 'claude-3-opus',
           name: 'Claude 3 Opus',
-          provider: 'anthropic',
+          provider: 'anthropic' as const,
           capabilities: ['chat'],
           enabled: !!import.meta.env.VITE_ANTHROPIC_API_KEY,
           config: { apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY },
@@ -34,7 +34,7 @@ export const useModelStore = create<ModelState>()(
         {
           id: 'gemini-pro',
           name: 'Gemini Pro',
-          provider: 'gemini',
+          provider: 'gemini' as const,
           capabilities: ['chat'],
           enabled: !!import.meta.env.VITE_GEMINI_API_KEY,
           config: { apiKey: import.meta.env.VITE_GEMINI_API_KEY },

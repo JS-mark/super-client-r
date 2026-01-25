@@ -1,13 +1,13 @@
 {
   "name": "super-client-r",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "main": "dist-electron/main.js",
+  "main": "out/main/index.js",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build && electron-builder",
+    "dev": "tsc -b && electron-vite dev",
+    "build": "tsc -b && electron-vite build && electron-builder",
     "lint": "oxlint .",
-    "preview": "vite preview",
+    "preview": "electron-vite preview",
     "check": "tsc -b --noEmit"
   },
   "dependencies": {
@@ -32,17 +32,24 @@
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.21",
     "babel-plugin-react-dev-locator": "^1.0.0",
-    "electron": "^40.0.0",
+    "electron": "^38.7.2",
     "electron-builder": "^26.4.0",
+    "electron-vite": "^5.0.0",
     "oxlint": "^1.41.0",
     "postcss": "^8.5.3",
     "rolldown": "1.0.0-rc.1",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",
-    "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6",
     "vite-plugin-trae-solo-badge": "^1.0.0",
     "vite-tsconfig-paths": "^5.1.4"
+  },
+  "build": {
+    "files": [
+      "out/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
   }
 }
