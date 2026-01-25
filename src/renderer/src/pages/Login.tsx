@@ -22,7 +22,7 @@ const Login: React.FC = () => {
           <Text type="secondary">Sign in to continue</Text>
         </div>
 
-        <Space direction="vertical" className="w-full" size="large">
+        <Space orientation="vertical" className="w-full" size="large">
           <Button
             block
             size="large"
