@@ -1,10 +1,13 @@
 /**
  * Skill Hook
- * 管理 Skills 的安装、卸载和执行
+ * 管理 Skills 的安装、卸载、执行和市场
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { skillClient } from "../services/skill/skillService";
+import { skillService } from "../services/skillService";
+import { useSkillStore } from "../stores/skillStore";
+import type { Skill } from "../types/skills";
 import type {
 	SkillExecutionResult,
 	SkillManifest,
@@ -17,6 +20,20 @@ export function useSkill() {
 	const [tools, setTools] = useState<
 		Array<{ skillId: string; tool: SkillTool }>
 	>([]);
+
+	// Store integration for market functionality
+	const {
+		installedSkills,
+		marketSkills,
+		isLoading: storeLoading,
+		marketPage,
+		marketLimit,
+		marketTotal,
+		fetchMarketSkills,
+		installSkill: installToStore,
+		uninstallSkill: uninstallFromStore,
+		updateSkill: updateInStore,
+	} = useSkillStore();
 
 	// 加载 skills 列表
 	const loadSkills = useCallback(async () => {
@@ -119,16 +136,99 @@ export function useSkill() {
 		[loadSkills],
 	);
 
+	// ========== Market Functions ==========
+
+	// Load market skills
+	const loadMarketSkills = useCallback(
+		async (page?: number, limit?: number) => {
+			try {
+				await fetchMarketSkills(page, limit);
+			} catch (error) {
+				console.error("Failed to load market skills:", error);
+			}
+		},
+		[fetchMarketSkills]
+	);
+
+	// Get skill details from market
+	const getMarketSkillDetails = useCallback(
+		async (id: string): Promise<Skill | undefined> => {
+			try {
+				return await skillService.getSkillDetails(id);
+			} catch (error) {
+				console.error("Failed to get skill details:", error);
+				return undefined;
+			}
+		},
+		[]
+	);
+
+	// Install skill from market
+	const installFromMarket = useCallback(
+		async (skill: Skill) => {
+			setLoading(true);
+			try {
+				// Install via skill client
+				if (skill.repository || skill.homepage) {
+					const manifest = await skillClient.installSkill(
+						skill.repository || skill.homepage || ""
+					);
+					setSkills((prev) => [...prev, manifest]);
+				}
+				// Add to store
+				installToStore(skill);
+			} catch (error: any) {
+				throw new Error(error.message || "Failed to install skill from market");
+			} finally {
+				setLoading(false);
+			}
+		},
+		[installToStore]
+	);
+
+	// Check if skill has update
+	const checkUpdate = useCallback(
+		(id: string): boolean => {
+			const installed = installedSkills.find((s) => s.id === id);
+			const market = marketSkills.find((s) => s.id === id);
+			if (!installed || !market) return false;
+			return market.version !== installed.version;
+		},
+		[installedSkills, marketSkills]
+	);
+
+	// Update skill
+	const updateSkill = useCallback(
+		async (id: string) => {
+			setLoading(true);
+			try {
+				// In real implementation, this would fetch latest version
+				await skillClient.installSkill(id);
+				await loadSkills();
+				updateInStore(id);
+			} catch (error: any) {
+				throw new Error(error.message || "Failed to update skill");
+			} finally {
+				setLoading(false);
+			}
+		},
+		[loadSkills, updateInStore]
+	);
+
 	// 初始化时加载
 	useEffect(() => {
 		loadSkills();
 		loadTools();
-	}, [loadSkills, loadTools]);
+		if (marketSkills.length === 0) {
+			loadMarketSkills();
+		}
+	}, [loadSkills, loadTools, loadMarketSkills, marketSkills.length]);
 
 	return {
+		// Local state
 		skills,
 		tools,
-		loading,
+		loading: loading || storeLoading,
 		loadSkills,
 		installSkill,
 		uninstallSkill,
@@ -136,5 +236,19 @@ export function useSkill() {
 		executeSkill,
 		enableSkill,
 		disableSkill,
+		updateSkill,
+		checkUpdate,
+
+		// Market state
+		installedSkills,
+		marketSkills,
+		marketPage,
+		marketLimit,
+		marketTotal,
+
+		// Market actions
+		loadMarketSkills,
+		getMarketSkillDetails,
+		installFromMarket,
 	};
 }
