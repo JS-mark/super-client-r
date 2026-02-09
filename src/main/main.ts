@@ -348,5 +348,5 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason) => {
-	logger.error("Unhandled rejection", reason);
+	logger.error("Unhandled rejection", reason instanceof Error ? reason : new Error(String(reason)));
 });

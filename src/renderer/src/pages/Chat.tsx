@@ -1,7 +1,6 @@
 import {
 	RobotOutlined,
 	ClearOutlined,
-	MoreOutlined,
 	ApiOutlined,
 	ToolOutlined,
 	CodeOutlined,
@@ -9,17 +8,206 @@ import {
 	CheckCircleOutlined,
 	LoadingOutlined,
 	CloseCircleOutlined,
+	SendOutlined,
+	ThunderboltOutlined,
+	StarOutlined,
 } from "@ant-design/icons";
-import { Button, Dropdown, Space, Tooltip, Badge, Card, Tag, Select } from "antd";
-import type { MenuProps } from "antd";
+import { Button, Badge, Card, Tag, Select, Avatar, Typography, Divider, Tooltip } from "antd";
 import type * as React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Conversations, Sender } from "@ant-design/x";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
 import { useChat, type ChatMode } from "../hooks/useChat";
 import { cn } from "../lib/utils";
+import { useSkillStore } from "../stores/skillStore";
+import { useMcpStore } from "../stores/mcpStore";
+import type { Message } from "../stores/chatStore";
+
+const { Text } = Typography;
+
+// Mode configuration with colors and icons
+const MODE_CONFIG: Record<ChatMode, { color: string; bgColor: string; icon: React.ReactNode; label: string; description: string }> = {
+	direct: {
+		color: "#3b82f6",
+		bgColor: "bg-blue-500",
+		icon: <MessageOutlined />,
+		label: "Direct",
+		description: "Chat directly with AI",
+	},
+	agent: {
+		color: "#8b5cf6",
+		bgColor: "bg-purple-500",
+		icon: <RobotOutlined />,
+		label: "Agent",
+		description: "AI agent with tools",
+	},
+	skill: {
+		color: "#f97316",
+		bgColor: "bg-orange-500",
+		icon: <ToolOutlined />,
+		label: "Skill",
+		description: "Execute skills",
+	},
+	mcp: {
+		color: "#06b6d4",
+		bgColor: "bg-cyan-500",
+		icon: <ApiOutlined />,
+		label: "MCP",
+		description: "MCP server tools",
+	},
+};
+
+// Tool call status card
+const ToolCallCard: React.FC<{ toolCall: NonNullable<Message["toolCall"]> }> = ({ toolCall }) => {
+	const [isExpanded, setIsExpanded] = useState(true);
+
+	const statusConfig = {
+		pending: { color: "blue", icon: <LoadingOutlined className="animate-spin" />, bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" },
+		success: { color: "green", icon: <CheckCircleOutlined />, bg: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" },
+		error: { color: "red", icon: <CloseCircleOutlined />, bg: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800" },
+	}[toolCall.status];
+
+	return (
+		<div className={cn("my-3 rounded-xl border overflow-hidden transition-all", statusConfig.bg)}>
+			<button
+				onClick={() => setIsExpanded(!isExpanded)}
+				className="w-full px-4 py-3 flex items-center gap-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+			>
+				<span className={cn("text-lg", `text-${statusConfig.color}-500`)}>{statusConfig.icon}</span>
+				<div className="flex-1 text-left">
+					<div className="font-medium text-sm text-slate-800 dark:text-slate-200">{toolCall.name}</div>
+					<div className="text-xs text-slate-500 capitalize">{toolCall.status}</div>
+				</div>
+				<span className="text-xs text-slate-400">{isExpanded ? "▼" : "▶"}</span>
+			</button>
+
+			{isExpanded && (
+				<div className="px-4 pb-4 space-y-3">
+					<div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-3">
+						<div className="text-xs font-medium text-slate-500 mb-1">Input</div>
+						<pre className="text-xs text-slate-700 dark:text-slate-300 overflow-auto max-h-24">
+							{JSON.stringify(toolCall.input, null, 2)}
+						</pre>
+					</div>
+
+					{toolCall.result !== undefined && (
+						<div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-3">
+							<div className="text-xs font-medium text-slate-500 mb-1">Result</div>
+							<pre className="text-xs text-slate-700 dark:text-slate-300 overflow-auto max-h-32">
+								{typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result, null, 2)}
+							</pre>
+						</div>
+					)}
+
+					{toolCall.error && (
+						<div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg p-3 text-sm">
+							{toolCall.error}
+						</div>
+					)}
+
+					{toolCall.duration !== undefined && (
+						<div className="text-right text-xs text-slate-400">
+							Duration: {toolCall.duration}ms
+						</div>
+					)}
+				</div>
+			)}
+		</div>
+	);
+};
+
+// Message bubble component
+const MessageBubble: React.FC<{
+	msg: Message;
+	isStreaming: boolean;
+	isLast: boolean;
+	streamingContent: string;
+}> = ({ msg, isStreaming, isLast, streamingContent }) => {
+	const isUser = msg.role === "user";
+	const isTool = msg.role === "tool";
+	const isAssistant = msg.role === "assistant";
+	const displayContent = isAssistant && isStreaming && isLast ? streamingContent : msg.content;
+
+	if (isTool && msg.toolCall) {
+		return <ToolCallCard toolCall={msg.toolCall} />;
+	}
+
+	return (
+		<div className={cn("flex gap-4 mb-6", isUser ? "flex-row-reverse" : "flex-row")}>
+			{/* Avatar */}
+			<div className={cn(
+				"w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+				isUser ? "bg-gradient-to-br from-blue-500 to-purple-500" : "bg-gradient-to-br from-purple-500 to-pink-500"
+			)}>
+				{isUser ? (
+					<span className="text-white font-bold">U</span>
+				) : (
+					<RobotOutlined className="text-white" />
+				)}
+			</div>
+
+			{/* Message content */}
+			<div className={cn("max-w-[80%]", isUser ? "items-end" : "items-start")}>
+				<div className={cn(
+					"rounded-2xl px-5 py-3",
+					isUser
+						? "bg-gradient-to-br from-blue-500 to-purple-500 text-white"
+							: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
+				)}>
+					{displayContent ? (
+						<div className={cn("prose prose-sm max-w-none", isUser ? "prose-invert" : "dark:prose-invert")}>
+							<Markdown content={displayContent} />
+						</div>
+					) : isStreaming && isAssistant ? (
+						<div className="flex items-center gap-2 text-slate-400 py-2">
+							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
+							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: "0.4s" }} />
+							<span className="text-sm">Thinking...</span>
+						</div>
+					) : null}
+				</div>
+				<div className={cn("text-xs text-slate-400 mt-1", isUser ? "text-right" : "text-left")}>
+					{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+				</div>
+			</div>
+		</div>
+	);
+};
+
+// Mode selector pill
+const ModePill: React.FC<{
+	mode: ChatMode;
+	isSelected: boolean;
+	onClick: () => void;
+}> = ({ mode, isSelected, onClick }) => {
+	const config = MODE_CONFIG[mode];
+
+	return (
+		<button
+			onClick={onClick}
+			className={cn(
+				"flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200",
+				isSelected
+					? `text-white shadow-lg`
+					: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+			)}
+			style={isSelected ? { backgroundColor: config.color } : undefined}
+		>
+			{config.icon}
+			<span className="font-medium text-sm">{config.label}</span>
+		</button>
+	);
+};
+
+// Empty state suggestions
+const SUGGESTIONS = [
+	"Explain quantum computing in simple terms",
+	"Write a Python function to calculate fibonacci",
+	"Help me debug this error in my code",
+	"Create a marketing plan for a new product",
+];
 
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
@@ -38,9 +226,13 @@ const Chat: React.FC = () => {
 		selectedMcpServerId,
 		setSelectedMcpServerId,
 	} = useChat();
-	const chatEndRef = useRef<HTMLDivElement>(null);
 
-	// Auto-scroll to bottom when new messages arrive
+	const { installedSkills } = useSkillStore();
+	const { servers } = useMcpStore();
+	const chatEndRef = useRef<HTMLDivElement>(null);
+	const [isInputFocused, setIsInputFocused] = useState(false);
+
+	// Auto-scroll to bottom
 	useEffect(() => {
 		chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
 	}, [messages, isStreaming, streamingContent]);
@@ -51,284 +243,193 @@ const Chat: React.FC = () => {
 		}
 	};
 
-	const menuItems: MenuProps["items"] = [
-		{
-			key: "clear",
-			label: t("chat.clear", "Clear Chat"),
-			icon: <ClearOutlined />,
-			danger: true,
-			onClick: clearMessages,
-		},
-		{
-			key: "export",
-			label: t("chat.export", "Export Chat"),
-			onClick: () => {
-				console.log("Export chat");
-			},
-		},
-	];
-
-	// Mode selector items
-	const modeOptions = [
-		{ value: "direct" as ChatMode, label: "Direct", icon: <MessageOutlined /> },
-		{ value: "agent" as ChatMode, label: "Agent", icon: <RobotOutlined /> },
-		{ value: "skill" as ChatMode, label: "Skill", icon: <ToolOutlined /> },
-		{ value: "mcp" as ChatMode, label: "MCP", icon: <ApiOutlined /> },
-	];
-
-	// Get current mode config
-	const getModeConfig = () => {
-		switch (chatMode) {
-			case "agent":
-				return { color: "purple", icon: <RobotOutlined />, label: "Agent" };
-			case "skill":
-				return { color: "orange", icon: <ToolOutlined />, label: "Skill" };
-			case "mcp":
-				return { color: "cyan", icon: <ApiOutlined />, label: "MCP" };
-			default:
-				return { color: "blue", icon: <MessageOutlined />, label: "Direct" };
-		}
-	};
-
-	const modeConfig = getModeConfig();
-
-	// Render tool call card
-	const ToolCallCard: React.FC<{ toolCall: NonNullable<typeof messages[0]["toolCall"]> }> = ({ toolCall }) => {
-		const statusIcon = {
-			pending: <LoadingOutlined className="animate-spin text-blue-500" />,
-			success: <CheckCircleOutlined className="text-green-500" />,
-			error: <CloseCircleOutlined className="text-red-500" />,
-		}[toolCall.status];
-
-		const statusColor = {
-			pending: "blue",
-			success: "green",
-			error: "red",
-		}[toolCall.status];
-
-		return (
-			<Card
-				size="small"
-				className={cn(
-					"my-2 max-w-lg",
-					"border-l-4",
-					toolCall.status === "pending" && "border-l-blue-500",
-					toolCall.status === "success" && "border-l-green-500",
-					toolCall.status === "error" && "border-l-red-500"
-				)}
-				title={
-					<div className="flex items-center gap-2">
-						<CodeOutlined />
-						<span className="font-medium">{toolCall.name}</span>
-						<Tag color={statusColor} className="ml-auto text-xs">
-							{statusIcon}
-							<span className="ml-1 capitalize">{toolCall.status}</span>
-						</Tag>
-					</div>
-				}
-			>
-				<div className="space-y-2">
-					<div>
-						<div className="text-xs text-slate-500 mb-1">Input:</div>
-						<pre className="text-xs bg-slate-50 dark:bg-slate-800 p-2 rounded overflow-auto max-h-32">
-							{JSON.stringify(toolCall.input, null, 2)}
-						</pre>
-					</div>
-					{toolCall.result !== undefined && (
-						<div>
-							<div className="text-xs text-slate-500 mb-1">Result:</div>
-							<pre className="text-xs bg-slate-50 dark:bg-slate-800 p-2 rounded overflow-auto max-h-48">
-								{typeof toolCall.result === "string"
-									? toolCall.result
-									: JSON.stringify(toolCall.result, null, 2)}
-							</pre>
-						</div>
-					)}
-					{toolCall.error && (
-						<div className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-							{toolCall.error}
-						</div>
-					)}
-					{toolCall.duration !== undefined && (
-						<div className="text-xs text-slate-400 text-right">
-							Duration: {toolCall.duration}ms
-						</div>
-					)}
-				</div>
-			</Card>
-		);
-	};
-
-	// Convert messages to @ant-design/x format
-	const conversationItems = messages.map((msg, idx) => {
-		const isTool = msg.role === "tool";
-		const isAssistant = msg.role === "assistant";
-
-		// For assistant messages, show streaming content if available and it's the last message
-		const displayContent = isAssistant && isStreaming && idx === messages.length - 1
-			? streamingContent
-			: msg.content;
-
-		return {
-			key: msg.id || idx.toString(),
-			role: msg.role as "user" | "assistant",
-			label: (
-				<div className="max-w-none">
-					{isTool && msg.toolCall ? (
-						<ToolCallCard toolCall={msg.toolCall} />
-					) : (
-						<div className="prose dark:prose-invert">
-							{displayContent ? (
-								<Markdown content={displayContent} />
-							) : isStreaming && isAssistant ? (
-								<div className="flex items-center gap-2 text-slate-400">
-									<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-									<span>Thinking...</span>
-								</div>
-							) : null}
-						</div>
-					)}
-				</div>
-			),
-		};
-	});
+	const modes: ChatMode[] = ["direct", "agent", "skill", "mcp"];
 
 	return (
 		<MainLayout>
-			<div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+			<div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950">
 				{/* Header */}
-				<div className="flex items-center justify-between px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-800/50 shadow-sm">
-					<div className="flex items-center gap-3">
-						<div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
-							<RobotOutlined className="text-white text-lg" />
+				<div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+					<div className="flex items-center gap-4">
+						<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+							<ThunderboltOutlined className="text-white text-xl" />
 						</div>
 						<div>
-							<h2 className="text-lg font-semibold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-								{t("chat.title", "AI Assistant")}
-							</h2>
-							<p className="text-xs text-slate-500 dark:text-slate-400">
-								{t("chat.subtitle", "Powered by Claude")}
+							<h1 className="text-xl font-bold text-slate-900 dark:text-white">
+								{t("chat.title", "AI Chat")}
+							</h1>
+							<p className="text-sm text-slate-500">
+								{messages.length} messages
 							</p>
 						</div>
 					</div>
-					<Space>
-						<Tooltip title={t("chat.clear", "Clear Chat")}>
+
+					<div className="flex items-center gap-2">
+						<Tooltip title="Clear conversation">
 							<Button
 								type="text"
 								icon={<ClearOutlined />}
 								onClick={clearMessages}
-								disabled={messages.length === 0}
-								className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
+								disabled={messages.length === 0 || isStreaming}
+								className="rounded-lg"
 							/>
 						</Tooltip>
-						<Dropdown menu={{ items: menuItems }} trigger={["click"]}>
-							<Button
-								type="text"
-								icon={<MoreOutlined />}
-								className="hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"
-							/>
-						</Dropdown>
-					</Space>
+					</div>
 				</div>
 
 				{/* Chat Area */}
 				<div className="flex-1 overflow-auto">
 					{messages.length === 0 ? (
-						<div className="flex flex-col items-center justify-center h-full text-center py-20">
-							<div className="w-32 h-32 mb-8 rounded-3xl bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20 flex items-center justify-center shadow-xl shadow-blue-500/10">
-								<span className="text-6xl">💬</span>
-							</div>
-							<h3 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-3">
-								Start a conversation
-							</h3>
-							<p className="text-slate-500 dark:text-slate-400 max-w-md text-base">
-								Ask me anything! I'm here to help you with your questions and tasks.
-							</p>
-							<div className="mt-6 flex gap-2">
-								{modeOptions.map((mode) => (
-									<Button
-										key={mode.value}
-										size="small"
-										onClick={() => setChatMode(mode.value)}
-										className={cn(
-											"transition-all",
-											chatMode === mode.value && "bg-blue-50 text-blue-600 border-blue-200"
-										)}
-									>
-										{mode.icon}
-										<span className="ml-1">{mode.label}</span>
-									</Button>
-								))}
+						<div className="flex flex-col items-center justify-center h-full px-6">
+							{/* Welcome Card */}
+							<div className="max-w-2xl w-full">
+								<div className="text-center mb-8">
+									<div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl mb-6">
+										<StarOutlined className="text-3xl text-white" />
+									</div>
+									<h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">
+										Welcome to AI Chat
+									</h2>
+									<p className="text-slate-500 text-lg">
+										Choose a mode and start your conversation
+									</p>
 								</div>
+
+								{/* Mode Selection */}
+								<div className="flex flex-wrap justify-center gap-3 mb-8">
+									{modes.map((mode) => (
+										<ModePill
+											key={mode}
+											mode={mode}
+											isSelected={chatMode === mode}
+											onClick={() => setChatMode(mode)}
+										/>
+									))}
+								</div>
+
+								{/* Suggestions */}
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+									{SUGGESTIONS.map((suggestion, idx) => (
+										<button
+											key={idx}
+											onClick={() => {
+												setInput(suggestion);
+											}}
+											className="p-4 text-left rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:shadow-md transition-all group"
+										>
+											<p className="text-slate-700 dark:text-slate-300 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400">
+												{suggestion}
+											</p>
+										</button>
+									))}
+								</div>
+							</div>
 						</div>
 					) : (
-						<Conversations
-							items={conversationItems}
-							className="h-full px-6 py-4"
-						/>
+						<div className="max-w-4xl mx-auto px-6 py-8">
+							{messages.map((msg, idx) => (
+								<MessageBubble
+									key={msg.id || idx}
+									msg={msg}
+									isStreaming={isStreaming}
+									isLast={idx === messages.length - 1}
+									streamingContent={streamingContent}
+								/>
+							))}
+							<div ref={chatEndRef} />
+						</div>
 					)}
-					<div ref={chatEndRef} />
 				</div>
 
 				{/* Input Area */}
-				<div className="p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50">
-					<div className="max-w-4xl mx-auto space-y-3">
-						{/* Mode Selector */}
-						<div className="flex items-center gap-2 flex-wrap">
-							<Badge color={modeConfig.color}>
-								<Select
-									value={chatMode}
-									onChange={setChatMode}
-									style={{ width: 120 }}
-									variant="borderless"
-									options={modeOptions.map((m) => ({
-										value: m.value,
-										label: (
-											<div className="flex items-center gap-2">
-												{m.icon}
-												<span>{m.label}</span>
-											</div>
-										),
-									}))}
+				<div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4">
+					<div className="max-w-4xl mx-auto">
+						{/* Mode selector */}
+						<div className="flex items-center gap-3 mb-3 overflow-x-auto pb-2">
+							{modes.map((mode) => (
+								<ModePill
+									key={mode}
+									mode={mode}
+									isSelected={chatMode === mode}
+									onClick={() => setChatMode(mode)}
 								/>
-							</Badge>
+							))}
 
+							{/* Skill selector */}
 							{chatMode === "skill" && (
 								<Select
 									placeholder="Select skill"
 									value={selectedSkillId}
 									onChange={setSelectedSkillId}
-									style={{ width: 160 }}
 									size="small"
-									options={[]} // TODO: Load from skill store
+									style={{ minWidth: 150 }}
+									options={installedSkills.map((s) => ({
+										value: s.id,
+										label: s.name,
+									}))}
 								/>
 							)}
 
+							{/* MCP selector */}
 							{chatMode === "mcp" && (
 								<Select
 									placeholder="Select MCP server"
 									value={selectedMcpServerId}
 									onChange={setSelectedMcpServerId}
-									style={{ width: 160 }}
 									size="small"
-									options={[]} // TODO: Load from MCP store
+									style={{ minWidth: 150 }}
+									options={servers
+										.filter((s) => s.status === "connected")
+										.map((s) => ({
+											value: s.id,
+											label: s.name,
+										}))}
 								/>
 							)}
 						</div>
 
-						<Sender
-							value={input}
-							onChange={setInput}
-							onSubmit={handleSend}
-							loading={isStreaming}
-							placeholder={t("chat.placeholder", "Type your message...")}
-							allowSpeech={false}
-							className="!bg-slate-50 dark:!bg-slate-800/50 !border-slate-200 dark:!border-slate-700 !rounded-2xl !shadow-sm focus:!shadow-md focus:!border-blue-400 dark:focus:!border-blue-500 transition-all duration-200"
-						/>
-						<div className="text-center">
-							<span className="text-xs text-slate-400">
-								{t("chat.hint", "Press Enter to send, Shift+Enter for new line")}
-							</span>
+						{/* Input box */}
+						<div
+							className={cn(
+								"relative flex items-end gap-2 rounded-2xl border bg-slate-50 dark:bg-slate-800 transition-all duration-200",
+								isInputFocused
+									? "border-blue-500 shadow-lg shadow-blue-500/10"
+									: "border-slate-200 dark:border-slate-700"
+							)}
+						>
+							<textarea
+								value={input}
+								onChange={(e) => setInput(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && !e.shiftKey) {
+										e.preventDefault();
+										handleSend();
+									}
+								}}
+								onFocus={() => setIsInputFocused(true)}
+								onBlur={() => setIsInputFocused(false)}
+								placeholder={t("chat.placeholder", "Type your message...")}
+								className="flex-1 bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[56px] focus:outline-none text-slate-800 dark:text-slate-200"
+								rows={1}
+								style={{ height: "auto" }}
+								disabled={isStreaming}
+							/>
+							<div className="pr-3 pb-3">
+								<Button
+									type="primary"
+									icon={<SendOutlined />}
+									onClick={handleSend}
+									loading={isStreaming}
+									disabled={!input.trim()}
+									className="rounded-xl h-10 w-10 flex items-center justify-center"
+								/>
+							</div>
+						</div>
+
+						<div className="text-center mt-2">
+							<Text className="text-xs text-slate-400">
+								Press Enter to send, Shift+Enter for new line
+							</Text>
 						</div>
 					</div>
 				</div>

@@ -1,4 +1,4 @@
-import { EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { EditOutlined, PlusOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
 import { Avatar, Button, Card, Divider, Input, Modal, Popconfirm, Select, Space, Switch, Tooltip } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -428,7 +428,7 @@ export const MenuSettings: React.FC = () => {
  */
 export const MenuSettingsWithModal: React.FC = () => {
 	const { t } = useTranslation();
-	const [config] = useState<MenuConfig>(getMenuConfig());
+	const [config, setConfig] = useState<MenuConfig>(getMenuConfig());
 	const [editingItem, setEditingItem] = useState<MenuItemConfig | null>(null);
 	const [editModalOpen, setEditModalOpen] = useState(false);
 

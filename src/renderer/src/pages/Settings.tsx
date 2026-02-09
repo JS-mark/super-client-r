@@ -46,6 +46,7 @@ import { useSearchParams } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
+import { AboutSection } from "../components/settings/AboutSection";
 import type { MenuItemConfig } from "../types/menu";
 import { getMenuConfig, saveMenuConfig } from "../types/menu";
 import { type ApiStatus, apiService } from "../services/apiService";
@@ -904,138 +905,13 @@ const Settings: React.FC = () => {
         </span>
       ),
       children: (
-        <Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
-          <div className="max-w-xl mx-auto">
-            {/* Logo and Title */}
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                <img src="/favicon.svg" alt="Logo" className="w-10 h-10" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">
-                  {appInfo?.name || "Super Client"}
-                </h2>
-                <Tag
-                  color="blue"
-                  className="!rounded-full !px-3 !py-0.5 !text-xs !font-medium !mt-1 !inline-block"
-                >
-                  v{appInfo?.version || "0.0.1"}
-                </Tag>
-              </div>
-            </div>
-
-            {/* Description */}
-            <p className="text-center text-slate-500 dark:text-slate-400 text-sm mb-6">
-              {t("settings.aboutDescription", "A powerful AI desktop client for seamless interaction with multiple AI services.")}
-            </p>
-
-            {/* Info Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-center">
-                <div className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {appInfo?.platform === "darwin" ? "macOS" : appInfo?.platform || "N/A"}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  {t("settings.platform", "Platform")}
-                </div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-center">
-                <div className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {appInfo?.arch || "N/A"}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  {t("settings.architecture", "Arch")}
-                </div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-center">
-                <div className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {appInfo?.node || "N/A"}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Node.js
-                </div>
-              </div>
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50 text-center">
-                <div className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {appInfo?.electron || "N/A"}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Electron
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
-              <Button
-                type="primary"
-                icon={<ReloadOutlined />}
-                onClick={handleCheckUpdate}
-                size="large"
-                className="!rounded-xl !h-11"
-              >
-                {t("settings.checkUpdate", "Check Update")}
-              </Button>
-              <Button
-                icon={<GithubOutlined />}
-                onClick={() => window.open("https://github.com/example/super-client", "_blank")}
-                size="large"
-                className="!rounded-xl !h-11"
-              >
-                GitHub
-              </Button>
-              <Button
-                icon={<BugOutlined />}
-                onClick={() => setActiveTab("debug")}
-                size="large"
-                className="!rounded-xl !h-11"
-              >
-                {t("settings.debug", "Debug")}
-              </Button>
-              <Button
-                icon={<FileTextOutlined />}
-                onClick={() => setActiveTab("logs")}
-                size="large"
-                className="!rounded-xl !h-11"
-              >
-                {t("settings.logs", "Logs")}
-              </Button>
-            </div>
-
-            {/* Quick Links */}
-            <div className="flex items-center justify-center gap-6 text-sm mb-6 pb-4 border-b border-slate-100 dark:border-slate-700/50">
-              <button
-                type="button"
-                onClick={() => window.open("https://github.com/example/super-client/issues", "_blank")}
-                className="text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5"
-              >
-                <BugOutlined className="text-xs" />
-                {t("settings.reportBug", "Report Bug")}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.open("https://github.com/example/super-client/blob/main/LICENSE", "_blank")}
-                className="text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5"
-              >
-                <FileTextOutlined className="text-xs" />
-                {t("settings.license", "License")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("debug")}
-                className="text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5"
-              >
-                <CodeOutlined className="text-xs" />
-                {t("settings.devTools", "DevTools")}
-              </button>
-            </div>
-
-            {/* Footer */}
-            <div className="text-center text-sm text-slate-400 dark:text-slate-500">
-              {t("settings.madeWith", "Made with")} <HeartOutlined className="text-red-400 mx-1 text-xs" /> {t("settings.byTeam", "by Super Client Team")}
-            </div>
-          </div>
-        </Card>
+        <AboutSection
+          appInfo={appInfo}
+          onCheckUpdate={handleCheckUpdate}
+          onOpenGitHub={() => window.open("https://github.com/example/super-client", "_blank")}
+          onReportBug={() => window.open("https://github.com/example/super-client/issues", "_blank")}
+          onOpenLicense={() => window.open("https://github.com/example/super-client/blob/main/LICENSE", "_blank")}
+        />
       ),
     },
   ];

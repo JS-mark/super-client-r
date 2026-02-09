@@ -21,6 +21,7 @@ interface SkillState {
 	updateSkill: (id: string) => void;
 	reinstallSkill: (id: string) => void;
 	checkUpdate: (id: string) => boolean;
+	setMarketItems: (items: Skill[]) => void;
 }
 
 export const useSkillStore = create<SkillState>()(
@@ -113,6 +114,8 @@ export const useSkillStore = create<SkillState>()(
 				// 简单的版本比较，实际可能需要 semver
 				return market.version !== installed.version;
 			},
+
+			setMarketItems: (items) => set({ marketSkills: items }),
 		}),
 		{
 			name: "skill-storage",

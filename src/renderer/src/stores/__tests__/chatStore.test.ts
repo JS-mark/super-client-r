@@ -52,7 +52,7 @@ describe("Chat Store", () => {
 				timestamp: Date.now(),
 			});
 
-			store.updateLastMessage({ content: "Hello World" });
+			store.updateLastMessage("Hello World");
 
 			expect(store.messages[0].content).toBe("Hello World");
 		});

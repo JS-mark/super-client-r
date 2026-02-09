@@ -16,7 +16,8 @@
       "Bash(tsc -b:*)",
       "Bash(pnpm tsc:*)",
       "Bash(npx tsc:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pnpm lint:*)"
     ]
   }
 }

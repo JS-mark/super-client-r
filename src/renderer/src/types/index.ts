@@ -6,3 +6,4 @@ export * from "./electron";
 export * from "./mcp";
 export * from "./models";
 export * from "./skills";
+export * from "./menu";

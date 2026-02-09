@@ -3,15 +3,16 @@ import { Layout, Menu, Tooltip } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { MenuItemConfig } from "../types/menu";
-import { getMenuConfig } from "../types/menu";
+import type { MenuItemConfig } from "../../types/menu";
+import { getMenuConfig } from "../../types/menu";
 
 const { Sider, Content } = Layout;
 
 /**
  * 图标映射：图标名称到 Ant Design 图标组件
  */
-const ICON_MAP: Record<string, React.ComponentType> = {
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	MessageOutlined,
 	AppstoreOutlined,
 	RocketOutlined,
@@ -41,7 +42,8 @@ function renderMenuItemIcon(item: MenuItemConfig): React.ReactNode {
 		);
 	} else {
 		// 默认 Ant Design 图标
-		const IconComponent = ICON_MAP[item.iconContent || MessageOutlined];
+		const iconKey = item.iconContent || "MessageOutlined";
+		const IconComponent = ICON_MAP[iconKey] || MessageOutlined;
 		iconNode = <IconComponent className="text-xl" />;
 	}
 

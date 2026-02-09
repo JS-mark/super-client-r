@@ -41,7 +41,7 @@ export interface JwtPayload {
 }
 
 // API Key 管理器
-class ApiKeyManager {
+export class ApiKeyManager {
 	private apiKeys: Map<string, ApiKey> = new Map();
 
 	/**
