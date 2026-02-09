@@ -3,197 +3,357 @@
  * 管理 skills 的安装、卸载和执行
  */
 
-import { EventEmitter } from 'events'
-import type { SkillExecutionResult, SkillManifest, SkillTool } from '../../ipc/types'
+import { EventEmitter } from "events";
+import fs from "fs/promises";
+import path from "path";
+import type {
+	SkillExecutionResult,
+	SkillManifest,
+	SkillTool,
+} from "../../ipc/types";
 
 export interface SkillConfig {
-  id: string
-  manifest: SkillManifest
-  path: string
-  enabled: boolean
+	id: string;
+	manifest: SkillManifest;
+	path: string;
+	enabled: boolean;
 }
 
 export class SkillService extends EventEmitter {
-  private skills: Map<string, SkillConfig> = new Map()
-  private skillsDir: string
+	private skills: Map<string, SkillConfig> = new Map();
+	private skillsDir: string;
 
-  constructor(skillsDir: string) {
-    super()
-    this.skillsDir = skillsDir
-  }
+	constructor(skillsDir: string) {
+		super();
+		this.skillsDir = skillsDir;
+	}
 
-  /**
-   * 初始化技能服务
-   */
-  async initialize(): Promise<void> {
-    // TODO: 从 skills 目录加载已安装的 skills
-    // 这里可以扫描目录并加载 manifest.json 文件
-  }
+	/**
+	 * 初始化技能服务
+	 */
+	async initialize(): Promise<void> {
+		try {
+			// 确保 skills 目录存在
+			await fs.mkdir(this.skillsDir, { recursive: true });
 
-  /**
-   * 获取所有已安装的 skills
-   */
-  listSkills(): SkillManifest[] {
-    return Array.from(this.skills.values())
-      .filter(s => s.enabled)
-      .map(s => s.manifest)
-  }
+			// 扫描 skills 目录
+			const entries = await fs.readdir(this.skillsDir, { withFileTypes: true });
 
-  /**
-   * 获取 skill 详情
-   */
-  getSkill(id: string): SkillManifest | undefined {
-    return this.skills.get(id)?.manifest
-  }
+			for (const entry of entries) {
+				if (entry.isDirectory()) {
+					const skillPath = path.join(this.skillsDir, entry.name);
+					const manifestPath = path.join(skillPath, "manifest.json");
 
-  /**
-   * 安装 skill
-   */
-  async installSkill(source: string): Promise<SkillManifest> {
-    // TODO: 实现实际的 skill 安装逻辑
-    // 1. 下载或复制 skill 文件
-    // 2. 验证 manifest
-    // 3. 注册到 skills map
+					try {
+						const manifestContent = await fs.readFile(manifestPath, "utf-8");
+						const manifest: SkillManifest = JSON.parse(manifestContent);
 
-    const manifest: SkillManifest = {
-      id: `skill_${Date.now()}`,
-      name: 'Example Skill',
-      description: 'An example skill',
-      version: '1.0.0',
-      author: 'Unknown',
-      category: 'utility',
-      tools: [
-        {
-          name: 'example_tool',
-          description: 'An example tool',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              input: { type: 'string' },
-            },
-          },
-        },
-      ],
-    }
+						// 验证 manifest
+						if (this.isValidManifest(manifest)) {
+							const config: SkillConfig = {
+								id: manifest.id,
+								manifest,
+								path: skillPath,
+								enabled: true,
+							};
 
-    const config: SkillConfig = {
-      id: manifest.id,
-      manifest,
-      path: source,
-      enabled: true,
-    }
+							this.skills.set(manifest.id, config);
+							this.emit("loaded", manifest);
+						}
+					} catch (error) {
+						console.error(`Failed to load skill from ${skillPath}:`, error);
+					}
+				}
+			}
+		} catch (error) {
+			console.error("Failed to initialize skill service:", error);
+			throw error;
+		}
+	}
 
-    this.skills.set(manifest.id, config)
-    this.emit('installed', manifest)
+	/**
+	 * 验证 manifest 是否有效
+	 */
+	private isValidManifest(manifest: unknown): manifest is SkillManifest {
+		if (!manifest || typeof manifest !== "object") {
+			return false;
+		}
 
-    return manifest
-  }
+		const m = manifest as Partial<SkillManifest>;
+		return (
+			typeof m.id === "string" &&
+			typeof m.name === "string" &&
+			typeof m.description === "string" &&
+			typeof m.version === "string" &&
+			typeof m.author === "string"
+		);
+	}
 
-  /**
-   * 卸载 skill
-   */
-  async uninstallSkill(id: string): Promise<void> {
-    const skill = this.skills.get(id)
-    if (!skill) {
-      throw new Error(`Skill ${id} not found`)
-    }
+	/**
+	 * 获取所有已安装的 skills
+	 */
+	listSkills(): SkillManifest[] {
+		return Array.from(this.skills.values())
+			.filter((s) => s.enabled)
+			.map((s) => s.manifest);
+	}
 
-    // TODO: 清理 skill 文件
+	/**
+	 * 获取 skill 详情
+	 */
+	getSkill(id: string): SkillManifest | undefined {
+		return this.skills.get(id)?.manifest;
+	}
 
-    this.skills.delete(id)
-    this.emit('uninstalled', id)
-  }
+	/**
+	 * 安装 skill
+	 */
+	async installSkill(source: string): Promise<SkillManifest> {
+		try {
+			// 检查 source 是本地路径还是 URL
+			let skillPath: string;
 
-  /**
-   * 启用 skill
-   */
-  enableSkill(id: string): void {
-    const skill = this.skills.get(id)
-    if (skill) {
-      skill.enabled = true
-      this.emit('enabled', id)
-    }
-  }
+			if (source.startsWith("http://") || source.startsWith("https://")) {
+				// TODO: 实现从 URL 下载
+				throw new Error("Installing from URL is not yet implemented");
+			} else {
+				// 本地路径
+				const sourcePath = path.resolve(source);
+				const sourceManifestPath = path.join(sourcePath, "manifest.json");
 
-  /**
-   * 禁用 skill
-   */
-  disableSkill(id: string): void {
-    const skill = this.skills.get(id)
-    if (skill) {
-      skill.enabled = false
-      this.emit('disabled', id)
-    }
-  }
+				// 验证源目录存在
+				const sourceStat = await fs.stat(sourcePath);
+				if (!sourceStat.isDirectory()) {
+					throw new Error("Source must be a directory");
+				}
 
-  /**
-   * 执行 skill
-   */
-  async executeSkill(
-    skillId: string,
-    toolName: string,
-    input: Record<string, unknown>,
-  ): Promise<SkillExecutionResult> {
-    const skill = this.skills.get(skillId)
-    if (!skill) {
-      return {
-        success: false,
-        error: `Skill ${skillId} not found`,
-      }
-    }
+				// 读取并验证 manifest
+				const manifestContent = await fs.readFile(sourceManifestPath, "utf-8");
+				const manifest: SkillManifest = JSON.parse(manifestContent);
 
-    if (!skill.enabled) {
-      return {
-        success: false,
-        error: `Skill ${skillId} is disabled`,
-      }
-    }
+				if (!this.isValidManifest(manifest)) {
+					throw new Error("Invalid manifest file");
+				}
 
-    // TODO: 实现实际的 skill 执行逻辑
-    // 这里应该调用 skill 的实际实现
+				// 检查是否已安装
+				if (this.skills.has(manifest.id)) {
+					throw new Error(`Skill ${manifest.id} is already installed`);
+				}
 
-    this.emit('executed', { skillId, toolName, input })
+				// 创建目标目录
+				skillPath = path.join(this.skillsDir, manifest.id);
+				await fs.mkdir(skillPath, { recursive: true });
 
-    return {
-      success: true,
-      output: { result: `Executed ${toolName} with input: ${JSON.stringify(input)}` },
-    }
-  }
+				// 复制文件
+				const entries = await fs.readdir(sourcePath, { withFileTypes: true });
+				for (const entry of entries) {
+					const src = path.join(sourcePath, entry.name);
+					const dest = path.join(skillPath, entry.name);
 
-  /**
-   * 获取 skill 的所有工具
-   */
-  getSkillTools(skillId: string): SkillTool[] {
-    return this.skills.get(skillId)?.manifest.tools || []
-  }
+					if (entry.isDirectory()) {
+						await fs.mkdir(dest, { recursive: true });
+						// 递归复制目录内容
+						await this.copyDirectory(src, dest);
+					} else {
+						await fs.copyFile(src, dest);
+					}
+				}
 
-  /**
-   * 获取所有可用工具（来自所有启用的 skills）
-   */
-  getAllAvailableTools(): Array<{ skillId: string; tool: SkillTool }> {
-    const tools: Array<{ skillId: string; tool: SkillTool }> = []
+				// 注册 skill
+				const config: SkillConfig = {
+					id: manifest.id,
+					manifest,
+					path: skillPath,
+					enabled: true,
+				};
 
-    for (const [id, skill] of this.skills.entries()) {
-      if (skill.enabled && skill.manifest.tools) {
-        for (const tool of skill.manifest.tools) {
-          tools.push({ skillId: id, tool })
-        }
-      }
-    }
+				this.skills.set(manifest.id, config);
+				this.emit("installed", manifest);
 
-    return tools
-  }
+				return manifest;
+			}
+		} catch (error) {
+			console.error(`Failed to install skill from ${source}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * 递归复制目录
+	 */
+	private async copyDirectory(src: string, dest: string): Promise<void> {
+		const entries = await fs.readdir(src, { withFileTypes: true });
+		for (const entry of entries) {
+			const srcPath = path.join(src, entry.name);
+			const destPath = path.join(dest, entry.name);
+
+			if (entry.isDirectory()) {
+				await fs.mkdir(destPath, { recursive: true });
+				await this.copyDirectory(srcPath, destPath);
+			} else {
+				await fs.copyFile(srcPath, destPath);
+			}
+		}
+	}
+
+	/**
+	 * 卸载 skill
+	 */
+	async uninstallSkill(id: string): Promise<void> {
+		const skill = this.skills.get(id);
+		if (!skill) {
+			throw new Error(`Skill ${id} not found`);
+		}
+
+		try {
+			// 删除 skill 目录
+			await fs.rm(skill.path, { recursive: true, force: true });
+		} catch (error) {
+			console.error(`Failed to remove skill directory ${skill.path}:`, error);
+			// 继续执行，即使删除失败
+		}
+
+		this.skills.delete(id);
+		this.emit("uninstalled", id);
+	}
+
+	/**
+	 * 启用 skill
+	 */
+	enableSkill(id: string): void {
+		const skill = this.skills.get(id);
+		if (skill) {
+			skill.enabled = true;
+			this.emit("enabled", id);
+		}
+	}
+
+	/**
+	 * 禁用 skill
+	 */
+	disableSkill(id: string): void {
+		const skill = this.skills.get(id);
+		if (skill) {
+			skill.enabled = false;
+			this.emit("disabled", id);
+		}
+	}
+
+	/**
+	 * 执行 skill
+	 */
+	async executeSkill(
+		skillId: string,
+		toolName: string,
+		input: Record<string, unknown>,
+	): Promise<SkillExecutionResult> {
+		const skill = this.skills.get(skillId);
+		if (!skill) {
+			return {
+				success: false,
+				error: `Skill ${skillId} not found`,
+			};
+		}
+
+		if (!skill.enabled) {
+			return {
+				success: false,
+				error: `Skill ${skillId} is disabled`,
+			};
+		}
+
+		try {
+			// 查找工具定义
+			const tool = skill.manifest.tools?.find((t) => t.name === toolName);
+			if (!tool) {
+				return {
+					success: false,
+					error: `Tool ${toolName} not found in skill ${skillId}`,
+				};
+			}
+
+			// 检查是否有实现文件
+			const implPath = path.join(skill.path, "index.js");
+			const implTsPath = path.join(skill.path, "index.ts");
+
+			let implExists = false;
+			try {
+				await fs.access(implPath);
+				implExists = true;
+			} catch {
+				try {
+					await fs.access(implTsPath);
+					implExists = true;
+				} catch {
+					// No implementation file
+				}
+			}
+
+			if (!implExists) {
+				return {
+					success: false,
+					error: `Skill ${skillId} has no implementation file`,
+				};
+			}
+
+			// TODO: 实现动态加载和执行 skill 代码
+			// 这需要使用动态 import 或 child_process 来执行 skill 代码
+			// 出于安全考虑，应该在沙箱环境中执行
+
+			this.emit("executed", { skillId, toolName, input });
+
+			return {
+				success: true,
+				output: {
+					result: `Executed ${toolName} with input: ${JSON.stringify(input)}`,
+				},
+			};
+		} catch (error) {
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error occurred";
+			return {
+				success: false,
+				error: errorMessage,
+			};
+		}
+	}
+
+	/**
+	 * 获取 skill 的所有工具
+	 */
+	getSkillTools(skillId: string): SkillTool[] {
+		return this.skills.get(skillId)?.manifest.tools || [];
+	}
+
+	/**
+	 * 获取所有可用工具（来自所有启用的 skills）
+	 */
+	getAllAvailableTools(): Array<{ skillId: string; tool: SkillTool }> {
+		const tools: Array<{ skillId: string; tool: SkillTool }> = [];
+
+		for (const [id, skill] of this.skills.entries()) {
+			if (skill.enabled && skill.manifest.tools) {
+				for (const tool of skill.manifest.tools) {
+					tools.push({ skillId: id, tool });
+				}
+			}
+		}
+
+		return tools;
+	}
 }
 
 // 单例实例
-let skillServiceInstance: SkillService | null = null
+let skillServiceInstance: SkillService | null = null;
 
 export function getSkillService(skillsDir?: string): SkillService {
-  if (!skillServiceInstance) {
-    if (!skillsDir) {
-      throw new Error('SkillService requires a skills directory on first initialization')
-    }
-    skillServiceInstance = new SkillService(skillsDir)
-  }
-  return skillServiceInstance
+	if (!skillServiceInstance) {
+		if (!skillsDir) {
+			throw new Error(
+				"SkillService requires a skills directory on first initialization",
+			);
+		}
+		skillServiceInstance = new SkillService(skillsDir);
+	}
+	return skillServiceInstance;
 }

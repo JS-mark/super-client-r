@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run check:*)",
+      "Bash(pnpm run lint:*)",
+      "Bash(pnpm run dev:*)",
+      "Bash(node:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm check:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add drag support to floating widget\n\nAdd drag handle with WebkitAppRegion to allow moving the floating window. The drag handle is visible on hover and positioned on the left side of the input bar.\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(pnpm dev:*)",
+      "Bash(tsc -b:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

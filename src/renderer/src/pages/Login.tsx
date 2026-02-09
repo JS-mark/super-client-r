@@ -1,72 +1,101 @@
-import { GithubOutlined, GoogleOutlined } from '@ant-design/icons'
-import { Button, Card, Space, Typography } from 'antd'
-import * as React from 'react'
-import { useNavigate } from 'react-router-dom'
+import { GithubOutlined, GoogleOutlined } from "@ant-design/icons";
+import { Button, Card, Space, Typography } from "antd";
+import type * as React from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 
-const { Title, Text } = Typography
+const { Title, Text } = Typography;
 
 const Login: React.FC = () => {
-  const navigate = useNavigate()
+	const { t } = useTranslation();
+	const navigate = useNavigate();
 
-  const handleLogin = (provider: 'google' | 'github') => {
-    console.log(`Login with ${provider}`)
-    // Mock login success
-    navigate('/chat')
-  }
+	const handleLogin = (provider: "google" | "github") => {
+		console.log(`Login with ${provider}`);
+		// Mock login success
+		navigate("/chat");
+	};
 
-  return (
-    <div className="flex h-screen w-full items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Card className="w-96 shadow-lg">
-        <div className="mb-8 text-center">
-          <Title level={2}>AI Desktop Client</Title>
-          <Text type="secondary">Sign in to continue</Text>
-        </div>
+	return (
+		<div className="flex h-[600px] w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+			{/* Background Decorations */}
+			<div className="absolute inset-0 overflow-hidden pointer-events-none">
+				<div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl animate-pulse" />
+				<div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+			</div>
 
-        <Space orientation="vertical" className="w-full" size="large">
-          <Button
-            block
-            size="large"
-            icon={<GoogleOutlined />}
-            onClick={() => handleLogin('google')}
-          >
-            Sign in with Google
-          </Button>
-          <Button
-            block
-            size="large"
-            icon={<GithubOutlined />}
-            onClick={() => handleLogin('github')}
-          >
-            Sign in with GitHub
-          </Button>
+			{/* Login Card */}
+			<Card className="w-[420px] shadow-2xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl animate-slide-up">
+				{/* Logo */}
+				<div className="mb-8 text-center">
+					<div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+						<span className="text-white font-bold text-2xl">S</span>
+					</div>
+					<Title level={2} className="!mb-2">
+						{t("app.loginTitle")}
+					</Title>
+					<Text type="secondary" className="text-base">
+						{t("app.loginSubtitle")}
+					</Text>
+				</div>
 
-          {import.meta.env.DEV && (
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-gray-50 px-2 text-gray-500 dark:bg-gray-900">
-                  Development
-                </span>
-              </div>
-            </div>
-          )}
+				{/* Login Buttons */}
+				<Space direction="vertical" className="w-full" size="middle">
+					<Button
+						block
+						size="large"
+						icon={<GoogleOutlined className="text-lg" />}
+						onClick={() => handleLogin("google")}
+						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-blue-300 hover:!shadow-md transition-all"
+					>
+						{t("app.signInGoogle")}
+					</Button>
+					<Button
+						block
+						size="large"
+						icon={<GithubOutlined className="text-lg" />}
+						onClick={() => handleLogin("github")}
+						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-purple-300 hover:!shadow-md transition-all"
+					>
+						{t("app.signInGithub")}
+					</Button>
 
-          {import.meta.env.DEV && (
-            <Button
-              block
-              size="large"
-              type="dashed"
-              onClick={() => handleLogin('mock' as any)}
-            >
-              Mock Login (Dev)
-            </Button>
-          )}
-        </Space>
-      </Card>
-    </div>
-  )
-}
+					{import.meta.env.DEV && (
+						<>
+							<div className="relative my-4">
+								<div className="absolute inset-0 flex items-center">
+									<span className="w-full border-t border-gray-200 dark:border-gray-700" />
+								</div>
+								<div className="relative flex justify-center text-xs uppercase">
+									<span className="bg-white dark:bg-gray-900 px-3 text-gray-400">
+										{t("app.development")}
+									</span>
+								</div>
+							</div>
 
-export default Login
+							<Button
+								block
+								size="large"
+								type="dashed"
+								onClick={() => handleLogin("mock" as any)}
+								className="!h-12 !rounded-xl !font-medium"
+							>
+								{t("app.mockLogin")}
+							</Button>
+						</>
+					)}
+				</Space>
+
+				{/* Footer */}
+				<div className="mt-8 text-center">
+					<Text type="secondary" className="text-xs">
+						By continuing, you agree to our Terms of Service and Privacy Policy
+					</Text>
+				</div>
+			</Card>
+		</div>
+	);
+};
+
+export default Login;

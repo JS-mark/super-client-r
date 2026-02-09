@@ -1,7 +1,172 @@
 {
-  "welcome": "Welcome to Super Client",
-  "settings": "Settings",
-  "save": "Save",
-  "cancel": "Cancel",
-  "language": "Language"
+	"app": {
+		"name": "AI Client",
+		"loginTitle": "AI Desktop Client",
+		"loginSubtitle": "Sign in to continue",
+		"signInGoogle": "Sign in with Google",
+		"signInGithub": "Sign in with GitHub",
+		"development": "Development",
+		"mockLogin": "Mock Login (Dev)"
+	},
+	"menu": {
+		"chat": "Chat",
+		"models": "Models",
+		"skills": "Skills",
+		"settings": "Settings"
+	},
+	"chat": {
+		"start": "Start a conversation",
+		"you": "You",
+		"ai": "AI",
+		"placeholder": "Type your message...",
+		"send": "Send"
+	},
+	"models": {
+		"title": "Configuration",
+		"tabModels": "Models",
+		"tabMcp": "MCP Servers",
+		"listTitle": "Models",
+		"add": "Add Model",
+		"edit": "Edit Model",
+		"save": "Save",
+		"cancel": "Cancel",
+		"form": {
+			"name": "Name",
+			"provider": "Provider",
+			"apiKey": "API Key",
+			"baseUrl": "Base URL"
+		}
+	},
+	"mcp": {
+		"title": "MCP Servers",
+		"add": "Add Server",
+		"addModalTitle": "Add MCP Server",
+		"form": {
+			"name": "Name",
+			"url": "Server URL"
+		}
+	},
+	"skills": {
+		"title": "Skill Center",
+		"searchPlaceholder": "Search skills...",
+		"tabs": {
+			"market": "Market",
+			"installed": "Installed"
+		},
+		"actions": {
+			"install": "Install",
+			"uninstall": "Uninstall",
+			"update": "Update",
+			"reinstall": "Reinstall"
+		},
+		"status": {
+			"installed": "Installed"
+		},
+		"messages": {
+			"installed": "Installed {{name}}",
+			"uninstalled": "Uninstalled {{name}}",
+			"updated": "Updated {{name}}",
+			"reinstalled": "Reinstalled {{name}}"
+		},
+		"by": "By",
+		"installedVersion": "Installed: "
+	},
+	"settings": {
+		"title": "Settings",
+		"description": "Configure application preferences and services",
+		"placeholder": "Application settings will be implemented here.",
+		"general": "General",
+		"generalTitle": "General Settings",
+		"userDataPath": "User Data Directory",
+		"open": "Open",
+		"language": "Language",
+		"apiService": "API Service",
+		"apiStatus": "Service Status",
+		"portConfig": "Port Configuration",
+		"apiManagement": "API Service Management",
+		"port": "Port",
+		"portHelp": "Restart required to apply changes",
+		"portRequired": "Port is required",
+		"portRange": "Port must be between 1024 and 65535",
+		"start": "Start",
+		"stop": "Stop",
+		"restart": "Restart",
+		"restartTip": "Apply port changes",
+		"running": "Running",
+		"stopped": "Stopped",
+		"listeningOn": "Listening on",
+		"about": "About",
+		"aboutDescription": "A powerful AI desktop client for seamless interaction with multiple AI services.",
+		"platform": "Platform",
+		"architecture": "Arch",
+		"checkUpdate": "Check for Updates",
+		"devTools": "Developer Tools",
+		"reportBug": "Report Bug",
+		"license": "License",
+		"madeWith": "Made with",
+		"byTeam": "by Super Client Team",
+		"loadError": "Failed to load settings",
+		"openPathError": "Failed to open path",
+		"checkUpdateError": "Failed to check updates",
+		"apiStartSuccess": "Server started successfully",
+		"apiStopSuccess": "Server stopped successfully",
+		"apiRestartSuccess": "Server restarted successfully",
+		"apiStartError": "Failed to start server",
+		"apiStopError": "Failed to stop server",
+		"apiRestartError": "Failed to restart server",
+		"logs": "Logs",
+		"debug": "Debug",
+		"selectLogFile": "Select log file",
+		"enableAutoRefresh": "Enable auto-refresh",
+		"disableAutoRefresh": "Disable auto-refresh",
+		"refresh": "Refresh",
+		"openFolder": "Open Folder",
+		"clearLogs": "Clear Logs",
+		"confirmClearLogs": "Clear all log files?",
+		"clearLogsSuccess": "Logs cleared",
+		"clearLogsError": "Failed to clear logs",
+		"loadLogFilesError": "Failed to load log files",
+		"loadLogsError": "Failed to load logs",
+		"openLogsFolderError": "Failed to open logs folder",
+		"noLogs": "No logs available",
+		"quickActions": "Quick Actions",
+		"openDevTools": "Open DevTools",
+		"relaunch": "Relaunch App",
+		"confirmRelaunch": "Relaunch the application?",
+		"relaunchError": "Failed to relaunch",
+		"clearStorage": "Clear Storage",
+		"storageClearedSuccess": "Storage cleared",
+		"systemInfo": "System Information",
+		"copyJson": "Copy JSON",
+		"copied": "Copied to clipboard",
+		"collectDebugInfoError": "Failed to collect debug info",
+		"devToolsOpened": "Developer tools opened",
+		"devToolsError": "Failed to open developer tools",
+		"performanceMonitor": "Performance Monitor",
+		"menuConfig": "Menu Configuration",
+		"menuLabel": "Label Name",
+		"iconType": "Icon Type",
+		"icon": "Icon",
+		"enabled": "Enabled",
+		"editMenuItem": "Edit Menu Item",
+		"confirmDeleteMenuItem": "Delete this menu item?",
+		"delete": "Delete",
+		"edit": "Edit",
+		"reset": "Reset",
+		"resetMenu": "Reset to default",
+		"toggleMenu": "Toggle menu item visibility",
+		"defaultIcon": "Default Icon",
+		"dragTip": "Drag to reorder menu items"
+	},
+	"error": {
+		"title": "Something went wrong",
+		"defaultMessage": "Sorry, an unexpected error has occurred.",
+		"backHome": "Back Home"
+	},
+	"common": {
+		"empty": "Empty",
+		"save": "Save",
+		"cancel": "Cancel",
+		"confirm": "Confirm"
+	}
 }

@@ -28,7 +28,7 @@ if (!app.isPackaged) {
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-software-rasterizer");
 // Disable Autofill features to prevent DevTools errors
-app.commandLine.appendSwitch("disable-features", "AutofillServer");
+app.commandLine.appendSwitch("disable-features", "AutofillServer,PasswordManager,Autofill,AutofillAssistant,AutofillPasswordManager,AutofillAddress,AutofillCreditCard,AutofillProfile,AutofillDownloadManager,AutofillFeedback");
 
 // 开发环境将 userData 设置到项目目录下，避免权限问题
 if (!app.isPackaged) {
@@ -46,10 +46,13 @@ let isQuitting = false;
  */
 function createWindow(): void {
 	mainWindow = new BrowserWindow({
-		width: 1200,
-		height: 800,
+		width: 800,
+		height: 600,
 		minWidth: 800,
 		minHeight: 600,
+		maxWidth: 800,
+		maxHeight: 600,
+		resizable: false,
 		show: false, // 延迟显示，避免闪烁
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),
@@ -57,6 +60,7 @@ function createWindow(): void {
 			nodeIntegration: false,
 			sandbox: !app.isPackaged, // 生产环境启用沙箱
 			webSecurity: true,
+			devTools: false,
 		},
 	});
 
@@ -68,7 +72,6 @@ function createWindow(): void {
 	// 加载页面
 	if (process.env["ELECTRON_RENDERER_URL"]) {
 		mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
-		mainWindow.webContents.openDevTools();
 	} else {
 		mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
 	}

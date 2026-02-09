@@ -1,14 +1,17 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "lib": ["ESNext"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    "noEmit": true,
-    "composite": true,
-    "skipLibCheck": true,
-    "types": ["node"]
-  },
-  "include": ["src/main", "src/preload", "electron.vite.config.ts"]
+	"compilerOptions": {
+		"target": "ESNext",
+		"lib": ["ESNext"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"noEmit": true,
+		"composite": true,
+		"skipLibCheck": true,
+		"types": ["node"],
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true
+	},
+	"include": ["src/main", "src/preload", "electron.vite.config.ts"]
 }

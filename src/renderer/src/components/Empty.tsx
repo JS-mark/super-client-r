@@ -1,8 +1,12 @@
-import { cn } from '@/lib/utils'
+import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 
 // Empty component
 export default function Empty() {
-  return (
-    <div className={cn('flex h-full items-center justify-center')}>Empty</div>
-  )
+	const { t } = useTranslation();
+	return (
+		<div className={cn("flex h-full items-center justify-center")}>
+			{t("common.empty")}
+		</div>
+	);
 }
