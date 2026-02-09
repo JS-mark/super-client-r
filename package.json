@@ -20,7 +20,10 @@
     "preview": "electron-vite preview",
     "check": "tsc -b --noEmit",
     "i18n:check": "tsx scripts/i18n/check.ts",
-    "i18n:translate": "tsx scripts/i18n/translate.ts"
+    "i18n:translate": "tsx scripts/i18n/translate.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -77,7 +80,10 @@
     "typescript": "~5.8.3",
     "vite": "^7.3.1",
     "vite-plugin-trae-solo-badge": "^1.0.0",
-    "vite-tsconfig-paths": "^6.0.5"
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^2.1.8",
+    "@vitest/ui": "^2.1.8",
+    "jsdom": "^25.0.1"
   },
   "build": {
     "files": [
