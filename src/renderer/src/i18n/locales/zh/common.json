@@ -23,6 +23,7 @@
 	},
 	"models": {
 		"title": "配置",
+		"description": "配置 AI 模型和 MCP 服务器",
 		"tabModels": "模型",
 		"tabMcp": "MCP 服务",
 		"listTitle": "模型列表",
@@ -157,6 +158,43 @@
 		"toggleMenu": "切换菜单项显示状态",
 		"defaultIcon": "默认图标",
 		"dragTip": "拖拽以重新排序菜单项"
+	},
+	"home": {
+		"welcome": "欢迎使用 Super Client",
+		"subtitle": "您的 AI 桌面助手",
+		"description": "Super Client 是一款强大的 AI 桌面应用，集成了多种 AI 服务、技能和 MCP 服务器，助您高效工作。",
+		"startChat": "开始对话",
+		"settings": "设置",
+		"stats": {
+			"messages": "消息数",
+			"models": "活跃模型",
+			"skills": "已安装技能",
+			"mcp": "MCP 连接"
+		},
+		"quickActions": {
+			"title": "快捷操作",
+			"chat": "开始对话",
+			"chatDesc": "与 AI 助手聊天",
+			"models": "模型",
+			"modelsDesc": "配置 AI 模型",
+			"skills": "技能",
+			"skillsDesc": "浏览技能市场",
+			"mcp": "MCP",
+			"mcpDesc": "管理 MCP 服务器"
+		},
+		"apiStatus": {
+			"title": "API 服务状态",
+			"running": "运行中",
+			"stopped": "已停止",
+			"start": "启动服务"
+		},
+		"featured": {
+			"title": "特色功能",
+			"chat": "多模式聊天",
+			"chatDesc": "直连、Agent、Skill 和 MCP 模式",
+			"mcp": "MCP 集成",
+			"mcpDesc": "连接外部工具服务器"
+		}
 	},
 	"error": {
 		"title": "出错了",

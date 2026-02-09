@@ -23,6 +23,7 @@
 	},
 	"models": {
 		"title": "Configuration",
+		"description": "Configure AI models and MCP servers",
 		"tabModels": "Models",
 		"tabMcp": "MCP Servers",
 		"listTitle": "Models",
@@ -157,6 +158,43 @@
 		"toggleMenu": "Toggle menu item visibility",
 		"defaultIcon": "Default Icon",
 		"dragTip": "Drag to reorder menu items"
+	},
+	"home": {
+		"welcome": "Welcome to Super Client",
+		"subtitle": "Your AI-powered desktop assistant",
+		"description": "Super Client is a powerful AI desktop application that integrates multiple AI services, skills, and MCP servers for seamless productivity.",
+		"startChat": "Start Chatting",
+		"settings": "Settings",
+		"stats": {
+			"messages": "Messages",
+			"models": "Active Models",
+			"skills": "Skills",
+			"mcp": "MCP Connected"
+		},
+		"quickActions": {
+			"title": "Quick Actions",
+			"chat": "Start Chat",
+			"chatDesc": "Chat with AI assistant",
+			"models": "Models",
+			"modelsDesc": "Configure AI models",
+			"skills": "Skills",
+			"skillsDesc": "Browse skill marketplace",
+			"mcp": "MCP",
+			"mcpDesc": "Manage MCP servers"
+		},
+		"apiStatus": {
+			"title": "API Service Status",
+			"running": "Running",
+			"stopped": "Stopped",
+			"start": "Start Service"
+		},
+		"featured": {
+			"title": "Featured Features",
+			"chat": "Multi-Mode Chat",
+			"chatDesc": "Direct, Agent, Skill & MCP modes",
+			"mcp": "MCP Integration",
+			"mcpDesc": "Connect to external tool servers"
+		}
 	},
 	"error": {
 		"title": "Something went wrong",
