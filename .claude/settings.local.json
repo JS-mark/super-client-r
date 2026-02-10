@@ -17,7 +17,20 @@
       "Bash(pnpm tsc:*)",
       "Bash(npx tsc:*)",
       "Bash(git commit:*)",
-      "Bash(pnpm lint:*)"
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(npx tsx:*)",
+      "WebFetch(domain:skillsmp.com)",
+      "WebSearch",
+      "Bash(ls:*)",
+      "WebFetch(domain:www.skillsmp.com)",
+      "Bash(find:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)",
+      "Bash(python3 -m json.tool:*)",
+      "Bash(git reset:*)"
     ]
   }
 }
