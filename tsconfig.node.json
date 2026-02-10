@@ -11,7 +11,10 @@
 		"types": ["node"],
 		"resolveJsonModule": true,
 		"esModuleInterop": true,
-		"allowSyntheticDefaultImports": true
+		"allowSyntheticDefaultImports": true,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"strictPropertyInitialization": false
 	},
 	"include": ["src/main", "src/preload", "electron.vite.config.ts"]
 }

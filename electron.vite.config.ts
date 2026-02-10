@@ -36,10 +36,22 @@ export default defineConfig({
 		plugins: [react(), tailwindcss()],
 		build: {
 			minify: false,
+			// Ensure worker files are properly bundled
+			rollupOptions: {
+				output: {
+					manualChunks: {
+						// Separate worker chunks for better caching
+						'log-worker': ['./src/renderer/src/workers/logWorker.ts'],
+					},
+				},
+			},
+		},
+		worker: {
+			format: 'es',
 		},
 		server: {
 			port: 5173,
-			strictPort: true,
+			strictPort: false,
 			hmr: {
 				port: 5174,
 			},
