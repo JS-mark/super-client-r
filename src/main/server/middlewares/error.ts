@@ -6,6 +6,6 @@ export const errorHandler = async (ctx: Context, next: Next) => {
 	} catch (err: any) {
 		ctx.status = err.status || 500;
 		ctx.body = { error: err.message };
-		console.error("Server error:", err);
+		console.error("Server error:", err instanceof Error ? err.message : String(err));
 	}
 };

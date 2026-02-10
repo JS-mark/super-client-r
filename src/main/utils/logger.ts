@@ -86,9 +86,6 @@ export class Logger {
 		// Rotate to today's log file
 		this.rotateLogFile();
 
-		// Start cleanup interval
-		this.startCleanupInterval();
-
 		this.initialized = true;
 	}
 
@@ -168,7 +165,7 @@ export class Logger {
 			appendFileSync(this.currentFile, content, { encoding: "utf8" });
 			this.currentSize += contentSize;
 		} catch (err) {
-			console.error("Failed to write log:", err);
+			console.error("Failed to write log:", err instanceof Error ? err.message : String(err));
 		}
 	}
 
@@ -254,54 +251,7 @@ export class Logger {
 		this.log(LogLevel.ERROR, message, { module, meta, error });
 	}
 
-	/**
-	 * Clean up old log files
-	 */
-	cleanup(): void {
-		try {
-			this.ensureInitialized();
 
-			const files = readdirSync(this.config.logDir)
-				.filter((f) => f.endsWith(".log"))
-				.map((f) => ({
-					name: f,
-					path: join(this.config.logDir, f),
-					mtime: statSync(join(this.config.logDir, f)).mtime,
-				}))
-				.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-			// Remove old files beyond maxFiles limit
-			if (files.length > this.config.maxFiles) {
-				const toDelete = files.slice(this.config.maxFiles);
-				for (const file of toDelete) {
-					try {
-						unlinkSync(file.path);
-						this.info(
-							`Cleaned up old log file: ${file.name}`,
-							undefined,
-							"Logger",
-						);
-					} catch (err) {
-						console.error(`Failed to delete log file ${file.name}:`, err);
-					}
-				}
-			}
-		} catch (err) {
-			console.error("Failed to cleanup logs:", err);
-		}
-	}
-
-	/**
-	 * Start cleanup interval (run every hour)
-	 */
-	private startCleanupInterval(): void {
-		setInterval(() => {
-			this.cleanup();
-		}, 60 * 60 * 1000);
-
-		// Run once on startup
-		this.cleanup();
-	}
 
 	/**
 	 * Get log directory path
@@ -403,7 +353,7 @@ export class Logger {
 			this.info("All logs cleared", undefined, "Logger");
 			this.currentSize = 0;
 		} catch (err) {
-			console.error("Failed to clear logs:", err);
+			console.error("Failed to clear logs:", err instanceof Error ? err.message : String(err));
 		}
 	}
 }

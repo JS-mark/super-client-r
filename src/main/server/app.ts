@@ -6,6 +6,7 @@ import bodyParser from "koa-bodyparser";
 import { storeManager } from "../store";
 import { SERVER_CONFIG } from "./config";
 import { authMiddleware } from "./middlewares/auth";
+import { corsMiddleware } from "./middlewares/cors";
 import { errorHandler } from "./middlewares/error";
 import { setupRoutes } from "./routes";
 
@@ -22,13 +23,16 @@ export class LocalServer {
 	}
 
 	private setupMiddleware() {
+		this.app.use(corsMiddleware);
 		this.app.use(bodyParser());
 		this.app.use(errorHandler);
 		this.app.use(authMiddleware);
 	}
 
 	private setupRoutes() {
-		setupRoutes(this.app);
+		const router = setupRoutes();
+		this.app.use(router.routes());
+		this.app.use(router.allowedMethods());
 	}
 
 	public async start(port?: number) {
@@ -58,7 +62,7 @@ export class LocalServer {
 				});
 
 				this.server.on("error", (err) => {
-					console.error("Server start error:", err);
+					console.error("Server start error:", err instanceof Error ? err.message : String(err));
 					reject(err);
 				});
 			});
@@ -76,7 +80,7 @@ export class LocalServer {
 		return new Promise<void>((resolve, reject) => {
 			this.server?.close((err) => {
 				if (err) {
-					console.error("Error stopping server:", err);
+					console.error("Error stopping server:", err instanceof Error ? err.message : String(err));
 					reject(err);
 				} else {
 					this.isRunning = false;

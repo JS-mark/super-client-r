@@ -62,4 +62,9 @@ export function registerApiHandlers() {
 		storeManager.setConfig("apiPort", port);
 		return true;
 	});
+
+	// 获取服务器端口
+	ipcMain.handle("get-server-port", () => {
+		return localServer.getPort();
+	});
 }
