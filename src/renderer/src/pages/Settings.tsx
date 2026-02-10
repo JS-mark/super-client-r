@@ -545,20 +545,16 @@ const ShortcutSettings: React.FC = () => {
 // 悬浮窗设置组件
 const FloatWidgetSettings: React.FC = () => {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    // 加载保存的设置
+  const [enabled, setEnabled] = useState(() => {
+    // 从 localStorage 读取初始值，默认 false
     const saved = localStorage.getItem("float-widget-enabled");
-    if (saved) {
-      setEnabled(saved === "true");
-    }
-  }, []);
+    return saved === "true";
+  });
 
   const handleToggle = (checked: boolean) => {
     setEnabled(checked);
     localStorage.setItem("float-widget-enabled", checked.toString());
-    // 这里可以添加 IPC 调用来控制悬浮窗显示/隐藏
+    // 发送 IPC 事件控制悬浮窗
     if (checked) {
       window.electron.ipc.send("float-widget:show");
     } else {
@@ -567,27 +563,25 @@ const FloatWidgetSettings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <SettingSection
-        title={t("settings.floatWidget", "Float Widget")}
-        icon={<DesktopOutlined />}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-700 dark:text-slate-300 font-medium">
-              {t("settings.enableFloatWidget", "Enable Float Widget")}
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {t(
-                "settings.floatWidgetHint",
-                "Show a floating widget on desktop",
-              )}
-            </p>
-          </div>
-          <Switch checked={enabled} onChange={handleToggle} size="default" />
+    <SettingSection
+      title={t("settings.floatWidget", "Float Widget")}
+      icon={<DesktopOutlined />}
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-700 dark:text-slate-300 font-medium">
+            {t("settings.enableFloatWidget", "Enable Float Widget")}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {t(
+              "settings.floatWidgetHint",
+              "Show a floating widget on desktop",
+            )}
+          </p>
         </div>
-      </SettingSection>
-    </div>
+        <Switch checked={enabled} onChange={handleToggle} size="default" />
+      </div>
+    </SettingSection>
   );
 };
 
@@ -1007,6 +1001,8 @@ const Settings: React.FC = () => {
                 <Radio.Button value="en">English</Radio.Button>
               </Radio.Group>
             </SettingSection>
+
+            <FloatWidgetSettings />
           </div>
         </Card>
       ),
@@ -1208,20 +1204,6 @@ const Settings: React.FC = () => {
       children: (
         <Card className="!border-0 !shadow-none !bg-transparent">
           <ShortcutSettings />
-        </Card>
-      ),
-    },
-    {
-      key: "floatwidget",
-      label: (
-        <span className="flex items-center gap-2 font-medium">
-          <DesktopOutlined />
-          {t("settings.floatWidget", "Float Widget")}
-        </span>
-      ),
-      children: (
-        <Card className="!border-0 !shadow-none !bg-transparent">
-          <FloatWidgetSettings />
         </Card>
       ),
     },
