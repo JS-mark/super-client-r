@@ -37,7 +37,7 @@
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@types/react-window": "^2.0.0",
     "antd": "^6.2.1",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "clsx": "^2.1.1",
     "electron-store": "^11.0.2",
     "get-port": "^7.1.0",
