@@ -10,11 +10,13 @@ interface SkillState {
 	marketPage: number;
 	marketLimit: number;
 	marketTotal: number;
+	marketDomain: string;
 	installedPage: number;
 	installedLimit: number;
 
-	fetchMarketSkills: (page?: number, limit?: number) => Promise<void>;
+	fetchMarketSkills: (page?: number, limit?: number, domain?: string, search?: string) => Promise<void>;
 	setMarketPage: (page: number) => void;
+	setMarketDomain: (domain: string) => void;
 	setInstalledPage: (page: number) => void;
 	installSkill: (skill: Skill) => void;
 	uninstallSkill: (id: string) => void;
@@ -33,15 +35,20 @@ export const useSkillStore = create<SkillState>()(
 			marketPage: 1,
 			marketLimit: 12,
 			marketTotal: 0,
+			marketDomain: "tools",
 			installedPage: 1,
 			installedLimit: 12,
 
-			fetchMarketSkills: async (page = 1, limit = 12) => {
+			fetchMarketSkills: async (page = 1, limit = 12, domain?: string, search?: string) => {
 				set({ isLoading: true });
 				try {
+					const currentDomain = domain || get().marketDomain;
 					const { skills, total } = await skillService.getMarketSkills(
 						page,
 						limit,
+						"stars",
+						currentDomain,
+						search,
 					);
 					set({
 						marketSkills: skills,
@@ -57,8 +64,14 @@ export const useSkillStore = create<SkillState>()(
 			},
 
 			setMarketPage: (page) => {
+				const { marketLimit, marketDomain } = get();
+				get().fetchMarketSkills(page, marketLimit, marketDomain);
+			},
+
+			setMarketDomain: (domain) => {
+				set({ marketDomain: domain });
 				const { marketLimit } = get();
-				get().fetchMarketSkills(page, marketLimit);
+				get().fetchMarketSkills(1, marketLimit, domain);
 			},
 
 			setInstalledPage: (page) => set({ installedPage: page }),

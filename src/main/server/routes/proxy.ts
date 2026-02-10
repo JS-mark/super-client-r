@@ -1,4 +1,10 @@
-import { request, summary, tags, query, path, description } from "koa-swagger-decorator";
+import {
+	description,
+	query,
+	request,
+	summary,
+	tags,
+} from "koa-swagger-decorator";
 import { storeManager } from "../../store";
 
 const SKILLSMP_API_BASE = "https://skillsmp.com/api/v1";
@@ -16,7 +22,11 @@ export class SkillsController {
 	@query({
 		page: { type: "number", default: 1, description: "页码" },
 		limit: { type: "number", default: 12, description: "每页数量" },
-		sortBy: { type: "string", default: "stars", description: "排序方式 (stars/name/createdAt)" },
+		sortBy: {
+			type: "string",
+			default: "stars",
+			description: "排序方式 (stars/name/createdAt)",
+		},
 		q: { type: "string", default: "tools", description: "搜索关键词" },
 	})
 	async getSkills(ctx: any) {
@@ -123,5 +133,4 @@ export class SkillsController {
 			ctx.body = { error: "Failed to search skills" };
 		}
 	}
-
 }

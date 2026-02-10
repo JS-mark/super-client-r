@@ -11,6 +11,7 @@ export interface AppConfig {
 	theme?: "light" | "dark" | "auto";
 	language?: string;
 	apiPort?: number;
+	skillsmpApiKey?: string;
 }
 
 export interface AppData {

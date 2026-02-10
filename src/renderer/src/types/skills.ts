@@ -9,6 +9,7 @@ export interface Skill {
 	icon?: string;
 	homepage?: string;
 	repository?: string;
+	readme?: string;
 	createdAt?: string;
 	updatedAt?: string;
 }
