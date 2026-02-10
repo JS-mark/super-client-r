@@ -188,7 +188,7 @@ const ModePill: React.FC<{
 		<button
 			onClick={onClick}
 			className={cn(
-				"flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-200",
+				"flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full transition-all duration-200 flex-shrink-0",
 				isSelected
 					? `text-white shadow-lg`
 					: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
@@ -196,7 +196,7 @@ const ModePill: React.FC<{
 			style={isSelected ? { backgroundColor: config.color } : undefined}
 		>
 			{config.icon}
-			<span className="font-medium text-sm">{config.label}</span>
+			<span className="font-medium text-sm whitespace-nowrap">{config.label}</span>
 		</button>
 	);
 };
@@ -278,25 +278,25 @@ const Chat: React.FC = () => {
 				</div>
 
 				{/* Chat Area */}
-				<div className="flex-1 overflow-auto">
+				<div className="flex-1 overflow-auto w-full">
 					{messages.length === 0 ? (
-						<div className="flex flex-col items-center justify-center h-full px-6">
+						<div className="flex flex-col items-center justify-center h-full w-full px-4 sm:px-6">
 							{/* Welcome Card */}
-							<div className="max-w-2xl w-full">
-								<div className="text-center mb-8">
-									<div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl mb-6">
-										<StarOutlined className="text-3xl text-white" />
+							<div className="w-full mx-auto">
+								<div className="text-center mb-6 sm:mb-8">
+									<div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl mb-4 sm:mb-6">
+										<StarOutlined className="text-2xl sm:text-3xl text-white" />
 									</div>
-									<h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-3">
+									<h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-3 whitespace-normal">
 										Welcome to AI Chat
 									</h2>
-									<p className="text-slate-500 text-lg">
+									<p className="text-slate-500 text-base sm:text-lg whitespace-normal">
 										Choose a mode and start your conversation
 									</p>
 								</div>
 
 								{/* Mode Selection */}
-								<div className="flex flex-wrap justify-center gap-3 mb-8">
+								<div className="flex flex-row flex-wrap justify-center gap-2 sm:gap-3 mb-6 sm:mb-8">
 									{modes.map((mode) => (
 										<ModePill
 											key={mode}
@@ -308,16 +308,16 @@ const Chat: React.FC = () => {
 								</div>
 
 								{/* Suggestions */}
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
 									{SUGGESTIONS.map((suggestion, idx) => (
 										<button
 											key={idx}
 											onClick={() => {
 												setInput(suggestion);
 											}}
-											className="p-4 text-left rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:shadow-md transition-all group"
+											className="p-4 text-left rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:shadow-md transition-all group block w-full min-w-0"
 										>
-											<p className="text-slate-700 dark:text-slate-300 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400">
+											<p className="text-slate-700 dark:text-slate-300 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 break-words">
 												{suggestion}
 											</p>
 										</button>
@@ -345,7 +345,7 @@ const Chat: React.FC = () => {
 				<div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4">
 					<div className="max-w-4xl mx-auto">
 						{/* Mode selector */}
-						<div className="flex items-center gap-3 mb-3 overflow-x-auto pb-2">
+						<div className="flex flex-row items-center gap-2 sm:gap-3 mb-3 overflow-x-auto pb-2">
 							{modes.map((mode) => (
 								<ModePill
 									key={mode}
