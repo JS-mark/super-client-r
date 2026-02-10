@@ -17,7 +17,7 @@ const Login: React.FC = () => {
 	};
 
 	return (
-		<div className="flex h-[600px] w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+		<div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
 			{/* Background Decorations */}
 			<div className="absolute inset-0 overflow-hidden pointer-events-none">
 				<div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl animate-pulse" />
@@ -41,7 +41,7 @@ const Login: React.FC = () => {
 				</div>
 
 				{/* Login Buttons */}
-				<Space direction="vertical" className="w-full" size="middle">
+				<Space orientation="vertical" className="w-full" size="middle">
 					<Button
 						block
 						size="large"

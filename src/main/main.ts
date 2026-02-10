@@ -46,13 +46,10 @@ let isQuitting = false;
  */
 function createWindow(): void {
 	mainWindow = new BrowserWindow({
-		width: 800,
-		height: 600,
-		minWidth: 800,
-		minHeight: 600,
-		maxWidth: 800,
-		maxHeight: 600,
-		resizable: false,
+		width: 1000,
+		height: 700,
+		minWidth: 600,
+		minHeight: 400,
 		show: false, // 延迟显示，避免闪烁
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),
@@ -60,7 +57,7 @@ function createWindow(): void {
 			nodeIntegration: false,
 			sandbox: !app.isPackaged, // 生产环境启用沙箱
 			webSecurity: true,
-			devTools: false,
+			devTools: true, // 始终启用开发者工具，便于调试
 		},
 	});
 

@@ -1,8 +1,8 @@
 import { App as AntdApp, ConfigProvider } from "antd";
-import { RouterProvider } from "react-router-dom";
-import { router } from "./router";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 import { useEffect } from "react";
+import { RouterProvider } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { router } from "./router";
 
 function App() {
 	useEffect(() => {
@@ -33,7 +33,7 @@ function App() {
 				},
 			}}
 		>
-			<AntdApp>
+			<AntdApp className="h-full w-full">
 				<ErrorBoundary>
 					<RouterProvider router={router} />
 				</ErrorBoundary>
