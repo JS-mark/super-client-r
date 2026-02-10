@@ -1,8 +1,8 @@
 import * as React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./index.css";
 import "./i18n";
+import "./styles/index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
 	<React.StrictMode>
@@ -11,6 +11,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 
 // Use contextBridge
-window.ipcRenderer.on("main-process-message", (_event, message) => {
+window.ipcRenderer?.on("main-process-message", (_event, message) => {
 	console.log(message);
 });
