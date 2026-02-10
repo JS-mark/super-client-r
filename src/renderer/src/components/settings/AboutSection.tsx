@@ -122,7 +122,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 						</Tag>
 					</div>
 
-					<Paragraph className="!text-slate-300 max-w-lg mx-auto">
+					<Paragraph className="!text-slate-300">
 						{t("settings.aboutDescription", "A powerful AI desktop client for seamless interaction with multiple AI services.")}
 					</Paragraph>
 
@@ -184,8 +184,8 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 
 			{/* Features Grid */}
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{features.map((feature, index) => (
-					<FeatureCard key={index} {...feature} />
+				{features.map((feature) => (
+					<FeatureCard key={feature.title} {...feature} />
 				))}
 			</div>
 

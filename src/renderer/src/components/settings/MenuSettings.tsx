@@ -1,10 +1,10 @@
-import { EditOutlined, PlusOutlined, ReloadOutlined, SettingOutlined } from "@ant-design/icons";
-import { Avatar, Button, Card, Divider, Input, Modal, Popconfirm, Select, Space, Switch, Tooltip } from "antd";
+import { PlusOutlined, SettingOutlined } from "@ant-design/icons";
+import { Avatar, Button, Input, Modal, Popconfirm, Select, Space, Switch, Tooltip } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { MenuConfig, MenuItemConfig, MenuItemIconType } from "../../types/menu";
-import { DEFAULT_MENU_CONFIG, getMenuConfig, resetMenuConfig, saveMenuConfig } from "../../types/menu";
+import { useMenuStore } from "../../stores/menuStore";
+import type { MenuItemConfig, MenuItemIconType } from "../../types/menu";
 
 // 图标类型选项
 const ICON_TYPE_OPTIONS = [
@@ -172,9 +172,9 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 				</div>
 
 				<div>
-					<label className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
 						{t("settings.iconType", "Icon Type")}
-					</label>
+					</span>
 					<Select
 						value={editingItem.iconType}
 						onChange={(v) => setEditingItem({ ...editingItem, iconType: v as MenuItemIconType })}
@@ -184,9 +184,9 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 				</div>
 
 				<div>
-					<label className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
 						{t("settings.icon", "Icon")}
-					</label>
+					</span>
 					<IconSelector
 						value={editingItem.iconContent || ""}
 						type={editingItem.iconType}
@@ -217,7 +217,7 @@ const EditIcon: React.FC = () => (
 );
 
 const ReloadIcon: React.FC = () => (
-	<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+	<svg xlinkTitle="reload" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
 		<path d="M1 4v6h6" />
 		<path d="M3.51 15a9 9 0 0 1 0-2-5.74" />
 		<path d="M4 13h6" />
@@ -250,47 +250,28 @@ const SettingSection: React.FC<{
 /**
  * 菜单配置组件
  */
-export const MenuSettings: React.FC = () => {
+export const MenuSettings: React.FC<{
+	onEditItem?: (item: MenuItemConfig) => void;
+}> = ({ onEditItem }) => {
 	const { t } = useTranslation();
-	const [config, setConfig] = useState<MenuConfig>(getMenuConfig());
-	const [editingItem, setEditingItem] = useState<MenuItemConfig | null>(null);
-	const [editModalOpen, setEditModalOpen] = useState(false);
+	const menuItems = useMenuStore((state) => state.items);
+	const setConfig = useMenuStore((state) => state.setConfig);
+	const toggleEnabled = useMenuStore((state) => state.toggleEnabled);
+	const resetConfig = useMenuStore((state) => state.resetConfig);
+
+	// 过滤掉设置项（设置按钮固定在侧边栏底部，不可配置）
+	const configurableItems = menuItems.filter((item) => item.id !== "settings");
 
 	const handleToggleEnabled = useCallback((itemId: string) => {
-		setConfig((prev) => {
-			const updatedItems = prev.items.map((item) =>
-				item.id === itemId ? { ...item, enabled: !item.enabled } : item,
-			);
-			saveMenuConfig({ items: updatedItems });
-			return { items: updatedItems };
-		});
-	}, []);
+		toggleEnabled(itemId);
+	}, [toggleEnabled]);
 
 	const handleEditItem = (item: MenuItemConfig) => {
-		setEditingItem(item);
-		setEditModalOpen(true);
-	};
-
-	const handleSaveItem = (item: MenuItemConfig) => {
-		const updatedItems = config.items.map((i) => (i.id === item.id ? item : i));
-		setConfig({ items: updatedItems });
-		saveMenuConfig({ items: updatedItems });
-		setEditModalOpen(false);
-		setEditingItem(null);
-	};
-
-	const handleDeleteItem = () => {
-		if (!editingItem) return;
-		const updatedItems = config.items.filter((i) => i.id !== editingItem.id);
-		setConfig({ items: updatedItems });
-		saveMenuConfig({ items: updatedItems });
-		setEditModalOpen(false);
-		setEditingItem(null);
+		onEditItem?.(item);
 	};
 
 	const handleReset = () => {
-		setConfig(DEFAULT_MENU_CONFIG);
-		resetMenuConfig();
+		resetConfig();
 	};
 
 	// 渲染图标
@@ -329,9 +310,10 @@ export const MenuSettings: React.FC = () => {
 					</Tooltip>
 				}
 			>
-				{/* 菜单项列表 */}
+				{/* 菜单项列表（不含设置项，设置按钮固定在底部） */}
 				<div className="space-y-2">
-					{config.items.map((item, index) => (
+					{configurableItems.map((item, index) => (
+						// biome-ignore lint/a11y/noStaticElementInteractions: <explanation>
 						<div
 							key={item.id}
 							className={`p-4 rounded-xl border transition-all
@@ -354,19 +336,27 @@ export const MenuSettings: React.FC = () => {
 								const fromIndex = Number(e.dataTransfer.getData("text/plain"));
 								if (fromIndex === index) return;
 
-								setConfig((prev) => {
-									const newItems = [...prev.items];
-									const [removed] = newItems.splice(fromIndex, 1);
-									newItems.splice(index, 0, removed);
-									saveMenuConfig({ items: newItems });
-									return { items: newItems };
-								});
+								// 重新排序可配置项，但保持设置项在原始位置
+								const newConfigurableItems = [...configurableItems];
+								const [removed] = newConfigurableItems.splice(fromIndex, 1);
+								newConfigurableItems.splice(index, 0, removed);
+
+								// 从完整列表中找到设置项
+								const settingsItem = menuItems.find((item) => item.id === "settings");
+
+								// 合并：可配置项 + 设置项（保持设置项在列表中）
+								const newItems = settingsItem
+									? [...newConfigurableItems, settingsItem]
+									: newConfigurableItems;
+
+								setConfig({ items: newItems });
 							}}
 						>
 							<div className="flex items-center gap-3">
 								{/* 拖拽手柄 */}
 								{item.enabled && (
 									<div className="cursor-grab text-slate-400 hover:text-slate-600">
+										{/** biome-ignore lint/a11y/noSvgWithoutTitle: <explanation> */}
 										<svg
 											width="16"
 											height="16"
@@ -418,7 +408,7 @@ export const MenuSettings: React.FC = () => {
 				</div>
 
 				{/* 拖拽提示 */}
-				<div className="p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-center text-slate-400 dark:text-slate-500">
+				<div className="mt-[10px] p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-center text-slate-400 dark:text-slate-500">
 					{t("settings.dragTip", "Drag to reorder menu items")}
 				</div>
 			</SettingSection>
@@ -430,31 +420,32 @@ export const MenuSettings: React.FC = () => {
  * 完整的菜单设置组件（包括 Modal）
  */
 export const MenuSettingsWithModal: React.FC = () => {
-	const { t } = useTranslation();
-	const [config, setConfig] = useState<MenuConfig>(getMenuConfig());
+	const updateItem = useMenuStore((state) => state.updateItem);
+	const deleteItem = useMenuStore((state) => state.deleteItem);
 	const [editingItem, setEditingItem] = useState<MenuItemConfig | null>(null);
 	const [editModalOpen, setEditModalOpen] = useState(false);
 
+	const handleEditItem = (item: MenuItemConfig) => {
+		setEditingItem(item);
+		setEditModalOpen(true);
+	};
+
 	const handleSaveItem = (item: MenuItemConfig) => {
-		const updatedItems = config.items.map((i) => (i.id === item.id ? item : i));
-		setConfig({ items: updatedItems });
-		saveMenuConfig({ items: updatedItems });
+		updateItem(item);
 		setEditModalOpen(false);
 		setEditingItem(null);
 	};
 
 	const handleDeleteItem = () => {
 		if (!editingItem) return;
-		const updatedItems = config.items.filter((i) => i.id !== editingItem.id);
-		setConfig({ items: updatedItems });
-		saveMenuConfig({ items: updatedItems });
+		deleteItem(editingItem.id);
 		setEditModalOpen(false);
 		setEditingItem(null);
 	};
 
 	return (
 		<>
-			<MenuSettings />
+			<MenuSettings onEditItem={handleEditItem} />
 			<MenuEditModal
 				open={editModalOpen}
 				item={editingItem}

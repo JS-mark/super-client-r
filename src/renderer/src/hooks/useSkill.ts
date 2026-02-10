@@ -29,7 +29,9 @@ export function useSkill() {
 		marketPage,
 		marketLimit,
 		marketTotal,
+		marketDomain,
 		fetchMarketSkills,
+		setMarketDomain,
 		installSkill: installToStore,
 		uninstallSkill: uninstallFromStore,
 		updateSkill: updateInStore,
@@ -140,9 +142,9 @@ export function useSkill() {
 
 	// Load market skills
 	const loadMarketSkills = useCallback(
-		async (page?: number, limit?: number) => {
+		async (page?: number, limit?: number, domain?: string) => {
 			try {
-				await fetchMarketSkills(page, limit);
+				await fetchMarketSkills(page, limit, domain);
 			} catch (error) {
 				console.error("Failed to load market skills:", error);
 			}
@@ -245,9 +247,11 @@ export function useSkill() {
 		marketPage,
 		marketLimit,
 		marketTotal,
+		marketDomain,
 
 		// Market actions
 		loadMarketSkills,
+		setMarketDomain,
 		getMarketSkillDetails,
 		installFromMarket,
 	};
