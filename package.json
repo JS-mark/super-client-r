@@ -37,7 +37,6 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@koa/cors": "^5.0.0",
     "@koa/router": "^15.3.0",
-    "@koa/proxies": "^0.12.4",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@types/react-window": "^2.0.0",
     "antd": "^6.2.1",

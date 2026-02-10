@@ -34,7 +34,9 @@
       "Bash(wc -l:*)",
       "Bash(timeout 10 pnpm:*)",
       "Bash(pnpm docs:build:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(git push)",
+      "Bash(pnpm install:*)"
     ]
   }
 }
