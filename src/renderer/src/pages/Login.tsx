@@ -3,16 +3,29 @@ import { Button, Card, Space, Typography } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
+import { useUserStore } from "../stores/userStore";
 
 const { Title, Text } = Typography;
 
 const Login: React.FC = () => {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
+	const { login } = useUserStore();
 
-	const handleLogin = (provider: "google" | "github") => {
+	const handleLogin = (provider: "google" | "github" | "mock") => {
 		console.log(`Login with ${provider}`);
-		// Mock login success
+
+		// Mock user data - 实际项目中应该从 OAuth 回调获取
+		const mockUser = {
+			id: `user_${Date.now()}`,
+			name: provider === "google" ? "Google User" : provider === "github" ? "GitHub User" : "Test User",
+			email: `${provider}_user@example.com`,
+		};
+
+		// 保存用户信息
+		login(mockUser);
+
+		// 跳转到聊天页面
 		navigate("/chat");
 	};
 
@@ -78,7 +91,7 @@ const Login: React.FC = () => {
 								block
 								size="large"
 								type="dashed"
-								onClick={() => handleLogin("mock" as any)}
+								onClick={() => handleLogin("mock")}
 								className="!h-12 !rounded-xl !font-medium"
 							>
 								{t("app.mockLogin")}
