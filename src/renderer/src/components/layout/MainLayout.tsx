@@ -1,10 +1,11 @@
 import { AppstoreOutlined, MessageOutlined, RocketOutlined, SettingOutlined } from "@ant-design/icons";
-import { Layout, Menu, Tooltip } from "antd";
+import { Layout, Tooltip } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { MenuItemConfig } from "../../types/menu";
 import { getMenuConfig } from "../../types/menu";
+import { cn } from "../../lib/utils";
 
 const { Sider, Content } = Layout;
 
@@ -66,20 +67,23 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	// 当前选中的菜单项 ID
 	const selectedKey = enabledItems.find((item) => location.pathname.startsWith(item.path))?.id || "";
 
+	// 判断是否为 chat 路由
+	const isChatRoute = location.pathname === "/" || location.pathname.startsWith("/chat");
+
 	// 处理菜单点击
 	const handleMenuClick = (item: MenuItemConfig) => {
 		navigate(item.path);
 	};
 
 	return (
-		<Layout className="h-[600px] bg-gradient-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+		<Layout className="h-full bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 			<Sider
 				width={64}
 				className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:!from-slate-950 dark:!via-slate-900 dark:!to-slate-950 !border-r !border-slate-700/50 shadow-2xl"
 			>
 				{/* Logo Area */}
 				<div className="h-16 flex items-center justify-center border-b border-slate-700/50">
-					<div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
+					<div className="w-9 h-9 rounded-xl bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
 						<span className="text-white font-bold text-sm">S</span>
 					</div>
 				</div>
@@ -112,9 +116,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 				</div>
 			</Sider>
 
-			<Layout>
-				<Content className="overflow-auto">
-					<div className="p-6 min-h-[600px]">{children}</div>
+			<Layout className="h-full">
+				<Content className="h-full overflow-auto">
+					<div className={cn("h-full", !isChatRoute && "p-6")}>{children}</div>
 				</Content>
 			</Layout>
 		</Layout>
