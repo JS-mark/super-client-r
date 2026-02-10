@@ -94,6 +94,15 @@ export interface IPCResponse<T = unknown> {
 }
 
 export interface ElectronAPI {
+	// 窗口控制
+	window: {
+		minimize: () => Promise<IPCResponse>;
+		maximize: () => Promise<IPCResponse>;
+		close: () => Promise<IPCResponse>;
+		isMaximized: () => Promise<IPCResponse<boolean>>;
+		onMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void;
+	};
+
 	// Agent 相关
 	agent: {
 		createSession: (config: AgentConfig) => Promise<IPCResponse<AgentSession>>;

@@ -15,9 +15,17 @@ import {
 } from "electron";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
+import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
 import { localServer } from "./server";
 import { pathService } from "./services/pathService";
 import { getSkillService } from "./services/skill/SkillService";
+import {
+	handleOpenUrl,
+	handleSecondInstance,
+	handleProtocolData,
+	parseProtocolUrl,
+	registerProtocol,
+} from "./services/protocolService";
 import { logger } from "./utils/logger";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
@@ -30,16 +38,37 @@ app.commandLine.appendSwitch("disable-software-rasterizer");
 // Disable Autofill features to prevent DevTools errors
 app.commandLine.appendSwitch("disable-features", "AutofillServer,PasswordManager,Autofill,AutofillAssistant,AutofillPasswordManager,AutofillAddress,AutofillCreditCard,AutofillProfile,AutofillDownloadManager,AutofillFeedback");
 
-// 开发环境将 userData 设置到项目目录下，避免权限问题
+// 开发环境将 userData 设置到用户 home 目录下，避免权限问题
+// dev 环境使用 .scr-data-dev，打包环境使用 .scr-data，实现数据隔离
+import { homedir } from "os";
 if (!app.isPackaged) {
-	const userDataPath = join(process.cwd(), ".userdata");
+	const userDataPath = join(homedir(), ".scr-data-dev");
 	app.setPath("userData", userDataPath);
+}
+
+// 注册为默认协议客户端
+registerProtocol();
+
+// 限制单实例运行
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+	logger.info("Another instance is running, quitting...");
+	app.quit();
 }
 
 let mainWindow: BrowserWindow | null = null;
 let floatingWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+
+/**
+ * 获取应用图标路径
+ */
+function getAppIconPath(): string {
+	return app.isPackaged
+		? join(process.resourcesPath, "build/icons/icon.png")
+		: join(process.cwd(), "build/icons/icon.png");
+}
 
 /**
  * 创建主窗口
@@ -51,6 +80,9 @@ function createWindow(): void {
 		minWidth: 600,
 		minHeight: 400,
 		show: false, // 延迟显示，避免闪烁
+		icon: getAppIconPath(),
+		frame: false, // 隐藏默认标题栏，使用自定义标题栏
+		titleBarStyle: "hidden", // macOS 隐藏标题栏
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),
 			contextIsolation: true,
@@ -90,6 +122,9 @@ function createWindow(): void {
 		}
 		return true;
 	});
+
+	// 设置窗口事件监听（用于自定义标题栏状态同步）
+	setupWindowEventListeners(mainWindow);
 
 	mainWindow.on("closed", () => {
 		mainWindow = null;
@@ -136,7 +171,10 @@ function createFloatingWindow(): void {
 }
 
 function createTray(): void {
-	const iconPath = join(app.getAppPath(), "public/favicon.svg");
+	// macOS 托盘图标: 20x20 彩色图标
+	const iconPath = app.isPackaged
+		? join(process.resourcesPath, "build/icons/tray-icon.png")
+		: join(process.cwd(), "build/icons/tray-icon.png");
 	const icon = nativeImage.createFromPath(iconPath);
 
 	tray = new Tray(icon);
@@ -317,6 +355,25 @@ app.whenReady().then(async () => {
 			mainWindow.show();
 		}
 	});
+
+	// 处理协议 URL (macOS)
+	app.on("open-url", (_event, url) => {
+		handleOpenUrl(url, mainWindow);
+	});
+
+	// 处理第二个实例启动 (Windows/Linux)
+	app.on("second-instance", (_event, argv) => {
+		handleSecondInstance(argv, mainWindow);
+	});
+
+	// 处理启动参数中的协议 URL
+	if (process.env.PENDING_PROTOCOL_URL) {
+		const data = parseProtocolUrl(process.env.PENDING_PROTOCOL_URL);
+		if (data) {
+			handleProtocolData(data, mainWindow);
+		}
+		delete process.env.PENDING_PROTOCOL_URL;
+	}
 });
 
 /**

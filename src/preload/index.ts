@@ -8,6 +8,15 @@ import { contextBridge, ipcRenderer } from "electron";
 // ============ 类型定义 ============
 
 export interface ElectronAPI {
+	// 窗口控制
+	window: {
+		minimize: () => Promise<IPCResponse>;
+		maximize: () => Promise<IPCResponse>;
+		close: () => Promise<IPCResponse>;
+		isMaximized: () => Promise<IPCResponse<boolean>>;
+		onMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void;
+	};
+
 	// Agent 相关
 	agent: {
 		createSession: (config: AgentConfig) => Promise<IPCResponse<AgentSession>>;
@@ -162,6 +171,20 @@ export interface IPCResponse<T = unknown> {
 // ============ 实现 ============
 
 const electronAPI: ElectronAPI = {
+	// Window API
+	window: {
+		minimize: () => ipcRenderer.invoke("window:minimize"),
+		maximize: () => ipcRenderer.invoke("window:maximize"),
+		close: () => ipcRenderer.invoke("window:close"),
+		isMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+		onMaximizeChange: (callback) => {
+			const listener = (_event: unknown, isMaximized: boolean) =>
+				callback(isMaximized);
+			ipcRenderer.on("window:on-maximize-change", listener);
+			return () => ipcRenderer.off("window:on-maximize-change", listener);
+		},
+	},
+
 	// Agent API
 	agent: {
 		createSession: (config) =>

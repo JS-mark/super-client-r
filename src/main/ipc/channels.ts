@@ -111,6 +111,16 @@ export const WINDOW_CHANNELS = {
 	ON_MAXIMIZE_CHANGE: "window:on-maximize-change",
 } as const;
 
+// 悬浮窗相关通道
+export const FLOAT_WIDGET_CHANNELS = {
+	// 显示悬浮窗
+	SHOW: "float-widget:show",
+	// 隐藏悬浮窗
+	HIDE: "float-widget:hide",
+	// 获取悬浮窗状态
+	GET_STATUS: "float-widget:get-status",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -119,4 +129,5 @@ export type IPCChannel =
 	| (typeof MCP_CHANNELS)[keyof typeof MCP_CHANNELS]
 	| (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS]
 	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS]
-	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS];
+	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS]
+	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS];

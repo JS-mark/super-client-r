@@ -7,8 +7,10 @@ import { setupAgentHandlers } from "../services/agent";
 import { registerAgentHandlers } from "./handlers/agentHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
+import { registerFloatWidgetHandlers } from "./handlers/floatWidgetHandlers";
 import { registerMcpHandlers } from "./handlers/mcpHandlers";
 import { registerSkillHandlers } from "./handlers/skillHandlers";
+import { registerWindowControlHandlers } from "./handlers/windowHandlers";
 
 /**
  * 注册所有 IPC 处理器
@@ -19,6 +21,8 @@ export function registerIpcHandlers(): void {
 	registerMcpHandlers();
 	registerAppHandlers();
 	registerApiHandlers();
+	registerWindowControlHandlers();
+	registerFloatWidgetHandlers();
 	setupAgentHandlers();
 }
 
