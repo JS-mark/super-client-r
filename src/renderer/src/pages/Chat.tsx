@@ -1,83 +1,77 @@
 import {
-	RobotOutlined,
-	ClearOutlined,
-	ApiOutlined,
-	ToolOutlined,
-	CodeOutlined,
-	MessageOutlined,
+	BulbOutlined,
 	CheckCircleOutlined,
-	LoadingOutlined,
+	ClearOutlined,
 	CloseCircleOutlined,
+	FileTextOutlined,
+	LoadingOutlined,
+	PaperClipOutlined,
+	PlusOutlined,
+	RightOutlined,
+	RobotOutlined,
 	SendOutlined,
-	ThunderboltOutlined,
 	StarOutlined,
+	ThunderboltOutlined,
+	ToolOutlined,
 } from "@ant-design/icons";
-import { Button, Badge, Card, Tag, Select, Avatar, Typography, Divider, Tooltip } from "antd";
+import {
+	Button,
+	Tooltip
+} from "antd";
 import type * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
-import { useChat, type ChatMode } from "../hooks/useChat";
+import { type ChatMode, useChat } from "../hooks/useChat";
 import { cn } from "../lib/utils";
-import { useSkillStore } from "../stores/skillStore";
-import { useMcpStore } from "../stores/mcpStore";
 import type { Message } from "../stores/chatStore";
 
-const { Text } = Typography;
-
-// Mode configuration with colors and icons
-const MODE_CONFIG: Record<ChatMode, { color: string; bgColor: string; icon: React.ReactNode; label: string; description: string }> = {
-	direct: {
-		color: "#3b82f6",
-		bgColor: "bg-blue-500",
-		icon: <MessageOutlined />,
-		label: "Direct",
-		description: "Chat directly with AI",
-	},
-	agent: {
-		color: "#8b5cf6",
-		bgColor: "bg-purple-500",
-		icon: <RobotOutlined />,
-		label: "Agent",
-		description: "AI agent with tools",
-	},
-	skill: {
-		color: "#f97316",
-		bgColor: "bg-orange-500",
-		icon: <ToolOutlined />,
-		label: "Skill",
-		description: "Execute skills",
-	},
-	mcp: {
-		color: "#06b6d4",
-		bgColor: "bg-cyan-500",
-		icon: <ApiOutlined />,
-		label: "MCP",
-		description: "MCP server tools",
-	},
-};
-
 // Tool call status card
-const ToolCallCard: React.FC<{ toolCall: NonNullable<Message["toolCall"]> }> = ({ toolCall }) => {
+const ToolCallCard: React.FC<{
+	toolCall: NonNullable<Message["toolCall"]>;
+}> = ({ toolCall }) => {
 	const [isExpanded, setIsExpanded] = useState(true);
 
 	const statusConfig = {
-		pending: { color: "blue", icon: <LoadingOutlined className="animate-spin" />, bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800" },
-		success: { color: "green", icon: <CheckCircleOutlined />, bg: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" },
-		error: { color: "red", icon: <CloseCircleOutlined />, bg: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800" },
+		pending: {
+			color: "blue",
+			icon: <LoadingOutlined className="animate-spin" />,
+			bg: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
+		},
+		success: {
+			color: "green",
+			icon: <CheckCircleOutlined />,
+			bg: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+		},
+		error: {
+			color: "red",
+			icon: <CloseCircleOutlined />,
+			bg: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
+		},
 	}[toolCall.status];
 
 	return (
-		<div className={cn("my-3 rounded-xl border overflow-hidden transition-all", statusConfig.bg)}>
+		<div
+			className={cn(
+				"my-3 rounded-xl border overflow-hidden transition-all",
+				statusConfig.bg,
+			)}
+		>
 			<button
 				onClick={() => setIsExpanded(!isExpanded)}
 				className="w-full px-4 py-3 flex items-center gap-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
 			>
-				<span className={cn("text-lg", `text-${statusConfig.color}-500`)}>{statusConfig.icon}</span>
+				<span className={cn("text-lg", `text-${statusConfig.color}-500`)}>
+					{statusConfig.icon}
+				</span>
 				<div className="flex-1 text-left">
-					<div className="font-medium text-sm text-slate-800 dark:text-slate-200">{toolCall.name}</div>
-					<div className="text-xs text-slate-500 capitalize">{toolCall.status}</div>
+					<div className="font-medium text-sm text-slate-800 dark:text-slate-200">
+						{toolCall.name}
+					</div>
+					<div className="text-xs text-slate-500 capitalize">
+						{toolCall.status}
+					</div>
 				</div>
 				<span className="text-xs text-slate-400">{isExpanded ? "▼" : "▶"}</span>
 			</button>
@@ -93,9 +87,13 @@ const ToolCallCard: React.FC<{ toolCall: NonNullable<Message["toolCall"]> }> = (
 
 					{toolCall.result !== undefined && (
 						<div className="bg-white/50 dark:bg-slate-900/50 rounded-lg p-3">
-							<div className="text-xs font-medium text-slate-500 mb-1">Result</div>
+							<div className="text-xs font-medium text-slate-500 mb-1">
+								Result
+							</div>
 							<pre className="text-xs text-slate-700 dark:text-slate-300 overflow-auto max-h-32">
-								{typeof toolCall.result === "string" ? toolCall.result : JSON.stringify(toolCall.result, null, 2)}
+								{typeof toolCall.result === "string"
+									? toolCall.result
+									: JSON.stringify(toolCall.result, null, 2)}
 							</pre>
 						</div>
 					)}
@@ -127,19 +125,29 @@ const MessageBubble: React.FC<{
 	const isUser = msg.role === "user";
 	const isTool = msg.role === "tool";
 	const isAssistant = msg.role === "assistant";
-	const displayContent = isAssistant && isStreaming && isLast ? streamingContent : msg.content;
+	const displayContent =
+		isAssistant && isStreaming && isLast ? streamingContent : msg.content;
 
 	if (isTool && msg.toolCall) {
 		return <ToolCallCard toolCall={msg.toolCall} />;
 	}
 
 	return (
-		<div className={cn("flex gap-4 mb-6", isUser ? "flex-row-reverse" : "flex-row")}>
+		<div
+			className={cn(
+				"flex gap-4 mb-6",
+				isUser ? "flex-row-reverse" : "flex-row",
+			)}
+		>
 			{/* Avatar */}
-			<div className={cn(
-				"w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
-				isUser ? "bg-gradient-to-br from-blue-500 to-purple-500" : "bg-gradient-to-br from-purple-500 to-pink-500"
-			)}>
+			<div
+				className={cn(
+					"w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+					isUser
+						? "bg-gradient-to-br from-blue-500 to-purple-500"
+						: "bg-gradient-to-br from-purple-500 to-pink-500",
+				)}
+			>
 				{isUser ? (
 					<span className="text-white font-bold">U</span>
 				) : (
@@ -149,57 +157,54 @@ const MessageBubble: React.FC<{
 
 			{/* Message content */}
 			<div className={cn("max-w-[80%]", isUser ? "items-end" : "items-start")}>
-				<div className={cn(
-					"rounded-2xl px-5 py-3",
-					isUser
-						? "bg-gradient-to-br from-blue-500 to-purple-500 text-white"
-							: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
-				)}>
+				<div
+					className={cn(
+						"rounded-2xl px-5 py-3",
+						isUser
+							? "bg-gradient-to-br from-blue-500 to-purple-500 text-white"
+							: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm",
+					)}
+				>
 					{displayContent ? (
-						<div className={cn("prose prose-sm max-w-none", isUser ? "prose-invert" : "dark:prose-invert")}>
+						<div
+							className={cn(
+								"prose prose-sm max-w-none",
+								isUser ? "prose-invert" : "dark:prose-invert",
+							)}
+						>
 							<Markdown content={displayContent} />
 						</div>
 					) : isStreaming && isAssistant ? (
 						<div className="flex items-center gap-2 text-slate-400 py-2">
 							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: "0.2s" }} />
-							<span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: "0.4s" }} />
+							<span
+								className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"
+								style={{ animationDelay: "0.2s" }}
+							/>
+							<span
+								className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"
+								style={{ animationDelay: "0.4s" }}
+							/>
 							<span className="text-sm">Thinking...</span>
 						</div>
 					) : null}
 				</div>
-				<div className={cn("text-xs text-slate-400 mt-1", isUser ? "text-right" : "text-left")}>
-					{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+				<div
+					className={cn(
+						"text-xs text-slate-400 mt-1",
+						isUser ? "text-right" : "text-left",
+					)}
+				>
+					{new Date(msg.timestamp).toLocaleTimeString([], {
+						hour: "2-digit",
+						minute: "2-digit",
+					})}
 				</div>
 			</div>
 		</div>
 	);
 };
 
-// Mode selector pill
-const ModePill: React.FC<{
-	mode: ChatMode;
-	isSelected: boolean;
-	onClick: () => void;
-}> = ({ mode, isSelected, onClick }) => {
-	const config = MODE_CONFIG[mode];
-
-	return (
-		<button
-			onClick={onClick}
-			className={cn(
-				"flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full transition-all duration-200 flex-shrink-0",
-				isSelected
-					? `text-white shadow-lg`
-					: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-			)}
-			style={isSelected ? { backgroundColor: config.color } : undefined}
-		>
-			{config.icon}
-			<span className="font-medium text-sm whitespace-nowrap">{config.label}</span>
-		</button>
-	);
-};
 
 // Empty state suggestions
 const SUGGESTIONS = [
@@ -207,6 +212,37 @@ const SUGGESTIONS = [
 	"Write a Python function to calculate fibonacci",
 	"Help me debug this error in my code",
 	"Create a marketing plan for a new product",
+];
+
+// Skill/tool icons for the input toolbar
+interface ToolbarItem {
+	id: string;
+	icon: React.ReactNode;
+	label: string;
+	type: "skill" | "tool" | "action";
+	color?: string;
+}
+
+// Quick action items for the toolbar
+const TOOLBAR_ITEMS: ToolbarItem[] = [
+	{ id: "quote", icon: <PlusOutlined />, label: "引用", type: "action" },
+	{ id: "attach", icon: <PaperClipOutlined />, label: "附件", type: "action" },
+	{
+		id: "prompt",
+		icon: <BulbOutlined />,
+		label: "提示词",
+		type: "tool",
+		color: "#52c41a",
+	},
+	{
+		id: "baidu",
+		icon: <span className="text-green-500 font-bold">du</span>,
+		label: "百度",
+		type: "tool",
+		color: "#52c41a",
+	},
+	{ id: "doc", icon: <FileTextOutlined />, label: "文档", type: "tool" },
+	{ id: "tools", icon: <ToolOutlined />, label: "工具", type: "tool" },
 ];
 
 const Chat: React.FC = () => {
@@ -219,23 +255,16 @@ const Chat: React.FC = () => {
 		isStreaming,
 		streamingContent,
 		clearMessages,
-		chatMode,
 		setChatMode,
-		selectedSkillId,
-		setSelectedSkillId,
-		selectedMcpServerId,
-		setSelectedMcpServerId,
 	} = useChat();
 
-	const { installedSkills } = useSkillStore();
-	const { servers } = useMcpStore();
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const [isInputFocused, setIsInputFocused] = useState(false);
 
 	// Auto-scroll to bottom
 	useEffect(() => {
 		chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages, isStreaming, streamingContent]);
+	}, []);
 
 	const handleSend = () => {
 		if (input.trim() && !isStreaming) {
@@ -294,24 +323,11 @@ const Chat: React.FC = () => {
 										Choose a mode and start your conversation
 									</p>
 								</div>
-
-								{/* Mode Selection */}
-								<div className="flex flex-row flex-wrap justify-center gap-2 sm:gap-3 mb-6 sm:mb-8">
-									{modes.map((mode) => (
-										<ModePill
-											key={mode}
-											mode={mode}
-											isSelected={chatMode === mode}
-											onClick={() => setChatMode(mode)}
-										/>
-									))}
-								</div>
-
 								{/* Suggestions */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-									{SUGGESTIONS.map((suggestion, idx) => (
+									{SUGGESTIONS.map((suggestion) => (
 										<button
-											key={idx}
+											key={suggestion}
 											onClick={() => {
 												setInput(suggestion);
 											}}
@@ -342,61 +358,18 @@ const Chat: React.FC = () => {
 				</div>
 
 				{/* Input Area */}
-				<div className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4">
-					<div className="max-w-4xl mx-auto">
-						{/* Mode selector */}
-						<div className="flex flex-row items-center gap-2 sm:gap-3 mb-3 overflow-x-auto pb-2">
-							{modes.map((mode) => (
-								<ModePill
-									key={mode}
-									mode={mode}
-									isSelected={chatMode === mode}
-									onClick={() => setChatMode(mode)}
-								/>
-							))}
-
-							{/* Skill selector */}
-							{chatMode === "skill" && (
-								<Select
-									placeholder="Select skill"
-									value={selectedSkillId}
-									onChange={setSelectedSkillId}
-									size="small"
-									style={{ minWidth: 150 }}
-									options={installedSkills.map((s) => ({
-										value: s.id,
-										label: s.name,
-									}))}
-								/>
-							)}
-
-							{/* MCP selector */}
-							{chatMode === "mcp" && (
-								<Select
-									placeholder="Select MCP server"
-									value={selectedMcpServerId}
-									onChange={setSelectedMcpServerId}
-									size="small"
-									style={{ minWidth: 150 }}
-									options={servers
-										.filter((s) => s.status === "connected")
-										.map((s) => ({
-											value: s.id,
-											label: s.name,
-										}))}
-								/>
-							)}
-						</div>
-
-						{/* Input box */}
+				<div className="px-6 py-4">
+					<div className="w-full mx-auto">
+						{/* Input box with toolbar */}
 						<div
 							className={cn(
-								"relative flex items-end gap-2 rounded-2xl border bg-slate-50 dark:bg-slate-800 transition-all duration-200",
+								"relative rounded-2xl border bg-slate-50 dark:bg-slate-800 transition-all duration-200",
 								isInputFocused
 									? "border-blue-500 shadow-lg shadow-blue-500/10"
-									: "border-slate-200 dark:border-slate-700"
+									: "border-slate-200 dark:border-slate-700",
 							)}
 						>
+							{/* Textarea */}
 							<textarea
 								value={input}
 								onChange={(e) => setInput(e.target.value)}
@@ -408,28 +381,68 @@ const Chat: React.FC = () => {
 								}}
 								onFocus={() => setIsInputFocused(true)}
 								onBlur={() => setIsInputFocused(false)}
-								placeholder={t("chat.placeholder", "Type your message...")}
-								className="flex-1 bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[56px] focus:outline-none text-slate-800 dark:text-slate-200"
+								placeholder={t(
+									"chat.placeholder",
+									"在这里输入消息，按 Enter 发送",
+								)}
+								className="w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none text-slate-800 dark:text-slate-200"
 								rows={1}
 								style={{ height: "auto" }}
 								disabled={isStreaming}
 							/>
-							<div className="pr-3 pb-3">
+
+							{/* Bottom toolbar */}
+							<div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-700">
+								{/* Left toolbar items */}
+								<div className="flex items-center gap-1">
+									{TOOLBAR_ITEMS.map((item) => (
+										<Tooltip key={item.id} title={item.label}>
+											<button
+												onClick={() => {
+													// Handle toolbar item click
+													if (item.id === "prompt") {
+														// Toggle prompt mode or show prompt selector
+														setChatMode("skill");
+													}
+												}}
+												className={cn(
+													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700",
+													item.color && "hover:text-[var(--hover-color)]",
+												)}
+												style={
+													item.color
+														? ({
+															"--hover-color": item.color,
+														} as React.CSSProperties)
+														: undefined
+												}
+											>
+												{item.icon}
+											</button>
+										</Tooltip>
+									))}
+
+									{/* Divider */}
+									<div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+
+									{/* More button */}
+									<Tooltip title="更多">
+										<button className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700">
+											<RightOutlined className="text-sm" />
+										</button>
+									</Tooltip>
+								</div>
+
+								{/* Right send button */}
 								<Button
 									type="primary"
-									icon={<SendOutlined />}
 									onClick={handleSend}
 									loading={isStreaming}
 									disabled={!input.trim()}
-									className="rounded-xl h-10 w-10 flex items-center justify-center"
+									className="rounded-full h-9 w-9 flex items-center justify-center !bg-slate-400 hover:!bg-slate-500 !border-0"
+									icon={<SendOutlined className="text-sm" />}
 								/>
 							</div>
-						</div>
-
-						<div className="text-center mt-2">
-							<Text className="text-xs text-slate-400">
-								Press Enter to send, Shift+Enter for new line
-							</Text>
 						</div>
 					</div>
 				</div>

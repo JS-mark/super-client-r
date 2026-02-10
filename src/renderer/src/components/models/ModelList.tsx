@@ -192,7 +192,7 @@ export const ModelList: React.FC = () => {
 						</span>
 					</div>
 				}
-				width={420}
+				size={420}
 				styles={{
 					body: { paddingBottom: 80 },
 					header: { borderBottom: "1px solid #f0f0f0" },
