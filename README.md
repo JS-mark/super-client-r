@@ -1,57 +1,64 @@
-# React + TypeScript + Vite
+# Super Client R 文档
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 文档索引
 
-Currently, two official plugins are available:
+| 文档                                           | 说明                 |
+|------------------------------------------------|----------------------|
+| [ARCHITECTURE.md](./ARCHITECTURE.md)           | 系统架构设计文档     |
+| [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | 项目结构规范         |
+| [CODING_STANDARDS.md](./CODING_STANDARDS.md)   | 代码规范             |
+| [DEVELOPMENT.md](./DEVELOPMENT.md)             | 开发指南             |
+| [API.md](./API.md)                             | IPC 和 HTTP API 文档 |
+| [CLAUDE_CODE_GUIDE.md](./CLAUDE_CODE_GUIDE.md) | Claude Code 开发指南 |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 快速导航
 
-## Expanding the ESLint configuration
+### 如果你是新开发者
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. 先阅读 [ARCHITECTURE.md](./ARCHITECTURE.md) 了解系统架构
+2. 查看 [DEVELOPMENT.md](./DEVELOPMENT.md) 配置开发环境
+3. 遵循 [CODING_STANDARDS.md](./CODING_STANDARDS.md) 编写代码
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+### 如果你要添加新功能
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+1. 参考 [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) 确定文件位置
+2. 查看 [API.md](./API.md) 了解通信接口
+3. 遵循 [CODING_STANDARDS.md](./CODING_STANDARDS.md) 代码规范
 
-```js
-import reactDom from 'eslint-plugin-react-dom'
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
+### 如果你要调试问题
 
-export default tseslint.config({
-  extends: [
-    // other configs...
-    // Enable lint rules for React
-    reactX.configs['recommended-typescript'],
-    // Enable lint rules for React DOM
-    reactDom.configs.recommended,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+1. 查看 [DEVELOPMENT.md](./DEVELOPMENT.md) 的"常见问题"章节
+2. 参考 [ARCHITECTURE.md](./ARCHITECTURE.md) 的模块关系图
+3. 使用 [API.md](./API.md) 验证接口调用
+
+---
+
+## 项目概述
+
+**Super Client R** 是一个基于 Electron 的 AI 客户端桌面应用，主要功能包括：
+
+- **AI 对话**: 基于 Claude SDK 的智能对话
+- **Agent 系统**: 支持工具调用的 AI 代理
+- **Skill 系统**: 可扩展的工具和插件体系
+- **MCP 支持**: Model Context Protocol 服务器管理
+- **本地 API**: 内置 HTTP 服务器供外部调用
+
+## 技术栈
+
+- **框架**: Electron + React + TypeScript
+- **UI**: Ant Design + Tailwind CSS
+- **构建**: Vite + electron-vite
+- **状态**: Zustand
+- **服务器**: Koa
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建功能分支 (`git checkout -b feat/amazing-feature`)
+3. 提交更改 (`git commit -m 'feat: add amazing feature'`)
+4. 推送分支 (`git push origin feat/amazing-feature`)
+5. 创建 Pull Request
+
+## 许可证
+
+MIT License
