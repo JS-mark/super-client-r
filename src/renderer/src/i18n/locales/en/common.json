@@ -48,6 +48,8 @@
 		}
 	},
 	"skills": {
+		"noData": "No skills found",
+		"noInstalled": "No installed skills",
 		"title": "Skill Center",
 		"searchPlaceholder": "Search skills...",
 		"tabs": {
@@ -96,6 +98,7 @@
 		"running": "Running",
 		"stopped": "Stopped",
 		"listeningOn": "Listening on",
+		"apiDocs": "API Docs",
 		"about": "About",
 		"aboutDescription": "A powerful AI desktop client for seamless interaction with multiple AI services.",
 		"platform": "Platform",
@@ -157,7 +160,23 @@
 		"resetMenu": "Reset to default",
 		"toggleMenu": "Toggle menu item visibility",
 		"defaultIcon": "Default Icon",
-		"dragTip": "Drag to reorder menu items"
+		"dragTip": "Drag to reorder menu items",
+		"apiKeys": "API Keys",
+		"skillsmpApi": "SkillsMP API",
+		"skillsmpApiKey": "API Key",
+		"skillsmpApiKeyPlaceholder": "Enter your SkillsMP API Key",
+		"skillsmpApiKeyHint": "Get your API Key from skillsmp.com",
+		"apiKeySaved": "API Key saved successfully",
+		"apiKeySaveError": "Failed to save API Key",
+		"shortcuts": "Shortcuts",
+		"shortcutsHint": "Use CmdOrCtrl for cross-platform compatibility",
+		"shortcuts.newChat": "New Chat",
+		"shortcuts.quickSearch": "Quick Search",
+		"shortcuts.toggleSidebar": "Toggle Sidebar",
+		"shortcuts.settings": "Settings",
+		"floatWidget": "Float Widget",
+		"enableFloatWidget": "Enable Float Widget",
+		"floatWidgetHint": "Show a floating widget on desktop"
 	},
 	"home": {
 		"welcome": "Welcome to Super Client",
@@ -201,9 +220,20 @@
 		"defaultMessage": "Sorry, an unexpected error has occurred.",
 		"backHome": "Back Home"
 	},
+	"window": {
+		"minimize": "Minimize",
+		"maximize": "Maximize",
+		"restore": "Restore",
+		"close": "Close"
+	},
+	"user": {
+		"guest": "Guest",
+		"logout": "Logout"
+	},
 	"common": {
 		"empty": "Empty",
 		"save": "Save",
+		"saved": "Saved",
 		"cancel": "Cancel",
 		"confirm": "Confirm"
 	}

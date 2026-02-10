@@ -1,21 +1,24 @@
 import {
   ApiOutlined,
+  BookOutlined,
   BugOutlined,
+  CheckCircleOutlined,
   ClearOutlined,
   CodeOutlined,
   CopyOutlined,
   DeleteOutlined,
+  DesktopOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
-  GithubOutlined,
   GlobalOutlined,
-  HeartOutlined,
   InfoCircleOutlined,
+  KeyOutlined,
   LinkOutlined,
   MenuOutlined,
   PlayCircleOutlined,
   PoweroffOutlined,
   ReloadOutlined,
+  SaveOutlined,
   SettingOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
@@ -23,7 +26,6 @@ import {
   Alert,
   Button,
   Card,
-  Divider,
   Empty,
   Form,
   Input,
@@ -35,6 +37,7 @@ import {
   Skeleton,
   Space,
   Spin,
+  Switch,
   Tabs,
   Tag,
   Tooltip,
@@ -43,24 +46,24 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
+import { List, type ListImperativeAPI } from "react-window";
 import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
-import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { AboutSection } from "../components/settings/AboutSection";
-import type { MenuItemConfig } from "../types/menu";
-import { getMenuConfig, saveMenuConfig } from "../types/menu";
+import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
+import { useLogWorker } from "../hooks/useLogWorker";
 import { type ApiStatus, apiService } from "../services/apiService";
 import {
   type AppInfo,
-  type LogFileInfo,
   appService,
+  type LogFileInfo,
 } from "../services/appService";
 
 const PORT_MIN = 1024;
 const PORT_MAX = 65535;
 const DEFAULT_PORT = 3000;
 const AUTO_REFRESH_INTERVAL = 5000;
-const LOG_TAIL_LINES = 500;
+const LOG_TAIL_LINES = 100; // 减少到100行，加快加载速度
 
 // 错误重试工具函数
 async function withRetry<T>(
@@ -124,66 +127,100 @@ const ErrorState: React.FC<{
   />
 );
 
+// 单行日志组件 - 用于虚拟滚动
+interface LogLineRowProps {
+  lines: string[];
+}
+
+const LogLine = ({
+  index,
+  style,
+  lines,
+}: {
+  index: number;
+  style: React.CSSProperties;
+  ariaAttributes: {
+    "aria-posinset": number;
+    "aria-setsize": number;
+    role: "listitem";
+  };
+} & LogLineRowProps) => (
+  <div
+    style={{ ...style, height: 20 }}
+    className="px-4 text-slate-100 text-xs font-mono leading-5 whitespace-pre-wrap break-all overflow-hidden"
+  >
+    {lines[index]}
+  </div>
+);
+
 // 日志查看器组件
 const LogViewer: React.FC = () => {
   const { t } = useTranslation();
   const [logFiles, setLogFiles] = useState<LogFileInfo[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>("");
-  const [logContent, setLogContent] = useState<string>("");
+  const [logLines, setLogLines] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const logContainerRef = useRef<HTMLPreElement>(null);
+  const listRef = useRef<ListImperativeAPI>(null);
   const refreshTimerRef = useRef<number | null>(null);
 
+  // 使用 Worker 处理日志
+  const { parseLogs, isLoading: workerLoading } = useLogWorker();
+
+  // 加载日志文件列表（轻量操作）
   const loadLogFiles = useCallback(async () => {
     try {
-      const files = await withRetry(() => appService.listLogFiles());
+      const files = await appService.listLogFiles();
       setLogFiles(files);
       if (files.length > 0 && !selectedFile) {
         setSelectedFile(files[0].path);
       }
       setError(null);
-    } catch (e) {
+    } catch {
       setError(t("settings.loadLogFilesError", "Failed to load log files"));
     }
   }, [selectedFile, t]);
 
+  // 加载日志内容 - 使用 Worker 处理
   const loadLogs = useCallback(async () => {
     if (!selectedFile) return;
 
     setLoading(true);
     try {
-      const content = await withRetry(() =>
-        appService.getLogs(selectedFile, LOG_TAIL_LINES),
-      );
-      setLogContent(content);
+      // 1. 从主进程获取原始内容（已优化为反向读取）
+      const rawContent = await appService.getLogs(selectedFile, LOG_TAIL_LINES);
+
+      // 2. 使用 Worker 在后台线程处理数据，避免阻塞主线程
+      const { lines } = await parseLogs(rawContent);
+
+      setLogLines(lines);
       setError(null);
 
-      // 自动滚动到底部
+      // 3. 滚动到底部
       requestAnimationFrame(() => {
-        if (logContainerRef.current) {
-          logContainerRef.current.scrollTop =
-            logContainerRef.current.scrollHeight;
-        }
+        listRef.current?.scrollToRow({ index: lines.length - 1, align: "end" });
       });
-    } catch (e) {
+    } catch {
       setError(t("settings.loadLogsError", "Failed to load logs"));
     } finally {
       setLoading(false);
     }
-  }, [selectedFile, t]);
+  }, [selectedFile, t, parseLogs]);
 
+  // 首次加载文件列表
   useEffect(() => {
     loadLogFiles();
   }, [loadLogFiles]);
 
+  // 选择文件时加载日志
   useEffect(() => {
     if (selectedFile) {
       loadLogs();
     }
   }, [selectedFile, loadLogs]);
 
+  // 自动刷新
   useEffect(() => {
     if (autoRefresh && selectedFile) {
       refreshTimerRef.current = window.setInterval(
@@ -203,7 +240,7 @@ const LogViewer: React.FC = () => {
     try {
       await appService.clearLogs();
       message.success(t("settings.clearLogsSuccess", "Logs cleared"));
-      setLogContent("");
+      setLogLines([]);
       await loadLogFiles();
     } catch (e) {
       message.error(t("settings.clearLogsError", "Failed to clear logs"));
@@ -215,7 +252,9 @@ const LogViewer: React.FC = () => {
       const logsPath = await appService.getLogsPath();
       await appService.openPath(logsPath);
     } catch (e) {
-      message.error(t("settings.openLogsFolderError", "Failed to open logs folder"));
+      message.error(
+        t("settings.openLogsFolderError", "Failed to open logs folder"),
+      );
     }
   };
 
@@ -311,24 +350,243 @@ const LogViewer: React.FC = () => {
       </div>
 
       <div className="relative">
-        {loading && !logContent && (
+        {(loading || workerLoading) && logLines.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-800/80 z-10 rounded-xl">
-            <Spin />
+            <Spin tip={workerLoading ? "Processing..." : "Loading..."} />
           </div>
         )}
 
-        <pre
-          ref={logContainerRef}
-          className="h-[500px] overflow-auto p-4 rounded-xl bg-slate-900 text-slate-100 text-sm font-mono leading-relaxed"
-        >
-          {logContent || (
-            <Empty
-              description={t("settings.noLogs", "No logs available")}
-              className="[&_.ant-empty-description]:!text-slate-400"
+        <div className="h-[500px] rounded-xl bg-slate-900 overflow-hidden">
+          {logLines.length > 0 ? (
+            <List<{ lines: string[] }>
+              listRef={listRef}
+              defaultHeight={500}
+              rowCount={logLines.length}
+              rowHeight={20}
+              rowProps={{ lines: logLines }}
+              rowComponent={LogLine}
+              overscanCount={5}
+              className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+              style={{ height: 500 }}
             />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <Empty
+                description={t("settings.noLogs", "No logs available")}
+                className="[&_.ant-empty-description]:!text-slate-400"
+              />
+            </div>
           )}
-        </pre>
+        </div>
       </div>
+    </div>
+  );
+};
+
+// API Keys 配置组件
+const ApiKeysConfig: React.FC = () => {
+  const { t } = useTranslation();
+  const [skillsmpKey, setSkillsmpKey] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // 加载已保存的 API Key
+  useEffect(() => {
+    const loadApiKey = async () => {
+      try {
+        // 通过 IPC 获取 API Key
+        const result = await window.electron.ipc.invoke(
+          "app:get-config",
+          "skillsmpApiKey",
+        );
+        if (result) {
+          setSkillsmpKey(result as string);
+        }
+      } catch (e) {
+        console.error("Failed to load API key:", e);
+      }
+    };
+    loadApiKey();
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await window.electron.ipc.invoke(
+        "app:set-config",
+        "skillsmpApiKey",
+        skillsmpKey,
+      );
+      setSaved(true);
+      message.success(t("settings.apiKeySaved", "API Key saved successfully"));
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      message.error(t("settings.apiKeySaveError", "Failed to save API Key"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SettingSection
+        title={t("settings.skillsmpApi", "SkillsMP API")}
+        icon={<KeyOutlined />}
+      >
+        <div className="space-y-4">
+          <div>
+            <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              {t("settings.skillsmpApiKey", "API Key")}
+            </span>
+            <Input.Password
+              value={skillsmpKey}
+              onChange={(e) => setSkillsmpKey(e.target.value)}
+              placeholder={t(
+                "settings.skillsmpApiKeyPlaceholder",
+                "Enter your SkillsMP API Key",
+              )}
+              className="!rounded-xl"
+              size="large"
+              prefix={<KeyOutlined className="text-slate-400" />}
+            />
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              {t(
+                "settings.skillsmpApiKeyHint",
+                "Get your API Key from skillsmp.com",
+              )}
+            </p>
+          </div>
+
+          <Button
+            type="primary"
+            icon={saved ? <CheckCircleOutlined /> : <SaveOutlined />}
+            onClick={handleSave}
+            loading={loading}
+            size="large"
+            className="!rounded-xl"
+          >
+            {saved ? t("common.saved", "Saved") : t("common.save", "Save")}
+          </Button>
+        </div>
+      </SettingSection>
+    </div>
+  );
+};
+
+// 快捷键设置组件
+const ShortcutSettings: React.FC = () => {
+  const { t } = useTranslation();
+  const [shortcuts, setShortcuts] = useState({
+    newChat: "CmdOrCtrl+N",
+    quickSearch: "CmdOrCtrl+K",
+    toggleSidebar: "CmdOrCtrl+B",
+    settings: "CmdOrCtrl+,",
+  });
+
+  const handleShortcutChange = (key: string, value: string) => {
+    setShortcuts((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const shortcutItems = [
+    {
+      key: "newChat",
+      label: t("settings.shortcuts.newChat", "New Chat"),
+      defaultValue: "CmdOrCtrl+N",
+    },
+    {
+      key: "quickSearch",
+      label: t("settings.shortcuts.quickSearch", "Quick Search"),
+      defaultValue: "CmdOrCtrl+K",
+    },
+    {
+      key: "toggleSidebar",
+      label: t("settings.shortcuts.toggleSidebar", "Toggle Sidebar"),
+      defaultValue: "CmdOrCtrl+B",
+    },
+    {
+      key: "settings",
+      label: t("settings.shortcuts.settings", "Settings"),
+      defaultValue: "CmdOrCtrl+,",
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <SettingSection
+        title={t("settings.shortcuts", "Keyboard Shortcuts")}
+        icon={<DesktopOutlined />}
+      >
+        <div className="space-y-4">
+          {shortcutItems.map((item) => (
+            <div key={item.key} className="flex items-center justify-between">
+              <span className="text-slate-700 dark:text-slate-300">
+                {item.label}
+              </span>
+              <Input
+                value={shortcuts[item.key as keyof typeof shortcuts]}
+                onChange={(e) => handleShortcutChange(item.key, e.target.value)}
+                className="!w-[200px] !rounded-xl"
+                placeholder={item.defaultValue}
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
+          {t(
+            "settings.shortcutsHint",
+            "Use CmdOrCtrl for cross-platform compatibility",
+          )}
+        </p>
+      </SettingSection>
+    </div>
+  );
+};
+
+// 悬浮窗设置组件
+const FloatWidgetSettings: React.FC = () => {
+  const { t } = useTranslation();
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    // 加载保存的设置
+    const saved = localStorage.getItem("float-widget-enabled");
+    if (saved) {
+      setEnabled(saved === "true");
+    }
+  }, []);
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    localStorage.setItem("float-widget-enabled", checked.toString());
+    // 这里可以添加 IPC 调用来控制悬浮窗显示/隐藏
+    if (checked) {
+      window.electron.ipc.send("float-widget:show");
+    } else {
+      window.electron.ipc.send("float-widget:hide");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SettingSection
+        title={t("settings.floatWidget", "Float Widget")}
+        icon={<DesktopOutlined />}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-slate-700 dark:text-slate-300 font-medium">
+              {t("settings.enableFloatWidget", "Enable Float Widget")}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {t(
+                "settings.floatWidgetHint",
+                "Show a floating widget on desktop",
+              )}
+            </p>
+          </div>
+          <Switch checked={enabled} onChange={handleToggle} size="default" />
+        </div>
+      </SettingSection>
     </div>
   );
 };
@@ -336,7 +594,9 @@ const LogViewer: React.FC = () => {
 // 调试工具组件
 const DebugTools: React.FC = () => {
   const { t } = useTranslation();
-  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
 
   const collectDebugInfo = useCallback(async () => {
@@ -674,7 +934,10 @@ const Settings: React.FC = () => {
     if (value < PORT_MIN || value > PORT_MAX) {
       return Promise.reject(
         new Error(
-          t("settings.portRange", `Port must be between ${PORT_MIN} and ${PORT_MAX}`),
+          t(
+            "settings.portRange",
+            `Port must be between ${PORT_MIN} and ${PORT_MAX}`,
+          ),
         ),
       );
     }
@@ -691,21 +954,42 @@ const Settings: React.FC = () => {
         </span>
       ),
       children: (
-        <Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
+        <Card
+          className="!border-0 !shadow-none !bg-transparent"
+          loading={loading}
+        >
           {error && <ErrorState message={error} onRetry={loadData} />}
 
           <div className="space-y-6">
-            <SettingSection title={t("settings.userDataPath", "User Data Directory")}>
-              <Space.Compact style={{ width: "100%" }}>
-                <Input value={userDataPath} readOnly className="!rounded-l-xl" />
-                <Button
-                  icon={<FolderOpenOutlined />}
-                  onClick={handleOpenPath}
-                  className="!rounded-r-xl"
-                >
-                  {t("settings.open", "Open")}
-                </Button>
-              </Space.Compact>
+            <SettingSection
+              title={t("settings.userDataPath", "User Data Directory")}
+            >
+              <div className="space-y-2">
+                <Space.Compact style={{ width: "100%" }}>
+                  <Input
+                    value={userDataPath}
+                    readOnly
+                    className="!rounded-l-xl"
+                    placeholder={t(
+                      "settings.userDataPathPlaceholder",
+                      "User data directory path",
+                    )}
+                  />
+                  <Button
+                    icon={<FolderOpenOutlined />}
+                    onClick={handleOpenPath}
+                    className="!rounded-r-xl"
+                  >
+                    {t("settings.open", "Open")}
+                  </Button>
+                </Space.Compact>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t(
+                    "settings.userDataPathHint",
+                    "This directory stores application data and cannot be changed",
+                  )}
+                </p>
+              </div>
             </SettingSection>
 
             <SettingSection
@@ -760,25 +1044,26 @@ const Settings: React.FC = () => {
         </span>
       ),
       children: (
-        <Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
+        <Card
+          className="!border-0 !shadow-none !bg-transparent"
+          loading={loading}
+        >
           <SettingSection title={t("settings.apiService", "API Service")}>
             <Form form={form} layout="inline" className="w-full">
               <div className="flex items-center gap-4 flex-wrap w-full">
                 {/* 状态指示器 */}
                 <div className="flex items-center gap-2 min-w-[120px]">
                   <div
-                    className={`w-2.5 h-2.5 rounded-full ${
-                      apiStatus.status === "running"
-                        ? "bg-green-500 animate-pulse"
-                        : "bg-red-500"
-                    }`}
+                    className={`w-2.5 h-2.5 rounded-full ${apiStatus.status === "running"
+                      ? "bg-green-500 animate-pulse"
+                      : "bg-red-500"
+                      }`}
                   />
                   <span
-                    className={`font-medium text-sm uppercase ${
-                      apiStatus.status === "running"
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
+                    className={`font-medium text-sm uppercase ${apiStatus.status === "running"
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
+                      }`}
                   >
                     {apiStatus.status === "running"
                       ? t("settings.running", "Running")
@@ -796,7 +1081,9 @@ const Settings: React.FC = () => {
                     min={PORT_MIN}
                     max={PORT_MAX}
                     placeholder={`${DEFAULT_PORT}`}
-                    prefix={<span className="text-slate-400 text-xs mr-1">Port</span>}
+                    prefix={
+                      <span className="text-slate-400 text-xs mr-1">Port</span>
+                    }
                     className="!w-[140px]"
                     size="middle"
                     disabled={apiStatus.status === "running"}
@@ -826,7 +1113,9 @@ const Settings: React.FC = () => {
                       >
                         {t("settings.stop", "Stop")}
                       </Button>
-                      <Tooltip title={t("settings.restartTip", "Apply port changes")}>
+                      <Tooltip
+                        title={t("settings.restartTip", "Apply port changes")}
+                      >
                         <Button
                           icon={<ReloadOutlined />}
                           onClick={() => handleApiAction("restart")}
@@ -843,28 +1132,96 @@ const Settings: React.FC = () => {
 
               {/* 提示信息 */}
               {apiStatus.status === "running" && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-                  <LinkOutlined />
-                  <span>
-                    {t("settings.listeningOn", "Listening on")}:{" "}
-                    <code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400">
-                      http://localhost:{apiStatus.port}
-                    </code>
-                  </span>
-                  <Button
-                    type="link"
-                    size="small"
-                    icon={<CopyOutlined />}
-                    onClick={() => {
-                      navigator.clipboard.writeText(`http://localhost:${apiStatus.port}`);
-                      message.success(t("settings.copied", "Copied to clipboard"));
-                    }}
-                    className="!px-1"
-                  />
-                </div>
+                <>
+                  <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                    <LinkOutlined />
+                    <span>
+                      {t("settings.listeningOn", "Listening on")}:{" "}
+                      <code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400">
+                        http://localhost:{apiStatus.port}
+                      </code>
+                    </span>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `http://localhost:${apiStatus.port}`,
+                        );
+                        message.success(
+                          t("settings.copied", "Copied to clipboard"),
+                        );
+                      }}
+                      className="!px-1"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                    <BookOutlined />
+                    <span>
+                      {t("settings.apiDocs", "API Docs")}:{" "}
+                      <Button
+                        type="link"
+                        size="small"
+                        className="!px-0 !py-0 h-auto"
+                        onClick={() => {
+                          appService.openExternal(
+                            `http://localhost:${apiStatus.port}/api-docs`,
+                          );
+                        }}
+                      >
+                        <code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400">
+                          http://localhost:{apiStatus.port}/api-docs
+                        </code>
+                      </Button>
+                    </span>
+                  </div>
+                </>
               )}
             </Form>
           </SettingSection>
+        </Card>
+      ),
+    },
+    {
+      key: "apikeys",
+      label: (
+        <span className="flex items-center gap-2 font-medium">
+          <KeyOutlined />
+          {t("settings.apiKeys", "API Keys")}
+        </span>
+      ),
+      children: (
+        <Card className="!border-0 !shadow-none !bg-transparent">
+          <ApiKeysConfig />
+        </Card>
+      ),
+    },
+    {
+      key: "shortcuts",
+      label: (
+        <span className="flex items-center gap-2 font-medium">
+          <KeyOutlined />
+          {t("settings.shortcuts", "Shortcuts")}
+        </span>
+      ),
+      children: (
+        <Card className="!border-0 !shadow-none !bg-transparent">
+          <ShortcutSettings />
+        </Card>
+      ),
+    },
+    {
+      key: "floatwidget",
+      label: (
+        <span className="flex items-center gap-2 font-medium">
+          <DesktopOutlined />
+          {t("settings.floatWidget", "Float Widget")}
+        </span>
+      ),
+      children: (
+        <Card className="!border-0 !shadow-none !bg-transparent">
+          <FloatWidgetSettings />
         </Card>
       ),
     },
@@ -908,9 +1265,21 @@ const Settings: React.FC = () => {
         <AboutSection
           appInfo={appInfo}
           onCheckUpdate={handleCheckUpdate}
-          onOpenGitHub={() => window.open("https://github.com/example/super-client", "_blank")}
-          onReportBug={() => window.open("https://github.com/example/super-client/issues", "_blank")}
-          onOpenLicense={() => window.open("https://github.com/example/super-client/blob/main/LICENSE", "_blank")}
+          onOpenGitHub={() =>
+            window.open("https://github.com/example/super-client", "_blank")
+          }
+          onReportBug={() =>
+            window.open(
+              "https://github.com/example/super-client/issues",
+              "_blank",
+            )
+          }
+          onOpenLicense={() =>
+            window.open(
+              "https://github.com/example/super-client/blob/main/LICENSE",
+              "_blank",
+            )
+          }
         />
       ),
     },
@@ -942,7 +1311,8 @@ const Settings: React.FC = () => {
           activeKey={activeTab}
           onChange={setActiveTab}
           items={items}
-          className="!bg-white/80 dark:!bg-slate-800/80 !rounded-2xl !p-6 !shadow-xl !backdrop-blur-sm"
+          tabPosition="left"
+          className="!bg-white/80 dark:!bg-slate-800/80 !rounded-2xl !p-6 !shadow-xl !backdrop-blur-sm settings-tabs"
         />
       </div>
     </MainLayout>

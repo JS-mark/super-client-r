@@ -48,6 +48,8 @@
 		}
 	},
 	"skills": {
+		"noData": "暂无技能",
+		"noInstalled": "暂无已安装技能",
 		"title": "技能中心",
 		"searchPlaceholder": "搜索技能...",
 		"tabs": {
@@ -96,6 +98,7 @@
 		"running": "运行中",
 		"stopped": "已停止",
 		"listeningOn": "监听地址",
+		"apiDocs": "API 文档",
 		"about": "关于",
 		"aboutDescription": "一个强大的 AI 桌面客户端，提供与多种 AI 服务的无缝交互体验。",
 		"platform": "平台",
@@ -157,7 +160,23 @@
 		"resetMenu": "重置为默认值",
 		"toggleMenu": "切换菜单项显示状态",
 		"defaultIcon": "默认图标",
-		"dragTip": "拖拽以重新排序菜单项"
+		"dragTip": "拖拽以重新排序菜单项",
+		"apiKeys": "API Keys",
+		"skillsmpApi": "SkillsMP API",
+		"skillsmpApiKey": "API Key",
+		"skillsmpApiKeyPlaceholder": "请输入 SkillsMP API Key",
+		"skillsmpApiKeyHint": "从 skillsmp.com 获取您的 API Key",
+		"apiKeySaved": "API Key 保存成功",
+		"apiKeySaveError": "保存 API Key 失败",
+		"shortcuts": "快捷键",
+		"shortcutsHint": "使用 CmdOrCtrl 实现跨平台兼容",
+		"shortcuts.newChat": "新建对话",
+		"shortcuts.quickSearch": "快速搜索",
+		"shortcuts.toggleSidebar": "切换侧边栏",
+		"shortcuts.settings": "设置",
+		"floatWidget": "悬浮窗",
+		"enableFloatWidget": "启用悬浮窗",
+		"floatWidgetHint": "在桌面上显示悬浮窗"
 	},
 	"home": {
 		"welcome": "欢迎使用 Super Client",
@@ -201,9 +220,20 @@
 		"defaultMessage": "抱歉，发生了意外错误。",
 		"backHome": "返回首页"
 	},
+	"window": {
+		"minimize": "最小化",
+		"maximize": "最大化",
+		"restore": "还原",
+		"close": "关闭"
+	},
+	"user": {
+		"guest": "访客",
+		"logout": "退出登录"
+	},
 	"common": {
 		"empty": "空",
 		"save": "保存",
+		"saved": "已保存",
 		"cancel": "取消",
 		"confirm": "确认"
 	}
