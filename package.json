@@ -25,7 +25,10 @@
     "i18n:translate": "tsx scripts/i18n/translate.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -34,6 +37,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@koa/cors": "^5.0.0",
     "@koa/router": "^15.3.0",
+    "@koa/proxies": "^0.12.4",
     "@modelcontextprotocol/sdk": "^1.25.3",
     "@types/react-window": "^2.0.0",
     "antd": "^6.2.1",
@@ -47,7 +51,6 @@
     "koa": "^3.1.1",
     "koa-bodyparser": "^4.4.1",
     "koa-proxies": "^0.12.4",
-    "koa-router": "^14.0.0",
     "koa-swagger-decorator": "^1.8.7",
     "lucide-react": "^0.563.0",
     "react": "^19.2.3",
@@ -94,7 +97,8 @@
     "vite": "^7.3.1",
     "vite-plugin-trae-solo-badge": "^1.0.0",
     "vite-tsconfig-paths": "^6.0.5",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "vitepress": "^1.6.3"
   },
   "build": {
     "appId": "com.superclient.app",

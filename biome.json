@@ -21,6 +21,12 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"style": {
+				"noNonNullAssertion": "off"
+			},
+			"complexity": {
+				"useOptionalChain": "off"
+			},
 			"a11y": {
 				"useButtonType": "off",
 				"noSvgWithoutTitle": "off"

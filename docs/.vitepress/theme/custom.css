@@ -1,0 +1,49 @@
+:root {
+  --vp-c-brand-1: #3b82f6;
+  --vp-c-brand-2: #2563eb;
+  --vp-c-brand-3: #1d4ed8;
+  --vp-c-brand-soft: rgba(59, 130, 246, 0.14);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #3b82f6 30%,
+    #8b5cf6
+  );
+
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    #3b82f6 50%,
+    #8b5cf6 50%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+.VPHero .VPImage {
+  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.3));
+}
+
+.VPFeature {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.VPFeature:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.custom-block {
+  border-radius: 8px;
+}
+
+code {
+  font-family: 'Fira Code', 'SF Mono', Monaco, monospace;
+}
+
+.vp-doc table {
+  font-size: 14px;
+}
+
+.vp-doc th {
+  background-color: var(--vp-c-bg-soft);
+}
