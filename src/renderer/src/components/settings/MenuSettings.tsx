@@ -159,11 +159,11 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 				</Space>
 			}
 		>
-			<Space direction="vertical" className="w-full" size="middle">
+			<Space orientation="vertical" className="w-full" size="middle">
 				<div>
-					<label className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
 						{t("settings.menuLabel", "Label")}
-					</label>
+					</span>
 					<Input
 						value={t(editingItem.label)}
 						readOnly
@@ -257,12 +257,14 @@ export const MenuSettings: React.FC = () => {
 	const [editModalOpen, setEditModalOpen] = useState(false);
 
 	const handleToggleEnabled = useCallback((itemId: string) => {
-		const updatedItems = config.items.map((item) =>
-			item.id === itemId ? { ...item, enabled: !item.enabled } : item,
-		);
-		setConfig({ items: updatedItems });
-		saveMenuConfig({ items: updatedItems });
-	}, [config]);
+		setConfig((prev) => {
+			const updatedItems = prev.items.map((item) =>
+				item.id === itemId ? { ...item, enabled: !item.enabled } : item,
+			);
+			saveMenuConfig({ items: updatedItems });
+			return { items: updatedItems };
+		});
+	}, []);
 
 	const handleEditItem = (item: MenuItemConfig) => {
 		setEditingItem(item);
@@ -352,12 +354,13 @@ export const MenuSettings: React.FC = () => {
 								const fromIndex = Number(e.dataTransfer.getData("text/plain"));
 								if (fromIndex === index) return;
 
-								const newItems = [...config.items];
-								const [removed] = newItems.splice(fromIndex, 1);
-								newItems.splice(index, 0, removed);
-
-								setConfig({ items: newItems });
-								saveMenuConfig({ items: newItems });
+								setConfig((prev) => {
+									const newItems = [...prev.items];
+									const [removed] = newItems.splice(fromIndex, 1);
+									newItems.splice(index, 0, removed);
+									saveMenuConfig({ items: newItems });
+									return { items: newItems };
+								});
 							}}
 						>
 							<div className="flex items-center gap-3">
