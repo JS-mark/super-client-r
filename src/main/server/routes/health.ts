@@ -1,11 +1,11 @@
-import Router from "koa-router";
+import { request, summary, tags, body, description } from "koa-swagger-decorator";
 
-export const healthRouter = new Router();
-
-healthRouter.get("/health", (ctx) => {
-	// Access port from ctx.state or global config if needed,
-	// but usually health check just returns ok.
-	// The original code returned the port, which is dynamic.
-	// We can pass the port or store it in app context.
-	ctx.body = { status: "ok", port: (ctx.app as any).port };
-});
+export class HealthController {
+	@request("get", "/health")
+	@summary("健康检查")
+	@description("检查服务是否正常运行")
+	@tags(["Health"])
+	async healthCheck(ctx: any) {
+		ctx.body = { status: "ok", port: (ctx.app as any).port };
+	}
+}

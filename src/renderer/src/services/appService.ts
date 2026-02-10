@@ -2,6 +2,7 @@ const APP_CHANNELS = {
   GET_INFO: 'app:get-info',
   GET_USER_DATA_PATH: 'app:get-user-data-path',
   OPEN_PATH: 'app:open-path',
+  OPEN_EXTERNAL: 'app:open-external',
   CHECK_UPDATE: 'app:check-update',
   QUIT: 'app:quit',
   RELAUNCH: 'app:relaunch',
@@ -46,4 +47,5 @@ export const appService = {
   getLogsPath: () => window.electron.ipc.invoke(APP_CHANNELS.GET_LOGS_PATH) as Promise<string>,
   listLogFiles: () => window.electron.ipc.invoke(APP_CHANNELS.LIST_LOG_FILES) as Promise<LogFileInfo[]>,
   clearLogs: () => window.electron.ipc.invoke(APP_CHANNELS.CLEAR_LOGS) as Promise<boolean>,
+  openExternal: (url: string) => window.electron.ipc.invoke(APP_CHANNELS.OPEN_EXTERNAL, url) as Promise<boolean>,
 }

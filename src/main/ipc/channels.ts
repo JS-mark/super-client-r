@@ -79,6 +79,8 @@ export const APP_CHANNELS = {
 	LIST_LOG_FILES: "app:list-log-files",
 	// 清除日志
 	CLEAR_LOGS: "app:clear-logs",
+	// 打开外部链接
+	OPEN_EXTERNAL: "app:open-external",
 } as const;
 
 // API Server 相关通道
@@ -95,6 +97,20 @@ export const API_CHANNELS = {
 	SET_PORT: "api:set-port",
 } as const;
 
+// 窗口控制相关通道
+export const WINDOW_CHANNELS = {
+	// 最小化窗口
+	MINIMIZE: "window:minimize",
+	// 最大化/还原窗口
+	MAXIMIZE: "window:maximize",
+	// 关闭窗口
+	CLOSE: "window:close",
+	// 获取窗口最大化状态
+	IS_MAXIMIZED: "window:is-maximized",
+	// 监听窗口最大化状态变化
+	ON_MAXIMIZE_CHANGE: "window:on-maximize-change",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -102,4 +118,5 @@ export type IPCChannel =
 	| (typeof CHAT_CHANNELS)[keyof typeof CHAT_CHANNELS]
 	| (typeof MCP_CHANNELS)[keyof typeof MCP_CHANNELS]
 	| (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS]
-	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS];
+	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS]
+	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS];
