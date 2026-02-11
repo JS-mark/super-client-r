@@ -147,6 +147,26 @@ export const SEARCH_CHANNELS = {
 	VALIDATE_CONFIG: "search:validate-config",
 } as const;
 
+// 文件附件相关通道
+export const FILE_CHANNELS = {
+	// 选择文件
+	SELECT_FILES: "file:select-files",
+	// 读取文件内容
+	READ_FILE: "file:read-file",
+	// 保存文件到附件目录
+	SAVE_ATTACHMENT: "file:save-attachment",
+	// 删除附件
+	DELETE_ATTACHMENT: "file:delete-attachment",
+	// 获取附件列表
+	LIST_ATTACHMENTS: "file:list-attachments",
+	// 打开附件
+	OPEN_ATTACHMENT: "file:open-attachment",
+	// 获取附件路径
+	GET_ATTACHMENT_PATH: "file:get-attachment-path",
+	// 复制文件到剪贴板
+	COPY_FILE: "file:copy-file",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -158,4 +178,5 @@ export type IPCChannel =
 	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS]
 	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS]
 	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS]
-	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS];
+	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS]
+	| (typeof FILE_CHANNELS)[keyof typeof FILE_CHANNELS];

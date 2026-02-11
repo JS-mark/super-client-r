@@ -108,6 +108,18 @@ export interface ElectronAPI {
 		validateConfig: (config: SearchConfig) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
 	};
 
+	// 文件附件 API
+	file: {
+		selectFiles: (options?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => Promise<IPCResponse<{ path: string; name: string; size: number; mimeType: string }[]>>;
+		readFile: (filePath: string, options?: { encoding?: BufferEncoding; maxSize?: number }) => Promise<IPCResponse<{ content: string; size: number }>>;
+		saveAttachment: (data: { sourcePath: string; conversationId?: string; messageId?: string; customName?: string }) => Promise<IPCResponse<AttachmentInfo>>;
+		deleteAttachment: (attachmentPath: string) => Promise<IPCResponse>;
+		listAttachments: (filter?: { conversationId?: string; messageId?: string; type?: string }) => Promise<IPCResponse<{ attachments: AttachmentInfo[] }>>;
+		openAttachment: (attachmentPath: string) => Promise<IPCResponse>;
+		getAttachmentPath: () => Promise<IPCResponse<string>>;
+		copyFile: (filePath: string) => Promise<IPCResponse>;
+	};
+
 	// 通用 IPC
 	ipc: {
 		on: (channel: string, listener: (...args: unknown[]) => void) => void;
@@ -287,6 +299,20 @@ export interface IPCResponse<T = unknown> {
 	error?: string;
 }
 
+export interface AttachmentInfo {
+	id: string;
+	name: string;
+	originalName: string;
+	path: string;
+	size: number;
+	mimeType: string;
+	type: "image" | "document" | "code" | "audio" | "video" | "archive" | "other";
+	createdAt: string;
+	conversationId?: string;
+	messageId?: string;
+	thumbnailPath?: string;
+}
+
 // ============ 实现 ============
 
 const electronAPI: ElectronAPI = {
@@ -397,6 +423,18 @@ const electronAPI: ElectronAPI = {
 		setDefault: (provider: SearchProviderType | null) => ipcRenderer.invoke("search:set-default", provider),
 		getDefault: () => ipcRenderer.invoke("search:get-default"),
 		validateConfig: (config: SearchConfig) => ipcRenderer.invoke("search:validate-config", config),
+	},
+
+	// 文件附件 API
+	file: {
+		selectFiles: (options) => ipcRenderer.invoke("file:select-files", options),
+		readFile: (filePath, options) => ipcRenderer.invoke("file:read-file", filePath, options),
+		saveAttachment: (data) => ipcRenderer.invoke("file:save-attachment", data),
+		deleteAttachment: (attachmentPath) => ipcRenderer.invoke("file:delete-attachment", attachmentPath),
+		listAttachments: (filter) => ipcRenderer.invoke("file:list-attachments", filter),
+		openAttachment: (attachmentPath) => ipcRenderer.invoke("file:open-attachment", attachmentPath),
+		getAttachmentPath: () => ipcRenderer.invoke("file:get-attachment-path"),
+		copyFile: (filePath) => ipcRenderer.invoke("file:copy-file", filePath),
 	},
 
 	// 通用 IPC

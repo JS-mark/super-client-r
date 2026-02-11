@@ -7,6 +7,7 @@ import { setupAgentHandlers } from "../services/agent";
 import { registerAgentHandlers } from "./handlers/agentHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
+import { registerFileHandlers } from "./handlers/fileHandlers";
 import { registerFloatWidgetHandlers } from "./handlers/floatWidgetHandlers";
 import { registerMcpHandlers } from "./handlers/mcpHandlers";
 import { registerPluginHandlers } from "./handlers/pluginHandlers";
@@ -27,6 +28,7 @@ export function registerIpcHandlers(): void {
 	registerFloatWidgetHandlers();
 	registerSearchHandlers();
 	registerPluginHandlers();
+	registerFileHandlers();
 	setupAgentHandlers();
 }
 

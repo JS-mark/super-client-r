@@ -148,6 +148,20 @@ export interface IPCResponse<T = unknown> {
 	error?: string;
 }
 
+export interface AttachmentInfo {
+	id: string;
+	name: string;
+	originalName: string;
+	path: string;
+	size: number;
+	mimeType: string;
+	type: "image" | "document" | "code" | "audio" | "video" | "archive" | "other";
+	createdAt: string;
+	conversationId?: string;
+	messageId?: string;
+	thumbnailPath?: string;
+}
+
 export interface ElectronAPI {
 	// 窗口控制
 	window: {
@@ -237,6 +251,18 @@ export interface ElectronAPI {
 		get: () => Promise<IPCResponse<string>>;
 		set: (mode: string) => Promise<IPCResponse<boolean>>;
 		onChange: (callback: (mode: string) => void) => () => void;
+	};
+
+	// 文件附件 API
+	file: {
+		selectFiles: (options?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => Promise<IPCResponse<{ path: string; name: string; size: number; mimeType: string }[]>>;
+		readFile: (filePath: string, options?: { encoding?: BufferEncoding; maxSize?: number }) => Promise<IPCResponse<{ content: string; size: number }>>;
+		saveAttachment: (data: { sourcePath: string; conversationId?: string; messageId?: string; customName?: string }) => Promise<IPCResponse<AttachmentInfo>>;
+		deleteAttachment: (attachmentPath: string) => Promise<IPCResponse>;
+		listAttachments: (filter?: { conversationId?: string; messageId?: string; type?: string }) => Promise<IPCResponse<{ attachments: AttachmentInfo[] }>>;
+		openAttachment: (attachmentPath: string) => Promise<IPCResponse>;
+		getAttachmentPath: () => Promise<IPCResponse<string>>;
+		copyFile: (filePath: string) => Promise<IPCResponse>;
 	};
 
 	// 通用 IPC

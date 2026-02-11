@@ -23,6 +23,9 @@ import {
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AttachmentList } from "../components/attachment";
+import { FileUploadButton } from "../components/attachment/FileUpload";
+import type { Attachment } from "../stores/attachmentStore";
 import { ChatExportDialog } from "../components/chat/ChatExportDialog";
 import { MessageContextMenu } from "../components/chat/MessageContextMenu";
 import { MessageSearch } from "../components/chat/MessageSearch";
@@ -284,7 +287,6 @@ const SEARCH_ENGINES: SearchEngine[] = [
 // Quick action items for the toolbar - labels use i18n keys
 const TOOLBAR_ITEMS: ToolbarItem[] = [
 	{ id: "quote", icon: <PlusOutlined />, label: "toolbar.quote", type: "action" },
-	{ id: "attach", icon: <PaperClipOutlined />, label: "toolbar.attach", type: "action" },
 	{
 		id: "prompt",
 		icon: <BulbOutlined />,
@@ -364,6 +366,9 @@ const Chat: React.FC = () => {
 	// Message search and export dialogs
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [isExportOpen, setIsExportOpen] = useState(false);
+
+	// Attachment state
+	const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
 
 	// Conversation ID for message operations
 	const conversationId = "default"; // TODO: Use actual conversation ID
@@ -592,8 +597,12 @@ const Chat: React.FC = () => {
 	}, []);
 
 	const handleSend = () => {
-		if (input.trim() && !isStreaming) {
+		if ((input.trim() || attachedFiles.length > 0) && !isStreaming) {
+			// TODO: Include attached files in the message
+			// For now, we just send the text message
 			sendMessage();
+			// Clear attached files after sending
+			setAttachedFiles([]);
 		}
 	};
 
@@ -675,6 +684,18 @@ const Chat: React.FC = () => {
 									: "border-slate-200 dark:border-slate-700",
 							)}
 						>
+							{/* Attached files */}
+							{attachedFiles.length > 0 && (
+								<div className="px-4 pt-3">
+									<AttachmentList
+										attachments={attachedFiles}
+										onRemove={(id) =>
+											setAttachedFiles((prev) => prev.filter((f) => f.id !== id))
+										}
+									/>
+								</div>
+							)}
+
 							{/* Textarea */}
 							<textarea
 								value={input}
@@ -701,6 +722,17 @@ const Chat: React.FC = () => {
 							<div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-700">
 								{/* Left toolbar items */}
 								<div className="flex items-center gap-1">
+									{/* File Upload Button */}
+									<FileUploadButton
+										onUploadComplete={(attachments) => {
+											setAttachedFiles((prev) => [...prev, ...attachments]);
+										}}
+										conversationId={conversationId}
+									/>
+
+									{/* Divider */}
+									<div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+
 									{TOOLBAR_ITEMS.map((item) => (
 										<Tooltip key={item.id} title={t(item.label, { ns: "chat" })}>
 											<button
@@ -757,7 +789,7 @@ const Chat: React.FC = () => {
 									type="primary"
 									onClick={handleSend}
 									loading={isStreaming}
-									disabled={!input.trim()}
+									disabled={!input.trim() && attachedFiles.length === 0}
 									className="rounded-full h-9 w-9 flex items-center justify-center !bg-slate-400 hover:!bg-slate-500 !border-0"
 									icon={<SendOutlined className="text-sm" />}
 								/>
