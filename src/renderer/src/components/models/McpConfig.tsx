@@ -1,17 +1,34 @@
-import { ApiOutlined, DeleteOutlined, PlusOutlined, LinkOutlined } from "@ant-design/icons";
-import { Button, Form, Input, List, Modal, Tag, Empty, Badge } from "antd";
+import {
+	ApiOutlined,
+	DeleteOutlined,
+	LinkOutlined,
+	PlusOutlined,
+} from "@ant-design/icons";
+import { Badge, Button, Empty, Form, Input, List, Modal, Tag } from "antd";
 import type * as React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
 import type { McpServer } from "../../types/mcp";
-import { cn } from "../../lib/utils";
 
-export const McpConfig: React.FC = () => {
+interface McpConfigProps {
+	addTrigger?: number;
+}
+
+export const McpConfig: React.FC<McpConfigProps> = ({ addTrigger }) => {
 	const { t } = useTranslation();
-	const { servers, addServer, removeServer } = useMcpStore();
+	const servers = useMcpStore((state) => state.servers);
+	const addServer = useMcpStore((state) => state.addServer);
+	const removeServer = useMcpStore((state) => state.removeServer);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [form] = Form.useForm();
+
+	// Listen for addTrigger changes to open modal
+	useEffect(() => {
+		if (addTrigger && addTrigger > 0) {
+			setIsModalOpen(true);
+		}
+	}, [addTrigger]);
 
 	const handleAdd = (values: any) => {
 		const newServer: McpServer = {
@@ -29,50 +46,50 @@ export const McpConfig: React.FC = () => {
 	const getStatusBadge = (status: string) => {
 		switch (status) {
 			case "connected":
-				return <Badge status="success" text={t("mcp.status.connected", "Connected")} />;
+				return (
+					<Badge
+						status="success"
+						text={t("status.connected", "Connected", { ns: "mcp" })}
+					/>
+				);
 			case "connecting":
-				return <Badge status="processing" text={t("mcp.status.connecting", "Connecting")} />;
+				return (
+					<Badge
+						status="processing"
+						text={t("status.connecting", "Connecting", { ns: "mcp" })}
+					/>
+				);
 			case "error":
-				return <Badge status="error" text={t("mcp.status.error", "Error")} />;
+				return <Badge status="error" text={t("status.error", "Error", { ns: "mcp" })} />;
 			default:
-				return <Badge status="default" text={t("mcp.status.disconnected", "Disconnected")} />;
+				return (
+					<Badge
+						status="default"
+						text={t("status.disconnected", "Disconnected", { ns: "mcp" })}
+					/>
+				);
 		}
 	};
 
 	return (
 		<div className="animate-fade-in">
-			{/* Header */}
-			<div className="mb-6 flex justify-between items-center">
-				<div>
-					<h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-						{t("mcp.title")}
-					</h2>
-					<p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						{t("mcp.description", "Manage Model Context Protocol servers")}
-					</p>
-				</div>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={() => setIsModalOpen(true)}
-					className="!h-10 !rounded-lg !font-medium"
-				>
-					{t("mcp.add")}
-				</Button>
-			</div>
-
 			{/* Server List */}
 			{servers.length === 0 ? (
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
 					description={
 						<span className="text-gray-500 dark:text-gray-400">
-							{t("mcp.empty", "No MCP servers configured yet")}
+							{t("empty", "No MCP servers configured yet", { ns: "mcp" })}
 						</span>
 					}
 				>
-					<Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalOpen(true)}>
-						{t("mcp.addFirst", "Add your first server")}
+					<Button
+						type="primary"
+						icon={<PlusOutlined />}
+						onClick={() => setIsModalOpen(true)}
+						className="!h-10 !rounded-lg !font-medium"
+					>
+						{t("add", { ns: "mcp" })}
 					</Button>
 				</Empty>
 			) : (
@@ -111,7 +128,9 @@ export const McpConfig: React.FC = () => {
 								description={
 									<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
 										<LinkOutlined className="text-xs" />
-										<span className="text-sm truncate max-w-md">{item.url}</span>
+										<span className="text-sm truncate max-w-md">
+											{item.url}
+										</span>
 									</div>
 								}
 							/>
@@ -127,33 +146,38 @@ export const McpConfig: React.FC = () => {
 						<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
 							<ApiOutlined className="text-white text-sm" />
 						</div>
-						<span className="font-semibold">{t("mcp.addModalTitle")}</span>
+						<span className="font-semibold">{t("addModalTitle", { ns: "mcp" })}</span>
 					</div>
 				}
 				open={isModalOpen}
 				onCancel={() => setIsModalOpen(false)}
 				onOk={() => form.submit()}
-				okText={t("mcp.add", "Add")}
-				cancelText={t("mcp.cancel", "Cancel")}
+				okText={t("add", "Add", { ns: "mcp" })}
+				cancelText={t("cancel", "Cancel", { ns: "mcp" })}
 				width={480}
+				destroyOnHidden={true}
+				maskClosable={true}
 			>
 				<Form form={form} layout="vertical" onFinish={handleAdd}>
 					<Form.Item
 						name="name"
-						label={t("mcp.form.name")}
-						rules={[{ required: true, message: t("mcp.form.nameRequired") }]}
+						label={t("form.name", { ns: "mcp" })}
+						rules={[{ required: true, message: t("form.nameRequired", { ns: "mcp" }) }]}
 					>
 						<Input
-							placeholder={t("mcp.form.namePlaceholder", "e.g., Filesystem Server")}
+							placeholder={t(
+								"mcp.form.namePlaceholder",
+								"e.g., Filesystem Server",
+							)}
 							className="!rounded-lg"
 						/>
 					</Form.Item>
 					<Form.Item
 						name="url"
-						label={t("mcp.form.url")}
+						label={t("form.url", { ns: "mcp" })}
 						rules={[
-							{ required: true, message: t("mcp.form.urlRequired") },
-							{ type: "url", message: t("mcp.form.urlInvalid") },
+							{ required: true, message: t("form.urlRequired", { ns: "mcp" }) },
+							{ type: "url", message: t("form.urlInvalid", { ns: "mcp" }) },
 						]}
 					>
 						<Input

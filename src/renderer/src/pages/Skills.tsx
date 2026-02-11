@@ -5,6 +5,7 @@ import {
 	ReloadOutlined,
 	SearchOutlined,
 	SyncOutlined,
+	ToolOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
 import {
@@ -13,16 +14,19 @@ import {
 	Dropdown,
 	Empty,
 	Input,
-	message,
 	Modal,
+	message,
 	Pagination,
 	Spin,
 	Tabs,
 	Tag,
+	Tooltip,
 } from "antd";
 import * as React from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
+import { useTitle } from "../hooks/useTitle";
 import { useSkillStore } from "../stores/skillStore";
 import type { Skill } from "../types/skills";
 
@@ -58,22 +62,28 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 
 	const handleInstall = () => {
 		installSkill(skill);
-		message.success(t("skills.messages.installed", { name: skill.name }));
+		message.success(
+			t("messages.installed", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	const handleUninstall = () => {
 		uninstallSkill(skill.id);
-		message.success(t("skills.messages.uninstalled", { name: skill.name }));
+		message.success(
+			t("messages.uninstalled", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	const handleUpdate = () => {
 		updateSkill(skill.id);
-		message.success(t("skills.messages.updated", { name: skill.name }));
+		message.success(t("messages.updated", { ns: "skills", name: skill.name }));
 	};
 
 	const handleReinstall = () => {
 		reinstallSkill(skill.id);
-		message.success(t("skills.messages.reinstalled", { name: skill.name }));
+		message.success(
+			t("messages.reinstalled", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	// 构建操作按钮
@@ -84,20 +94,20 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 			buttons.push(
 				<Button key="reinstall" onClick={handleReinstall}>
 					<ReloadOutlined />
-					{t("skills.actions.reinstall")}
+					{t("actions.reinstall", { ns: "skills" })}
 				</Button>,
 			);
 			buttons.push(
 				<Button key="uninstall" danger onClick={handleUninstall}>
 					<DeleteOutlined />
-					{t("skills.actions.uninstall")}
+					{t("actions.uninstall", { ns: "skills" })}
 				</Button>,
 			);
 			if (hasUpdate) {
 				buttons.push(
 					<Button key="update" type="primary" onClick={handleUpdate}>
 						<SyncOutlined />
-						{t("skills.actions.update")}
+						{t("actions.update", { ns: "skills" })}
 					</Button>,
 				);
 			}
@@ -105,7 +115,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 			buttons.push(
 				<Button key="install" type="primary" onClick={handleInstall}>
 					<DownloadOutlined />
-					{t("skills.actions.install")}
+					{t("actions.install", { ns: "skills" })}
 				</Button>,
 			);
 		}
@@ -121,7 +131,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 					<div>
 						<div className="text-lg font-semibold">{skill.name}</div>
 						<div className="text-sm text-gray-400">
-							{t("skills.by")} {skill.author}
+							{t("by", { ns: "skills" })} {skill.author}
 						</div>
 					</div>
 				</div>
@@ -130,6 +140,8 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 			onCancel={onClose}
 			footer={renderFooter()}
 			width={600}
+			destroyOnHidden={true}
+			maskClosable={false}
 		>
 			<div className="space-y-4">
 				<div className="flex items-center gap-2">
@@ -137,7 +149,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 					{skill.category && <Tag>{skill.category}</Tag>}
 					{isInstalled && (
 						<Tag color="success">
-							{t("skills.status.installed")}
+							{t("status.installed", { ns: "skills" })}
 							{installedVersion && installedVersion !== skill.version && (
 								<span className="ml-1">
 									({installedVersion} → {skill.version})
@@ -149,7 +161,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 
 				<div>
 					<h4 className="text-sm font-medium text-gray-700 mb-2">
-						{t("skills.description", "Description")}
+						{t("description", "Description", { ns: "skills" })}
 					</h4>
 					<p className="text-gray-600 whitespace-pre-wrap">
 						{skill.description}
@@ -159,7 +171,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 				{skill.readme && (
 					<div>
 						<h4 className="text-sm font-medium text-gray-700 mb-2">
-							{t("skills.readme", "README")}
+							{t("readme", "README", { ns: "skills" })}
 						</h4>
 						<div className="bg-gray-50 p-4 rounded-lg max-h-96 overflow-y-auto">
 							<pre className="text-sm text-gray-600 whitespace-pre-wrap">
@@ -172,7 +184,7 @@ const SkillDetailModal: React.FC<SkillDetailModalProps> = ({
 				{skill.repository && (
 					<div>
 						<h4 className="text-sm font-medium text-gray-700 mb-2">
-							{t("skills.repository", "Repository")}
+							{t("repository", "Repository", { ns: "skills" })}
 						</h4>
 						<a
 							href={skill.repository}
@@ -212,25 +224,31 @@ const SkillCard: React.FC<{
 	const handleInstall = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		installSkill(skill);
-		message.success(t("skills.messages.installed", { name: skill.name }));
+		message.success(
+			t("messages.installed", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	const handleUninstall = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		uninstallSkill(skill.id);
-		message.success(t("skills.messages.uninstalled", { name: skill.name }));
+		message.success(
+			t("messages.uninstalled", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	const handleUpdate = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		updateSkill(skill.id);
-		message.success(t("skills.messages.updated", { name: skill.name }));
+		message.success(t("messages.updated", { ns: "skills", name: skill.name }));
 	};
 
 	const handleReinstall = (e: React.MouseEvent) => {
 		e.stopPropagation();
 		reinstallSkill(skill.id);
-		message.success(t("skills.messages.reinstalled", { name: skill.name }));
+		message.success(
+			t("messages.reinstalled", { ns: "skills", name: skill.name }),
+		);
 	};
 
 	// 主要操作按钮：安装、重装、卸载
@@ -239,16 +257,29 @@ const SkillCard: React.FC<{
 	const moreItems: MenuProps["items"] = [];
 
 	if (isInstalled) {
+		// 如果有更新，优先显示更新按钮
+		if (hasUpdate) {
+			mainActions.push(
+				<Button
+					key="update"
+					type="primary"
+					size="small"
+					icon={<SyncOutlined />}
+					onClick={handleUpdate}
+				>
+					{t("actions.update", { ns: "skills" })}
+				</Button>,
+			);
+		}
 		// 已安装：显示重装和卸载
 		mainActions.push(
 			<Button
 				key="reinstall"
-				type="primary"
 				size="small"
 				icon={<ReloadOutlined />}
 				onClick={handleReinstall}
 			>
-				{t("skills.actions.reinstall")}
+				{t("actions.reinstall", { ns: "skills" })}
 			</Button>,
 		);
 		mainActions.push(
@@ -259,22 +290,9 @@ const SkillCard: React.FC<{
 				icon={<DeleteOutlined />}
 				onClick={handleUninstall}
 			>
-				{t("skills.actions.uninstall")}
+				{t("actions.uninstall", { ns: "skills" })}
 			</Button>,
 		);
-
-		// 如果有更新，添加到更多菜单
-		if (hasUpdate) {
-			moreItems.push({
-				key: "update",
-				label: t("skills.actions.update"),
-				icon: <SyncOutlined />,
-				onClick: () => {
-					updateSkill(skill.id);
-					message.success(t("skills.messages.updated", { name: skill.name }));
-				},
-			});
-		}
 	} else {
 		// 未安装：显示安装
 		mainActions.push(
@@ -285,7 +303,7 @@ const SkillCard: React.FC<{
 				icon={<DownloadOutlined />}
 				onClick={handleInstall}
 			>
-				{t("skills.actions.install")}
+				{t("actions.install", { ns: "skills" })}
 			</Button>,
 		);
 	}
@@ -323,7 +341,7 @@ const SkillCard: React.FC<{
 						installedVersion &&
 						installedVersion !== skill.version && (
 							<span className="text-xs text-gray-400 mt-1">
-								{t("skills.installedVersion")}
+								{t("installedVersion", { ns: "skills" })}
 								{installedVersion}
 							</span>
 						)}
@@ -331,12 +349,24 @@ const SkillCard: React.FC<{
 			}
 		>
 			<div className="flex flex-col h-32 justify-between">
-				<p className="text-gray-500 line-clamp-3 mb-2 flex-grow">
-					{skill.description}
-				</p>
+				<Tooltip
+					title={skill.description}
+					placement="topLeft"
+					styles={{
+						root: { maxWidth: 400 },
+						container: {
+							maxHeight: 200,
+							overflow: "auto",
+						},
+					}}
+				>
+					<p className="text-gray-500 line-clamp-3 mb-2 grow cursor-help">
+						{skill.description}
+					</p>
+				</Tooltip>
 				<div className="flex justify-between items-center text-xs text-gray-400 mt-2">
 					<span>
-						{t("skills.by")} {skill.author}
+						{t("by", { ns: "skills" })} {skill.author}
 					</span>
 					{skill.category && <Tag variant="filled">{skill.category}</Tag>}
 				</div>
@@ -347,8 +377,31 @@ const SkillCard: React.FC<{
 
 const Skills: React.FC = () => {
 	const { t } = useTranslation();
-	const { installedSkills, marketSkills, marketTotal, fetchMarketSkills, isLoading } =
-		useSkillStore();
+
+	// 页面标题组件 - 同时用于 TitleBar 和页面头部
+	const pageTitle = useMemo(() => {
+		return (
+			<div className="flex items-center gap-2">
+				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+					<ToolOutlined className="text-white text-xs" />
+				</div>
+				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+					{t("title", "技能市场", { ns: "skills" })}
+				</span>
+			</div>
+		);
+	}, [t]);
+
+	// 设置标题栏
+	useTitle(pageTitle);
+
+	const {
+		installedSkills,
+		marketSkills,
+		marketTotal,
+		fetchMarketSkills,
+		isLoading,
+	} = useSkillStore();
 	const [marketSearchTerm, setMarketSearchTerm] = React.useState("");
 	const [installedSearchTerm, setInstalledSearchTerm] = React.useState("");
 	const [selectedSkill, setSelectedSkill] = React.useState<Skill | null>(null);
@@ -399,13 +452,13 @@ const Skills: React.FC = () => {
 	const items = [
 		{
 			key: "market",
-			label: t("skills.tabs.market"),
+			label: t("tabs.market", { ns: "skills" }),
 			children: (
 				<div className="h-full flex flex-col pr-2">
 					<div className="mb-4 flex gap-2 shrink-0">
 						<Input
 							prefix={<SearchOutlined className="text-gray-400" />}
-							placeholder={t("skills.searchPlaceholder")}
+							placeholder={t("searchPlaceholder", { ns: "skills" })}
 							allowClear
 							value={marketSearchTerm}
 							onChange={(e) => setMarketSearchTerm(e.target.value)}
@@ -423,7 +476,7 @@ const Skills: React.FC = () => {
 							}}
 							loading={isLoading}
 						>
-							{t("common.search", "搜索")}
+							{t("search", { ns: "common" })}
 						</Button>
 					</div>
 					<div className="flex-1 overflow-y-auto min-h-0">
@@ -432,11 +485,18 @@ const Skills: React.FC = () => {
 								<Spin size="large" />
 							</div>
 						) : marketSkills.length === 0 ? (
-							<Empty description={t("skills.noData")} className="py-20" />
+							<Empty
+								description={t("noData", { ns: "skills" })}
+								className="py-20"
+							/>
 						) : (
 							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 								{marketSkills.map((item) => (
-									<SkillCard key={item.id} skill={item} onClick={() => handleSkillClick(item)} />
+									<SkillCard
+										key={item.id}
+										skill={item}
+										onClick={() => handleSkillClick(item)}
+									/>
 								))}
 							</div>
 						)}
@@ -457,13 +517,13 @@ const Skills: React.FC = () => {
 		},
 		{
 			key: "installed",
-			label: `${t("skills.tabs.installed")} (${installedSkills.length})`,
+			label: `${t("tabs.installed", { ns: "skills" })} (${installedSkills.length})`,
 			children: (
 				<div className="h-full overflow-y-auto pr-2">
 					<div className="mb-4 flex gap-2">
 						<Input
 							prefix={<SearchOutlined className="text-gray-400" />}
-							placeholder={t("skills.searchPlaceholder")}
+							placeholder={t("searchPlaceholder", { ns: "skills" })}
 							allowClear
 							value={installedSearchTerm}
 							onChange={(e) => setInstalledSearchTerm(e.target.value)}
@@ -475,15 +535,22 @@ const Skills: React.FC = () => {
 								// 本地搜索，无需调用 API
 							}}
 						>
-							{t("common.search", "搜索")}
+							{t("search", { ns: "common" })}
 						</Button>
 					</div>
 					{filterInstalledSkills(installedSkills).length === 0 ? (
-						<Empty description={t("skills.noInstalled")} className="py-20" />
+						<Empty
+							description={t("noInstalled", { ns: "skills" })}
+							className="py-20"
+						/>
 					) : (
 						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 							{filterInstalledSkills(installedSkills).map((item) => (
-								<SkillCard key={item.id} skill={item} onClick={() => handleSkillClick(item)} />
+								<SkillCard
+									key={item.id}
+									skill={item}
+									onClick={() => handleSkillClick(item)}
+								/>
 							))}
 						</div>
 					)}
@@ -494,11 +561,7 @@ const Skills: React.FC = () => {
 
 	return (
 		<MainLayout>
-			<div className="flex flex-col h-full">
-				<div className="mb-6 flex justify-between items-center shrink-0">
-					<h1 className="min-w-[100px] text-2xl font-bold mr-[10px]">{t("skills.title")}</h1>
-				</div>
-
+			<div className="p-4 h-full overflow-auto">
 				<Tabs
 					defaultActiveKey="market"
 					items={items}

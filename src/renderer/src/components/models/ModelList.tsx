@@ -1,15 +1,37 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, ApiOutlined } from "@ant-design/icons";
-import { Button, Drawer, Form, Input, List, Select, Space, Switch, Tag, Empty } from "antd";
-import type * as React from "react";
-import { useState } from "react";
+import {
+	ApiOutlined,
+	DeleteOutlined,
+	EditOutlined,
+	PlusOutlined,
+} from "@ant-design/icons";
+import {
+	Button,
+	Drawer,
+	Empty,
+	Form,
+	Input,
+	List,
+	Select,
+	Space,
+	Switch,
+	Tag,
+} from "antd";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { cn } from "../../lib/utils";
 import { useModelStore } from "../../stores/modelStore";
 import type { ModelInfo } from "../../types/models";
-import { cn } from "../../lib/utils";
 
-export const ModelList: React.FC = () => {
+interface ModelListProps {
+	addTrigger?: number;
+}
+
+export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const { t } = useTranslation();
-	const { models, addModel, updateModel, removeModel } = useModelStore();
+	const models = useModelStore((state) => state.models);
+	const addModel = useModelStore((state) => state.addModel);
+	const updateModel = useModelStore((state) => state.updateModel);
+	const removeModel = useModelStore((state) => state.removeModel);
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [editingModel, setEditingModel] = useState<ModelInfo | null>(null);
 	const [form] = Form.useForm();
@@ -19,6 +41,13 @@ export const ModelList: React.FC = () => {
 		form.resetFields();
 		setIsDrawerOpen(true);
 	};
+
+	// Listen for addTrigger changes to open drawer
+	useEffect(() => {
+		if (addTrigger && addTrigger > 0) {
+			handleAdd();
+		}
+	});
 
 	const handleEdit = (model: ModelInfo) => {
 		setEditingModel(model);
@@ -64,44 +93,29 @@ export const ModelList: React.FC = () => {
 		}
 	};
 
-	const getProviderIcon = (provider: string) => {
+	const getProviderIcon = () => {
 		return <ApiOutlined className="text-lg" />;
 	};
 
 	return (
 		<div className="animate-fade-in">
-			{/* Header */}
-			<div className="mb-6 flex justify-between items-center">
-				<div>
-					<h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-						{t("models.listTitle")}
-					</h2>
-					<p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-						{t("models.listDescription", "Manage your AI model configurations")}
-					</p>
-				</div>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={handleAdd}
-					className="!h-10 !rounded-lg !font-medium"
-				>
-					{t("models.add")}
-				</Button>
-			</div>
-
 			{/* Model List */}
 			{models.length === 0 ? (
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
 					description={
 						<span className="text-gray-500 dark:text-gray-400">
-							{t("models.empty", "No models configured yet")}
+							{t("empty", "No models configured yet")}
 						</span>
 					}
 				>
-					<Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-						{t("models.addFirst", "Add your first model")}
+					<Button
+						type="primary"
+						icon={<PlusOutlined />}
+						onClick={handleAdd}
+						className="!h-10 !rounded-lg !font-medium"
+					>
+						{t("add", { ns: "models" })}
 					</Button>
 				</Empty>
 			) : (
@@ -146,7 +160,7 @@ export const ModelList: React.FC = () => {
 											getProviderColor(item.provider),
 										)}
 									>
-										{getProviderIcon(item.provider)}
+										{getProviderIcon()}
 									</div>
 								}
 								title={
@@ -164,7 +178,7 @@ export const ModelList: React.FC = () => {
 										</Tag>
 										{!item.enabled && (
 											<Tag color="default" className="!text-xs">
-												{t("models.disabled", "Disabled")}
+												{t("disabled", "Disabled", { ns: "models" })}
 											</Tag>
 										)}
 									</div>
@@ -184,28 +198,28 @@ export const ModelList: React.FC = () => {
 			<Drawer
 				title={
 					<div className="flex items-center gap-2">
-						<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-							<ApiOutlined className="text-white text-sm" />
-						</div>
 						<span className="font-semibold">
-							{editingModel ? t("models.edit") : t("models.add")}
+							{editingModel ? t("edit", { ns: "models" }) : t("add", { ns: "models" })}
 						</span>
 					</div>
 				}
 				size={420}
 				styles={{
 					body: { paddingBottom: 80 },
-					header: { borderBottom: "1px solid #f0f0f0" },
+					// @ts-expect-error
+					header: { borderBottom: "1px solid #f0f0f0", WebkitAppRegion: "no-drag" },
 				}}
 				onClose={() => setIsDrawerOpen(false)}
 				open={isDrawerOpen}
+				destroyOnHidden={true}
+				maskClosable={true}
 				extra={
 					<Space>
 						<Button onClick={() => setIsDrawerOpen(false)}>
-							{t("models.cancel")}
+							{t("cancel", { ns: "models" })}
 						</Button>
 						<Button type="primary" onClick={() => form.submit()}>
-							{t("models.save")}
+							{t("save", { ns: "models" })}
 						</Button>
 					</Space>
 				}
@@ -213,21 +227,26 @@ export const ModelList: React.FC = () => {
 				<Form form={form} layout="vertical" onFinish={handleSave}>
 					<Form.Item
 						name="name"
-						label={t("models.form.name")}
-						rules={[{ required: true, message: t("models.form.nameRequired") }]}
+						label={t("form.name", { ns: "models" })}
+						rules={[{ required: true, message: t("form.nameRequired", { ns: "models" }) }]}
 					>
 						<Input
-							placeholder={t("models.form.namePlaceholder", "e.g., GPT-4")}
+							placeholder={t("form.namePlaceholder", "e.g., GPT-4", { ns: "models" })}
 							className="!rounded-lg"
 						/>
 					</Form.Item>
 					<Form.Item
 						name="provider"
-						label={t("models.form.provider")}
-						rules={[{ required: true, message: t("models.form.providerRequired") }]}
+						label={t("form.provider", { ns: "models" })}
+						rules={[
+							{ required: true, message: t("form.providerRequired", { ns: "models" }) },
+						]}
 					>
 						<Select
-							placeholder={t("models.form.providerPlaceholder", "Select provider")}
+							placeholder={t(
+								"models.form.providerPlaceholder",
+								"Select provider",
+							)}
 							className="!rounded-lg"
 						>
 							<Select.Option value="openai">OpenAI</Select.Option>
@@ -238,21 +257,27 @@ export const ModelList: React.FC = () => {
 					</Form.Item>
 					<Form.Item
 						name="apiKey"
-						label={t("models.form.apiKey")}
-						help={t("models.form.apiKeyHelp", "Your API key for authentication")}
+						label={t("form.apiKey", { ns: "models" })}
+						help={t(
+							"models.form.apiKeyHelp",
+							"Your API key for authentication",
+						)}
 					>
 						<Input.Password
-							placeholder={t("models.form.apiKeyPlaceholder", "sk-...")}
+							placeholder={t("form.apiKeyPlaceholder", "sk-...", { ns: "models" })}
 							className="!rounded-lg"
 						/>
 					</Form.Item>
 					<Form.Item
 						name="baseUrl"
-						label={t("models.form.baseUrl")}
-						help={t("models.form.baseUrlHelp", "Custom API endpoint URL")}
+						label={t("form.baseUrl", { ns: "models" })}
+						help={t("form.baseUrlHelp", "Custom API endpoint URL", { ns: "models" })}
 					>
 						<Input
-							placeholder={t("models.form.baseUrlPlaceholder", "https://api.example.com")}
+							placeholder={t(
+								"models.form.baseUrlPlaceholder",
+								"https://api.example.com",
+							)}
 							className="!rounded-lg"
 						/>
 					</Form.Item>

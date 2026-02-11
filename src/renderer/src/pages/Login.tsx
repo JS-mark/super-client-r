@@ -31,25 +31,25 @@ const Login: React.FC = () => {
 
 	return (
 		<div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
-			{/* Background Decorations */}
+			{/* Background Decorations - 静态渐变以提高性能 */}
 			<div className="absolute inset-0 overflow-hidden pointer-events-none">
-				<div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl animate-pulse" />
-				<div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+				<div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl" />
+				<div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-400/20 rounded-full blur-3xl" />
+				<div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-pink-400/10 rounded-full blur-3xl" />
 			</div>
 
 			{/* Login Card */}
-			<Card className="w-[420px] shadow-2xl border-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl animate-slide-up">
+			<Card className="w-[420px] shadow-2xl border-0 bg-white dark:bg-gray-900">
 				{/* Logo */}
 				<div className="mb-8 text-center">
 					<div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
 						<span className="text-white font-bold text-2xl">S</span>
 					</div>
 					<Title level={2} className="!mb-2">
-						{t("app.loginTitle")}
+						{t("loginTitle", { ns: "app" })}
 					</Title>
 					<Text type="secondary" className="text-base">
-						{t("app.loginSubtitle")}
+						{t("loginSubtitle", { ns: "app" })}
 					</Text>
 				</div>
 
@@ -62,7 +62,7 @@ const Login: React.FC = () => {
 						onClick={() => handleLogin("google")}
 						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-blue-300 hover:!shadow-md transition-all"
 					>
-						{t("app.signInGoogle")}
+						{t("signInGoogle", { ns: "app" })}
 					</Button>
 					<Button
 						block
@@ -71,7 +71,7 @@ const Login: React.FC = () => {
 						onClick={() => handleLogin("github")}
 						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-purple-300 hover:!shadow-md transition-all"
 					>
-						{t("app.signInGithub")}
+						{t("signInGithub", { ns: "app" })}
 					</Button>
 
 					{import.meta.env.DEV && (
@@ -82,7 +82,7 @@ const Login: React.FC = () => {
 								</div>
 								<div className="relative flex justify-center text-xs uppercase">
 									<span className="bg-white dark:bg-gray-900 px-3 text-gray-400">
-										{t("app.development")}
+										{t("development", { ns: "app" })}
 									</span>
 								</div>
 							</div>
@@ -94,7 +94,7 @@ const Login: React.FC = () => {
 								onClick={() => handleLogin("mock")}
 								className="!h-12 !rounded-xl !font-medium"
 							>
-								{t("app.mockLogin")}
+								{t("mockLogin", { ns: "app" })}
 							</Button>
 						</>
 					)}
@@ -103,7 +103,7 @@ const Login: React.FC = () => {
 				{/* Footer */}
 				<div className="mt-8 text-center">
 					<Text type="secondary" className="text-xs">
-						By continuing, you agree to our Terms of Service and Privacy Policy
+						{t("terms", { ns: "app" })}
 					</Text>
 				</div>
 			</Card>

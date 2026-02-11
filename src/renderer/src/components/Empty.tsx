@@ -6,7 +6,7 @@ export default function Empty() {
 	const { t } = useTranslation();
 	return (
 		<div className={cn("flex h-full items-center justify-center")}>
-			{t("common.empty")}
+			{t("empty", { ns: "common" })}
 		</div>
 	);
 }

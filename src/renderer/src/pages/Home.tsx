@@ -13,11 +13,11 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
+import { type ApiStatus, apiService } from "../services/apiService";
 import { useChatStore } from "../stores/chatStore";
 import { useMcpStore } from "../stores/mcpStore";
-import { useSkillStore } from "../stores/skillStore";
 import { useModelStore } from "../stores/modelStore";
-import { apiService, type ApiStatus } from "../services/apiService";
+import { useSkillStore } from "../stores/skillStore";
 
 interface QuickAction {
   key: string;
@@ -31,11 +31,14 @@ interface QuickAction {
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { messages } = useChatStore();
-  const { servers } = useMcpStore();
-  const { installedSkills } = useSkillStore();
-  const { models } = useModelStore();
-  const [apiStatus, setApiStatus] = useState<ApiStatus>({ status: "stopped", port: 0 });
+  const messages = useChatStore((state) => state.messages);
+  const servers = useMcpStore((state) => state.servers);
+  const installedSkills = useSkillStore((state) => state.installedSkills);
+  const models = useModelStore((state) => state.models);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>({
+    status: "stopped",
+    port: 0,
+  });
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -49,38 +52,48 @@ const Home = () => {
     checkStatus();
   }, []);
 
-  const connectedMcpServers = servers.filter((s) => s.status === "connected").length;
+  const connectedMcpServers = servers.filter(
+    (s) => s.status === "connected",
+  ).length;
   const enabledModels = models.filter((m) => m.enabled).length;
 
   const quickActions: QuickAction[] = [
     {
       key: "chat",
-      title: t("home.quickActions.chat", "Start Chat"),
-      description: t("home.quickActions.chatDesc", "Chat with AI assistant"),
+      title: t("quickActions.chat", "Start Chat", { ns: "home" }),
+      description: t("quickActions.chatDesc", "Chat with AI assistant", {
+        ns: "home",
+      }),
       icon: <MessageOutlined className="text-2xl" />,
       color: "from-blue-500 to-blue-600",
       onClick: () => navigate("/chat"),
     },
     {
       key: "models",
-      title: t("home.quickActions.models", "Models"),
-      description: t("home.quickActions.modelsDesc", "Configure AI models"),
+      title: t("quickActions.models", "Models", { ns: "home" }),
+      description: t("quickActions.modelsDesc", "Configure AI models", {
+        ns: "home",
+      }),
       icon: <CloudOutlined className="text-2xl" />,
       color: "from-purple-500 to-purple-600",
       onClick: () => navigate("/models"),
     },
     {
       key: "skills",
-      title: t("home.quickActions.skills", "Skills"),
-      description: t("home.quickActions.skillsDesc", "Browse skill marketplace"),
+      title: t("quickActions.skills", "Skills", { ns: "home" }),
+      description: t("quickActions.skillsDesc", "Browse skill marketplace", {
+        ns: "home",
+      }),
       icon: <ToolOutlined className="text-2xl" />,
       color: "from-orange-500 to-orange-600",
       onClick: () => navigate("/skills"),
     },
     {
       key: "mcp",
-      title: t("home.quickActions.mcp", "MCP"),
-      description: t("home.quickActions.mcpDesc", "Manage MCP servers"),
+      title: t("quickActions.mcp", "MCP", { ns: "home" }),
+      description: t("quickActions.mcpDesc", "Manage MCP servers", {
+        ns: "home",
+      }),
       icon: <ApiOutlined className="text-2xl" />,
       color: "from-cyan-500 to-cyan-600",
       onClick: () => navigate("/mcp"),
@@ -92,11 +105,11 @@ const Home = () => {
       <div className="space-y-8">
         {/* Hero Section */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8 md:p-12">
-          {/* Background Pattern */}
+          {/* Background Pattern - 使用静态渐变替代动画以提高性能 */}
           <div className="absolute inset-0 opacity-20">
-            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" />
-            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-            <div className="absolute -bottom-32 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
+            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl" />
+            <div className="absolute -bottom-32 left-1/2 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl" />
           </div>
 
           <div className="relative z-10">
@@ -106,10 +119,12 @@ const Home = () => {
               </div>
               <div>
                 <h1 className="text-3xl md:text-4xl font-bold text-white">
-                  {t("home.welcome", "Welcome to Super Client")}
+                  {t("welcome", "Welcome to Super Client", { ns: "home" })}
                 </h1>
                 <p className="text-slate-300 mt-1">
-                  {t("home.subtitle", "Your AI-powered desktop assistant")}
+                  {t("subtitle", "Your AI-powered desktop assistant", {
+                    ns: "home",
+                  })}
                 </p>
               </div>
             </div>
@@ -117,7 +132,7 @@ const Home = () => {
             <p className="text-slate-400 max-w-2xl mb-6">
               {t(
                 "home.description",
-                "Super Client is a powerful AI desktop application that integrates multiple AI services, skills, and MCP servers for seamless productivity."
+                "Super Client is a powerful AI desktop application that integrates multiple AI services, skills, and MCP servers for seamless productivity.",
               )}
             </p>
 
@@ -129,7 +144,7 @@ const Home = () => {
                 onClick={() => navigate("/chat")}
                 className="!bg-white !text-slate-900 hover:!bg-slate-100 !border-0 !rounded-xl !h-12 !px-6"
               >
-                {t("home.startChat", "Start Chatting")}
+                {t("startChat", "Start Chatting", { ns: "home" })}
               </Button>
               <Button
                 size="large"
@@ -137,7 +152,7 @@ const Home = () => {
                 onClick={() => navigate("/settings")}
                 className="!bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !rounded-xl !h-12 !px-6"
               >
-                {t("home.settings", "Settings")}
+                {t("settings", "Settings", { ns: "home" })}
               </Button>
             </div>
           </div>
@@ -147,7 +162,11 @@ const Home = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="!bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 !border-blue-200 dark:!border-blue-800/50 !rounded-2xl">
             <Statistic
-              title={<span className="text-blue-600 dark:text-blue-400">{t("home.stats.messages", "Messages")}</span>}
+              title={
+                <span className="text-blue-600 dark:text-blue-400">
+                  {t("stats.messages", "Messages", { ns: "home" })}
+                </span>
+              }
               value={messages.length}
               prefix={<MessageOutlined className="mr-2" />}
               valueStyle={{ color: "#3b82f6" }}
@@ -156,7 +175,11 @@ const Home = () => {
 
           <Card className="!bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 !border-purple-200 dark:!border-purple-800/50 !rounded-2xl">
             <Statistic
-              title={<span className="text-purple-600 dark:text-purple-400">{t("home.stats.models", "Active Models")}</span>}
+              title={
+                <span className="text-purple-600 dark:text-purple-400">
+                  {t("stats.models", "Active Models", { ns: "home" })}
+                </span>
+              }
               value={enabledModels}
               prefix={<CloudOutlined className="mr-2" />}
               valueStyle={{ color: "#9333ea" }}
@@ -165,7 +188,11 @@ const Home = () => {
 
           <Card className="!bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 !border-orange-200 dark:!border-orange-800/50 !rounded-2xl">
             <Statistic
-              title={<span className="text-orange-600 dark:text-orange-400">{t("home.stats.skills", "Skills")}</span>}
+              title={
+                <span className="text-orange-600 dark:text-orange-400">
+                  {t("stats.skills", "Skills", { ns: "home" })}
+                </span>
+              }
               value={installedSkills.length}
               prefix={<ToolOutlined className="mr-2" />}
               valueStyle={{ color: "#ea580c" }}
@@ -174,7 +201,11 @@ const Home = () => {
 
           <Card className="!bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/30 dark:to-cyan-800/20 !border-cyan-200 dark:!border-cyan-800/50 !rounded-2xl">
             <Statistic
-              title={<span className="text-cyan-600 dark:text-cyan-400">{t("home.stats.mcp", "MCP Connected")}</span>}
+              title={
+                <span className="text-cyan-600 dark:text-cyan-400">
+                  {t("stats.mcp", "MCP Connected", { ns: "home" })}
+                </span>
+              }
               value={connectedMcpServers}
               prefix={<ApiOutlined className="mr-2" />}
               valueStyle={{ color: "#0891b2" }}
@@ -186,7 +217,7 @@ const Home = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
             <ThunderboltOutlined className="text-yellow-500" />
-            {t("home.quickActions.title", "Quick Actions")}
+            {t("quickActions.title", "Quick Actions", { ns: "home" })}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {quickActions.map((action) => (
@@ -195,12 +226,16 @@ const Home = () => {
                 onClick={action.onClick}
                 className="group relative overflow-hidden rounded-2xl p-6 text-left transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-90 transition-opacity group-hover:opacity-100`} />
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-90 transition-opacity group-hover:opacity-100`}
+                />
                 <div className="relative z-10">
                   <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4 text-white">
                     {action.icon}
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-1">{action.title}</h3>
+                  <h3 className="text-lg font-bold text-white mb-1">
+                    {action.title}
+                  </h3>
                   <p className="text-white/80 text-sm">{action.description}</p>
                 </div>
                 <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mb-16 -mr-16 transition-transform group-hover:scale-150" />
@@ -215,7 +250,9 @@ const Home = () => {
             title={
               <div className="flex items-center gap-2">
                 <CodeOutlined className="text-blue-500" />
-                <span>{t("home.apiStatus.title", "API Service Status")}</span>
+                <span>
+                  {t("apiStatus.title", "API Service Status", { ns: "home" })}
+                </span>
               </div>
             }
             className="!rounded-2xl !border-slate-200 dark:!border-slate-700"
@@ -223,16 +260,15 @@ const Home = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-3 h-3 rounded-full ${
-                    apiStatus.status === "running"
+                  className={`w-3 h-3 rounded-full ${apiStatus.status === "running"
                       ? "bg-green-500 animate-pulse"
                       : "bg-slate-400"
-                  }`}
+                    }`}
                 />
                 <span className="font-medium">
                   {apiStatus.status === "running"
-                    ? t("home.apiStatus.running", "Running")
-                    : t("home.apiStatus.stopped", "Stopped")}
+                    ? t("apiStatus.running", "Running", { ns: "home" })
+                    : t("apiStatus.stopped", "Stopped", { ns: "home" })}
                 </span>
               </div>
               {apiStatus.status === "running" && (
@@ -248,7 +284,7 @@ const Home = () => {
                 className="mt-4 !rounded-lg"
                 onClick={() => apiService.start()}
               >
-                {t("home.apiStatus.start", "Start Service")}
+                {t("apiStatus.start", "Start Service", { ns: "home" })}
               </Button>
             )}
           </Card>
@@ -257,7 +293,9 @@ const Home = () => {
             title={
               <div className="flex items-center gap-2">
                 <RobotOutlined className="text-purple-500" />
-                <span>{t("home.featured.title", "Featured Features")}</span>
+                <span>
+                  {t("featured.title", "Featured Features", { ns: "home" })}
+                </span>
               </div>
             }
             className="!rounded-2xl !border-slate-200 dark:!border-slate-700"
@@ -268,8 +306,16 @@ const Home = () => {
                   <MessageOutlined className="text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <div className="font-medium">{t("home.featured.chat", "Multi-Mode Chat")}</div>
-                  <div className="text-sm text-slate-500">{t("home.featured.chatDesc", "Direct, Agent, Skill & MCP modes")}</div>
+                  <div className="font-medium">
+                    {t("featured.chat", "Multi-Mode Chat", { ns: "home" })}
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    {t(
+                      "featured.chatDesc",
+                      "Direct, Agent, Skill & MCP modes",
+                      { ns: "home" },
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
@@ -277,8 +323,14 @@ const Home = () => {
                   <ApiOutlined className="text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <div className="font-medium">{t("home.featured.mcp", "MCP Integration")}</div>
-                  <div className="text-sm text-slate-500">{t("home.featured.mcpDesc", "Connect to external tool servers")}</div>
+                  <div className="font-medium">
+                    {t("featured.mcp", "MCP Integration", { ns: "home" })}
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    {t("featured.mcpDesc", "Connect to external tool servers", {
+                      ns: "home",
+                    })}
+                  </div>
                 </div>
               </div>
             </div>

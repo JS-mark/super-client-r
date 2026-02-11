@@ -12,13 +12,13 @@ const ErrorPage: React.FC = () => {
 		<div className="flex h-full w-full items-center justify-center">
 			<Result
 				status="500"
-				title={t("error.title")}
+				title={t("title", "Something went wrong", { ns: "error" })}
 				subTitle={
-					error?.statusText || error?.message || t("error.defaultMessage")
+					error?.statusText || error?.message || t("defaultMessage")
 				}
 				extra={
 					<Button type="primary" onClick={() => navigate("/")}>
-						{t("error.backHome")}
+						{t("backHome", "Back Home", { ns: "error" })}
 					</Button>
 				}
 			/>

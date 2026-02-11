@@ -283,27 +283,3 @@ body {
   border-radius: 8px;
   transition: all 0.2s ease;
 }
-
-.settings-tabs .ant-tabs-tab:hover {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-.dark .settings-tabs .ant-tabs-tab:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-.settings-tabs .ant-tabs-tab-active {
-  background-color: rgba(24, 144, 255, 0.1) !important;
-}
-
-.dark .settings-tabs .ant-tabs-tab-active {
-  background-color: rgba(24, 144, 255, 0.2) !important;
-}
-
-.settings-tabs .ant-tabs-content {
-  padding-left: 0;
-}
-
-.settings-tabs .ant-tabs-ink-bar {
-  display: none;
-}

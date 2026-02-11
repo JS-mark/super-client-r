@@ -25,7 +25,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 	isStreaming = false,
 	className,
 }) => {
-	const { t } = useTranslation();
+	const { t } = useTranslation("chat");
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -57,7 +57,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 					value={value}
 					onChange={(e) => onChange(e.target.value)}
 					onKeyDown={handleKeyDown}
-					placeholder={t("chat.placeholder")}
+					placeholder={t("placeholder")}
 					autoSize={{ minRows: 1, maxRows: 6 }}
 					disabled={disabled}
 					className="flex-1 !rounded-2xl !border-gray-200 dark:!border-gray-700 !bg-gray-50 dark:!bg-gray-800 focus:!border-blue-500 focus:!shadow-none"
@@ -88,7 +88,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 			{/* Hint Text */}
 			<div className="text-center mt-2">
 				<span className="text-xs text-gray-400">
-					{t("chat.hint", "Press Enter to send, Shift+Enter for new line")}
+					{t("hint", "Press Enter to send, Shift+Enter for new line")}
 				</span>
 			</div>
 		</div>

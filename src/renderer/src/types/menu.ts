@@ -4,6 +4,11 @@
 export type MenuItemIconType = "emoji" | "image" | "default";
 
 /**
+ * 菜单项动作类型
+ */
+export type MenuItemAction = "navigate" | "modal" | "callback";
+
+/**
  * 菜单项配置
  */
 export interface MenuItemConfig {
@@ -11,7 +16,7 @@ export interface MenuItemConfig {
 	id: string;
 	/** 显示名称 */
 	label: string;
-	/** 路由路径 */
+	/** 路由路径或动作标识 */
 	path: string;
 	/** 图标类型 */
 	iconType: MenuItemIconType;
@@ -19,6 +24,8 @@ export interface MenuItemConfig {
 	iconContent?: string;
 	/** 是否启用 */
 	enabled: boolean;
+	/** 动作类型：navigate-路由跳转，modal-打开弹窗，callback-执行回调 */
+	action?: MenuItemAction;
 }
 
 /**
@@ -36,35 +43,39 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 	items: [
 		{
 			id: "chat",
-			label: "menu.chat",
+			label: "chat",
 			path: "/chat",
 			iconType: "default",
 			iconContent: "MessageOutlined",
 			enabled: true,
+			action: "navigate",
 		},
 		{
 			id: "models",
-			label: "menu.models",
+			label: "models",
 			path: "/models",
 			iconType: "default",
 			iconContent: "AppstoreOutlined",
 			enabled: true,
+			action: "navigate",
 		},
 		{
 			id: "skills",
-			label: "menu.skills",
+			label: "skills",
 			path: "/skills",
 			iconType: "default",
 			iconContent: "RocketOutlined",
 			enabled: true,
+			action: "navigate",
 		},
 		{
 			id: "settings",
-			label: "menu.settings",
+			label: "settings",
 			path: "/settings",
 			iconType: "default",
 			iconContent: "SettingOutlined",
 			enabled: true,
+			action: "navigate",
 		},
 	],
 };

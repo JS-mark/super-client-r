@@ -1,5 +1,20 @@
-import { PlusOutlined, SettingOutlined } from "@ant-design/icons";
-import { Avatar, Button, Input, Modal, Popconfirm, Select, Space, Switch, Tooltip } from "antd";
+import {
+	EditOutlined,
+	PlusOutlined,
+	ReloadOutlined,
+	SettingOutlined,
+} from "@ant-design/icons";
+import {
+	Avatar,
+	Button,
+	Input,
+	Modal,
+	Popconfirm,
+	Select,
+	Space,
+	Switch,
+	Tooltip,
+} from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -36,7 +51,12 @@ interface IconSelectorProps {
 	onChange: (value: string) => void;
 }
 
-const IconSelector: React.FC<IconSelectorProps> = ({ value, type, onChange }) => {
+const IconSelector: React.FC<IconSelectorProps> = ({
+	value,
+	type,
+	onChange,
+}) => {
+	const { t } = useTranslation();
 	const [previewUrl, setPreviewUrl] = useState("");
 
 	const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -75,11 +95,14 @@ const IconSelector: React.FC<IconSelectorProps> = ({ value, type, onChange }) =>
 						const input = document.createElement("input");
 						input.type = "file";
 						input.accept = "image/*";
-						input.onchange = (e) => handleImageUpload(e as unknown as React.ChangeEvent<HTMLInputElement>);
+						input.onchange = (e) =>
+							handleImageUpload(
+								e as unknown as React.ChangeEvent<HTMLInputElement>,
+							);
 						input.click();
 					}}
 				>
-					选择图片
+					{t("selectImage", { ns: "settings" })}
 				</Button>
 			</div>
 		);
@@ -109,16 +132,24 @@ interface MenuEditModalProps {
 	onDelete: () => void;
 }
 
-const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onSave, onDelete }) => {
+const MenuEditModal: React.FC<MenuEditModalProps> = ({
+	open,
+	item,
+	onCancel,
+	onSave,
+	onDelete,
+}) => {
 	const { t } = useTranslation();
-	const [editingItem, setEditingItem] = useState<MenuItemConfig>(item || {
-		id: "",
-		label: "",
-		path: "",
-		iconType: "default",
-		iconContent: "MessageOutlined",
-		enabled: true,
-	});
+	const [editingItem, setEditingItem] = useState<MenuItemConfig>(
+		item || {
+			id: "",
+			label: "",
+			path: "",
+			iconType: "default",
+			iconContent: "MessageOutlined",
+			enabled: true,
+		},
+	);
 
 	useEffect(() => {
 		if (item) {
@@ -134,27 +165,29 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 	return (
 		<Modal
 			open={open}
-			title={t("settings.editMenuItem", "Edit Menu Item")}
+			title={t("editMenuItem", "Edit Menu Item", { ns: "settings" })}
 			onCancel={onCancel}
 			onOk={handleSave}
 			width={500}
+			destroyOnHidden
+			maskClosable={false}
 			footer={
 				<Space>
 					<Button onClick={onCancel}>
-						{t("common.cancel", "Cancel")}
+						{t("cancel", "Cancel", { ns: "common" })}
 					</Button>
 					<Popconfirm
-						title={t("settings.confirmDeleteMenuItem", "Delete this menu item?")}
+						title={t("confirmDeleteMenuItem", "Delete this menu item?", {
+							ns: "settings",
+						})}
 						onConfirm={onDelete}
-						okText={t("common.confirm", "Confirm")}
-						cancelText={t("common.cancel", "Cancel")}
+						okText={t("confirm", "Confirm", { ns: "common" })}
+						cancelText={t("cancel", "Cancel", { ns: "common" })}
 					>
-						<Button danger>
-							{t("settings.delete", "Delete")}
-						</Button>
+						<Button danger>{t("delete", "Delete", { ns: "settings" })}</Button>
 					</Popconfirm>
 					<Button type="primary" onClick={handleSave}>
-						{t("common.save", "Save")}
+						{t("save", "Save", { ns: "common" })}
 					</Button>
 				</Space>
 			}
@@ -162,7 +195,7 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 			<Space orientation="vertical" className="w-full" size="middle">
 				<div>
 					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-						{t("settings.menuLabel", "Label")}
+						{t("menuLabel", "Label", { ns: "settings" })}
 					</span>
 					<Input
 						value={t(editingItem.label)}
@@ -173,11 +206,16 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 
 				<div>
 					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-						{t("settings.iconType", "Icon Type")}
+						{t("iconType", "Icon Type", { ns: "settings" })}
 					</span>
 					<Select
 						value={editingItem.iconType}
-						onChange={(v) => setEditingItem({ ...editingItem, iconType: v as MenuItemIconType })}
+						onChange={(v) =>
+							setEditingItem({
+								...editingItem,
+								iconType: v as MenuItemIconType,
+							})
+						}
 						options={ICON_TYPE_OPTIONS}
 						className="!w-full"
 					/>
@@ -185,7 +223,7 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 
 				<div>
 					<span className="text-sm text-slate-600 dark:text-slate-400 mb-2">
-						{t("settings.icon", "Icon")}
+						{t("icon", "Icon", { ns: "settings" })}
 					</span>
 					<IconSelector
 						value={editingItem.iconContent || ""}
@@ -196,7 +234,7 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 
 				<div className="flex items-center justify-between">
 					<span className="text-sm text-slate-600 dark:text-slate-400">
-						{t("settings.enabled", "Enabled")}
+						{t("enabled", "Enabled", { ns: "settings" })}
 					</span>
 					<Switch
 						checked={editingItem.enabled}
@@ -208,24 +246,6 @@ const MenuEditModal: React.FC<MenuEditModalProps> = ({ open, item, onCancel, onS
 	);
 };
 
-// SVG 图标组件
-const EditIcon: React.FC = () => (
-	<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-		<path d="M11 4H4a2 2 0 0 0 0-2 2v14a2 2 0 0 0 0 2 2h14" />
-		<path d="m18.5 2.5 3 3L21 9" />
-	</svg>
-);
-
-const ReloadIcon: React.FC = () => (
-	<svg xlinkTitle="reload" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-		<path d="M1 4v6h6" />
-		<path d="M3.51 15a9 9 0 0 1 0-2-5.74" />
-		<path d="M4 13h6" />
-		<path d="M21 3v6h-6" />
-		<path d="M3 21h6" />
-	</svg>
-);
-
 /**
  * 设置区块组件（内部）
  */
@@ -235,7 +255,7 @@ const SettingSection: React.FC<{
 	children: React.ReactNode;
 	extra?: React.ReactNode;
 }> = ({ title, icon, children, extra }) => (
-	<div className="p-6 rounded-2xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50">
+	<div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
 		<div className="flex items-center justify-between mb-4">
 			<h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
 				{icon}
@@ -262,9 +282,12 @@ export const MenuSettings: React.FC<{
 	// 过滤掉设置项（设置按钮固定在侧边栏底部，不可配置）
 	const configurableItems = menuItems.filter((item) => item.id !== "settings");
 
-	const handleToggleEnabled = useCallback((itemId: string) => {
-		toggleEnabled(itemId);
-	}, [toggleEnabled]);
+	const handleToggleEnabled = useCallback(
+		(itemId: string) => {
+			toggleEnabled(itemId);
+		},
+		[toggleEnabled],
+	);
 
 	const handleEditItem = (item: MenuItemConfig) => {
 		onEditItem?.(item);
@@ -296,16 +319,18 @@ export const MenuSettings: React.FC<{
 	return (
 		<div className="space-y-6">
 			<SettingSection
-				title={t("settings.menuConfig", "Menu Configuration")}
+				title={t("menuConfig", "Menu Configuration", { ns: "settings" })}
 				icon={<SettingOutlined />}
 				extra={
-					<Tooltip title={t("settings.resetMenu", "Reset to default")}>
+					<Tooltip
+						title={t("resetMenu", "Reset to default", { ns: "settings" })}
+					>
 						<Button
 							size="small"
-							icon={<ReloadIcon />}
+							icon={<ReloadOutlined />}
 							onClick={handleReset}
 						>
-							{t("settings.reset", "Reset")}
+							{t("reset", "Reset", { ns: "settings" })}
 						</Button>
 					</Tooltip>
 				}
@@ -342,7 +367,9 @@ export const MenuSettings: React.FC<{
 								newConfigurableItems.splice(index, 0, removed);
 
 								// 从完整列表中找到设置项
-								const settingsItem = menuItems.find((item) => item.id === "settings");
+								const settingsItem = menuItems.find(
+									(item) => item.id === "settings",
+								);
 
 								// 合并：可配置项 + 设置项（保持设置项在列表中）
 								const newItems = settingsItem
@@ -356,7 +383,6 @@ export const MenuSettings: React.FC<{
 								{/* 拖拽手柄 */}
 								{item.enabled && (
 									<div className="cursor-grab text-slate-400 hover:text-slate-600">
-										{/** biome-ignore lint/a11y/noSvgWithoutTitle: <explanation> */}
 										<svg
 											width="16"
 											height="16"
@@ -379,13 +405,15 @@ export const MenuSettings: React.FC<{
 								{renderIcon(item)}
 
 								{/* 标签名称 */}
-								<span className="flex-1 font-medium">
-									{t(item.label)}
-								</span>
+								<span className="flex-1 font-medium">{t(item.label)}</span>
 
 								{/* 操作按钮 */}
 								<div className="flex items-center gap-2">
-									<Tooltip title={t("settings.toggleMenu", "Toggle menu item")}>
+									<Tooltip
+										title={t("toggleMenu", "Toggle menu item", {
+											ns: "settings",
+										})}
+									>
 										<Switch
 											checked={item.enabled}
 											size="small"
@@ -395,11 +423,11 @@ export const MenuSettings: React.FC<{
 									<Button
 										type="text"
 										size="small"
-										icon={<EditIcon />}
+										icon={<EditOutlined />}
 										onClick={() => handleEditItem(item)}
 										disabled={!item.enabled}
 									>
-										{t("settings.edit", "Edit")}
+										{t("edit", "Edit", { ns: "settings" })}
 									</Button>
 								</div>
 							</div>
@@ -409,7 +437,7 @@ export const MenuSettings: React.FC<{
 
 				{/* 拖拽提示 */}
 				<div className="mt-[10px] p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-center text-slate-400 dark:text-slate-500">
-					{t("settings.dragTip", "Drag to reorder menu items")}
+					{t("dragTip", "Drag to reorder menu items", { ns: "settings" })}
 				</div>
 			</SettingSection>
 		</div>

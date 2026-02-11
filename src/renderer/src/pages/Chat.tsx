@@ -11,7 +11,6 @@ import {
 	RobotOutlined,
 	SendOutlined,
 	StarOutlined,
-	ThunderboltOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
 import {
@@ -19,11 +18,12 @@ import {
 	Tooltip
 } from "antd";
 import type * as React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
-import { type ChatMode, useChat } from "../hooks/useChat";
+import { useChat } from "../hooks/useChat";
+import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 import type { Message } from "../stores/chatStore";
 
@@ -206,12 +206,12 @@ const MessageBubble: React.FC<{
 };
 
 
-// Empty state suggestions
-const SUGGESTIONS = [
-	"Explain quantum computing in simple terms",
-	"Write a Python function to calculate fibonacci",
-	"Help me debug this error in my code",
-	"Create a marketing plan for a new product",
+// Empty state suggestions - use i18n keys
+const SUGGESTION_KEYS = [
+	"suggestions.quantum",
+	"suggestions.fibonacci",
+	"suggestions.debug",
+	"suggestions.marketing",
 ];
 
 // Skill/tool icons for the input toolbar
@@ -223,30 +223,32 @@ interface ToolbarItem {
 	color?: string;
 }
 
-// Quick action items for the toolbar
+// Quick action items for the toolbar - labels use i18n keys
 const TOOLBAR_ITEMS: ToolbarItem[] = [
-	{ id: "quote", icon: <PlusOutlined />, label: "引用", type: "action" },
-	{ id: "attach", icon: <PaperClipOutlined />, label: "附件", type: "action" },
+	{ id: "quote", icon: <PlusOutlined />, label: "chat.toolbar.quote", type: "action" },
+	{ id: "attach", icon: <PaperClipOutlined />, label: "chat.toolbar.attach", type: "action" },
 	{
 		id: "prompt",
 		icon: <BulbOutlined />,
-		label: "提示词",
+		label: "chat.toolbar.prompt",
 		type: "tool",
 		color: "#52c41a",
 	},
 	{
 		id: "baidu",
 		icon: <span className="text-green-500 font-bold">du</span>,
-		label: "百度",
+		label: "chat.toolbar.baidu",
 		type: "tool",
 		color: "#52c41a",
 	},
-	{ id: "doc", icon: <FileTextOutlined />, label: "文档", type: "tool" },
-	{ id: "tools", icon: <ToolOutlined />, label: "工具", type: "tool" },
+	{ id: "doc", icon: <FileTextOutlined />, label: "chat.toolbar.doc", type: "tool" },
+	{ id: "tools", icon: <ToolOutlined />, label: "chat.toolbar.tools", type: "tool" },
 ];
 
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
+	;
+
 	const {
 		messages,
 		input,
@@ -257,6 +259,35 @@ const Chat: React.FC = () => {
 		clearMessages,
 		setChatMode,
 	} = useChat();
+
+
+	// 设置标题栏和页面标题
+	const pageTitle = useMemo(() => (
+		<>
+			<div className="flex items-center gap-2">
+				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+					<RobotOutlined className="text-white text-xs" />
+				</div>
+				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("title", "AI 聊天", { ns: "chat" })}</span>
+			</div>
+			<div
+				className="flex items-center gap-2"
+				// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
+				style={{ WebkitAppRegion: "no-drag" }}
+			>
+				<Tooltip title="Clear conversation">
+					<Button
+						type="text"
+						icon={<span className="text-slate-700 dark:text-slate-200"><ClearOutlined /></span>}
+						onClick={clearMessages}
+						disabled={messages.length === 0 || isStreaming}
+						className="rounded-lg"
+					/>
+				</Tooltip>
+			</div>
+		</>
+	), [messages, t, clearMessages, isStreaming]);
+	useTitle(pageTitle)
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const [isInputFocused, setIsInputFocused] = useState(false);
@@ -272,40 +303,9 @@ const Chat: React.FC = () => {
 		}
 	};
 
-	const modes: ChatMode[] = ["direct", "agent", "skill", "mcp"];
-
 	return (
 		<MainLayout>
 			<div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950">
-				{/* Header */}
-				<div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-					<div className="flex items-center gap-4">
-						<div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-							<ThunderboltOutlined className="text-white text-xl" />
-						</div>
-						<div>
-							<h1 className="text-xl font-bold text-slate-900 dark:text-white">
-								{t("chat.title", "AI Chat")}
-							</h1>
-							<p className="text-sm text-slate-500">
-								{messages.length} messages
-							</p>
-						</div>
-					</div>
-
-					<div className="flex items-center gap-2">
-						<Tooltip title="Clear conversation">
-							<Button
-								type="text"
-								icon={<ClearOutlined />}
-								onClick={clearMessages}
-								disabled={messages.length === 0 || isStreaming}
-								className="rounded-lg"
-							/>
-						</Tooltip>
-					</div>
-				</div>
-
 				{/* Chat Area */}
 				<div className="flex-1 overflow-auto w-full">
 					{messages.length === 0 ? (
@@ -317,24 +317,24 @@ const Chat: React.FC = () => {
 										<StarOutlined className="text-2xl sm:text-3xl text-white" />
 									</div>
 									<h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-3 whitespace-normal">
-										Welcome to AI Chat
+										{t("welcomeTitle", { ns: "chat" })}
 									</h2>
 									<p className="text-slate-500 text-base sm:text-lg whitespace-normal">
-										Choose a mode and start your conversation
+										{t("welcomeSubtitle", { ns: "chat" })}
 									</p>
 								</div>
 								{/* Suggestions */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-									{SUGGESTIONS.map((suggestion) => (
+									{SUGGESTION_KEYS.map((key) => (
 										<button
-											key={suggestion}
+											key={key}
 											onClick={() => {
-												setInput(suggestion);
+												setInput(t(key, { ns: 'chat' }));
 											}}
 											className="p-4 text-left rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:shadow-md transition-all group block w-full min-w-0"
 										>
 											<p className="text-slate-700 dark:text-slate-300 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 break-words">
-												{suggestion}
+												{t(key, { ns: 'chat' })}
 											</p>
 										</button>
 									))}
@@ -406,7 +406,7 @@ const Chat: React.FC = () => {
 													}
 												}}
 												className={cn(
-													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700",
+													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600",
 													item.color && "hover:text-[var(--hover-color)]",
 												)}
 												style={
@@ -427,7 +427,7 @@ const Chat: React.FC = () => {
 
 									{/* More button */}
 									<Tooltip title="更多">
-										<button className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700">
+										<button className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600">
 											<RightOutlined className="text-sm" />
 										</button>
 									</Tooltip>

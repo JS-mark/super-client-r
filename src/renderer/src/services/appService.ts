@@ -20,6 +20,7 @@ export interface AppInfo {
   node: string
   platform: string
   arch: string
+  v8?: string
 }
 
 export interface UpdateCheckResult {
