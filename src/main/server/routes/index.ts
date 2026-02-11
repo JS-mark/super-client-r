@@ -2,6 +2,7 @@ import { SwaggerRouter } from "koa-swagger-decorator";
 import { swaggerConfig } from "../middlewares/swagger";
 import { HealthController } from "./health";
 import { SkillsController } from "./proxy";
+import { McpController } from "./mcp";
 
 export const setupRoutes = () => {
 	const router = new SwaggerRouter({}, swaggerConfig);
@@ -10,6 +11,7 @@ export const setupRoutes = () => {
 	// 使用 router.map() 而不是手动 router.get()，这样装饰器才会被处理
 	router.map(HealthController, {});
 	router.map(SkillsController, {});
+	router.map(McpController, {});
 
 	// 注册 Swagger 路由（必须在 map 之后调用）
 	router.swagger(swaggerConfig);
