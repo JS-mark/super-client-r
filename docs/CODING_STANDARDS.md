@@ -247,14 +247,14 @@ function cn(...inputs: ClassValue[]) {
 
 ### 4.1 变量命名
 
-| 类型 | 规范 | 示例 |
-|------|------|------|
-| 变量/函数 | camelCase | `userName`, `getUser()` |
-| 组件/类 | PascalCase | `UserCard`, `UserService` |
-| 常量 | UPPER_SNAKE_CASE | `API_BASE_URL` |
-| 类型/接口 | PascalCase | `User`, `UserProps` |
-| 枚举成员 | PascalCase | `Status.Success` |
-| 私有属性 | _camelCase | `_internalValue` |
+| 类型      | 规范             | 示例                      |
+|-----------|------------------|---------------------------|
+| 变量/函数 | camelCase        | `userName`, `getUser()`   |
+| 组件/类   | PascalCase       | `UserCard`, `UserService` |
+| 常量      | UPPER_SNAKE_CASE | `API_BASE_URL`            |
+| 类型/接口 | PascalCase       | `User`, `UserProps`       |
+| 枚举成员  | PascalCase       | `Status.Success`          |
+| 私有属性  | _camelCase       | `_internalValue`          |
 
 ### 4.2 布尔变量
 
@@ -496,16 +496,16 @@ describe('AgentService', () => {
 
 ### 10.2 类型 (type)
 
-| 类型 | 说明 |
-|------|------|
-| `feat` | 新功能 |
-| `fix` | 修复 bug |
-| `docs` | 文档更新 |
-| `style` | 代码格式 (不影响功能) |
-| `refactor` | 重构 |
-| `perf` | 性能优化 |
-| `test` | 测试相关 |
-| `chore` | 构建/工具链 |
+| 类型       | 说明                  |
+|------------|-----------------------|
+| `feat`     | 新功能                |
+| `fix`      | 修复 bug              |
+| `docs`     | 文档更新              |
+| `style`    | 代码格式 (不影响功能) |
+| `refactor` | 重构                  |
+| `perf`     | 性能优化              |
+| `test`     | 测试相关              |
+| `chore`    | 构建/工具链           |
 
 ### 10.3 示例
 
@@ -558,27 +558,32 @@ Refs: #123
 ## 12. 代码审查清单
 
 ### 功能完整性
+
 - [ ] 功能按预期工作
 - [ ] 错误处理完善
 - [ ] 边界条件处理
 
 ### 代码质量
+
 - [ ] TypeScript 类型完整
 - [ ] 无 console.log (或已标记 TODO)
 - [ ] 无未使用的变量/导入
 - [ ] 函数复杂度合理
 
 ### 性能
+
 - [ ] 避免不必要的重渲染
 - [ ] 大数据量使用虚拟化
 - [ ] 图片/资源懒加载
 
 ### 安全
+
 - [ ] 无敏感信息硬编码
 - [ ] 用户输入已验证
 - [ ] IPC 通信类型安全
 
 ### 可维护性
+
 - [ ] 代码自解释 (必要时加注释)
 - [ ] 遵循命名规范
 - [ ] 单一职责原则

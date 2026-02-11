@@ -9,6 +9,7 @@ import Models from "./pages/Models";
 import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
+import Workspaces from "./pages/Workspaces";
 
 export const router = createHashRouter([
 	{
@@ -58,6 +59,12 @@ export const router = createHashRouter([
 		element: <Bookmarks />,
 		errorElement: <ErrorPage />,
 		handle: { title: "收藏" },
+	},
+	{
+		path: "/workspaces",
+		element: <Workspaces />,
+		errorElement: <ErrorPage />,
+		handle: { title: "工作区" },
 	},
 	{
 		path: "/settings",

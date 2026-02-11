@@ -7,6 +7,7 @@
 Super Client R 使用 Electron 的 IPC (Inter-Process Communication) 机制实现主进程与渲染进程的通信。
 
 **安全设计**:
+
 - Context Isolation 启用
 - 通过 Preload 脚本暴露最小化 API
 - 所有 IPC 通道严格类型化
@@ -636,15 +637,15 @@ Response:
 
 ### 错误码规范
 
-| 错误码 | 说明 |
-|--------|------|
-| `INVALID_REQUEST` | 请求参数无效 |
-| `NOT_FOUND` | 资源不存在 |
-| `ALREADY_EXISTS` | 资源已存在 |
-| `NOT_CONNECTED` | 未连接/未初始化 |
-| `EXECUTION_ERROR` | 执行出错 |
-| `TIMEOUT` | 操作超时 |
-| `INTERNAL_ERROR` | 内部错误 |
+| 错误码            | 说明            |
+|-------------------|-----------------|
+| `INVALID_REQUEST` | 请求参数无效    |
+| `NOT_FOUND`       | 资源不存在      |
+| `ALREADY_EXISTS`  | 资源已存在      |
+| `NOT_CONNECTED`   | 未连接/未初始化 |
+| `EXECUTION_ERROR` | 执行出错        |
+| `TIMEOUT`         | 操作超时        |
+| `INTERNAL_ERROR`  | 内部错误        |
 
 ### 错误响应格式
 

@@ -1,0 +1,394 @@
+import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import {
+	Dropdown,
+	Button,
+	Modal,
+	Form,
+	Input,
+	ColorPicker,
+	Radio,
+	message,
+	Tooltip,
+	Tag,
+} from "antd";
+import {
+	DownOutlined,
+	PlusOutlined,
+	SettingOutlined,
+	CopyOutlined,
+	ExportOutlined,
+	ImportOutlined,
+	DeleteOutlined,
+	CheckOutlined,
+} from "@ant-design/icons";
+import { cn } from "../../lib/utils";
+import {
+	useWorkspaceStore,
+	WORKSPACE_COLORS,
+	type Workspace,
+	type WorkspaceType,
+} from "../../stores/workspaceStore";
+
+const WORKSPACE_TYPE_OPTIONS: { value: WorkspaceType; label: string; icon: string }[] = [
+	{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
+	{ value: "work", label: "workspaces.type.work", icon: "💼" },
+	{ value: "project", label: "workspaces.type.project", icon: "📁" },
+	{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
+];
+
+interface WorkspaceFormData {
+	name: string;
+	description?: string;
+	type: WorkspaceType;
+	color: string;
+	icon?: string;
+}
+
+// 工作区徽章组件
+function WorkspaceBadge({
+	workspace,
+	size = "default",
+	showName = true,
+}: {
+	workspace: Workspace;
+	size?: "small" | "default";
+	showName?: boolean;
+}) {
+	const isSmall = size === "small";
+
+	return (
+		<div className="flex items-center gap-2">
+			<div
+				className={cn(
+					"rounded-lg flex items-center justify-center font-medium text-white",
+					isSmall ? "w-6 h-6 text-xs" : "w-8 h-8 text-sm"
+				)}
+				style={{ backgroundColor: workspace.color }}
+			>
+				{workspace.icon || workspace.name.charAt(0).toUpperCase()}
+			</div>
+			{showName && (
+				<div className="flex flex-col">
+					<span
+						className={cn(
+							"font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px]",
+							isSmall && "text-xs"
+						)}
+					>
+						{workspace.name}
+					</span>
+					{!isSmall && (
+						<span className="text-xs text-slate-500 dark:text-slate-400">
+							{workspace.sessionIds.length} 个会话
+						</span>
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
+
+// 创建工作区弹窗
+function CreateWorkspaceModal({
+	open,
+	onClose,
+	onCreate,
+}: {
+	open: boolean;
+	onClose: () => void;
+	onCreate: (data: WorkspaceFormData) => void;
+}) {
+	const { t } = useTranslation();
+	const [form] = Form.useForm();
+	const [color, setColor] = useState(WORKSPACE_COLORS[0]);
+
+	const handleSubmit = () => {
+		form.validateFields().then((values) => {
+			onCreate({ ...values, color });
+			form.resetFields();
+			setColor(WORKSPACE_COLORS[0]);
+			onClose();
+		});
+	};
+
+	return (
+		<Modal
+			title={t("workspaces.create.title", "创建工作区")}
+			open={open}
+			onOk={handleSubmit}
+			onCancel={onClose}
+			okText={t("common.create", "创建")}
+			cancelText={t("common.cancel", "取消")}
+		>
+			<Form form={form} layout="vertical" className="mt-4">
+				<Form.Item
+					name="name"
+					label={t("workspaces.name", "名称")}
+					rules={[{ required: true, message: "请输入工作区名称" }]}
+				>
+					<Input placeholder={t("workspaces.namePlaceholder", "我的工作区")} />
+				</Form.Item>
+
+				<Form.Item
+					name="description"
+					label={t("workspaces.description", "描述")}
+				>
+					<Input.TextArea
+						rows={2}
+						placeholder={t("workspaces.descriptionPlaceholder", "工作区描述...")}
+					/>
+				</Form.Item>
+
+				<Form.Item
+					name="type"
+					label={t("workspaces.type.label", "类型")}
+					initialValue="personal"
+				>
+					<Radio.Group>
+						<div className="grid grid-cols-2 gap-2">
+							{WORKSPACE_TYPE_OPTIONS.map((type) => (
+								<Radio.Button key={type.value} value={type.value} className="!h-auto">
+									<div className="flex items-center gap-2 py-1">
+										<span>{type.icon}</span>
+										<span>{t(type.label)}</span>
+									</div>
+								</Radio.Button>
+							))}
+						</div>
+					</Radio.Group>
+				</Form.Item>
+
+				<Form.Item label={t("workspaces.color", "颜色")}>
+					<div className="flex flex-wrap gap-2">
+						{WORKSPACE_COLORS.map((c) => (
+							<button
+								key={c}
+								type="button"
+								onClick={() => setColor(c)}
+								className={cn(
+									"w-8 h-8 rounded-lg transition-all",
+									color === c ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : "hover:scale-105"
+								)}
+								style={{ backgroundColor: c }}
+							/>
+						))}
+					</div>
+				</Form.Item>
+			</Form>
+		</Modal>
+	);
+}
+
+// 主组件
+export function WorkspaceSwitcher() {
+	const { t } = useTranslation();
+	const {
+		workspaces,
+		currentWorkspaceId,
+		defaultWorkspaceId,
+		switchWorkspace,
+		createWorkspace,
+		duplicateWorkspace,
+		deleteWorkspace,
+		exportWorkspace,
+		getCurrentWorkspace,
+	} = useWorkspaceStore();
+
+	const [createModalOpen, setCreateModalOpen] = useState(false);
+	const [dropdownOpen, setDropdownOpen] = useState(false);
+
+	const currentWorkspace = getCurrentWorkspace();
+
+	// 按order排序的工作区
+	const sortedWorkspaces = [...workspaces].sort((a, b) => a.order - b.order);
+
+	const handleCreate = (data: WorkspaceFormData) => {
+		const id = createWorkspace(data);
+		message.success(t("workspaces.create.success", "工作区创建成功"));
+		setDropdownOpen(false);
+	};
+
+	const handleDuplicate = (workspace: Workspace) => {
+		duplicateWorkspace(workspace.id);
+		message.success(t("workspaces.duplicate.success", "工作区已复制"));
+	};
+
+	const handleDelete = (workspace: Workspace) => {
+		if (workspace.id === defaultWorkspaceId) {
+			message.error(t("workspaces.delete.cannotDeleteDefault", "不能删除默认工作区"));
+			return;
+		}
+
+		Modal.confirm({
+			title: t("workspaces.delete.confirmTitle", "删除工作区"),
+			content: t(
+				"workspaces.delete.confirmContent",
+				"确定要删除工作区 \"{{name}}\" 吗？此操作不可撤销。",
+				{ name: workspace.name }
+			),
+			onOk: () => {
+				const success = deleteWorkspace(workspace.id);
+				if (success) {
+					message.success(t("workspaces.delete.success", "工作区已删除"));
+				}
+			},
+		});
+	};
+	const handleExport = (workspace: Workspace) => {
+		try {
+			const data = exportWorkspace(workspace.id);
+			const blob = new Blob([JSON.stringify(data, null, 2)], {
+				type: "application/json",
+			});
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `workspace-${workspace.name}-${Date.now()}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			message.success(t("workspaces.export.success", "工作区已导出"));
+		} catch (error) {
+			message.error(t("workspaces.export.error", "导出失败"));
+		}
+	};
+
+	const menuItems = [
+		{
+			key: "header",
+			label: (
+				<div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 mb-1">
+					{t("workspaces.switch.title", "切换工作区")}
+				</div>
+			),
+			disabled: true,
+		},
+		...sortedWorkspaces.map((workspace) => ({
+			key: workspace.id,
+			label: (
+				<div className="flex items-center justify-between w-full group">
+					<button
+						onClick={() => {
+							switchWorkspace(workspace.id);
+							setDropdownOpen(false);
+						}}
+						className="flex items-center gap-2 flex-1 text-left"
+					>
+						<WorkspaceBadge workspace={workspace} size="small" showName={false} />
+						<span className="text-sm text-slate-700 dark:text-slate-200">
+							{workspace.name}
+						</span>
+						{workspace.id === currentWorkspaceId && (
+							<CheckOutlined className="text-blue-500 text-xs ml-2" />
+						)}
+					</button>
+
+					{/* 操作按钮 */}
+					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+						<Tooltip title={t("workspaces.duplicate", "复制")}>
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									handleDuplicate(workspace);
+								}}
+								className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+							>
+								<CopyOutlined className="text-xs" />
+							</button>
+						</Tooltip>
+						<Tooltip title={t("workspaces.export", "导出")}>
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									handleExport(workspace);
+								}}
+								className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+							>
+								<ExportOutlined className="text-xs" />
+							</button>
+						</Tooltip>
+						{workspace.id !== defaultWorkspaceId && (
+							<Tooltip title={t("common.delete", "删除")}>
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										handleDelete(workspace);
+									}}
+									className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500"
+								>
+									<DeleteOutlined className="text-xs" />
+								</button>
+							</Tooltip>
+						)}
+					</div>
+				</div>
+			),
+		})),
+		{
+			key: "divider",
+			type: "divider" as const,
+		},
+		{
+			key: "create",
+			label: (
+				<button
+					onClick={() => {
+						setCreateModalOpen(true);
+						setDropdownOpen(false);
+					}}
+					className="flex items-center gap-2 text-blue-600 dark:text-blue-400 w-full text-left"
+				>
+					<PlusOutlined />
+					<span>{t("workspaces.create.title", "创建工作区")}</span>
+				</button>
+			),
+		},
+		{
+			key: "manage",
+			label: (
+				<button
+					onClick={() => {
+						// Navigate to workspaces page
+						window.location.hash = "/workspaces";
+						setDropdownOpen(false);
+					}}
+					className="flex items-center gap-2 text-slate-600 dark:text-slate-400 w-full text-left"
+				>
+					<SettingOutlined />
+					<span>{t("workspaces.manage", "管理工作区")}</span>
+				</button>
+			),
+		},
+	];
+
+	if (!currentWorkspace) return null;
+
+	return (
+		<>
+			<Dropdown
+				menu={{ items: menuItems }}
+				open={dropdownOpen}
+				onOpenChange={setDropdownOpen}
+				placement="bottomLeft"
+				trigger={["click"]}
+				overlayClassName="workspace-switcher-dropdown"
+			>
+				<Button
+					type="text"
+					className="w-full h-auto py-2 px-3 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+				>
+					<WorkspaceBadge workspace={currentWorkspace} />
+					<DownOutlined className="text-slate-400 text-xs" />
+				</Button>
+			</Dropdown>
+
+			<CreateWorkspaceModal
+				open={createModalOpen}
+				onClose={() => setCreateModalOpen(false)}
+				onCreate={handleCreate}
+			/>
+		</>
+	);
+}

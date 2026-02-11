@@ -5,6 +5,7 @@
 **Super Client R** 是一个基于 Electron 的 AI 客户端桌面应用，集成了 Claude AI、MCP (Model Context Protocol)、Skill 系统等能力，提供智能对话、工具调用、插件扩展等功能。
 
 ### 1.1 核心特性
+
 - **AI 对话**: 基于 Claude SDK 的智能对话系统
 - **MCP 支持**: Model Context Protocol 服务器管理
 - **Skill 系统**: 可扩展的工具和插件体系
@@ -13,15 +14,16 @@
 - **浮动组件**: 悬浮窗交互支持
 
 ### 1.2 技术栈
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 框架 | Electron | ^38.7.2 |
-| UI | React + Ant Design | ^19.2.3 / ^6.2.1 |
-| 构建 | Vite + electron-vite | ^7.3.1 / ^5.0.0 |
-| 状态 | Zustand | ^5.0.10 |
-| 样式 | Tailwind CSS | ^4.1.18 |
-| 语言 | TypeScript | ~5.8.3 |
-| 服务器 | Koa | ^3.1.1 |
+
+| 层级   | 技术                 | 版本             |
+|--------|----------------------|------------------|
+| 框架   | Electron             | ^38.7.2          |
+| UI     | React + Ant Design   | ^19.2.3 / ^6.2.1 |
+| 构建   | Vite + electron-vite | ^7.3.1 / ^5.0.0  |
+| 状态   | Zustand              | ^5.0.10          |
+| 样式   | Tailwind CSS         | ^4.1.18          |
+| 语言   | TypeScript           | ~5.8.3           |
+| 服务器 | Koa                  | ^3.1.1           |
 
 ---
 
@@ -118,13 +120,13 @@
 
 ### 3.2 核心模块职责
 
-| 模块 | 职责 | 关键服务 |
-|------|------|----------|
+| 模块      | 职责                        | 关键服务     |
+|-----------|-----------------------------|--------------|
 | **Agent** | AI 会话管理、消息流、工具调用 | AgentService |
-| **Skill** | 技能安装/卸载/执行 | SkillService |
-| **MCP** | MCP 服务器管理、工具发现 | McpService |
-| **Chat** | 消息历史、界面交互 | ChatStore |
-| **API** | HTTP 服务、代理转发 | Koa Server |
+| **Skill** | 技能安装/卸载/执行          | SkillService |
+| **MCP**   | MCP 服务器管理、工具发现     | McpService   |
+| **Chat**  | 消息历史、界面交互           | ChatStore    |
+| **API**   | HTTP 服务、代理转发          | Koa Server   |
 
 ---
 
@@ -269,12 +271,12 @@ api:start                 // 启动服务器
 
 ### 5.2 通信模式
 
-| 模式 | 使用场景 | 实现方式 |
-|------|----------|----------|
-| **Request/Response** | 同步调用 | `ipcRenderer.invoke` + `ipcMain.handle` |
-| **Event (Main→Renderer)** | 服务端推送 | `webContents.send` + `ipcRenderer.on` |
-| **Event (Renderer→Main)** | 单向通知 | `ipcRenderer.send` + `ipcMain.on` |
-| **Stream** | 流式数据 (AI 响应) | EventEmitter + 逐块传输 |
+| 模式                      | 使用场景           | 实现方式                                |
+|---------------------------|--------------------|-----------------------------------------|
+| **Request/Response**      | 同步调用           | `ipcRenderer.invoke` + `ipcMain.handle` |
+| **Event (Main→Renderer)** | 服务端推送         | `webContents.send` + `ipcRenderer.on`   |
+| **Event (Renderer→Main)** | 单向通知           | `ipcRenderer.send` + `ipcMain.on`       |
+| **Stream**                | 流式数据 (AI 响应) | EventEmitter + 逐块传输                 |
 
 ---
 
@@ -300,12 +302,12 @@ interface AgentStore {
 
 ### 6.2 持久化策略
 
-| 数据类型 | 存储位置 | 持久化方式 |
-|----------|----------|------------|
-| 用户配置 | electron-store | 自动保存 |
-| 聊天记录 | electron-store | 手动触发 |
-| 会话状态 | Memory | 不持久化 |
-| Skill 数据 | File System | 安装时保存 |
+| 数据类型   | 存储位置       | 持久化方式 |
+|------------|----------------|------------|
+| 用户配置   | electron-store | 自动保存   |
+| 聊天记录   | electron-store | 手动触发   |
+| 会话状态   | Memory         | 不持久化   |
+| Skill 数据 | File System    | 安装时保存 |
 
 ---
 
@@ -342,16 +344,19 @@ MCP Server Config:
 ## 8. 安全设计
 
 ### 8.1 进程隔离
+
 - Context Isolation: **启用**
 - Node Integration: **禁用** (Renderer)
 - Sandbox: **生产环境启用**
 
 ### 8.2 代码安全
+
 - Preload 脚本是最小化暴露的 API 边界
 - IPC 通道严格类型化
 - 用户输入验证在服务层进行
 
 ### 8.3 数据安全
+
 - 敏感配置使用 electron-store 加密存储
 - 日志脱敏处理
 - 本地服务器使用 Token 认证
@@ -400,17 +405,20 @@ pnpm i18n:translate       # 自动翻译
 ## 10. 性能优化
 
 ### 10.1 启动优化
+
 - 使用 Vite 快速 HMR
 - 延迟加载非核心模块
 - 主窗口与浮动窗口按需创建
 
 ### 10.2 运行时优化
+
 - Zustand 选择性订阅
 - 大列表虚拟化
 - 图片懒加载
 - Markdown 渲染优化
 
 ### 10.3 内存管理
+
 - 及时清理会话数据
 - 限制历史消息数量
 - 定期垃圾回收

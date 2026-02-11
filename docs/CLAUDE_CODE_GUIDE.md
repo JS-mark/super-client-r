@@ -13,6 +13,7 @@
 **架构模式**: 主进程-渲染进程分离架构
 
 **关键文件位置**:
+
 - 主进程入口: `src/main/main.ts`
 - 渲染进程入口: `src/renderer/src/main.tsx`
 - IPC 定义: `src/main/ipc/channels.ts`, `src/main/ipc/types.ts`
@@ -32,6 +33,7 @@
 ```
 
 **AI 开发时必须注意**:
+
 - 不能在渲染进程直接使用 Node.js API（如 `fs`, `path`）
 - 跨进程通信必须通过 IPC 通道
 - 所有 IPC 调用必须是异步的
@@ -92,6 +94,7 @@ export const newService = {
 ```
 
 **验证清单**:
+
 - [ ] 通道名称使用 `kebab-case` 格式（`module:action`）
 - [ ] 请求/响应类型定义完整
 - [ ] 处理器返回 `{ success, data?, error? }` 格式
@@ -148,6 +151,7 @@ export const useFeatureStore = create<FeatureState>()(
 ```
 
 **关键决策点**:
+
 - 是否需要持久化？→ 使用 `persist` 中间件
 - 哪些状态需要持久化？→ 使用 `partialize` 选择
 - 是否需要异步操作？→ 在 store 中直接定义 async 方法
@@ -204,6 +208,7 @@ export function FeatureComponent({
 ```
 
 **AI 生成组件时必须**:
+
 1. 定义 Props 接口
 2. 使用 `useCallback` 缓存事件处理器
 3. 使用 `useTranslation` 支持国际化
@@ -572,6 +577,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer);
 使用 Claude Code 生成代码后，对照以下清单验证：
 
 ### IPC 相关
+
 - [ ] 通道名称使用 `module:action` 格式
 - [ ] 请求/响应类型定义在 `types.ts`
 - [ ] Handler 返回 `{ success, data?, error? }` 格式
@@ -579,23 +585,27 @@ contextBridge.exposeInMainWorld('ipcRenderer', ipcRenderer);
 - [ ] Preload 脚本正确暴露 API
 
 ### Store 相关
+
 - [ ] 使用 `persist` 时指定 `partialize` 避免持久化过多数据
 - [ ] 异步方法正确处理 loading 状态
 - [ ] 导出 hook 使用 selector 避免重渲染
 
 ### 组件相关
+
 - [ ] Props 接口定义完整
 - [ ] 使用 `useCallback` 缓存事件处理器
 - [ ] 使用 `useTranslation` 支持 i18n
 - [ ] 复杂逻辑抽取到自定义 hook
 
 ### 安全相关
+
 - [ ] 不暴露 `ipcRenderer` 对象
 - [ ] 验证所有用户输入
 - [ ] 文件操作限制在用户数据目录
 - [ ] 敏感信息不存储在代码中
 
 ### 性能相关
+
 - [ ] 事件监听有清理函数
 - [ ] 大数据使用虚拟化
 - [ ] 避免不必要的重渲染
@@ -632,26 +642,26 @@ Service: src/main/services/
 
 ### 命名规范速查
 
-| 类型 | 规范 | 示例 |
-|------|------|------|
-| 组件 | PascalCase | `ChatInput.tsx` |
-| Hooks | camelCase | `useChat.ts` |
+| 类型         | 规范       | 示例                   |
+|--------------|------------|------------------------|
+| 组件         | PascalCase | `ChatInput.tsx`        |
+| Hooks        | camelCase  | `useChat.ts`           |
 | IPC Channels | kebab-case | `agent:create-session` |
-| Store | camelCase | `useChatStore.ts` |
-| Services | PascalCase | `AgentService.ts` |
+| Store        | camelCase  | `useChatStore.ts`      |
+| Services     | PascalCase | `AgentService.ts`      |
 
 ---
 
 ## 8. 故障排除速查
 
-| 问题 | 可能原因 | 解决方案 |
-|------|----------|----------|
-| IPC 无响应 | Handler 未注册 | 检查 index.ts 是否导入 |
-| 类型错误 | 路径别名错误 | 检查 tsconfig paths |
-| 样式不生效 | Tailwind 未扫描 | 检查文件路径包含在 content 中 |
-| 构建失败 | 循环依赖 | 检查导入关系 |
-| 热重载失效 | 缓存问题 | 删除 out/ 重试 |
-| Preload 报错 | Context Isolation | 使用 contextBridge |
+| 问题         | 可能原因          | 解决方案                      |
+|--------------|-------------------|-------------------------------|
+| IPC 无响应   | Handler 未注册    | 检查 index.ts 是否导入        |
+| 类型错误     | 路径别名错误      | 检查 tsconfig paths           |
+| 样式不生效   | Tailwind 未扫描   | 检查文件路径包含在 content 中 |
+| 构建失败     | 循环依赖          | 检查导入关系                  |
+| 热重载失效   | 缓存问题          | 删除 out/ 重试                |
+| Preload 报错 | Context Isolation | 使用 contextBridge            |
 
 ---
 

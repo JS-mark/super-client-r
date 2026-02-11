@@ -96,6 +96,15 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			action: "navigate",
 		},
 		{
+			id: "workspaces",
+			label: "workspaces",
+			path: "/workspaces",
+			iconType: "default",
+			iconContent: "FolderOutlined",
+			enabled: true,
+			action: "navigate",
+		},
+		{
 			id: "settings",
 			label: "settings",
 			path: "/settings",

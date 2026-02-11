@@ -2,11 +2,11 @@
 
 ## 环境要求
 
-| 工具 | 版本要求 | 说明 |
-|------|----------|------|
-| Node.js | >= 22 | 运行时环境 |
-| pnpm | >= 10 | 包管理器 |
-| Git | >= 2.40 | 版本控制 |
+| 工具    | 版本要求 | 说明       |
+|---------|----------|------------|
+| Node.js | >= 22    | 运行时环境 |
+| pnpm    | >= 10    | 包管理器   |
+| Git     | >= 2.40  | 版本控制   |
 
 ---
 
@@ -55,35 +55,35 @@ pnpm build && pnpm dist
 
 ### 开发
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm dev` | 启动开发服务器 |
-| `pnpm preview` | 预览生产构建 |
+| 命令           | 说明           |
+|----------------|----------------|
+| `pnpm dev`     | 启动开发服务器 |
+| `pnpm preview` | 预览生产构建   |
 
 ### 代码质量
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm check` | TypeScript 类型检查 |
-| `pnpm lint` | oxlint 代码检查 |
-| `pnpm lint:biome` | Biome 代码检查 |
-| `pnpm format` | 格式化代码 |
+| 命令               | 说明                    |
+|--------------------|-------------------------|
+| `pnpm check`       | TypeScript 类型检查     |
+| `pnpm lint`        | oxlint 代码检查         |
+| `pnpm lint:biome`  | Biome 代码检查          |
+| `pnpm format`      | 格式化代码              |
 | `pnpm check:biome` | Biome 全面检查 (含修复) |
 
 ### 国际化
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm i18n:check` | 检查翻译完整性 |
+| 命令                  | 说明             |
+|-----------------------|------------------|
+| `pnpm i18n:check`     | 检查翻译完整性   |
 | `pnpm i18n:translate` | 自动翻译缺失词条 |
 
 ### 构建
 
-| 命令 | 说明 |
-|------|------|
-| `pnpm build` | 完整构建 (main + renderer) |
-| `pnpm build:main` | 仅构建主进程 |
-| `pnpm build:renderer` | 仅构建渲染进程 |
+| 命令                  | 说明                       |
+|-----------------------|----------------------------|
+| `pnpm build`          | 完整构建 (main + renderer) |
+| `pnpm build:main`     | 仅构建主进程               |
+| `pnpm build:renderer` | 仅构建渲染进程             |
 
 ---
 
@@ -398,6 +398,7 @@ Error: Cannot find module '@/components/Button'
 ```
 
 **解决方案**:
+
 - 检查 `tsconfig.web.json` paths 配置
 - 重启 TypeScript 服务
 - 检查文件是否存在
@@ -409,6 +410,7 @@ Error: No handler registered for 'channel:name'
 ```
 
 **解决方案**:
+
 - 确认处理器已注册 (`src/main/ipc/index.ts`)
 - 检查通道名称拼写
 - 确认预加载脚本已正确暴露 API
@@ -420,6 +422,7 @@ Tailwind classes not working
 ```
 
 **解决方案**:
+
 - 检查 `index.css` 是否正确导入
 - 确认 Tailwind CSS v4 配置
 - 重启开发服务器
@@ -427,6 +430,7 @@ Tailwind classes not working
 ### 问题4: 热重载失效
 
 **解决方案**:
+
 ```bash
 # 完全重启
 Ctrl+C

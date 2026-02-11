@@ -1,6 +1,7 @@
 import {
 	ApiOutlined,
 	AppstoreOutlined,
+	FolderOutlined,
 	MessageOutlined,
 	RocketOutlined,
 	SettingOutlined,
@@ -35,6 +36,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	SettingOutlined,
 	ApiOutlined,
 	StarOutlined,
+	FolderOutlined,
 };
 
 /**

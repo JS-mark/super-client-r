@@ -1,0 +1,68 @@
+{
+	"title": "工作区管理",
+	"subtitle": "管理工作区和对话",
+	"name": "名称",
+	"namePlaceholder": "我的工作区",
+	"description": "描述",
+	"descriptionPlaceholder": "工作区描述...",
+	"color": "颜色",
+	"search": "搜索工作区...",
+	"default": "默认",
+	"current": "当前",
+	"manage": "管理工作区",
+	"import": "导入",
+	"empty": "还没有工作区，创建一个吧",
+	"noResults": "没有找到匹配的工作区",
+	"create": {
+		"title": "创建工作区",
+		"success": "工作区创建成功"
+	},
+	"edit": {
+		"title": "编辑工作区",
+		"success": "工作区更新成功"
+	},
+	"delete": {
+		"confirmTitle": "删除工作区",
+		"confirmContent": "确定要删除工作区 \"{{name}}\" 吗？",
+		"success": "工作区已删除",
+		"cannotDeleteDefault": "不能删除默认工作区"
+	},
+	"duplicate": {
+		"success": "工作区已复制"
+	},
+	"export": {
+		"success": "工作区已导出",
+		"error": "导出失败"
+	},
+	"import": {
+		"success": "工作区导入成功",
+		"error": "导入失败",
+		"invalidFormat": "无效的工作区文件格式"
+	},
+	"setDefault": {
+		"success": "已设为默认工作区"
+	},
+	"type": {
+		"label": "类型",
+		"personal": "个人",
+		"work": "工作",
+		"project": "项目",
+		"temp": "临时"
+	},
+	"stats": {
+		"total": "工作区总数",
+		"personal": "个人",
+		"work": "工作",
+		"project": "项目",
+		"sessions": "会话"
+	},
+	"actions": {
+		"switch": "切换到此工作区",
+		"duplicate": "复制",
+		"export": "导出",
+		"setDefault": "设为默认"
+	},
+	"switch": {
+		"title": "切换工作区"
+	}
+}
