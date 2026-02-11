@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppInfo } from "../../services/appService";
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 
 interface AboutSectionProps {
 	appInfo: AppInfo | null;
@@ -28,89 +28,51 @@ interface AboutSectionProps {
 	onOpenModal?: () => void;
 }
 
-// 概览 Tab
+// 概览 Tab - 更紧凑小巧
 const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { t } = useTranslation();
 
 	const features = [
-		{
-			icon: <RocketOutlined />,
-			titleKey: "settings.about.features.aiChat.title",
-			descKey: "settings.about.features.aiChat.desc",
-			color: "from-blue-500 to-cyan-500",
-		},
-		{
-			icon: <CodeOutlined />,
-			titleKey: "settings.about.features.mcp.title",
-			descKey: "settings.about.features.mcp.desc",
-			color: "from-purple-500 to-pink-500",
-		},
-		{
-			icon: <StarOutlined />,
-			titleKey: "settings.about.features.skills.title",
-			descKey: "settings.about.features.skills.desc",
-			color: "from-orange-500 to-red-500",
-		},
-		{
-			icon: <InfoCircleOutlined />,
-			titleKey: "settings.about.features.localApi.title",
-			descKey: "settings.about.features.localApi.desc",
-			color: "from-green-500 to-emerald-500",
-		},
+		{ icon: <RocketOutlined />, titleKey: "about.features.aiChat.title", descKey: "about.features.aiChat.desc", color: "from-blue-500 to-cyan-500" },
+		{ icon: <CodeOutlined />, titleKey: "about.features.mcp.title", descKey: "about.features.mcp.desc", color: "from-purple-500 to-pink-500" },
+		{ icon: <StarOutlined />, titleKey: "about.features.skills.title", descKey: "about.features.skills.desc", color: "from-orange-500 to-red-500" },
+		{ icon: <InfoCircleOutlined />, titleKey: "about.features.localApi.title", descKey: "about.features.localApi.desc", color: "from-green-500 to-emerald-500" },
 	];
 
 	return (
-		<div className="space-y-6">
-			{/* Hero Section */}
-			<div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-3">
-				<div className="absolute inset-0 opacity-20">
-					<div className="absolute top-0 left-0 w-64 h-64 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl" />
-					<div className="absolute top-0 right-0 w-64 h-64 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl" />
-				</div>
-
+		<div className="space-y-3">
+			{/* Hero Section - 更紧凑 */}
+			<div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-3">
 				<div className="relative z-10 text-center">
-					<div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 shadow-2xl mb-4">
-						<RocketOutlined className="text-2xl text-white" />
+					<div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 shadow-md mb-2">
+						<RocketOutlined className="text-lg text-white" />
 					</div>
-
-					<Title level={3} className="!text-white !mb-2">
+					<Title level={5} className="!text-white !mb-1 !text-base">
 						{appInfo?.name || "Super Client"}
 					</Title>
-
-					<div className="flex items-center justify-center gap-2 mb-3">
-						<Tag className="!bg-white/20 !text-white !border-0 !rounded-full !px-3 !py-0.5">
+					<div className="flex items-center justify-center gap-2 mb-1">
+						<Tag className="!bg-white/20 !text-white !border-0 !rounded-full !px-2 !py-0 !text-xs">
 							v{appInfo?.version || "0.0.1"}
 						</Tag>
-						<Tag className="!bg-green-500/20 !text-green-400 !border-green-500/30 !rounded-full !px-3 !py-0.5">
-							MIT License
+						<Tag className="!bg-green-500/20 !text-green-400 !border-green-500/30 !rounded-full !px-2 !py-0 !text-xs">
+							MIT
 						</Tag>
 					</div>
-
-					<Paragraph className="!text-slate-300 text-sm">
+					<Paragraph className="!text-slate-400 !text-xs !mb-0">
 						{t("aboutDescription", "A powerful AI desktop client for seamless interaction with multiple AI services.", { ns: "settings" })}
 					</Paragraph>
 				</div>
 			</div>
 
-			{/* Features Grid */}
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+			{/* Features Grid - 更紧凑 2x2 */}
+			<div className="grid grid-cols-2 gap-2">
 				{features.map((feature) => (
-					<div
-						key={feature.titleKey}
-						className="group relative overflow-hidden rounded-xl p-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-all duration-300"
-					>
-						<div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-br ${feature.color} opacity-10 rounded-full -mr-4 -mt-4 transition-transform group-hover:scale-150`} />
-						<div className="relative z-10">
-							<div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 shadow-lg`}>
-								<span className="text-white text-lg">{feature.icon}</span>
-							</div>
-							<h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">
-								{t(feature.titleKey)}
-							</h3>
-							<p className="text-xs text-slate-500 dark:text-slate-400">
-								{t(feature.descKey)}
-							</p>
+					<div key={feature.titleKey} className="relative overflow-hidden rounded-lg p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-all">
+						<div className={`w-7 h-7 rounded-md bg-gradient-to-br ${feature.color} flex items-center justify-center mb-1.5 shadow-sm`}>
+							<span className="text-white text-xs">{feature.icon}</span>
 						</div>
+						<h3 className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-0.5 leading-tight">{t(feature.titleKey, { ns: "settings" })}</h3>
+						<p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{t(feature.descKey, { ns: "settings" })}</p>
 					</div>
 				))}
 			</div>
@@ -118,7 +80,7 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	);
 };
 
-// 系统信息 Tab
+// 系统信息 Tab - 更紧凑
 const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { t } = useTranslation();
 
@@ -130,28 +92,29 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	];
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3">
 			<Card
+				size="small"
 				title={
-					<span className="flex items-center gap-2">
+					<span className="flex items-center gap-1.5 text-sm">
 						<CodeOutlined className="text-blue-500" />
 						<span>{t("about.systemInfo", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+				className="!rounded-lg !border-slate-200 dark:!border-slate-700"
 			>
-				<div className="grid grid-cols-2 gap-4">
+				<div className="grid grid-cols-2 gap-2">
 					{systemItems.map((item) => (
 						<div
-							key={item.value}
-							className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50"
+							key={item.label}
+							className="flex items-center gap-2 p-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50"
 						>
-							<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm">
+							<div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs">
 								{item.icon}
 							</div>
-							<div>
-								<div className="text-xs font-medium text-slate-900 dark:text-slate-100">{item.value}</div>
-								<div className="text-xs text-slate-500 dark:text-slate-400">{item.label}</div>
+							<div className="min-w-0">
+								<div className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">{item.value}</div>
+								<div className="text-[10px] text-slate-500 dark:text-slate-400">{item.label}</div>
 							</div>
 						</div>
 					))}
@@ -159,78 +122,66 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 			</Card>
 
 			<Card
+				size="small"
 				title={
-					<span className="flex items-center gap-2">
+					<span className="flex items-center gap-1.5 text-sm">
 						<TrophyOutlined className="text-yellow-500" />
 						<span>{t("about.achievements", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+				className="!rounded-lg !border-slate-200 dark:!border-slate-700 !mt-[10px]"
 			>
-				<div className="flex flex-wrap gap-2">
-					<Tag color="blue">AI Chat</Tag>
-					<Tag color="purple">MCP Support</Tag>
-					<Tag color="orange">Skill System</Tag>
-					<Tag color="green">Local API</Tag>
-					<Tag color="cyan">i18n</Tag>
-					<Tag color="magenta">Dark Mode</Tag>
+				<div className="flex flex-wrap gap-1.5">
+					<Tag color="blue" className="!text-xs">AI Chat</Tag>
+					<Tag color="purple" className="!text-xs">MCP</Tag>
+					<Tag color="orange" className="!text-xs">Skills</Tag>
+					<Tag color="green" className="!text-xs">API</Tag>
+					<Tag color="cyan" className="!text-xs">i18n</Tag>
+					<Tag color="magenta" className="!text-xs">Dark</Tag>
 				</div>
 			</Card>
 		</div>
 	);
 };
 
-// 更新日志 Tab
+// 更新日志 Tab - 更紧凑
 const ChangelogTab: React.FC = () => {
 	const { t } = useTranslation();
 
 	return (
 		<Card
+			size="small"
 			title={
-				<span className="flex items-center gap-2">
+				<span className="flex items-center gap-1.5 text-sm">
 					<InfoCircleOutlined className="text-purple-500" />
 					<span>{t("about.recentUpdates", { ns: "settings" })}</span>
 				</span>
 			}
-			className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+			className="!rounded-lg !border-slate-200 dark:!border-slate-700"
 		>
 			<Timeline
+				mode="left"
+				className="!text-xs"
 				items={[
 					{
 						color: "green",
-						children: (
-							<div>
-								<Text strong>v0.0.1</Text>
-								<div className="text-slate-500 text-sm">Initial release with core chat functionality</div>
-							</div>
-						),
+						label: "v0.0.1",
+						children: <span className="text-slate-500 text-xs">Initial release with core chat</span>,
 					},
 					{
 						color: "blue",
-						children: (
-							<div>
-								<Text strong>MCP Support</Text>
-								<div className="text-slate-500 text-sm">Added MCP server integration and marketplace</div>
-							</div>
-						),
+						label: "MCP",
+						children: <span className="text-slate-500 text-xs">MCP server integration</span>,
 					},
 					{
 						color: "purple",
-						children: (
-							<div>
-								<Text strong>Skill System</Text>
-								<div className="text-slate-500 text-sm">New skill marketplace and management</div>
-							</div>
-						),
+						label: "Skills",
+						children: <span className="text-slate-500 text-xs">Skill marketplace</span>,
 					},
 					{
 						color: "orange",
-						children: (
-							<div>
-								<Text strong>API Server</Text>
-								<div className="text-slate-500 text-sm">Added JWT authentication and API key management</div>
-							</div>
-						),
+						label: "API",
+						children: <span className="text-slate-500 text-xs">JWT & API key auth</span>,
 					},
 				]}
 			/>
@@ -238,7 +189,7 @@ const ChangelogTab: React.FC = () => {
 	);
 };
 
-// 团队 Tab
+// 团队 Tab - 更紧凑
 const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 	onCheckUpdate,
 	onOpenGitHub,
@@ -248,74 +199,74 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 	const { t } = useTranslation();
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-3">
 			<Card
+				size="small"
 				title={
-					<span className="flex items-center gap-2">
+					<span className="flex items-center gap-1.5 text-sm">
 						<TeamOutlined className="text-blue-500" />
 						<span>{t("about.team", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+				className="!rounded-lg !border-slate-200 dark:!border-slate-700"
 			>
-				<div className="text-center py-6">
-					<div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-4">
-						<HeartOutlined className="text-2xl text-white" />
+				<div className="text-center py-3">
+					<div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-2">
+						<HeartOutlined className="text-lg text-white" />
 					</div>
-					<div className="text-slate-800 dark:text-slate-200 font-medium">
+					<div className="text-slate-800 dark:text-slate-200 font-medium text-sm">
 						{t("madeWith", "Made with", { ns: "settings" })} <HeartOutlined className="text-red-400 mx-1" /> {t("byTeam", "by Super Client Team", { ns: "settings" })}
 					</div>
-					<div className="text-sm text-slate-500 dark:text-slate-400 mt-2">
+					<div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
 						{t("about.thanks", "感谢所有贡献者和用户的支持", { ns: "settings" })}
 					</div>
 				</div>
 			</Card>
 
 			<Card
+				size="small"
 				title={
-					<span className="flex items-center gap-2">
+					<span className="flex items-center gap-1.5 text-sm">
 						<FileTextOutlined className="text-green-500" />
 						<span>{t("license", "License", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+				className="!rounded-lg !border-slate-200 dark:!border-slate-700 !mt-[10px]"
 			>
-				<div className="text-sm text-slate-600 dark:text-slate-400">
-					<p>{t("about.licenseText", "This project is licensed under the MIT License.", { ns: "settings" })}</p>
-					<p className="mt-2">{t("about.licenseDesc", "You are free to use, modify, and distribute this software.", { ns: "settings" })}</p>
+				<div className="text-xs text-slate-600 dark:text-slate-400">
+					<p className="mb-1">{t("about.licenseText", "This project is licensed under the MIT License.", { ns: "settings" })}</p>
+					<p>{t("about.licenseDesc", "You are free to use, modify, and distribute this software.", { ns: "settings" })}</p>
 				</div>
 			</Card>
 
-
-
-			{/* 底部操作按钮 */}
-			<div className="flex flex-wrap items-center justify-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+			{/* 底部操作按钮 - 更紧凑 */}
+			<div className="flex flex-wrap items-center justify-center gap-2 pt-2">
 				<Button
 					type="primary"
 					icon={<ReloadOutlined />}
 					onClick={onCheckUpdate}
-					className="!rounded-lg"
+					className="!rounded-md"
 				>
 					{t("checkUpdate", "Check Update", { ns: "settings" })}
 				</Button>
 				<Button
 					icon={<GithubOutlined />}
 					onClick={onOpenGitHub}
-					className="!rounded-lg"
+					className="!rounded-md"
 				>
 					GitHub
 				</Button>
 				<Button
 					icon={<BugOutlined />}
 					onClick={onReportBug}
-					className="!rounded-lg"
+					className="!rounded-md"
 				>
-					{t("reportBug", "Report Bug", { ns: "settings" })}
+					{t("reportBug", "Report", { ns: "settings" })}
 				</Button>
 				<Button
 					icon={<FileTextOutlined />}
 					onClick={onOpenLicense}
-					className="!rounded-lg"
+					className="!rounded-md"
 				>
 					{t("license", "License", { ns: "settings" })}
 				</Button>
@@ -338,7 +289,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 		{
 			key: "overview",
 			label: (
-				<span className="flex items-center gap-1">
+				<span className="flex items-center gap-1 text-xs">
 					<InfoCircleOutlined />
 					{t("about.overview", { ns: "settings" })}
 				</span>
@@ -348,9 +299,9 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 		{
 			key: "system",
 			label: (
-				<span className="flex items-center gap-1">
+				<span className="flex items-center gap-1 text-xs">
 					<CodeOutlined />
-					{t("about.system", { ns: "settings" })}
+					{t("about.systemInfo", { ns: "settings" })}
 				</span>
 			),
 			children: <SystemInfoTab appInfo={appInfo} />,
@@ -358,9 +309,9 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 		{
 			key: "changelog",
 			label: (
-				<span className="flex items-center gap-1">
+				<span className="flex items-center gap-1 text-xs">
 					<RocketOutlined />
-					{t("about.changelog", { ns: "settings" })}
+					{t("about.recentUpdates", { ns: "settings" })}
 				</span>
 			),
 			children: <ChangelogTab />,
@@ -368,7 +319,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 		{
 			key: "team",
 			label: (
-				<span className="flex items-center gap-1">
+				<span className="flex items-center gap-1 text-xs">
 					<TeamOutlined />
 					{t("about.team", { ns: "settings" })}
 				</span>
@@ -385,11 +336,12 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 	];
 
 	return (
-		<div className="space-y-4">
+		<div className="space-y-2">
 			<Tabs
 				activeKey={activeTab}
 				onChange={setActiveTab}
 				items={tabItems}
+				size="small"
 				className="about-tabs"
 			/>
 		</div>
