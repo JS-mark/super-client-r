@@ -1,9 +1,11 @@
-import { App as AntdApp, ConfigProvider } from "antd";
+import { App as AntdApp, ConfigProvider, theme } from "antd";
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
 
+const { darkAlgorithm, compactAlgorithm } = theme;
 function App() {
 	useEffect(() => {
 		// Global navigation handler from main process
@@ -25,19 +27,23 @@ function App() {
 		};
 	}, []);
 
+	const theme = {
+		algorithm: [darkAlgorithm, compactAlgorithm],
+	};
+
 	return (
 		<ConfigProvider
-			theme={{
-				token: {
-					colorPrimary: "#1890ff",
-				},
-			}}
+			theme={theme}
+			// 禁用动画以提高性能
+			wave={{ disabled: true }}
 		>
-			<AntdApp className="h-full w-full">
-				<ErrorBoundary>
-					<RouterProvider router={router} />
-				</ErrorBoundary>
-			</AntdApp>
+			<TitleProvider>
+				<AntdApp className="h-full w-full">
+					<ErrorBoundary>
+						<RouterProvider router={router} />
+					</ErrorBoundary>
+				</AntdApp>
+			</TitleProvider>
 		</ConfigProvider>
 	);
 }

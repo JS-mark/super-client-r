@@ -9,11 +9,9 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 const FloatWidget: React.FC = () => {
 	const [isHovered, setIsHovered] = useState(false);
-	const navigate = useNavigate();
 
 	const handleMouseEnter = () => {
 		setIsHovered(true);
@@ -48,7 +46,7 @@ const FloatWidget: React.FC = () => {
 		>
 			{/* Capsule Input Bar */}
 			<div
-				className="w-[280px] h-[48px] bg-white rounded-full shadow-lg flex items-center px-4 cursor-pointer hover:bg-gray-50 transition-colors border border-gray-100"
+				className="w-[280px] h-3xl bg-white rounded-full shadow-lg flex items-center px-4 cursor-pointer hover:bg-gray-50 transition-colors border border-gray-100"
 				onClick={handleMainClick}
 			>
 				<div
@@ -67,9 +65,9 @@ const FloatWidget: React.FC = () => {
 			{/* Dropdown Menu */}
 			{isHovered && (
 				<div className="w-[280px] mt-2 bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100 animate-in fade-in slide-in-from-top-2 duration-200">
-					{menuItems.map((item, index) => (
+					{menuItems.map((item) => (
 						<div
-							key={index}
+							key={item.label}
 							className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
 							onClick={handleMainClick} // For now, all open main window
 						>

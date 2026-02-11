@@ -12,30 +12,36 @@ export const router = createHashRouter([
 		path: "/float",
 		element: <FloatWidget />,
 		errorElement: <ErrorPage />,
+		handle: { title: "浮动组件" },
 	},
 	{
 		path: "/",
 		element: <Login />,
 		errorElement: <ErrorPage />,
+		handle: { title: "登录" },
 	},
 	{
 		path: "/chat",
 		element: <Chat />,
 		errorElement: <ErrorPage />,
+		handle: { title: "AI 聊天" },
 	},
 	{
 		path: "/models",
 		element: <Models />,
 		errorElement: <ErrorPage />,
+		handle: { title: "模型管理" },
 	},
 	{
 		path: "/skills",
 		element: <Skills />,
 		errorElement: <ErrorPage />,
+		handle: { title: "技能市场" },
 	},
 	{
 		path: "/settings",
 		element: <Settings />,
 		errorElement: <ErrorPage />,
+		handle: { title: "设置" },
 	},
 ]);
