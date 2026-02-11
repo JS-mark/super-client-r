@@ -1,0 +1,30 @@
+{
+	"start": "开始一段对话",
+	"you": "你",
+	"ai": "AI",
+	"placeholder": "输入你的消息...",
+	"send": "发送",
+	"welcomeTitle": "欢迎使用 AI Chat",
+	"welcomeSubtitle": "选择模式并开始您的对话",
+	"suggestions": {
+		"quantum": "用简单的话解释量子计算",
+		"fibonacci": "编写一个计算斐波那契数列的 Python 函数",
+		"debug": "帮我调试代码中的这个错误",
+		"marketing": "为新产品创建营销计划"
+	},
+	"toolbar": {
+		"quote": "引用",
+		"attach": "附件",
+		"prompt": "提示词",
+		"baidu": "百度",
+		"doc": "文档",
+		"tools": "工具",
+		"more": "更多"
+	},
+	"modes": {
+		"direct": "直连",
+		"agent": "Agent",
+		"skill": "技能",
+		"mcp": "MCP"
+	}
+}

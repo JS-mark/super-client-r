@@ -1,0 +1,30 @@
+{
+	"title": "Skill Center",
+	"description": "Description",
+	"readme": "README",
+	"repository": "Repository",
+	"noData": "No skills found",
+	"noInstalled": "No installed skills",
+	"searchPlaceholder": "Search skills...",
+	"tabs": {
+		"market": "Market",
+		"installed": "Installed"
+	},
+	"actions": {
+		"install": "Install",
+		"uninstall": "Uninstall",
+		"update": "Update",
+		"reinstall": "Reinstall"
+	},
+	"status": {
+		"installed": "Installed"
+	},
+	"messages": {
+		"installed": "Installed {{name}}",
+		"uninstalled": "Uninstalled {{name}}",
+		"updated": "Updated {{name}}",
+		"reinstalled": "Reinstalled {{name}}"
+	},
+	"by": "By",
+	"installedVersion": "Installed: "
+}

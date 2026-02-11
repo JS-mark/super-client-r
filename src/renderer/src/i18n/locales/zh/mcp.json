@@ -1,0 +1,35 @@
+{
+	"title": "MCP 服务",
+	"add": "添加服务",
+	"addModalTitle": "添加 MCP 服务",
+	"edit": "编辑服务",
+	"delete": "删除服务",
+	"connect": "连接",
+	"disconnect": "断开",
+	"cancel": "取消",
+	"empty": "暂无 MCP 服务配置",
+	"status": {
+		"connected": "已连接",
+		"connecting": "连接中",
+		"disconnected": "未连接",
+		"error": "错误"
+	},
+	"form": {
+		"name": "名称",
+		"nameRequired": "请输入名称",
+		"namePlaceholder": "例如：文件系统服务",
+		"url": "服务地址",
+		"urlRequired": "请输入服务地址",
+		"urlInvalid": "无效的 URL 格式"
+	},
+	"messages": {
+		"connectSuccess": "已连接到服务",
+		"connectError": "连接失败，请检查服务地址",
+		"disconnectSuccess": "已断开连接",
+		"disconnectError": "断开连接失败",
+		"saveSuccess": "服务已保存",
+		"saveError": "保存服务失败",
+		"deleteSuccess": "服务已删除",
+		"deleteError": "删除服务失败"
+	}
+}

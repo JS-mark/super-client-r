@@ -1,0 +1,37 @@
+{
+	"title": "配置",
+	"description": "配置 AI 模型和 MCP 服务器",
+	"tabModels": "模型",
+	"tabMcp": "MCP 服务",
+	"listTitle": "模型列表",
+	"add": "添加模型",
+	"edit": "编辑模型",
+	"save": "保存",
+	"cancel": "取消",
+	"delete": "删除",
+	"test": "测试连接",
+	"empty": "暂无模型配置",
+	"disabled": "已禁用",
+	"form": {
+		"name": "名称",
+		"nameRequired": "请输入名称",
+		"namePlaceholder": "例如：GPT-4",
+		"provider": "提供商",
+		"providerRequired": "请选择提供商",
+		"providerPlaceholder": "选择提供商",
+		"apiKey": "API Key",
+		"apiKeyHelp": "您的 API 密钥用于认证",
+		"apiKeyPlaceholder": "sk-...",
+		"baseUrl": "Base URL",
+		"baseUrlHelp": "自定义 API 端点 URL",
+		"baseUrlPlaceholder": "https://api.example.com"
+	},
+	"messages": {
+		"saveSuccess": "模型保存成功",
+		"saveError": "保存模型失败",
+		"deleteSuccess": "模型删除成功",
+		"deleteError": "删除模型失败",
+		"testSuccess": "连接测试成功",
+		"testError": "连接测试失败"
+	}
+}

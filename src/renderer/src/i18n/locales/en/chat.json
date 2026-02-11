@@ -1,0 +1,30 @@
+{
+	"start": "Start a conversation",
+	"you": "You",
+	"ai": "AI",
+	"placeholder": "Type your message...",
+	"send": "Send",
+	"welcomeTitle": "Welcome to AI Chat",
+	"welcomeSubtitle": "Choose a mode and start your conversation",
+	"suggestions": {
+		"quantum": "Explain quantum computing in simple terms",
+		"fibonacci": "Write a Python function to calculate fibonacci",
+		"debug": "Help me debug this error in my code",
+		"marketing": "Create a marketing plan for a new product"
+	},
+	"toolbar": {
+		"quote": "Quote",
+		"attach": "Attach",
+		"prompt": "Prompt",
+		"baidu": "Baidu",
+		"doc": "Document",
+		"tools": "Tools",
+		"more": "More"
+	},
+	"modes": {
+		"direct": "Direct",
+		"agent": "Agent",
+		"skill": "Skill",
+		"mcp": "MCP"
+	}
+}

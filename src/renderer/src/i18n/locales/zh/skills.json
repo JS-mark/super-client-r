@@ -1,0 +1,30 @@
+{
+	"title": "技能中心",
+	"description": "技能描述",
+	"readme": "README",
+	"repository": "代码仓库",
+	"noData": "暂无技能",
+	"noInstalled": "暂无已安装技能",
+	"searchPlaceholder": "搜索技能...",
+	"tabs": {
+		"market": "市场",
+		"installed": "已安装"
+	},
+	"actions": {
+		"install": "安装",
+		"uninstall": "卸载",
+		"update": "更新",
+		"reinstall": "重装"
+	},
+	"status": {
+		"installed": "已安装"
+	},
+	"messages": {
+		"installed": "已安装 {{name}}",
+		"uninstalled": "已卸载 {{name}}",
+		"updated": "已更新 {{name}}",
+		"reinstalled": "已重装 {{name}}"
+	},
+	"by": "作者",
+	"installedVersion": "已安装版本: "
+}

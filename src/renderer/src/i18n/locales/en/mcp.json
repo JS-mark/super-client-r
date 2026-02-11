@@ -1,0 +1,35 @@
+{
+	"title": "MCP Servers",
+	"add": "Add Server",
+	"addModalTitle": "Add MCP Server",
+	"edit": "Edit Server",
+	"delete": "Delete Server",
+	"connect": "Connect",
+	"disconnect": "Disconnect",
+	"cancel": "Cancel",
+	"empty": "No MCP servers configured yet",
+	"status": {
+		"connected": "Connected",
+		"connecting": "Connecting",
+		"disconnected": "Disconnected",
+		"error": "Error"
+	},
+	"form": {
+		"name": "Name",
+		"nameRequired": "Name is required",
+		"namePlaceholder": "e.g., Filesystem Server",
+		"url": "Server URL",
+		"urlRequired": "Server URL is required",
+		"urlInvalid": "Invalid URL format"
+	},
+	"messages": {
+		"connectSuccess": "Connected to server",
+		"connectError": "Connection failed, please check server URL",
+		"disconnectSuccess": "Disconnected from server",
+		"disconnectError": "Failed to disconnect",
+		"saveSuccess": "Server saved",
+		"saveError": "Failed to save server",
+		"deleteSuccess": "Server deleted",
+		"deleteError": "Failed to delete server"
+	}
+}

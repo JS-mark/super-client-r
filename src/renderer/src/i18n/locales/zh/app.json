@@ -1,0 +1,10 @@
+{
+	"name": "AI 客户端",
+	"loginTitle": "AI 桌面客户端",
+	"loginSubtitle": "登录以继续",
+	"signInGoogle": "使用 Google 登录",
+	"signInGithub": "使用 GitHub 登录",
+	"development": "开发环境",
+	"mockLogin": "模拟登录 (Dev)",
+	"terms": "继续即表示您同意我们的服务条款和隐私政策"
+}

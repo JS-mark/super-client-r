@@ -1,0 +1,10 @@
+{
+	"name": "AI Client",
+	"loginTitle": "AI Desktop Client",
+	"loginSubtitle": "Sign in to continue",
+	"signInGoogle": "Sign in with Google",
+	"signInGithub": "Sign in with GitHub",
+	"development": "Development",
+	"mockLogin": "Mock Login (Dev)",
+	"terms": "By continuing, you agree to our Terms of Service and Privacy Policy"
+}

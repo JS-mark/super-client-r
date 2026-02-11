@@ -1,0 +1,37 @@
+{
+	"title": "Configuration",
+	"description": "Configure AI models and MCP servers",
+	"tabModels": "Models",
+	"tabMcp": "MCP Servers",
+	"listTitle": "Models",
+	"add": "Add Model",
+	"edit": "Edit Model",
+	"save": "Save",
+	"cancel": "Cancel",
+	"delete": "Delete",
+	"test": "Test Connection",
+	"empty": "No models configured yet",
+	"disabled": "Disabled",
+	"form": {
+		"name": "Name",
+		"nameRequired": "Name is required",
+		"namePlaceholder": "e.g., GPT-4",
+		"provider": "Provider",
+		"providerRequired": "Provider is required",
+		"providerPlaceholder": "Select provider",
+		"apiKey": "API Key",
+		"apiKeyHelp": "Your API key for authentication",
+		"apiKeyPlaceholder": "sk-...",
+		"baseUrl": "Base URL",
+		"baseUrlHelp": "Custom API endpoint URL",
+		"baseUrlPlaceholder": "https://api.example.com"
+	},
+	"messages": {
+		"saveSuccess": "Model saved successfully",
+		"saveError": "Failed to save model",
+		"deleteSuccess": "Model deleted successfully",
+		"deleteError": "Failed to delete model",
+		"testSuccess": "Test connection successful",
+		"testError": "Test connection failed"
+	}
+}
