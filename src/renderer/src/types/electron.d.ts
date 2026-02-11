@@ -66,17 +66,34 @@ export interface SkillExecutionResult {
 	error?: string;
 }
 
+export type McpServerType = "builtin" | "third-party" | "market";
+export type McpTransportType = "stdio" | "sse" | "http";
+
 export interface McpServerConfig {
 	id: string;
 	name: string;
-	command: string;
+	type: McpServerType;
+	transport: McpTransportType;
+	// stdio transport
+	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
+	// sse/http transport (for third-party)
+	url?: string;
+	headers?: Record<string, string>;
+	// metadata
+	description?: string;
+	version?: string;
+	author?: string;
+	icon?: string;
+	enabled?: boolean;
 }
 
 export interface McpServerStatus {
 	id: string;
-	status: "connected" | "disconnected" | "error";
+	status: "connected" | "disconnected" | "connecting" | "error";
+	type?: McpServerType;
+	transport?: McpTransportType;
 	tools?: McpTool[];
 	error?: string;
 }
@@ -85,6 +102,44 @@ export interface McpTool {
 	name: string;
 	description: string;
 	inputSchema: Record<string, unknown>;
+}
+
+export interface BuiltinMcpDefinition {
+	id: string;
+	name: string;
+	description: string;
+	version: string;
+	icon?: string;
+	tags: string[];
+	transport: McpTransportType;
+	command: string;
+	args: string[];
+	env?: Record<string, string>;
+	configSchema?: Record<string, unknown>;
+}
+
+export interface McpMarketItem {
+	id: string;
+	name: string;
+	description: string;
+	version: string;
+	author: string;
+	icon?: string;
+	tags: string[];
+	rating: number;
+	downloads: number;
+	installCount?: number;
+	transport: McpTransportType;
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	url?: string;
+	headers?: Record<string, string>;
+	readmeUrl?: string;
+	repositoryUrl?: string;
+	license?: string;
+	createdAt?: string;
+	updatedAt?: string;
 }
 
 export interface IPCResponse<T = unknown> {
@@ -136,6 +191,7 @@ export interface ElectronAPI {
 
 	// MCP 相关
 	mcp: {
+		// 基础管理
 		connect: (id: string) => Promise<IPCResponse<McpServerStatus>>;
 		disconnect: (id: string) => Promise<IPCResponse>;
 		listServers: () => Promise<IPCResponse<McpServerConfig[]>>;
@@ -151,6 +207,36 @@ export interface ElectronAPI {
 		getAllTools: () => Promise<
 			IPCResponse<Array<{ serverId: string; tool: McpTool }>>
 		>;
+		// 内置 MCP
+		builtin: {
+			getDefinitions: () => Promise<IPCResponse<BuiltinMcpDefinition[]>>;
+			createConfig: (definitionId: string, config?: Record<string, unknown>) => Promise<IPCResponse<McpServerConfig>>;
+			search: (params: { keyword?: string; tags?: string[] }) => Promise<IPCResponse<BuiltinMcpDefinition[]>>;
+		};
+		// 第三方 MCP
+		thirdParty: {
+			add: (config: McpServerConfig) => Promise<IPCResponse>;
+			proxy: (serverId: string, request: { endpoint: string; method: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; headers?: Record<string, string> }) => Promise<IPCResponse>;
+		};
+		// MCP 市场
+		market: {
+			search: (params: { query?: string; tags?: string[]; sortBy?: "downloads" | "rating" | "newest"; page?: number; limit?: number }) => Promise<IPCResponse<{ items: McpMarketItem[]; total: number; page: number; limit: number }>>;
+			getPopular: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
+			getTopRated: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
+			getNewest: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
+			getDetail: (id: string) => Promise<IPCResponse<McpMarketItem | null>>;
+			getTags: () => Promise<IPCResponse<string[]>>;
+			install: (marketItem: McpMarketItem, customConfig?: { name?: string; env?: Record<string, string>; url?: string }) => Promise<IPCResponse<McpServerConfig>>;
+			getReadme: (marketItem: McpMarketItem) => Promise<IPCResponse<string>>;
+			setApiUrl: (url: string) => Promise<IPCResponse>;
+		};
+	};
+
+	// 主题 API
+	theme: {
+		get: () => Promise<IPCResponse<string>>;
+		set: (mode: string) => Promise<IPCResponse<boolean>>;
+		onChange: (callback: (mode: string) => void) => () => void;
 	};
 
 	// 通用 IPC
