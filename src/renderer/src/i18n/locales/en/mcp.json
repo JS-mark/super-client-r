@@ -1,5 +1,5 @@
 {
-	"title": "MCP Servers",
+	"title": "MCP Market",
 	"add": "Add Server",
 	"addModalTitle": "Add MCP Server",
 	"edit": "Edit Server",
@@ -12,7 +12,8 @@
 		"connected": "Connected",
 		"connecting": "Connecting",
 		"disconnected": "Disconnected",
-		"error": "Error"
+		"error": "Error",
+		"installed": "Installed"
 	},
 	"form": {
 		"name": "Name",
@@ -20,7 +21,16 @@
 		"namePlaceholder": "e.g., Filesystem Server",
 		"url": "Server URL",
 		"urlRequired": "Server URL is required",
-		"urlInvalid": "Invalid URL format"
+		"urlInvalid": "Invalid URL format",
+		"urlPlaceholder": "http://localhost:3000/mcp",
+		"descriptionPlaceholder": "Enter MCP server description (optional)",
+		"transport": "Transport Type",
+		"transportRequired": "Please select transport type",
+		"command": "Command",
+		"commandRequired": "Please enter command",
+		"commandPlaceholder": "e.g., npx",
+		"args": "Arguments",
+		"argsPlaceholder": "e.g., -y @modelcontextprotocol/server-filesystem"
 	},
 	"messages": {
 		"connectSuccess": "Connected to server",
@@ -30,6 +40,39 @@
 		"saveSuccess": "Server saved",
 		"saveError": "Failed to save server",
 		"deleteSuccess": "Server deleted",
-		"deleteError": "Failed to delete server"
+		"deleteError": "Failed to delete server",
+		"installed": "Installed {{name}}",
+		"uninstalled": "Uninstalled {{name}}",
+		"deleted": "Deleted {{name}}",
+		"testSuccess": "Connection test successful",
+		"testFailed": "Connection test failed",
+		"updated": "Updated {{name}}",
+		"added": "Added {{name}}"
+	},
+	"tabs": {
+		"market": "Market",
+		"installed": "Installed",
+		"thirdParty": "Third Party"
+	},
+	"searchPlaceholder": "Search MCP servers...",
+	"searchInstalled": "Search installed MCP...",
+	"searchThirdParty": "Search third party MCP...",
+	"noData": "No MCP servers available",
+	"noInstalled": "No MCP servers installed",
+	"noThirdParty": "No third party MCP servers, click Add button to create",
+	"tags": {
+		"filter": "Filter by tag",
+		"all": "All tags"
+	},
+	"actions": {
+		"install": "Install",
+		"uninstall": "Uninstall",
+		"test": "Test Connection",
+		"enable": "Enable",
+		"disable": "Disable"
+	},
+	"confirm": {
+		"delete": "Confirm Delete",
+		"deleteContent": "Are you sure you want to delete {{name}}?"
 	}
 }

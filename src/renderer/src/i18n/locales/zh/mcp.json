@@ -1,5 +1,5 @@
 {
-	"title": "MCP 服务",
+	"title": "MCP 市场",
 	"add": "添加服务",
 	"addModalTitle": "添加 MCP 服务",
 	"edit": "编辑服务",
@@ -12,7 +12,8 @@
 		"connected": "已连接",
 		"connecting": "连接中",
 		"disconnected": "未连接",
-		"error": "错误"
+		"error": "错误",
+		"installed": "已安装"
 	},
 	"form": {
 		"name": "名称",
@@ -20,7 +21,16 @@
 		"namePlaceholder": "例如：文件系统服务",
 		"url": "服务地址",
 		"urlRequired": "请输入服务地址",
-		"urlInvalid": "无效的 URL 格式"
+		"urlInvalid": "无效的 URL 格式",
+		"urlPlaceholder": "http://localhost:3000/mcp",
+		"descriptionPlaceholder": "输入 MCP 服务描述（可选）",
+		"transport": "传输类型",
+		"transportRequired": "请选择传输类型",
+		"command": "命令",
+		"commandRequired": "请输入命令",
+		"commandPlaceholder": "例如：npx",
+		"args": "参数",
+		"argsPlaceholder": "例如：-y @modelcontextprotocol/server-filesystem"
 	},
 	"messages": {
 		"connectSuccess": "已连接到服务",
@@ -30,6 +40,39 @@
 		"saveSuccess": "服务已保存",
 		"saveError": "保存服务失败",
 		"deleteSuccess": "服务已删除",
-		"deleteError": "删除服务失败"
+		"deleteError": "删除服务失败",
+		"installed": "已安装 {{name}}",
+		"uninstalled": "已卸载 {{name}}",
+		"deleted": "已删除 {{name}}",
+		"testSuccess": "连接测试成功",
+		"testFailed": "连接测试失败",
+		"updated": "已更新 {{name}}",
+		"added": "已添加 {{name}}"
+	},
+	"tabs": {
+		"market": "市场",
+		"installed": "已安装",
+		"thirdParty": "第三方"
+	},
+	"searchPlaceholder": "搜索 MCP 服务...",
+	"searchInstalled": "搜索已安装的 MCP...",
+	"searchThirdParty": "搜索第三方 MCP...",
+	"noData": "暂无 MCP 服务",
+	"noInstalled": "暂无已安装的 MCP",
+	"noThirdParty": "暂无第三方 MCP，点击添加按钮创建",
+	"tags": {
+		"filter": "筛选标签",
+		"all": "全部标签"
+	},
+	"actions": {
+		"install": "安装",
+		"uninstall": "卸载",
+		"test": "测试连接",
+		"enable": "启用",
+		"disable": "禁用"
+	},
+	"confirm": {
+		"delete": "确认删除",
+		"deleteContent": "确定要删除 {{name}} 吗？"
 	}
 }
