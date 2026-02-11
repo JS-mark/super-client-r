@@ -1,4 +1,5 @@
 import { createHashRouter } from "react-router-dom";
+import Bookmarks from "./pages/Bookmarks";
 import Chat from "./pages/Chat";
 import ErrorPage from "./pages/Error";
 import FloatWidget from "./pages/FloatWidget";
@@ -51,6 +52,12 @@ export const router = createHashRouter([
 		element: <Plugins />,
 		errorElement: <ErrorPage />,
 		handle: { title: "插件中心" },
+	},
+	{
+		path: "/bookmarks",
+		element: <Bookmarks />,
+		errorElement: <ErrorPage />,
+		handle: { title: "收藏" },
 	},
 	{
 		path: "/settings",

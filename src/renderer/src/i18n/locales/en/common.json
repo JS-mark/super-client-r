@@ -55,6 +55,7 @@
 	"description": "Description",
 	"tags": "Tags",
 	"repository": "Repository",
+	"export": "Export",
 	"actions": {
 		"install": "Install",
 		"uninstall": "Uninstall",

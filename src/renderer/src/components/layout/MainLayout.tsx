@@ -4,6 +4,7 @@ import {
 	MessageOutlined,
 	RocketOutlined,
 	SettingOutlined,
+	StarOutlined,
 } from "@ant-design/icons";
 import { Dropdown, Layout, type MenuProps, Tooltip } from "antd";
 import type React from "react";
@@ -33,6 +34,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	RocketOutlined,
 	SettingOutlined,
 	ApiOutlined,
+	StarOutlined,
 };
 
 /**

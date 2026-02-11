@@ -1,0 +1,12 @@
+{
+	"title": "Bookmarked Messages",
+	"subtitle": "Manage your important bookmarked messages",
+	"empty": "No bookmarked messages yet",
+	"noResults": "No matching bookmarks found",
+	"search": "Search bookmarks...",
+	"deleted": "Bookmark deleted",
+	"noteSaved": "Note saved",
+	"exported": "Bookmarks exported",
+	"note": "Note",
+	"editNote": "Edit Note"
+}

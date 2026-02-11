@@ -4,6 +4,7 @@ import { initReactI18next } from "react-i18next";
 
 // Import all locale files explicitly
 import zhApp from "./locales/zh/app.json";
+import zhBookmarks from "./locales/zh/bookmarks.json";
 import zhChat from "./locales/zh/chat.json";
 import zhCommon from "./locales/zh/common.json";
 import zhError from "./locales/zh/error.json";
@@ -17,6 +18,7 @@ import zhUser from "./locales/zh/user.json";
 import zhWindow from "./locales/zh/window.json";
 
 import enApp from "./locales/en/app.json";
+import enBookmarks from "./locales/en/bookmarks.json";
 import enChat from "./locales/en/chat.json";
 import enCommon from "./locales/en/common.json";
 import enError from "./locales/en/error.json";
@@ -32,6 +34,7 @@ import enWindow from "./locales/en/window.json";
 const resources = {
 	zh: {
 		app: zhApp,
+		bookmarks: zhBookmarks,
 		chat: zhChat,
 		common: zhCommon,
 		error: zhError,
@@ -46,6 +49,7 @@ const resources = {
 	},
 	en: {
 		app: enApp,
+		bookmarks: enBookmarks,
 		chat: enChat,
 		common: enCommon,
 		error: enError,
@@ -62,6 +66,7 @@ const resources = {
 
 const allNamespaces = [
 	"app",
+	"bookmarks",
 	"chat",
 	"common",
 	"error",

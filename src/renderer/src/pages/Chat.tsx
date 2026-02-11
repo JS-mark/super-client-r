@@ -3,29 +3,36 @@ import {
 	CheckCircleOutlined,
 	ClearOutlined,
 	CloseCircleOutlined,
+	ExportOutlined,
 	FileTextOutlined,
 	LoadingOutlined,
 	PaperClipOutlined,
 	PlusOutlined,
 	RightOutlined,
 	RobotOutlined,
+	SearchOutlined,
 	SendOutlined,
 	StarOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
 import {
 	Button,
-	Tooltip
+	Tooltip,
+	message
 } from "antd";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ChatExportDialog } from "../components/chat/ChatExportDialog";
+import { MessageContextMenu } from "../components/chat/MessageContextMenu";
+import { MessageSearch } from "../components/chat/MessageSearch";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
 import { useChat } from "../hooks/useChat";
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 import type { Message } from "../stores/chatStore";
+import { useMessageStore } from "../stores/messageStore";
 import {
 	GoogleIcon,
 	BingIcon,
@@ -129,18 +136,22 @@ const MessageBubble: React.FC<{
 	isStreaming: boolean;
 	isLast: boolean;
 	streamingContent: string;
-}> = ({ msg, isStreaming, isLast, streamingContent }) => {
+	conversationId: string;
+	onDelete?: (msgId: string) => void;
+}> = ({ msg, isStreaming, isLast, streamingContent, conversationId, onDelete }) => {
 	const isUser = msg.role === "user";
 	const isTool = msg.role === "tool";
 	const isAssistant = msg.role === "assistant";
 	const displayContent =
 		isAssistant && isStreaming && isLast ? streamingContent : msg.content;
+	const { t } = useTranslation();
+	const { isBookmarked } = useMessageStore();
 
 	if (isTool && msg.toolCall) {
 		return <ToolCallCard toolCall={msg.toolCall} />;
 	}
 
-	return (
+	const messageContent = (
 		<div
 			className={cn(
 				"flex gap-4 mb-6",
@@ -167,12 +178,21 @@ const MessageBubble: React.FC<{
 			<div className={cn("max-w-[80%]", isUser ? "items-end" : "items-start")}>
 				<div
 					className={cn(
-						"rounded-2xl px-5 py-3",
+						"rounded-2xl px-5 py-3 relative group",
 						isUser
 							? "bg-gradient-to-br from-blue-500 to-purple-500 text-white"
 							: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm",
 					)}
 				>
+					{/* Bookmark indicator */}
+					{isBookmarked(msg.id) && (
+						<div className={cn(
+							"absolute -top-2",
+							isUser ? "left-2" : "right-2"
+						)}>
+							<StarOutlined className="text-yellow-500 text-sm" />
+						</div>
+					)}
 					{displayContent ? (
 						<div
 							className={cn(
@@ -210,6 +230,21 @@ const MessageBubble: React.FC<{
 				</div>
 			</div>
 		</div>
+	);
+
+	// Don't wrap tool messages with context menu
+	if (isTool) {
+		return messageContent;
+	}
+
+	return (
+		<MessageContextMenu
+			message={msg}
+			conversationId={conversationId}
+			onDelete={onDelete ? () => onDelete(msg.id) : undefined}
+		>
+			{messageContent}
+		</MessageContextMenu>
 	);
 };
 
@@ -289,7 +324,25 @@ const Chat: React.FC = () => {
 				// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 				style={{ WebkitAppRegion: "no-drag" }}
 			>
-				<Tooltip title="Clear conversation">
+				<Tooltip title={t("chat.toolbar.searchMessages", "搜索消息")}>
+					<Button
+						type="text"
+						icon={<span className="text-slate-700 dark:text-slate-200"><SearchOutlined /></span>}
+						onClick={() => setIsSearchOpen(true)}
+						disabled={messages.length === 0}
+						className="rounded-lg"
+					/>
+				</Tooltip>
+				<Tooltip title={t("chat.toolbar.export", "导出")}>
+					<Button
+						type="text"
+						icon={<span className="text-slate-700 dark:text-slate-200"><ExportOutlined /></span>}
+						onClick={() => setIsExportOpen(true)}
+						disabled={messages.length === 0 || isStreaming}
+						className="rounded-lg"
+					/>
+				</Tooltip>
+				<Tooltip title={t("chat.toolbar.clear", "清空")}>
 					<Button
 						type="text"
 						icon={<span className="text-slate-700 dark:text-slate-200"><ClearOutlined /></span>}
@@ -307,6 +360,13 @@ const Chat: React.FC = () => {
 	const [isInputFocused, setIsInputFocused] = useState(false);
 	const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
 	const [selectedEngine, setSelectedEngine] = useState<string>("baidu");
+
+	// Message search and export dialogs
+	const [isSearchOpen, setIsSearchOpen] = useState(false);
+	const [isExportOpen, setIsExportOpen] = useState(false);
+
+	// Conversation ID for message operations
+	const conversationId = "default"; // TODO: Use actual conversation ID
 
 	// 搜索配置
 	const [searchConfigs, setSearchConfigs] = useState<SearchConfig[]>([]);
@@ -584,6 +644,11 @@ const Chat: React.FC = () => {
 									isStreaming={isStreaming}
 									isLast={idx === messages.length - 1}
 									streamingContent={streamingContent}
+									conversationId={conversationId}
+									onDelete={(msgId) => {
+										// TODO: Implement message deletion
+										message.info(t("chat.messageDeleteNotImplemented", "消息删除功能待实现"));
+									}}
 								/>
 							))}
 							<div ref={chatEndRef} />
@@ -701,6 +766,24 @@ const Chat: React.FC = () => {
 					</div>
 				</div>
 			</div>
+
+			{/* Message Search Dialog */}
+			<MessageSearch
+				messages={messages}
+				isOpen={isSearchOpen}
+				onClose={() => setIsSearchOpen(false)}
+				onJumpToMessage={(messageId) => {
+					// TODO: Implement scroll to message
+					message.info(`${t("chat.jumpToMessage", "跳转到消息")}: ${messageId}`);
+				}}
+			/>
+
+			{/* Chat Export Dialog */}
+			<ChatExportDialog
+				messages={messages}
+				isOpen={isExportOpen}
+				onClose={() => setIsExportOpen(false)}
+			/>
 		</MainLayout>
 	);
 };

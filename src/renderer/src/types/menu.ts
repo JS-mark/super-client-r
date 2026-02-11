@@ -87,6 +87,15 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			action: "navigate",
 		},
 		{
+			id: "bookmarks",
+			label: "bookmarks",
+			path: "/bookmarks",
+			iconType: "default",
+			iconContent: "StarOutlined",
+			enabled: true,
+			action: "navigate",
+		},
+		{
 			id: "settings",
 			label: "settings",
 			path: "/settings",

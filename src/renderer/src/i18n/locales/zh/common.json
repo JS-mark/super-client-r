@@ -55,6 +55,7 @@
 	"description": "描述",
 	"tags": "标签",
 	"repository": "仓库",
+	"export": "导出",
 	"actions": {
 		"install": "安装",
 		"uninstall": "卸载",

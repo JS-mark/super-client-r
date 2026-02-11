@@ -1,0 +1,12 @@
+{
+	"title": "收藏的消息",
+	"subtitle": "管理您收藏的重要消息",
+	"empty": "暂无收藏的消息",
+	"noResults": "未找到匹配的书签",
+	"search": "搜索收藏...",
+	"deleted": "书签已删除",
+	"noteSaved": "备注已保存",
+	"exported": "书签已导出",
+	"note": "备注",
+	"editNote": "编辑备注"
+}
