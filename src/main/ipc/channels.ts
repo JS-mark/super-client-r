@@ -121,6 +121,16 @@ export const FLOAT_WIDGET_CHANNELS = {
 	GET_STATUS: "float-widget:get-status",
 } as const;
 
+// 主题相关通道
+export const THEME_CHANNELS = {
+	// 获取主题设置
+	GET_THEME: "theme:get",
+	// 设置主题
+	SET_THEME: "theme:set",
+	// 主题变更事件
+	ON_CHANGE: "theme:on-change",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -130,4 +140,5 @@ export type IPCChannel =
 	| (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS]
 	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS]
 	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS]
-	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS];
+	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS]
+	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS];

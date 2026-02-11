@@ -63,17 +63,35 @@ export interface SkillExecutionResult {
 
 // ============ MCP 相关类型 ============
 
+export type McpServerType = "builtin" | "third-party" | "market";
+
+export type McpTransportType = "stdio" | "sse" | "http";
+
 export interface McpServerConfig {
 	id: string;
 	name: string;
-	command: string;
+	type: McpServerType;
+	transport: McpTransportType;
+	// stdio transport
+	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
+	// sse/http transport (for third-party)
+	url?: string;
+	headers?: Record<string, string>;
+	// metadata
+	description?: string;
+	version?: string;
+	author?: string;
+	icon?: string;
+	enabled?: boolean;
 }
 
 export interface McpServerStatus {
 	id: string;
 	status: "connected" | "disconnected" | "connecting" | "error";
+	type?: McpServerType;
+	transport?: McpTransportType;
 	tools?: McpTool[];
 	error?: string;
 }
@@ -82,6 +100,90 @@ export interface McpTool {
 	name: string;
 	description: string;
 	inputSchema: Record<string, unknown>;
+}
+
+export interface McpToolCallRequest {
+	serverId: string;
+	toolName: string;
+	args: Record<string, unknown>;
+}
+
+export interface McpToolCallResponse {
+	success: boolean;
+	data?: unknown;
+	error?: string;
+}
+
+// MCP Market types
+export interface McpMarketItem {
+	id: string;
+	name: string;
+	description: string;
+	version: string;
+	author: string;
+	icon?: string;
+	tags: string[];
+	rating: number;
+	downloads: number;
+	installCount?: number;
+	transport: McpTransportType;
+	// For stdio servers
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	// For remote servers
+	url?: string;
+	headers?: Record<string, string>;
+	readmeUrl?: string;
+	repositoryUrl?: string;
+	license?: string;
+	createdAt?: string;
+	updatedAt?: string;
+}
+
+export interface McpMarketSearchParams {
+	query?: string;
+	tags?: string[];
+	sortBy?: "downloads" | "rating" | "newest";
+	page?: number;
+	limit?: number;
+}
+
+export interface McpMarketSearchResult {
+	items: McpMarketItem[];
+	total: number;
+	page: number;
+	limit: number;
+}
+
+// Third-party MCP proxy types
+export interface ThirdPartyMcpRequest {
+	endpoint: string;
+	method: "GET" | "POST" | "PUT" | "DELETE";
+	body?: unknown;
+	headers?: Record<string, string>;
+}
+
+export interface ThirdPartyMcpResponse {
+	success: boolean;
+	data?: unknown;
+	error?: string;
+	statusCode?: number;
+}
+
+// Built-in MCP server definitions
+export interface BuiltinMcpDefinition {
+	id: string;
+	name: string;
+	description: string;
+	version: string;
+	icon?: string;
+	tags: string[];
+	transport: McpTransportType;
+	command: string;
+	args: string[];
+	env?: Record<string, string>;
+	configSchema?: Record<string, unknown>;
 }
 
 // ============ Chat 相关类型 ============
