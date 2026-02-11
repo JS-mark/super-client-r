@@ -19,7 +19,12 @@
 		"baidu": "百度",
 		"doc": "文档",
 		"tools": "工具",
-		"more": "更多"
+		"more": "更多",
+		"search": "搜索"
+	},
+	"searchEngine": {
+		"title": "选择搜索引擎",
+		"shortcut": "直接搜索"
 	},
 	"modes": {
 		"direct": "直连",

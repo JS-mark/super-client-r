@@ -131,6 +131,22 @@ export const THEME_CHANNELS = {
 	ON_CHANGE: "theme:on-change",
 } as const;
 
+// 搜索相关通道
+export const SEARCH_CHANNELS = {
+	// 获取所有搜索配置
+	GET_CONFIGS: "search:get-configs",
+	// 保存搜索配置
+	SAVE_CONFIG: "search:save-config",
+	// 删除搜索配置
+	DELETE_CONFIG: "search:delete-config",
+	// 设置默认搜索引擎
+	SET_DEFAULT: "search:set-default",
+	// 获取默认搜索引擎
+	GET_DEFAULT: "search:get-default",
+	// 验证搜索配置
+	VALIDATE_CONFIG: "search:validate-config",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -141,4 +157,5 @@ export type IPCChannel =
 	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS]
 	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS]
 	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS]
-	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS];
+	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS]
+	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS];

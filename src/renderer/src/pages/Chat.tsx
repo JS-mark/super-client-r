@@ -18,7 +18,7 @@ import {
 	Tooltip
 } from "antd";
 import type * as React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
@@ -26,6 +26,14 @@ import { useChat } from "../hooks/useChat";
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 import type { Message } from "../stores/chatStore";
+import {
+	GoogleIcon,
+	BingIcon,
+	BaiduIcon,
+	SogouIcon,
+} from "../components/icons/SearchEngineIcons";
+import type { SearchConfig, SearchProviderType } from "../types/search";
+import { searchService } from "../services/search/searchService";
 
 // Tool call status card
 const ToolCallCard: React.FC<{
@@ -223,31 +231,38 @@ interface ToolbarItem {
 	color?: string;
 }
 
+// Search engine definitions
+interface SearchEngine {
+	id: string;
+	name: string;
+	icon: React.ReactNode;
+	key: string;
+}
+
+const SEARCH_ENGINES: SearchEngine[] = [
+	{ id: "google", name: "Google", icon: <GoogleIcon size={16} />, key: "↑" },
+	{ id: "bing", name: "Bing", icon: <BingIcon size={16} />, key: "↓" },
+	{ id: "baidu", name: "百度", icon: <BaiduIcon size={16} />, key: "←" },
+	{ id: "sogou", name: "搜狗", icon: <SogouIcon size={16} />, key: "→" },
+];
+
 // Quick action items for the toolbar - labels use i18n keys
 const TOOLBAR_ITEMS: ToolbarItem[] = [
-	{ id: "quote", icon: <PlusOutlined />, label: "chat.toolbar.quote", type: "action" },
-	{ id: "attach", icon: <PaperClipOutlined />, label: "chat.toolbar.attach", type: "action" },
+	{ id: "quote", icon: <PlusOutlined />, label: "toolbar.quote", type: "action" },
+	{ id: "attach", icon: <PaperClipOutlined />, label: "toolbar.attach", type: "action" },
 	{
 		id: "prompt",
 		icon: <BulbOutlined />,
-		label: "chat.toolbar.prompt",
+		label: "toolbar.prompt",
 		type: "tool",
 		color: "#52c41a",
 	},
-	{
-		id: "baidu",
-		icon: <span className="text-green-500 font-bold">du</span>,
-		label: "chat.toolbar.baidu",
-		type: "tool",
-		color: "#52c41a",
-	},
-	{ id: "doc", icon: <FileTextOutlined />, label: "chat.toolbar.doc", type: "tool" },
-	{ id: "tools", icon: <ToolOutlined />, label: "chat.toolbar.tools", type: "tool" },
+	{ id: "doc", icon: <FileTextOutlined />, label: "toolbar.doc", type: "tool" },
+	{ id: "tools", icon: <ToolOutlined />, label: "toolbar.tools", type: "tool" },
 ];
 
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
-	;
 
 	const {
 		messages,
@@ -259,7 +274,6 @@ const Chat: React.FC = () => {
 		clearMessages,
 		setChatMode,
 	} = useChat();
-
 
 	// 设置标题栏和页面标题
 	const pageTitle = useMemo(() => (
@@ -291,6 +305,226 @@ const Chat: React.FC = () => {
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
 	const [isInputFocused, setIsInputFocused] = useState(false);
+	const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+	const [selectedEngine, setSelectedEngine] = useState<string>("baidu");
+
+	// 搜索配置
+	const [searchConfigs, setSearchConfigs] = useState<SearchConfig[]>([]);
+	const [defaultSearchProvider, setDefaultSearchProvider] = useState<SearchProviderType | undefined>();
+
+	// 加载搜索配置
+	const loadSearchConfigs = useCallback(async () => {
+		try {
+			const result = await searchService.getConfigs();
+			if (result.success && result.data) {
+				setSearchConfigs(result.data.configs);
+				setDefaultSearchProvider(result.data.defaultProvider);
+				// 如果有默认搜索引擎，设置为选中
+				if (result.data.defaultProvider) {
+					setSelectedEngine(result.data.defaultProvider);
+				}
+			}
+		} catch (error) {
+			console.error("Failed to load search configs:", error);
+		}
+	}, []);
+
+	useEffect(() => {
+		loadSearchConfigs();
+	}, [loadSearchConfigs]);
+
+	// Search engine panel - full width at top of input area
+	// Search categories
+	const categories = [
+		{ id: 'all', name: '全部', count: 12 },
+		{ id: 'question', name: '问题', count: null },
+		{ id: 'tool', name: '工具', count: null },
+		{ id: 'skill', name: '技能', count: null },
+	];
+	const [activeCategory, setActiveCategory] = useState('all');
+	const [searchQuery, setSearchQuery] = useState('');
+
+	const searchEnginePanel = (
+		<div className="w-full bg-[#252526] rounded-lg overflow-hidden shadow-2xl border border-[#3c3c3c]">
+			{/* Search Input */}
+			<div className="px-3 py-3 border-b border-[#3c3c3c]">
+				<div className="flex items-center gap-2 text-[#cccccc]">
+					<svg className="w-4 h-4 text-[#858585]" viewBox="0 0 16 16" fill="currentColor">
+						<path d="M11.7422 10.3439C12.5329 9.2673 13 7.9382 13 6.5C13 2.91015 10.0899 0 6.5 0C2.91015 0 0 2.91015 0 6.5C0 10.0899 2.91015 13 6.5 13C7.9382 13 9.2673 12.5329 10.3439 11.7422L14.1464 15.5446C14.3417 15.7399 14.6583 15.7399 14.8536 15.5446L15.5446 14.8536C15.7399 14.6583 15.7399 14.3417 15.5446 14.1464L11.7422 10.3439ZM6.5 11C8.98528 11 11 8.98528 11 6.5C11 4.01472 8.98528 2 6.5 2C4.01472 2 2 4.01472 2 6.5C2 8.98528 4.01472 11 6.5 11Z"/>
+					</svg>
+					<input
+						type="text"
+						placeholder="搜索问题、工具或AI..."
+						value={searchQuery}
+						onChange={(e) => setSearchQuery(e.target.value)}
+						className="flex-1 bg-transparent text-[13px] text-[#cccccc] placeholder-[#6e6e6e] outline-none"
+					/>
+				</div>
+			</div>
+
+			{/* Category Tabs */}
+			<div className="flex items-center px-2 py-2 border-b border-[#3c3c3c] gap-1">
+				{categories.map((cat) => (
+					<button
+						key={cat.id}
+						onClick={() => setActiveCategory(cat.id)}
+						className={cn(
+							"flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] transition-colors",
+							activeCategory === cat.id
+								? "bg-[#094771] text-white"
+								: "text-[#cccccc] hover:bg-[#2a2d2e]"
+						)}
+					>
+						<span>{cat.name}</span>
+						{cat.count !== null && (
+							<span className="text-[10px] opacity-70">{cat.count}</span>
+						)}
+					</button>
+				))}
+			</div>
+
+			{/* Search Engine List */}
+			<div className="py-1 max-h-[200px] overflow-y-auto">
+				{/* 已配置的搜索引擎 */}
+				{searchConfigs.length > 0 && (
+					<>
+						<div className="px-3 py-1.5 text-[11px] text-[#858585] uppercase tracking-wider">
+							我的搜索
+						</div>
+						{searchConfigs.filter(c => c.enabled).map((config) => (
+							<button
+								key={config.id}
+								onClick={() => {
+									setSelectedEngine(config.provider);
+									setSearchPopoverOpen(false);
+								}}
+								className={cn(
+									"w-full flex items-center justify-between px-3 py-2.5 transition-colors",
+									selectedEngine === config.provider
+										? "bg-[#094771]"
+										: "hover:bg-[#2a2d2e]"
+								)}
+							>
+								<div className="flex items-center gap-3">
+									<span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+										{getEngineIcon(config.provider)}
+									</span>
+									<span className={cn(
+										"text-[13px]",
+										selectedEngine === config.provider ? "text-white" : "text-[#cccccc]"
+									)}>
+										{config.name}
+									</span>
+								</div>
+								{config.isDefault && (
+									<span className="text-[11px] text-white/80 bg-white/20 px-1.5 py-0.5 rounded">默认</span>
+								)}
+							</button>
+						))}
+						<div className="my-2 border-t border-[#3c3c3c]" />
+					</>
+				)}
+				{/* 基础搜索引擎 */}
+				<div className="px-3 py-1.5 text-[11px] text-[#858585] uppercase tracking-wider">
+					快速搜索
+				</div>
+				{SEARCH_ENGINES.map((engine) => (
+					<button
+						key={engine.id}
+						onClick={() => {
+							setSelectedEngine(engine.id);
+							setSearchPopoverOpen(false);
+						}}
+						className={cn(
+							"w-full flex items-center justify-between px-3 py-2.5 transition-colors",
+							selectedEngine === engine.id
+								? "bg-[#094771]"
+								: "hover:bg-[#2a2d2e]"
+						)}
+					>
+						<div className="flex items-center gap-3">
+							<span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+								{engine.icon}
+							</span>
+							<span className={cn(
+								"text-[13px]",
+								selectedEngine === engine.id ? "text-white" : "text-[#cccccc]"
+							)}>
+								{engine.name}
+							</span>
+						</div>
+						{selectedEngine === engine.id && !searchConfigs.find(c => c.provider === engine.id)?.isDefault && (
+							<span className="text-[11px] text-white/80 bg-white/20 px-1.5 py-0.5 rounded">免费</span>
+						)}
+					</button>
+				))}
+			</div>
+
+			{/* Footer */}
+			<div className="flex items-center justify-between px-3 py-2 border-t border-[#3c3c3c] bg-[#252526]">
+				<div className="flex items-center gap-2">
+					<svg className="w-3.5 h-3.5 text-[#858585]" viewBox="0 0 16 16" fill="currentColor">
+						<path d="M8.5 1.5a.5.5 0 00-1 0v5.793L5.354 5.146a.5.5 0 10-.707.707l3 3a.5.5 0 00.707 0l3-3a.5.5 0 00-.707-.707L8.5 7.293V1.5z"/>
+						<path d="M3.5 9.5a.5.5 0 00-1 0v2A2.5 2.5 0 005 14h6a2.5 2.5 0 002.5-2.5v-2a.5.5 0 00-1 0v2A1.5 1.5 0 0111 13H5a1.5 1.5 0 01-1.5-1.5v-2z"/>
+					</svg>
+					<span className="text-[11px] text-[#cccccc]">网络搜索</span>
+				</div>
+				<div className="flex items-center gap-1.5 text-[10px] text-[#858585]">
+					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">ESC</span>
+					<span>关闭</span>
+					<span className="mx-1">·</span>
+					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">▲▼</span>
+					<span>选择</span>
+					<span className="mx-1">·</span>
+					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">⌘</span>
+					<span>+</span>
+					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">▲▼</span>
+					<span>翻页</span>
+					<span className="mx-1">·</span>
+					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">↵</span>
+					<span>确认</span>
+				</div>
+			</div>
+		</div>
+	);
+
+	// 获取搜索引擎图标
+	const getEngineIcon = useCallback((provider: string) => {
+		switch (provider) {
+			case "google": return <GoogleIcon size={16} />;
+			case "bing": return <BingIcon size={16} />;
+			case "baidu": return <BaiduIcon size={16} />;
+			case "sogou": return <SogouIcon size={16} />;
+			default: return <span className="text-lg">🔍</span>;
+		}
+	}, []);
+
+	// 获取搜索引擎名称
+	const getEngineName = useCallback((provider: string) => {
+		const config = searchConfigs.find(c => c.provider === provider);
+		if (config) return config.name;
+		switch (provider) {
+			case "google": return "Google";
+			case "bing": return "Bing";
+			case "baidu": return "百度";
+			case "sogou": return "搜狗";
+			default: return provider;
+		}
+	}, [searchConfigs]);
+
+	// 获取当前选中的搜索引擎
+	const currentEngine = useMemo(() => {
+		const config = searchConfigs.find(c => c.provider === selectedEngine);
+		if (config) {
+			return {
+				id: config.provider,
+				name: config.name,
+				icon: getEngineIcon(config.provider),
+				key: "",
+			};
+		}
+		return SEARCH_ENGINES.find(e => e.id === selectedEngine) || SEARCH_ENGINES[2];
+	}, [selectedEngine, searchConfigs, getEngineIcon]);
 
 	// Auto-scroll to bottom
 	useEffect(() => {
@@ -359,7 +593,14 @@ const Chat: React.FC = () => {
 
 				{/* Input Area */}
 				<div className="px-6 py-4">
-					<div className="w-full mx-auto">
+					<div className="w-full mx-auto max-w-4xl">
+						{/* Search Engine Panel - Full width at top */}
+						{searchPopoverOpen && (
+							<div className="mb-2 shadow-lg rounded-lg overflow-hidden">
+								{searchEnginePanel}
+							</div>
+						)}
+
 						{/* Input box with toolbar */}
 						<div
 							className={cn(
@@ -396,7 +637,7 @@ const Chat: React.FC = () => {
 								{/* Left toolbar items */}
 								<div className="flex items-center gap-1">
 									{TOOLBAR_ITEMS.map((item) => (
-										<Tooltip key={item.id} title={item.label}>
+										<Tooltip key={item.id} title={t(item.label, { ns: "chat" })}>
 											<button
 												onClick={() => {
 													// Handle toolbar item click
@@ -422,7 +663,20 @@ const Chat: React.FC = () => {
 										</Tooltip>
 									))}
 
-									{/* Divider */}
+									{/* Search engine toggle button */}
+									<Tooltip title={t("chat.toolbar.search", "搜索")}>
+										<button
+											onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
+											className={cn(
+												"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600",
+												searchPopoverOpen && "bg-slate-200 dark:bg-slate-600"
+											)}
+										>
+											{currentEngine.icon}
+										</button>
+									</Tooltip>
+
+								{/* Divider */}
 									<div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
 
 									{/* More button */}

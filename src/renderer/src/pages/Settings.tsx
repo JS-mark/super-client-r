@@ -22,6 +22,7 @@ import {
   ReloadOutlined,
   RocketOutlined,
   SaveOutlined,
+  SearchOutlined,
   SettingOutlined,
   StarOutlined,
   SunOutlined,
@@ -61,6 +62,7 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
 import { AboutSection } from "../components/settings/AboutSection";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
+import { SearchSettings } from "../components/settings/SearchSettings";
 import { useLogWorker } from "../hooks/useLogWorker";
 import { type ThemeMode, useTheme } from "../hooks/useTheme";
 import { useTitle } from "../hooks/useTitle";
@@ -1623,6 +1625,20 @@ const Settings: React.FC = () => {
               )}
             </Form>
           </SettingSection>
+        </Card>
+      ),
+    },
+    {
+      key: "search",
+      label: (
+        <span className="flex items-center gap-2 font-medium">
+          <SearchOutlined />
+          {t("search", "Search", { ns: "settings" })}
+        </span>
+      ),
+      children: (
+        <Card className="!border-0 !shadow-none !bg-transparent">
+          <SearchSettings />
         </Card>
       ),
     },

@@ -5,6 +5,29 @@
 
 import Store from "electron-store";
 
+export type SearchProviderType =
+	| "zhipu"
+	| "tavily"
+	| "searxng"
+	| "exa"
+	| "exa_mcp"
+	| "bocha"
+	| "sogou"
+	| "google"
+	| "bing"
+	| "baidu";
+
+export interface SearchConfig {
+	id: string;
+	provider: SearchProviderType;
+	name: string;
+	apiKey: string;
+	apiUrl?: string;
+	enabled: boolean;
+	isDefault?: boolean;
+	config?: Record<string, unknown>;
+}
+
 export interface AppConfig {
 	apiKey?: string;
 	model?: string;
@@ -13,6 +36,8 @@ export interface AppConfig {
 	apiPort?: number;
 	skillsmpApiKey?: string;
 	floatWidgetEnabled?: boolean;
+	searchConfigs?: SearchConfig[];
+	defaultSearchProvider?: SearchProviderType;
 }
 
 export interface AppData {
@@ -103,6 +128,50 @@ export class StoreManager {
 
 	getLastSession(): string | undefined {
 		return this.getData("lastSessionId");
+	}
+
+	// ============ 搜索配置相关 ============
+
+	getSearchConfigs(): SearchConfig[] {
+		return this.configStore.get("searchConfigs") || [];
+	}
+
+	saveSearchConfig(config: SearchConfig): void {
+		const configs = this.getSearchConfigs();
+		const existingIndex = configs.findIndex((c) => c.id === config.id);
+
+		if (existingIndex >= 0) {
+			configs[existingIndex] = config;
+		} else {
+			configs.push(config);
+		}
+
+		this.configStore.set("searchConfigs", configs);
+	}
+
+	deleteSearchConfig(id: string): void {
+		const configs = this.getSearchConfigs().filter((c) => c.id !== id);
+		this.configStore.set("searchConfigs", configs);
+	}
+
+	setDefaultSearchProvider(provider: SearchProviderType | null): void {
+		if (provider === null) {
+			this.configStore.delete("defaultSearchProvider" as keyof AppConfig);
+		} else {
+			this.configStore.set("defaultSearchProvider", provider);
+		}
+
+		// Update isDefault flag on configs
+		const configs = this.getSearchConfigs();
+		const updatedConfigs = configs.map((c) => ({
+			...c,
+			isDefault: c.provider === provider,
+		}));
+		this.configStore.set("searchConfigs", updatedConfigs);
+	}
+
+	getDefaultSearchProvider(): SearchProviderType | undefined {
+		return this.configStore.get("defaultSearchProvider");
 	}
 
 	// ============ 清除所有数据 ============

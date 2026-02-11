@@ -98,6 +98,16 @@ export interface ElectronAPI {
 		onChange: (callback: (mode: string) => void) => () => void;
 	};
 
+	// 搜索配置 API
+	search: {
+		getConfigs: () => Promise<IPCResponse<{ configs: SearchConfig[]; defaultProvider?: SearchProviderType }>>;
+		saveConfig: (config: SearchConfig) => Promise<IPCResponse>;
+		deleteConfig: (id: string) => Promise<IPCResponse>;
+		setDefault: (provider: SearchProviderType | null) => Promise<IPCResponse>;
+		getDefault: () => Promise<IPCResponse<SearchProviderType | undefined>>;
+		validateConfig: (config: SearchConfig) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
+	};
+
 	// 通用 IPC
 	ipc: {
 		on: (channel: string, listener: (...args: unknown[]) => void) => void;
@@ -248,6 +258,29 @@ export interface BuiltinMcpDefinition {
 	configSchema?: Record<string, unknown>;
 }
 
+export type SearchProviderType =
+	| "zhipu"
+	| "tavily"
+	| "searxng"
+	| "exa"
+	| "exa_mcp"
+	| "bocha"
+	| "sogou"
+	| "google"
+	| "bing"
+	| "baidu";
+
+export interface SearchConfig {
+	id: string;
+	provider: SearchProviderType;
+	name: string;
+	apiKey: string;
+	apiUrl?: string;
+	enabled: boolean;
+	isDefault?: boolean;
+	config?: Record<string, unknown>;
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
@@ -354,6 +387,16 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.on("theme:on-change", listener);
 			return () => ipcRenderer.off("theme:on-change", listener);
 		},
+	},
+
+	// 搜索配置 API
+	search: {
+		getConfigs: () => ipcRenderer.invoke("search:get-configs"),
+		saveConfig: (config: SearchConfig) => ipcRenderer.invoke("search:save-config", config),
+		deleteConfig: (id: string) => ipcRenderer.invoke("search:delete-config", id),
+		setDefault: (provider: SearchProviderType | null) => ipcRenderer.invoke("search:set-default", provider),
+		getDefault: () => ipcRenderer.invoke("search:get-default"),
+		validateConfig: (config: SearchConfig) => ipcRenderer.invoke("search:validate-config", config),
 	},
 
 	// 通用 IPC

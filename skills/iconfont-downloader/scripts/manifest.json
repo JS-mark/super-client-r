@@ -1,0 +1,96 @@
+{
+  "id": "iconfont-downloader",
+  "name": "Iconfont图标下载器",
+  "description": "从iconfont.cn搜索并下载最匹配的SVG图标。支持登录验证、关键词搜索、图标预览和批量下载功能。",
+  "version": "1.0.0",
+  "author": "Super Client R",
+  "category": "design",
+  "icon": "🎨",
+  "permissions": ["network", "filesystem"],
+  "tools": [
+    {
+      "name": "login",
+      "description": "登录iconfont.cn账号。如果未登录，调用其他工具前必须先执行此操作。",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "iconfont用户名或手机号"
+          },
+          "password": {
+            "type": "string",
+            "description": "iconfont密码"
+          }
+        },
+        "required": ["username", "password"]
+      }
+    },
+    {
+      "name": "search",
+      "description": "根据关键词搜索iconfont图标，返回最匹配的图标列表供用户选择",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "description": "搜索关键词，如'home', 'user', 'settings'"
+          },
+          "limit": {
+            "type": "number",
+            "description": "返回结果数量，默认10个",
+            "default": 10
+          },
+          "page": {
+            "type": "number",
+            "description": "页码，默认1",
+            "default": 1
+          }
+        },
+        "required": ["keyword"]
+      }
+    },
+    {
+      "name": "download",
+      "description": "下载选中的SVG图标到指定目录",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "iconId": {
+            "type": "string",
+            "description": "图标ID"
+          },
+          "iconName": {
+            "type": "string",
+            "description": "图标名称，用于文件名"
+          },
+          "outputPath": {
+            "type": "string",
+            "description": "保存目录路径，默认为项目icons目录"
+          },
+          "rename": {
+            "type": "string",
+            "description": "重命名文件（可选，不包含扩展名）"
+          }
+        },
+        "required": ["iconId", "iconName"]
+      }
+    },
+    {
+      "name": "checkLoginStatus",
+      "description": "检查当前登录状态",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "logout",
+      "description": "退出iconfont登录",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  ]
+}

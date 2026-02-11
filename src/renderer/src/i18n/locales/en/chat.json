@@ -19,7 +19,12 @@
 		"baidu": "Baidu",
 		"doc": "Document",
 		"tools": "Tools",
-		"more": "More"
+		"more": "More",
+		"search": "Search"
+	},
+	"searchEngine": {
+		"title": "Select Search Engine",
+		"shortcut": "to search directly"
 	},
 	"modes": {
 		"direct": "Direct",
