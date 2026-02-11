@@ -1,10 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
-import {
-	existsSync,
-	readdirSync,
-	statSync,
-	unlinkSync,
-} from "fs";
+import { existsSync, promises as fsPromises, readdirSync } from "fs";
 import { join } from "path";
 import { storeManager } from "../../store";
 import { APP_CHANNELS } from "../channels";
@@ -24,6 +19,7 @@ export function registerAppHandlers() {
 			version: app.getVersion(),
 			electron: process.versions.electron,
 			node: process.versions.node,
+			v8: process.versions.v8,
 			platform: process.platform,
 			arch: process.arch,
 		};
@@ -74,28 +70,35 @@ export function registerAppHandlers() {
 		return join(app.getPath("userData"), "logs");
 	});
 
-	ipcMain.handle(APP_CHANNELS.LIST_LOG_FILES, () => {
+	ipcMain.handle(APP_CHANNELS.LIST_LOG_FILES, async () => {
 		const logsDir = join(app.getPath("userData"), "logs");
 		if (!existsSync(logsDir)) {
 			return [];
 		}
 
-		const files = readdirSync(logsDir)
-			.filter((f) => f.endsWith(".log"))
-			.map((name) => {
-				const filePath = join(logsDir, name);
-				const stats = statSync(filePath);
-				return {
-					name,
-					path: filePath,
-					size: stats.size,
-					createdAt: stats.birthtime.toISOString(),
-					modifiedAt: stats.mtime.toISOString(),
-				} as LogFileInfo;
-			})
-			.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
-
-		return files;
+		try {
+			const entries = await fsPromises.readdir(logsDir, {
+				withFileTypes: true,
+			});
+			const files = await Promise.all(
+				entries
+					.filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
+					.map(async (entry) => {
+						const filePath = join(logsDir, entry.name);
+						const stats = await fsPromises.stat(filePath);
+						return {
+							name: entry.name,
+							path: filePath,
+							size: stats.size,
+							createdAt: stats.birthtime.toISOString(),
+							modifiedAt: stats.mtime.toISOString(),
+						} as LogFileInfo;
+					}),
+			);
+			return files.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
+		} catch {
+			return [];
+		}
 	});
 
 	ipcMain.handle(
@@ -132,19 +135,22 @@ export function registerAppHandlers() {
 	 * 从文件末尾高效读取最后 N 行
 	 * 使用分块从后向前读取，避免读取整个文件
 	 */
-	async function readLastLines(filePath: string, lineCount: number): Promise<string> {
-		const fs = await import('fs');
+	async function readLastLines(
+		filePath: string,
+		lineCount: number,
+	): Promise<string> {
+		const fs = await import("fs");
 		const CHUNK_SIZE = 16384; // 16KB chunks
 
 		return new Promise((resolve, reject) => {
 			try {
-				const fd = fs.openSync(filePath, 'r');
+				const fd = fs.openSync(filePath, "r");
 				const stats = fs.fstatSync(fd);
 				const fileSize = stats.size;
 
 				if (fileSize === 0) {
 					fs.closeSync(fd);
-					resolve('');
+					resolve("");
 					return;
 				}
 
@@ -153,14 +159,14 @@ export function registerAppHandlers() {
 					const buffer = Buffer.alloc(fileSize);
 					fs.readSync(fd, buffer, 0, fileSize, 0);
 					fs.closeSync(fd);
-					const lines = buffer.toString('utf-8').split('\n');
-					resolve(lines.slice(-lineCount).join('\n'));
+					const lines = buffer.toString("utf-8").split("\n");
+					resolve(lines.slice(-lineCount).join("\n"));
 					return;
 				}
 
 				// 从文件末尾开始读取
 				let position = fileSize;
-				let chunks: Buffer[] = [];
+				const chunks: Buffer[] = [];
 				let totalBytes = 0;
 				let foundLines = 0;
 
@@ -176,8 +182,8 @@ export function registerAppHandlers() {
 					totalBytes += chunkSize;
 
 					// 检查当前已读取的内容中有多少行
-					const currentContent = Buffer.concat(chunks).toString('utf-8');
-					foundLines = currentContent.split('\n').length - 1;
+					const currentContent = Buffer.concat(chunks).toString("utf-8");
+					foundLines = currentContent.split("\n").length - 1;
 
 					// 限制最大读取 256KB，防止内存溢出
 					if (totalBytes >= 262144) {
@@ -188,12 +194,12 @@ export function registerAppHandlers() {
 				fs.closeSync(fd);
 
 				// 处理读取的内容
-				const content = Buffer.concat(chunks).toString('utf-8');
-				const lines = content.split('\n');
+				const content = Buffer.concat(chunks).toString("utf-8");
+				const lines = content.split("\n");
 
 				// 第一行可能是不完整的（除非读到文件开头），丢弃它
 				const startIndex = position > 0 ? 1 : 0;
-				const result = lines.slice(startIndex).slice(-lineCount).join('\n');
+				const result = lines.slice(startIndex).slice(-lineCount).join("\n");
 
 				resolve(result);
 			} catch (err) {
@@ -202,21 +208,33 @@ export function registerAppHandlers() {
 		});
 	}
 
-	ipcMain.handle(APP_CHANNELS.CLEAR_LOGS, () => {
+	ipcMain.handle(APP_CHANNELS.CLEAR_LOGS, async () => {
 		const logsDir = join(app.getPath("userData"), "logs");
 		if (!existsSync(logsDir)) {
 			return true;
 		}
 
-		const files = readdirSync(logsDir).filter((f) => f.endsWith(".log"));
-		for (const file of files) {
-			try {
-				unlinkSync(join(logsDir, file));
-			} catch {
-				// ignore
-			}
+		try {
+			const entries = await fsPromises.readdir(logsDir, {
+				withFileTypes: true,
+			});
+			const files = entries
+				.filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
+				.map((entry) => join(logsDir, entry.name));
+
+			await Promise.all(
+				files.map(async (filePath) => {
+					try {
+						await fsPromises.unlink(filePath);
+					} catch {
+						// ignore
+					}
+				}),
+			);
+			return true;
+		} catch {
+			return false;
 		}
-		return true;
 	});
 
 	// 打开外部链接
