@@ -34,9 +34,11 @@ export const McpConfig: React.FC<McpConfigProps> = ({ addTrigger }) => {
 		const newServer: McpServer = {
 			id: Date.now().toString(),
 			name: values.name,
+			type: "third-party",
+			transport: "http",
 			url: values.url,
 			status: "disconnected",
-			capabilities: [],
+			enabled: true,
 		};
 		addServer(newServer);
 		setIsModalOpen(false);

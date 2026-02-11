@@ -169,7 +169,7 @@ const Home = () => {
               }
               value={messages.length}
               prefix={<MessageOutlined className="mr-2" />}
-              valueStyle={{ color: "#3b82f6" }}
+              styles={{ content: { color: "#3b82f6" } }}
             />
           </Card>
 
@@ -182,7 +182,7 @@ const Home = () => {
               }
               value={enabledModels}
               prefix={<CloudOutlined className="mr-2" />}
-              valueStyle={{ color: "#9333ea" }}
+              styles={{ content: { color: "#9333ea" } }}
             />
           </Card>
 
@@ -195,7 +195,7 @@ const Home = () => {
               }
               value={installedSkills.length}
               prefix={<ToolOutlined className="mr-2" />}
-              valueStyle={{ color: "#ea580c" }}
+              styles={{ content: { color: "#ea580c" } }}
             />
           </Card>
 
@@ -208,7 +208,7 @@ const Home = () => {
               }
               value={connectedMcpServers}
               prefix={<ApiOutlined className="mr-2" />}
-              valueStyle={{ color: "#0891b2" }}
+              styles={{ content: { color: "#0891b2" } }}
             />
           </Card>
         </div>
@@ -261,8 +261,8 @@ const Home = () => {
               <div className="flex items-center gap-3">
                 <div
                   className={`w-3 h-3 rounded-full ${apiStatus.status === "running"
-                      ? "bg-green-500 animate-pulse"
-                      : "bg-slate-400"
+                    ? "bg-green-500 animate-pulse"
+                    : "bg-slate-400"
                     }`}
                 />
                 <span className="font-medium">
