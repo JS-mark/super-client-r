@@ -122,7 +122,10 @@
 				"desc": "内置 HTTP 服务"
 			}
 		},
+		"overview": "概览",
 		"systemInfo": "系统信息",
-		"recentUpdates": "最近更新"
+		"recentUpdates": "最近更新",
+		"team": "团队",
+		"achievements": "成就"
 	}
 }

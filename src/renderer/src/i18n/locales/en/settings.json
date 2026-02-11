@@ -23,7 +23,6 @@
 	"stopped": "Stopped",
 	"listeningOn": "Listening on",
 	"apiDocs": "API Docs",
-	"about": "About",
 	"aboutDescription": "A powerful AI desktop client for seamless interaction with multiple AI services.",
 	"platform": "Platform",
 	"architecture": "Arch",
@@ -122,7 +121,10 @@
 				"desc": "Built-in HTTP service"
 			}
 		},
+		"overview": "Overview",
 		"systemInfo": "System Information",
-		"recentUpdates": "Recent Updates"
+		"recentUpdates": "Recent Updates",
+		"team": "Team",
+		"achievements": "Achievements"
 	}
 }

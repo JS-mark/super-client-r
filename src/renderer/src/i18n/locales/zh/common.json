@@ -50,5 +50,15 @@
 	"public": "公开",
 	"private": "私有",
 	"internal": "内部",
-	"external": "外部"
+	"external": "外部",
+	"by": "作者",
+	"description": "描述",
+	"tags": "标签",
+	"repository": "仓库",
+	"actions": {
+		"install": "安装",
+		"uninstall": "卸载",
+		"delete": "删除",
+		"edit": "编辑"
+	}
 }

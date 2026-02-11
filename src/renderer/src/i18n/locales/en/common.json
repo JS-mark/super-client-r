@@ -50,5 +50,15 @@
 	"public": "Public",
 	"private": "Private",
 	"internal": "Internal",
-	"external": "External"
+	"external": "External",
+	"by": "By",
+	"description": "Description",
+	"tags": "Tags",
+	"repository": "Repository",
+	"actions": {
+		"install": "Install",
+		"uninstall": "Uninstall",
+		"delete": "Delete",
+		"edit": "Edit"
+	}
 }
