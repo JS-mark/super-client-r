@@ -5,6 +5,7 @@ import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
 import McpMarket from "./pages/McpMarket";
 import Models from "./pages/Models";
+import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
 
@@ -44,6 +45,12 @@ export const router = createHashRouter([
 		element: <McpMarket />,
 		errorElement: <ErrorPage />,
 		handle: { title: "MCP 市场" },
+	},
+	{
+		path: "/plugins",
+		element: <Plugins />,
+		errorElement: <ErrorPage />,
+		handle: { title: "插件中心" },
 	},
 	{
 		path: "/settings",

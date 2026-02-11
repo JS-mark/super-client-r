@@ -78,6 +78,15 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			action: "navigate",
 		},
 		{
+			id: "plugins",
+			label: "plugins",
+			path: "/plugins",
+			iconType: "default",
+			iconContent: "PluginOutlined",
+			enabled: true,
+			action: "navigate",
+		},
+		{
 			id: "settings",
 			label: "settings",
 			path: "/settings",

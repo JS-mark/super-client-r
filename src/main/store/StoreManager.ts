@@ -38,6 +38,11 @@ export interface AppConfig {
 	floatWidgetEnabled?: boolean;
 	searchConfigs?: SearchConfig[];
 	defaultSearchProvider?: SearchProviderType;
+	// Plugin related
+	plugins?: unknown[];
+	pluginsData?: Record<string, unknown>;
+	// Keybindings
+	keybindings?: Record<string, string>;
 }
 
 export interface AppData {
