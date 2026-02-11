@@ -12,6 +12,7 @@ export interface AppConfig {
 	language?: string;
 	apiPort?: number;
 	skillsmpApiKey?: string;
+	floatWidgetEnabled?: boolean;
 }
 
 export interface AppData {
@@ -31,6 +32,7 @@ export class StoreManager {
 				defaults: {
 					theme: "auto",
 					language: "en",
+					floatWidgetEnabled: false,
 				},
 			}) as Store<AppConfig>;
 		}

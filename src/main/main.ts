@@ -15,17 +15,19 @@ import {
 } from "electron";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
+import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
 import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
 import { localServer } from "./server";
 import { pathService } from "./services/pathService";
-import { getSkillService } from "./services/skill/SkillService";
 import {
 	handleOpenUrl,
-	handleSecondInstance,
 	handleProtocolData,
+	handleSecondInstance,
 	parseProtocolUrl,
 	registerProtocol,
 } from "./services/protocolService";
+import { getSkillService } from "./services/skill/SkillService";
+import { storeManager } from "./store/StoreManager";
 import { logger } from "./utils/logger";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
@@ -36,11 +38,15 @@ if (!app.isPackaged) {
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-software-rasterizer");
 // Disable Autofill features to prevent DevTools errors
-app.commandLine.appendSwitch("disable-features", "AutofillServer,PasswordManager,Autofill,AutofillAssistant,AutofillPasswordManager,AutofillAddress,AutofillCreditCard,AutofillProfile,AutofillDownloadManager,AutofillFeedback");
+app.commandLine.appendSwitch(
+	"disable-features",
+	"AutofillServer,PasswordManager,Autofill,AutofillAssistant,AutofillPasswordManager,AutofillAddress,AutofillCreditCard,AutofillProfile,AutofillDownloadManager,AutofillFeedback",
+);
 
 // 开发环境将 userData 设置到用户 home 目录下，避免权限问题
 // dev 环境使用 .scr-data-dev，打包环境使用 .scr-data，实现数据隔离
 import { homedir } from "os";
+
 if (!app.isPackaged) {
 	const userDataPath = join(homedir(), ".scr-data-dev");
 	app.setPath("userData", userDataPath);
@@ -146,6 +152,7 @@ function createFloatingWindow(): void {
 		alwaysOnTop: true,
 		hasShadow: false,
 		skipTaskbar: true,
+		show: false, // 初始不显示，根据设置决定是否显示
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),
 			contextIsolation: true,
@@ -166,6 +173,9 @@ function createFloatingWindow(): void {
 			hash: "float",
 		});
 	}
+
+	// 将窗口实例设置到 handler 中
+	setFloatingWindow(floatingWindow);
 
 	// floatingWindow.webContents.openDevTools({ mode: 'detach' })
 }
@@ -188,12 +198,19 @@ function createTray(): void {
 		},
 		{ type: "separator" },
 		{
-			label: "设置",
+			label: "使用说明",
 			click: () => {
-				mainWindow?.show();
-				mainWindow?.webContents.send("navigate-to", "/settings");
+				shell.openExternal("https://js-mark.com/super-client-r/");
 			},
 		},
+		{
+			label: "关于",
+			click: () => {
+				mainWindow?.show();
+				mainWindow?.webContents.send("show-about-modal");
+			},
+		},
+		{ type: "separator" },
 		{ type: "separator" },
 		{
 			label: "退出",
@@ -347,6 +364,12 @@ app.whenReady().then(async () => {
 	createTray();
 	createMenu();
 
+	// 根据设置决定是否显示悬浮窗
+	const floatWidgetEnabled = storeManager.getConfig("floatWidgetEnabled");
+	if (floatWidgetEnabled && floatingWindow) {
+		floatingWindow.show();
+	}
+
 	// macOS: 点击 dock 图标时重新创建窗口
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) {
@@ -402,5 +425,8 @@ process.on("uncaughtException", (error) => {
 });
 
 process.on("unhandledRejection", (reason) => {
-	logger.error("Unhandled rejection", reason instanceof Error ? reason : new Error(String(reason)));
+	logger.error(
+		"Unhandled rejection",
+		reason instanceof Error ? reason : new Error(String(reason)),
+	);
 });
