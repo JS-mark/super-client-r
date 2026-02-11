@@ -16,6 +16,7 @@ import {
   LinkOutlined,
   MenuOutlined,
   MonitorOutlined,
+  MoonOutlined,
   PlayCircleOutlined,
   PoweroffOutlined,
   ReloadOutlined,
@@ -23,6 +24,7 @@ import {
   SaveOutlined,
   SettingOutlined,
   StarOutlined,
+  SunOutlined,
   SyncOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
@@ -38,7 +40,6 @@ import {
   message,
   Popconfirm,
   Progress,
-  Radio,
   Row,
   Select,
   Skeleton,
@@ -61,6 +62,7 @@ import { McpConfig } from "../components/models/McpConfig";
 import { AboutSection } from "../components/settings/AboutSection";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { useLogWorker } from "../hooks/useLogWorker";
+import { type ThemeMode, useTheme } from "../hooks/useTheme";
 import { useTitle } from "../hooks/useTitle";
 import { type ApiStatus, apiService } from "../services/apiService";
 import {
@@ -102,7 +104,7 @@ const SettingSection: React.FC<{
   children: React.ReactNode;
   extra?: React.ReactNode;
 }> = ({ title, icon, children, extra }) => (
-  <div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+  <div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
     <div className="flex items-center justify-between mb-4">
       <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
         {icon}
@@ -188,7 +190,9 @@ const LogViewer: React.FC = () => {
       }
       setError(null);
     } catch {
-      setError(t("loadLogFilesError", "Failed to load log files", { ns: "settings" }));
+      setError(
+        t("loadLogFilesError", "Failed to load log files", { ns: "settings" }),
+      );
     }
   }, [selectedFile, t]);
 
@@ -249,11 +253,15 @@ const LogViewer: React.FC = () => {
   const handleClearLogs = async () => {
     try {
       await appService.clearLogs();
-      message.success(t("clearLogsSuccess", "Logs cleared", { ns: "settings" }));
+      message.success(
+        t("clearLogsSuccess", "Logs cleared", { ns: "settings" }),
+      );
       setLogLines([]);
       await loadLogFiles();
     } catch (e) {
-      message.error(t("clearLogsError", "Failed to clear logs", { ns: "settings" }));
+      message.error(
+        t("clearLogsError", "Failed to clear logs", { ns: "settings" }),
+      );
     }
   };
 
@@ -263,7 +271,9 @@ const LogViewer: React.FC = () => {
       await appService.openPath(logsPath);
     } catch (e) {
       message.error(
-        t("openLogsFolderError", "Failed to open logs folder", { ns: "settings" }),
+        t("openLogsFolderError", "Failed to open logs folder", {
+          ns: "settings",
+        }),
       );
     }
   };
@@ -291,7 +301,9 @@ const LogViewer: React.FC = () => {
         <Select
           value={selectedFile}
           onChange={setSelectedFile}
-          placeholder={t("selectLogFile", "Select log file", { ns: "settings" })}
+          placeholder={t("selectLogFile", "Select log file", {
+            ns: "settings",
+          })}
           className="min-w-[300px]"
           size="large"
           options={logFiles.map((file) => ({
@@ -309,8 +321,12 @@ const LogViewer: React.FC = () => {
           <Tooltip
             title={
               autoRefresh
-                ? t("disableAutoRefresh", "Disable auto-refresh", { ns: "settings" })
-                : t("enableAutoRefresh", "Enable auto-refresh", { ns: "settings" })
+                ? t("disableAutoRefresh", "Disable auto-refresh", {
+                  ns: "settings",
+                })
+                : t("enableAutoRefresh", "Enable auto-refresh", {
+                  ns: "settings",
+                })
             }
           >
             <Button
@@ -342,7 +358,9 @@ const LogViewer: React.FC = () => {
           </Button>
 
           <Popconfirm
-            title={t("confirmClearLogs", "Clear all log files?", { ns: "settings" })}
+            title={t("confirmClearLogs", "Clear all log files?", {
+              ns: "settings",
+            })}
             onConfirm={handleClearLogs}
             okText={t("confirm", "Confirm", { ns: "common" })}
             cancelText={t("cancel", "Cancel", { ns: "common" })}
@@ -362,11 +380,14 @@ const LogViewer: React.FC = () => {
       <div className="relative">
         {(loading || workerLoading) && logLines.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-800/80 z-10 rounded-xl">
-            <Spin fullscreen tip={workerLoading ? "Processing..." : "Loading..."} />
+            <Spin
+              fullscreen
+              tip={workerLoading ? "Processing..." : "Loading..."}
+            />
           </div>
         )}
 
-        <div className="max-h-[420px] rounded-xl bg-slate-900 overflow-hidden">
+        <div className="!max-h-[350px] rounded-xl bg-slate-900 overflow-hidden">
           {logLines.length > 0 ? (
             <List<{ lines: string[] }>
               listRef={listRef}
@@ -382,7 +403,9 @@ const LogViewer: React.FC = () => {
           ) : (
             <div className="h-full flex items-center justify-center">
               <Empty
-                description={t("noLogs", "No logs available", { ns: "settings" })}
+                description={t("noLogs", "No logs available", {
+                  ns: "settings",
+                })}
                 className="[&_.ant-empty-description]:!text-slate-400"
               />
             </div>
@@ -428,10 +451,14 @@ const ApiKeysConfig: React.FC = () => {
         skillsmpKey,
       );
       setSaved(true);
-      message.success(t("apiKeySaved", "API Key saved successfully", { ns: "settings" }));
+      message.success(
+        t("apiKeySaved", "API Key saved successfully", { ns: "settings" }),
+      );
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
-      message.error(t("apiKeySaveError", "Failed to save API Key", { ns: "settings" }));
+      message.error(
+        t("apiKeySaveError", "Failed to save API Key", { ns: "settings" }),
+      );
     } finally {
       setLoading(false);
     }
@@ -475,7 +502,9 @@ const ApiKeysConfig: React.FC = () => {
             size="large"
             className="!rounded-xl"
           >
-            {saved ? t("saved", "Saved", { ns: "common" }) : t("save", "Save", { ns: "common" })}
+            {saved
+              ? t("saved", "Saved", { ns: "common" })
+              : t("save", "Save", { ns: "common" })}
           </Button>
         </div>
       </SettingSection>
@@ -552,6 +581,71 @@ const ShortcutSettings: React.FC = () => {
   );
 };
 
+// 主题设置组件
+const ThemeSettings: React.FC = () => {
+  const { t } = useTranslation();
+  const { mode, isDark, setThemeMode } = useTheme();
+
+  const themeOptions = [
+    {
+      value: "light",
+      label: t("theme.light", "Light", { ns: "settings" }),
+      icon: <SunOutlined />,
+      description: t("theme.lightDesc", "Always use light theme", {
+        ns: "settings",
+      }),
+    },
+    {
+      value: "dark",
+      label: t("theme.dark", "Dark", { ns: "settings" }),
+      icon: <MoonOutlined />,
+      description: t("theme.darkDesc", "Always use dark theme", {
+        ns: "settings",
+      }),
+    },
+    {
+      value: "auto",
+      label: t("theme.auto", "Auto", { ns: "settings" }),
+      icon: <DesktopOutlined />,
+      description: t("theme.autoDesc", "Follow system preference", {
+        ns: "settings",
+      }),
+    },
+  ];
+
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+        {isDark ? (
+          <MoonOutlined className="text-sm" />
+        ) : (
+          <SunOutlined className="text-sm" />
+        )}
+        <span className="text-sm">
+          {t("theme", "Theme", { ns: "settings" })}
+        </span>
+      </div>
+      <Select
+        value={mode}
+        onChange={(value) => setThemeMode(value as ThemeMode)}
+        className="w-[100px]"
+        size="small"
+        variant="borderless"
+        popupMatchSelectWidth={false}
+        options={themeOptions.map((option) => ({
+          value: option.value,
+          label: (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{option.icon}</span>
+              <span className="text-sm">{option.label}</span>
+            </div>
+          ),
+        }))}
+      />
+    </div>
+  );
+};
+
 // 悬浮窗设置组件
 const FloatWidgetSettings: React.FC = () => {
   const { t } = useTranslation();
@@ -603,7 +697,9 @@ const FloatWidgetSettings: React.FC = () => {
             {t("enableFloatWidget", "Enable Float Widget", { ns: "settings" })}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {t("floatWidgetHint", "Show a floating widget on desktop", { ns: "settings" })}
+            {t("floatWidgetHint", "Show a floating widget on desktop", {
+              ns: "settings",
+            })}
           </p>
         </div>
         <Switch
@@ -624,10 +720,14 @@ const QuickActionsTab: React.FC = () => {
   const handleOpenDevTools = async () => {
     try {
       await appService.openDevTools();
-      message.success(t("devToolsOpened", "Developer tools opened", { ns: "settings" }));
+      message.success(
+        t("devToolsOpened", "Developer tools opened", { ns: "settings" }),
+      );
     } catch (e) {
       message.error(
-        t("devToolsError", "Failed to open developer tools", { ns: "settings" }),
+        t("devToolsError", "Failed to open developer tools", {
+          ns: "settings",
+        }),
       );
     }
   };
@@ -636,7 +736,9 @@ const QuickActionsTab: React.FC = () => {
     try {
       await appService.relaunch();
     } catch (e) {
-      message.error(t("relaunchError", "Failed to relaunch", { ns: "settings" }));
+      message.error(
+        t("relaunchError", "Failed to relaunch", { ns: "settings" }),
+      );
     }
   };
 
@@ -653,7 +755,9 @@ const QuickActionsTab: React.FC = () => {
       key: "devTools",
       icon: <CodeOutlined />,
       label: t("openDevTools", "打开开发者工具", { ns: "settings" }),
-      description: t("openDevToolsDesc", "打开 Chromium DevTools 进行调试", { ns: "settings" }),
+      description: t("openDevToolsDesc", "打开 Chromium DevTools 进行调试", {
+        ns: "settings",
+      }),
       onClick: handleOpenDevTools,
       type: "primary" as const,
     },
@@ -664,13 +768,19 @@ const QuickActionsTab: React.FC = () => {
       description: t("relaunchDesc", "完全重启应用程序", { ns: "settings" }),
       onClick: handleRelaunch,
       confirm: true,
-      confirmTitle: t("confirmRelaunch", "确定要重启应用吗？", { ns: "settings" }),
+      confirmTitle: t("confirmRelaunch", "确定要重启应用吗？", {
+        ns: "settings",
+      }),
     },
     {
       key: "clearStorage",
       icon: <DeleteOutlined />,
       label: t("clearStorage", "清除存储", { ns: "settings" }),
-      description: t("clearStorageDesc", "清除 localStorage 和 sessionStorage", { ns: "settings" }),
+      description: t(
+        "clearStorageDesc",
+        "清除 localStorage 和 sessionStorage",
+        { ns: "settings" },
+      ),
       onClick: handleClearStorage,
       danger: true,
     },
@@ -684,12 +794,14 @@ const QuickActionsTab: React.FC = () => {
           className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
         >
           <div className="flex items-center gap-4">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.type === "primary"
-              ? "bg-blue-500 text-white"
-              : action.danger
-                ? "bg-red-100 dark:bg-red-900/30 text-red-500"
-                : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-              }`}>
+            <div
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.type === "primary"
+                ? "bg-blue-500 text-white"
+                : action.danger
+                  ? "bg-red-100 dark:bg-red-900/30 text-red-500"
+                  : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                }`}
+            >
               {action.icon}
             </div>
             <div>
@@ -735,7 +847,9 @@ const QuickActionsTab: React.FC = () => {
 // 系统信息 Tab 组件
 const SystemInfoTab: React.FC = () => {
   const { t } = useTranslation();
-  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
 
   const collectDebugInfo = useCallback(async () => {
@@ -765,7 +879,9 @@ const SystemInfoTab: React.FC = () => {
       });
     } catch (e) {
       message.error(
-        t("collectDebugInfoError", "Failed to collect debug info", { ns: "settings" }),
+        t("collectDebugInfoError", "Failed to collect debug info", {
+          ns: "settings",
+        }),
       );
     } finally {
       setLoading(false);
@@ -783,17 +899,47 @@ const SystemInfoTab: React.FC = () => {
     }
   };
 
-  const infoItems = debugInfo ? [
-    { label: t("appName", "应用名称", { ns: "settings" }), value: (debugInfo.app as AppInfo)?.name || "N/A" },
-    { label: t("version", "版本", { ns: "settings" }), value: (debugInfo.app as AppInfo)?.version || "N/A" },
-    { label: "Electron", value: (debugInfo.app as AppInfo)?.electron || "N/A" },
-    { label: "Node.js", value: (debugInfo.app as AppInfo)?.node || "N/A" },
-    { label: t("platform", "平台", { ns: "settings" }), value: (debugInfo.app as AppInfo)?.platform || "N/A" },
-    { label: t("architecture", "架构", { ns: "settings" }), value: (debugInfo.app as AppInfo)?.arch || "N/A" },
-    { label: t("userDataPath", "用户数据路径", { ns: "settings" }), value: debugInfo.userDataPath as string || "N/A", fullWidth: true },
-    { label: t("apiStatus", "API 状态", { ns: "settings" }), value: (debugInfo.apiStatus as ApiStatus)?.status === "running" ? t("running", "运行中", { ns: "settings" }) : t("stopped", "已停止", { ns: "settings" }) },
-    { label: t("apiPort", "API 端口", { ns: "settings" }), value: (debugInfo.apiStatus as ApiStatus)?.port || "N/A" },
-  ] : [];
+  const infoItems = debugInfo
+    ? [
+      {
+        label: t("appName", "应用名称", { ns: "settings" }),
+        value: (debugInfo.app as AppInfo)?.name || "N/A",
+      },
+      {
+        label: t("version", "版本", { ns: "settings" }),
+        value: (debugInfo.app as AppInfo)?.version || "N/A",
+      },
+      {
+        label: "Electron",
+        value: (debugInfo.app as AppInfo)?.electron || "N/A",
+      },
+      { label: "Node.js", value: (debugInfo.app as AppInfo)?.node || "N/A" },
+      {
+        label: t("platform", "平台", { ns: "settings" }),
+        value: (debugInfo.app as AppInfo)?.platform || "N/A",
+      },
+      {
+        label: t("architecture", "架构", { ns: "settings" }),
+        value: (debugInfo.app as AppInfo)?.arch || "N/A",
+      },
+      {
+        label: t("userDataPath", "用户数据路径", { ns: "settings" }),
+        value: (debugInfo.userDataPath as string) || "N/A",
+        fullWidth: true,
+      },
+      {
+        label: t("apiStatus", "API 状态", { ns: "settings" }),
+        value:
+          (debugInfo.apiStatus as ApiStatus)?.status === "running"
+            ? t("running", "运行中", { ns: "settings" })
+            : t("stopped", "已停止", { ns: "settings" }),
+      },
+      {
+        label: t("apiPort", "API 端口", { ns: "settings" }),
+        value: (debugInfo.apiStatus as ApiStatus)?.port || "N/A",
+      },
+    ]
+    : [];
 
   return (
     <div className="space-y-4">
@@ -853,14 +999,24 @@ const PerformanceMonitorTab: React.FC = () => {
   });
 
   useEffect(() => {
-    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
-    const loadTime = navigation ? navigation.loadEventEnd - navigation.startTime || 0 : performance.now();
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number } }).memory;
+    const navigation = performance.getEntriesByType(
+      "navigation",
+    )[0] as PerformanceNavigationTiming;
+    const loadTime = navigation
+      ? navigation.loadEventEnd - navigation.startTime || 0
+      : performance.now();
+    const memory = (
+      performance as unknown as {
+        memory?: { usedJSHeapSize: number; totalJSHeapSize: number };
+      }
+    ).memory;
 
     setMetrics({
       pageLoadTime: Math.round(loadTime),
       memoryUsed: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
-      memoryTotal: memory ? Math.round(memory.totalJSHeapSize / 1024 / 1024) : 0,
+      memoryTotal: memory
+        ? Math.round(memory.totalJSHeapSize / 1024 / 1024)
+        : 0,
       cpuCores: navigator.hardwareConcurrency || 0,
       networkStatus: navigator.onLine,
       language: navigator.language,
@@ -876,7 +1032,9 @@ const PerformanceMonitorTab: React.FC = () => {
     },
     {
       title: t("networkStatus", "网络状态", { ns: "settings" }),
-      value: metrics.networkStatus ? t("online", "在线", { ns: "settings" }) : t("offline", "离线", { ns: "settings" }),
+      value: metrics.networkStatus
+        ? t("online", "在线", { ns: "settings" })
+        : t("offline", "离线", { ns: "settings" }),
       icon: <GlobalOutlined />,
       color: metrics.networkStatus ? "#22c55e" : "#ef4444",
     },
@@ -912,7 +1070,7 @@ const PerformanceMonitorTab: React.FC = () => {
                     {card.icon}
                   </span>
                 }
-                valueStyle={{ color: card.color, fontSize: "24px" }}
+                styles={{ content: { color: card.color, fontSize: "24px" } }}
               />
             </Card>
           </Col>
@@ -943,10 +1101,12 @@ const PerformanceMonitorTab: React.FC = () => {
             />
             <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
               <span>
-                {t("used", "已使用", { ns: "settings" })}: {metrics.memoryUsed} MB
+                {t("used", "已使用", { ns: "settings" })}: {metrics.memoryUsed}{" "}
+                MB
               </span>
               <span>
-                {t("total", "总计", { ns: "settings" })}: {metrics.memoryTotal} MB
+                {t("total", "总计", { ns: "settings" })}: {metrics.memoryTotal}{" "}
+                MB
               </span>
             </div>
           </div>
@@ -961,9 +1121,21 @@ const PerformanceMonitorTab: React.FC = () => {
               {t("performanceTips", "性能提示", { ns: "settings" })}
             </div>
             <ul className="text-sm text-slate-500 dark:text-slate-400 mt-2 space-y-1 list-disc list-inside">
-              <li>{t("performanceTip1", "定期清理日志文件可以释放磁盘空间", { ns: "settings" })}</li>
-              <li>{t("performanceTip2", "关闭不用的功能可以减少内存占用", { ns: "settings" })}</li>
-              <li>{t("performanceTip3", "使用开发者工具可以分析性能瓶颈", { ns: "settings" })}</li>
+              <li>
+                {t("performanceTip1", "定期清理日志文件可以释放磁盘空间", {
+                  ns: "settings",
+                })}
+              </li>
+              <li>
+                {t("performanceTip2", "关闭不用的功能可以减少内存占用", {
+                  ns: "settings",
+                })}
+              </li>
+              <li>
+                {t("performanceTip3", "使用开发者工具可以分析性能瓶颈", {
+                  ns: "settings",
+                })}
+              </li>
             </ul>
           </div>
         </div>
@@ -1011,11 +1183,7 @@ const DebugTools: React.FC = () => {
   ];
 
   return (
-    <Tabs
-      activeKey={activeTab}
-      onChange={setActiveTab}
-      items={tabItems}
-    />
+    <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
   );
 };
 
@@ -1029,9 +1197,11 @@ const Settings: React.FC = () => {
         <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center">
           <SettingOutlined className="text-white text-xs" />
         </div>
-        <span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("title", "设置", { ns: "settings" })}</span>
+        <span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+          {t("title", "设置", { ns: "settings" })}
+        </span>
       </div>
-    )
+    );
   }, [t]);
 
   // 设置标题栏
@@ -1119,7 +1289,9 @@ const Settings: React.FC = () => {
     try {
       await appService.openPath(userDataPath);
     } catch (e) {
-      message.error(t("openPathError", "Failed to open path", { ns: "settings" }));
+      message.error(
+        t("openPathError", "Failed to open path", { ns: "settings" }),
+      );
     }
   };
 
@@ -1132,7 +1304,9 @@ const Settings: React.FC = () => {
         message.info(result.message);
       }
     } catch (e) {
-      message.error(t("checkUpdateError", "Failed to check updates", { ns: "settings" }));
+      message.error(
+        t("checkUpdateError", "Failed to check updates", { ns: "settings" }),
+      );
     }
   };
 
@@ -1204,7 +1378,9 @@ const Settings: React.FC = () => {
 
           <div className="space-y-6">
             <SettingSection
-              title={t("userDataPath", "User Data Directory", { ns: "settings" })}
+              title={t("userDataPath", "User Data Directory", {
+                ns: "settings",
+              })}
             >
               <div className="space-y-2">
                 <Space.Compact style={{ width: "100%" }}>
@@ -1235,19 +1411,36 @@ const Settings: React.FC = () => {
             </SettingSection>
 
             <SettingSection
-              title={t("language", "Language", { ns: "settings" })}
-              icon={<GlobalOutlined />}
+              title={t("preferences", "Preferences", { ns: "settings" })}
+              icon={<SettingOutlined />}
             >
-              <Radio.Group
-                value={i18n.language}
-                onChange={(e) => i18n.changeLanguage(e.target.value)}
-                optionType="button"
-                buttonStyle="solid"
-                size="large"
-              >
-                <Radio.Button value="zh">中文</Radio.Button>
-                <Radio.Button value="en">English</Radio.Button>
-              </Radio.Group>
+              <ThemeSettings />
+              <div className="flex items-center justify-between py-2 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                  <GlobalOutlined className="text-sm" />
+                  <span className="text-sm">
+                    {t("language", "Language", { ns: "settings" })}
+                  </span>
+                </div>
+                <Select
+                  value={i18n.language}
+                  onChange={(value) => i18n.changeLanguage(value)}
+                  className="w-[100px]"
+                  size="small"
+                  variant="borderless"
+                  popupMatchSelectWidth={false}
+                  options={[
+                    {
+                      value: "zh",
+                      label: <span className="text-sm">中文</span>,
+                    },
+                    {
+                      value: "en",
+                      label: <span className="text-sm">English</span>,
+                    },
+                  ]}
+                />
+              </div>
             </SettingSection>
 
             <FloatWidgetSettings />
@@ -1292,7 +1485,9 @@ const Settings: React.FC = () => {
           className="!border-0 !shadow-none !bg-transparent"
           loading={loading}
         >
-          <SettingSection title={t("apiService", "API Service", { ns: "settings" })}>
+          <SettingSection
+            title={t("apiService", "API Service", { ns: "settings" })}
+          >
             <Form form={form} layout="inline" className="w-full">
               <div className="flex items-center gap-4 flex-wrap w-full">
                 {/* 状态指示器 */}
@@ -1358,7 +1553,9 @@ const Settings: React.FC = () => {
                         {t("stop", "Stop", { ns: "settings" })}
                       </Button>
                       <Tooltip
-                        title={t("restartTip", "Apply port changes", { ns: "settings" })}
+                        title={t("restartTip", "Apply port changes", {
+                          ns: "settings",
+                        })}
                       >
                         <Button
                           icon={<ReloadOutlined />}
@@ -1394,7 +1591,9 @@ const Settings: React.FC = () => {
                           `http://localhost:${apiStatus.port}`,
                         );
                         message.success(
-                          t("copied", "Copied to clipboard", { ns: "settings" }),
+                          t("copied", "Copied to clipboard", {
+                            ns: "settings",
+                          }),
                         );
                       }}
                       className="!px-1"
