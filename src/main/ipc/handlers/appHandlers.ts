@@ -256,4 +256,19 @@ export function registerAppHandlers() {
 		storeManager.setConfig(key as any, value);
 		return true;
 	});
+
+	// 获取主题设置
+	ipcMain.handle("theme:get", () => {
+		return storeManager.getConfig("theme") || "auto";
+	});
+
+	// 设置主题
+	ipcMain.handle("theme:set", (_, themeMode: string) => {
+		storeManager.setConfig("theme", themeMode as "light" | "dark" | "auto");
+		// 广播主题变更到所有窗口
+		BrowserWindow.getAllWindows().forEach((win) => {
+			win.webContents.send("theme:on-change", themeMode);
+		});
+		return true;
+	});
 }
