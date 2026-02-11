@@ -3,6 +3,7 @@ import Chat from "./pages/Chat";
 import ErrorPage from "./pages/Error";
 import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
+import McpMarket from "./pages/McpMarket";
 import Models from "./pages/Models";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
@@ -37,6 +38,12 @@ export const router = createHashRouter([
 		element: <Skills />,
 		errorElement: <ErrorPage />,
 		handle: { title: "技能市场" },
+	},
+	{
+		path: "/mcp",
+		element: <McpMarket />,
+		errorElement: <ErrorPage />,
+		handle: { title: "MCP 市场" },
 	},
 	{
 		path: "/settings",
