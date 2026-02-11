@@ -63,6 +63,7 @@ import { McpConfig } from "../components/models/McpConfig";
 import { AboutSection } from "../components/settings/AboutSection";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { SearchSettings } from "../components/settings/SearchSettings";
+import { ShortcutSettings } from "../components/settings/ShortcutSettings";
 import { useLogWorker } from "../hooks/useLogWorker";
 import { type ThemeMode, useTheme } from "../hooks/useTheme";
 import { useTitle } from "../hooks/useTitle";
@@ -514,74 +515,6 @@ const ApiKeysConfig: React.FC = () => {
   );
 };
 
-// 快捷键设置组件
-const ShortcutSettings: React.FC = () => {
-  const { t } = useTranslation();
-  const [shortcuts, setShortcuts] = useState({
-    newChat: "CmdOrCtrl+N",
-    quickSearch: "CmdOrCtrl+K",
-    toggleSidebar: "CmdOrCtrl+B",
-    settings: "CmdOrCtrl+,",
-  });
-
-  const handleShortcutChange = (key: string, value: string) => {
-    setShortcuts((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const shortcutItems = [
-    {
-      key: "newChat",
-      label: t("shortcuts.newChat", "New Chat", { ns: "settings" }),
-      defaultValue: "CmdOrCtrl+N",
-    },
-    {
-      key: "quickSearch",
-      label: t("shortcuts.quickSearch", "Quick Search", { ns: "settings" }),
-      defaultValue: "CmdOrCtrl+K",
-    },
-    {
-      key: "toggleSidebar",
-      label: t("shortcuts.toggleSidebar", "Toggle Sidebar", { ns: "settings" }),
-      defaultValue: "CmdOrCtrl+B",
-    },
-    {
-      key: "settings",
-      label: t("shortcuts.settings", "Settings", { ns: "settings" }),
-      defaultValue: "CmdOrCtrl+,",
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <SettingSection
-        title={t("shortcuts", "Keyboard Shortcuts", { ns: "settings" })}
-        icon={<DesktopOutlined />}
-      >
-        <div className="space-y-4">
-          {shortcutItems.map((item) => (
-            <div key={item.key} className="flex items-center justify-between">
-              <span className="text-slate-700 dark:text-slate-300">
-                {item.label}
-              </span>
-              <Input
-                value={shortcuts[item.key as keyof typeof shortcuts]}
-                onChange={(e) => handleShortcutChange(item.key, e.target.value)}
-                className="!w-[200px] !rounded-xl"
-                placeholder={item.defaultValue}
-              />
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
-          {t(
-            "settings.shortcutsHint",
-            "Use CmdOrCtrl for cross-platform compatibility",
-          )}
-        </p>
-      </SettingSection>
-    </div>
-  );
-};
 
 // 主题设置组件
 const ThemeSettings: React.FC = () => {

@@ -13,6 +13,7 @@ import zhMcp from "./locales/zh/mcp.json";
 import zhMenu from "./locales/zh/menu.json";
 import zhModels from "./locales/zh/models.json";
 import zhSettings from "./locales/zh/settings.json";
+import zhShortcuts from "./locales/zh/shortcuts.json";
 import zhSkills from "./locales/zh/skills.json";
 import zhUser from "./locales/zh/user.json";
 import zhWindow from "./locales/zh/window.json";
@@ -27,6 +28,7 @@ import enMcp from "./locales/en/mcp.json";
 import enMenu from "./locales/en/menu.json";
 import enModels from "./locales/en/models.json";
 import enSettings from "./locales/en/settings.json";
+import enShortcuts from "./locales/en/shortcuts.json";
 import enSkills from "./locales/en/skills.json";
 import enUser from "./locales/en/user.json";
 import enWindow from "./locales/en/window.json";
@@ -43,6 +45,7 @@ const resources = {
 		menu: zhMenu,
 		models: zhModels,
 		settings: zhSettings,
+		shortcuts: zhShortcuts,
 		skills: zhSkills,
 		user: zhUser,
 		window: zhWindow,
@@ -58,6 +61,7 @@ const resources = {
 		menu: enMenu,
 		models: enModels,
 		settings: enSettings,
+		shortcuts: enShortcuts,
 		skills: enSkills,
 		user: enUser,
 		window: enWindow,
@@ -75,6 +79,7 @@ const allNamespaces = [
 	"menu",
 	"models",
 	"settings",
+	"shortcuts",
 	"skills",
 	"user",
 	"window",
