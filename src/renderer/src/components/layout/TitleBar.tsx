@@ -7,11 +7,33 @@ import {
 import { Tooltip } from "antd";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { useMatches } from "react-router-dom";
+import { type TitleContent, useTitleContext } from "../../hooks/useTitle";
 
 export const TitleBar: React.FC = () => {
 	const { t } = useTranslation();
 	const [isMaximized, setIsMaximized] = React.useState(false);
 	const [isMac, setIsMac] = React.useState(false);
+	const matches = useMatches();
+	const { title: dynamicTitle } = useTitleContext();
+
+	// 从路由获取标题
+	const routeTitle: TitleContent = React.useMemo(() => {
+		const lastMatch = matches[matches.length - 1];
+		if (lastMatch?.handle && typeof lastMatch.handle === "object") {
+			return (lastMatch.handle as { title?: TitleContent }).title;
+		}
+		return undefined;
+	}, [matches]);
+
+	// 优先使用动态标题，其次是路由标题
+	const displayTitle =
+		dynamicTitle || routeTitle || t("name", "Super Client", { ns: "app" });
+
+	// 判断是否为 React 元素
+	const isReactElement = React.useMemo(() => {
+		return React.isValidElement(displayTitle);
+	}, [displayTitle]);
 
 	React.useEffect(() => {
 		// 检测平台
@@ -48,18 +70,17 @@ export const TitleBar: React.FC = () => {
 
 	return (
 		<div
-			className="h-10 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 flex items-center justify-between select-none"
+			className="h-auto py-3 flex items-center justify-between select-none !bg-white dark:!bg-slate-800"
 			// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 			style={{ WebkitAppRegion: "drag" }}
 		>
 			{/* 左侧：应用标题和图标 */}
-			<div className={`flex items-center gap-2 ${isMac ? "px-20" : "px-4"}`}>
-				<div className="w-5 h-5 rounded-md bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-sm">
-					<span className="text-white font-bold text-xs">S</span>
-				</div>
-				<span className="text-slate-300 text-sm font-medium">
-					{t("app.name", "Super Client")}
-				</span>
+			<div className={`flex items-center gap-2 px-4 flex-row w-full justify-between`}>
+				{isReactElement ? (
+					displayTitle
+				) : (
+					<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{displayTitle as string}</span>
+				)}
 			</div>
 
 			{/* 右侧：窗口控制按钮 - macOS 隐藏，使用系统自带交通灯 */}
@@ -69,7 +90,7 @@ export const TitleBar: React.FC = () => {
 					// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 					style={{ WebkitAppRegion: "no-drag" }}
 				>
-					<Tooltip title={t("window.minimize", "最小化")} placement="bottom">
+					<Tooltip title={t("minimize", "最小化")} placement="bottom">
 						<button
 							type="button"
 							onClick={handleMinimize}
@@ -80,11 +101,7 @@ export const TitleBar: React.FC = () => {
 					</Tooltip>
 
 					<Tooltip
-						title={
-							isMaximized
-								? t("window.restore", "还原")
-								: t("window.maximize", "最大化")
-						}
+						title={isMaximized ? t("restore", "还原") : t("maximize", "最大化")}
 						placement="bottom"
 					>
 						<button
@@ -100,7 +117,7 @@ export const TitleBar: React.FC = () => {
 						</button>
 					</Tooltip>
 
-					<Tooltip title={t("window.close", "关闭")} placement="bottom">
+					<Tooltip title={t("close", "关闭", { ns: "window" })} placement="bottom">
 						<button
 							type="button"
 							onClick={handleClose}

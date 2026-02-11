@@ -6,6 +6,7 @@ import {
 } from "@ant-design/icons";
 import { Dropdown, Layout, type MenuProps, Tooltip } from "antd";
 import type React from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
@@ -16,7 +17,9 @@ import {
 	useUserStore,
 } from "../../stores/userStore";
 import type { MenuItemConfig } from "../../types/menu";
+import { AboutModal } from "../AboutModal";
 import { TitleBar } from "./TitleBar";
+import { appService, type AppInfo } from "../../services/appService";
 
 const { Sider, Content } = Layout;
 
@@ -74,6 +77,30 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	// 用户状态
 	const { user, isLoggedIn, logout } = useUserStore();
 
+	// 关于弹窗状态
+	const [aboutModalOpen, setAboutModalOpen] = useState(false);
+	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+
+	// 获取应用信息
+	useEffect(() => {
+		appService.getInfo().then((info) => {
+			setAppInfo(info);
+		});
+	}, []);
+
+	// 监听显示关于弹窗事件（从系统托盘菜单触发）
+	useEffect(() => {
+		const handleShowAboutModal = () => {
+			setAboutModalOpen(true);
+		};
+
+		window.electron.ipc.on("show-about-modal", handleShowAboutModal);
+
+		return () => {
+			window.electron.ipc.off("show-about-modal", handleShowAboutModal);
+		};
+	}, []);
+
 	// 过滤出已启用的菜单项（排除设置项，设置项固定显示在底部）
 	const enabledItems = menuItems.filter(
 		(item) => item.enabled && item.id !== "settings",
@@ -86,10 +113,6 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const selectedKey =
 		enabledItems.find((item) => location.pathname.startsWith(item.path))?.id ||
 		"";
-
-	// 判断是否为 chat 路由
-	const isChatRoute =
-		location.pathname === "/" || location.pathname.startsWith("/chat");
 
 	// 处理菜单点击
 	const handleMenuClick = (item: MenuItemConfig) => {
@@ -107,7 +130,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const contextMenuItems: MenuProps["items"] = [
 		{
 			key: "username",
-			label: user?.name || t("user.guest", "访客"),
+			label: user?.name || t("guest", "访客", { ns: "user" }),
 			disabled: true,
 		},
 		{
@@ -115,7 +138,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 		},
 		{
 			key: "logout",
-			label: t("user.logout", "退出登录"),
+			label: t("logout", "退出登录", { ns: "user" }),
 			onClick: handleLogout,
 		},
 	];
@@ -145,97 +168,104 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 
 	return (
 		<Layout className="h-full bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-			{/* 自定义标题栏 - 只在右侧顶部 */}
-			<TitleBar />
 
+			{/* 左侧边栏 - 全高 */}
+			<Sider
+				width={80}
+				className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:!from-slate-950 dark:!via-slate-900 dark:!to-slate-950 !border-r !border-slate-700/50 shadow-2xl h-full"
+			>
+				<div className="flex flex-col h-full pt-[30px]">
+					{/* Logo Area - 用户头像 */}
+					<div className="h-16 flex items-center justify-center border-b border-slate-700/50">
+						<Dropdown
+							menu={{ items: contextMenuItems }}
+							placement="bottomLeft"
+							trigger={["contextMenu"]}
+						>
+							<div>
+								<Tooltip
+									title={user?.name || t("name", "Super Client", { ns: "app" })}
+									placement="right"
+									mouseEnterDelay={0.5}
+								>
+									<UserAvatar />
+								</Tooltip>
+							</div>
+						</Dropdown>
+					</div>
+
+					{/* Menu - 仅图标 */}
+					<div className="mt-4 px-2 flex flex-col gap-1">
+						{enabledItems.map((item) => {
+							const isSelected = selectedKey === item.id;
+							return (
+								<Tooltip
+									key={item.id}
+									title={t(item.label, { ns: "menu" })}
+									placement="right"
+									mouseEnterDelay={0.5}
+								>
+									<button
+										type="button"
+										onClick={() => handleMenuClick(item)}
+										className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
+									>
+										<span
+											className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSelected
+												? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
+												: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
+												}`}
+										>
+											{renderMenuItemIcon(item)}
+										</span>
+									</button>
+								</Tooltip>
+							);
+						})}
+					</div>
+
+					{/* Settings Button - 固定在底部 */}
+					<div className="mt-auto px-2 pb-4 pt-4 border-t border-slate-700/50">
+						<Tooltip
+							title={t("settings", { ns: "menu" })}
+							placement="right"
+							mouseEnterDelay={0.5}
+						>
+							<button
+								type="button"
+								onClick={() => navigate("/settings")}
+								className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
+							>
+								<span
+									className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSettingsSelected
+										? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
+										: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
+										}`}
+								>
+									<SettingOutlined className="text-xl" />
+								</span>
+							</button>
+						</Tooltip>
+					</div>
+				</div>
+			</Sider>
 			{/* 右侧内容区域 */}
 			<Layout className="h-full flex flex-col">
+				{/* 自定义标题栏 - 只在右侧顶部 */}
+				<TitleBar />
 
-				{/* 左侧边栏 - 全高 */}
-				<Sider
-					width={80}
-					className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:!from-slate-950 dark:!via-slate-900 dark:!to-slate-950 !border-r !border-slate-700/50 shadow-2xl h-full"
-				>
-					<div className="flex flex-col h-full">
-						{/* Logo Area - 用户头像 */}
-						<div className="h-16 flex items-center justify-center border-b border-slate-700/50">
-							<Dropdown
-								menu={{ items: contextMenuItems }}
-								placement="bottomLeft"
-								trigger={["contextMenu"]}
-							>
-								<div>
-									<Tooltip
-										title={user?.name || t("app.name", "Super Client")}
-										placement="right"
-										mouseEnterDelay={0.5}
-									>
-										<UserAvatar />
-									</Tooltip>
-								</div>
-							</Dropdown>
-						</div>
-
-						{/* Menu - 仅图标 */}
-						<div className="mt-4 px-2 flex flex-col gap-1">
-							{enabledItems.map((item) => {
-								const isSelected = selectedKey === item.id;
-								return (
-									<Tooltip
-										key={item.id}
-										title={t(item.label)}
-										placement="right"
-										mouseEnterDelay={0.5}
-									>
-										<button
-											type="button"
-											onClick={() => handleMenuClick(item)}
-											className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
-										>
-											<span
-												className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSelected
-													? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-													: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
-													}`}
-											>
-												{renderMenuItemIcon(item)}
-											</span>
-										</button>
-									</Tooltip>
-								);
-							})}
-						</div>
-
-						{/* Settings Button - 固定在底部 */}
-						<div className="mt-auto px-2 pb-4 pt-4 border-t border-slate-700/50">
-							<Tooltip
-								title={t("menu.settings")}
-								placement="right"
-								mouseEnterDelay={0.5}
-							>
-								<button
-									type="button"
-									onClick={() => navigate("/settings")}
-									className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
-								>
-									<span
-										className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSettingsSelected
-											? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-											: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
-											}`}
-									>
-										<SettingOutlined className="text-xl" />
-									</span>
-								</button>
-							</Tooltip>
-						</div>
-					</div>
-				</Sider>
 				{/* 内容区域 */}
 				<Content className="flex-1 overflow-auto">
-					<div className={cn("h-full", !isChatRoute && "p-6")}>{children}</div>
+					<div className={cn("h-full", "animate-fade-in", "!bg-white", "dark:!bg-slate-800")}>{children}</div>
 				</Content>
 			</Layout>
+
+			{/* 关于弹窗 */}
+			<AboutModal
+				open={aboutModalOpen}
+				onClose={() => setAboutModalOpen(false)}
+				appInfo={appInfo}
+			/>
 		</Layout>
 	);
 };
