@@ -3,7 +3,9 @@
  */
 
 export * from "./electron";
-export * from "./mcp";
+export type { McpServer, McpMarketItem, McpMarketSearchResult } from "./mcp";
+export type { McpServerType, McpTransportType, McpTool } from "./electron";
+export type { BuiltinMcpDefinition } from "./mcp";
 export * from "./models";
 export * from "./skills";
 export * from "./menu";
