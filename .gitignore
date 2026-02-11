@@ -27,3 +27,4 @@ release
 *.sw?
 .userdata/*
 docs/.vitepress/cache
+tsconfig.*.tsbuildinfo
