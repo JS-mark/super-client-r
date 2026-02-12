@@ -18,52 +18,23 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { List, type ListImperativeAPI } from "react-window";
-import { useLogWorker } from "../../hooks/useLogWorker";
+import { LazyLog, ScrollFollow } from "@melloware/react-logviewer";
 import { type LogFileInfo, appService } from "../../services/appService";
 import { ErrorState } from "./SettingSection";
+import "@melloware/react-logviewer/style.css";
 
 const AUTO_REFRESH_INTERVAL = 5000;
 const LOG_TAIL_LINES = 100;
-
-// 单行日志组件 - 用于虚拟滚动
-interface LogLineRowProps {
-	lines: string[];
-}
-
-const LogLine = ({
-	index,
-	style,
-	lines,
-}: {
-	index: number;
-	style: React.CSSProperties;
-	ariaAttributes: {
-		"aria-posinset": number;
-		"aria-setsize": number;
-		role: "listitem";
-	};
-} & LogLineRowProps) => (
-	<div
-		style={{ ...style, height: 20 }}
-		className="px-4 text-slate-100 text-xs font-mono leading-5 whitespace-pre-wrap break-all overflow-hidden"
-	>
-		{lines[index]}
-	</div>
-);
 
 export const LogViewer: React.FC = () => {
 	const { t } = useTranslation();
 	const [logFiles, setLogFiles] = useState<LogFileInfo[]>([]);
 	const [selectedFile, setSelectedFile] = useState<string>("");
-	const [logLines, setLogLines] = useState<string[]>([]);
+	const [logContent, setLogContent] = useState<string>("");
 	const [loading, setLoading] = useState(false);
 	const [autoRefresh, setAutoRefresh] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const listRef = useRef<ListImperativeAPI>(null);
 	const refreshTimerRef = useRef<number | null>(null);
-
-	const { parseLogs, isLoading: workerLoading } = useLogWorker();
 
 	const loadLogFiles = useCallback(async () => {
 		try {
@@ -86,20 +57,14 @@ export const LogViewer: React.FC = () => {
 		setLoading(true);
 		try {
 			const rawContent = await appService.getLogs(selectedFile, LOG_TAIL_LINES);
-			const { lines } = await parseLogs(rawContent);
-
-			setLogLines(lines);
+			setLogContent(rawContent);
 			setError(null);
-
-			requestAnimationFrame(() => {
-				listRef.current?.scrollToRow({ index: lines.length - 1, align: "end" });
-			});
 		} catch {
 			setError(t("loadLogsError", "Failed to load logs", { ns: "settings" }));
 		} finally {
 			setLoading(false);
 		}
-	}, [selectedFile, t, parseLogs]);
+	}, [selectedFile, t]);
 
 	useEffect(() => {
 		loadLogFiles();
@@ -132,7 +97,7 @@ export const LogViewer: React.FC = () => {
 			message.success(
 				t("clearLogsSuccess", "Logs cleared", { ns: "settings" }),
 			);
-			setLogLines([]);
+			setLogContent("");
 			await loadLogFiles();
 		} catch (e) {
 			message.error(
@@ -198,11 +163,11 @@ export const LogViewer: React.FC = () => {
 						title={
 							autoRefresh
 								? t("disableAutoRefresh", "Disable auto-refresh", {
-									ns: "settings",
-								})
+										ns: "settings",
+									})
 								: t("enableAutoRefresh", "Enable auto-refresh", {
-									ns: "settings",
-								})
+										ns: "settings",
+									})
 						}
 					>
 						<Button
@@ -254,30 +219,35 @@ export const LogViewer: React.FC = () => {
 			</div>
 
 			<div className="relative">
-				{(loading || workerLoading) && logLines.length === 0 && (
+				{loading && !logContent && (
 					<div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-slate-800/80 z-10 rounded-xl">
-						<Spin
-							fullscreen
-							tip={workerLoading ? "Processing..." : "Loading..."}
-						/>
+						<Spin tip="Loading..." />
 					</div>
 				)}
 
-				<div className="!max-h-[350px] rounded-xl bg-slate-900 overflow-hidden">
-					{logLines.length > 0 ? (
-						<List<{ lines: string[] }>
-							listRef={listRef}
-							defaultHeight={500}
-							rowCount={logLines.length}
-							rowHeight={20}
-							rowProps={{ lines: logLines }}
-							rowComponent={LogLine}
-							overscanCount={5}
-							className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
-							style={{ height: 500 }}
+				<div className="rounded-xl overflow-hidden" style={{ height: 500 }}>
+					{logContent ? (
+						<ScrollFollow
+							startFollowing={autoRefresh}
+							render={({ follow, onScroll }) => (
+								<LazyLog
+									text={logContent}
+									follow={follow}
+									onScroll={onScroll}
+									style={{ height: 500 }}
+									containerStyle={{
+										backgroundColor: "#0f172a",
+										fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+										fontSize: 12,
+									}}
+									lineClassName="text-slate-100"
+									highlight={[]}
+									selectableLines
+								/>
+							)}
 						/>
 					) : (
-						<div className="h-full flex items-center justify-center">
+						<div className="h-full flex items-center justify-center bg-slate-900">
 							<Empty
 								description={t("noLogs", "No logs available", {
 									ns: "settings",
