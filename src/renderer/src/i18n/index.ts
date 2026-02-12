@@ -17,6 +17,7 @@ import zhSettings from "./locales/zh/settings.json";
 import zhShortcuts from "./locales/zh/shortcuts.json";
 import zhSkills from "./locales/zh/skills.json";
 import zhUser from "./locales/zh/user.json";
+import zhLogviewer from "./locales/zh/logviewer.json";
 import zhWindow from "./locales/zh/window.json";
 import zhWorkspaces from "./locales/zh/workspaces.json";
 
@@ -34,6 +35,7 @@ import enSettings from "./locales/en/settings.json";
 import enShortcuts from "./locales/en/shortcuts.json";
 import enSkills from "./locales/en/skills.json";
 import enUser from "./locales/en/user.json";
+import enLogviewer from "./locales/en/logviewer.json";
 import enWorkspaces from "./locales/en/workspaces.json";
 import enWindow from "./locales/en/window.json";
 
@@ -46,6 +48,7 @@ const resources = {
 		common: zhCommon,
 		error: zhError,
 		home: zhHome,
+		logviewer: zhLogviewer,
 		mcp: zhMcp,
 		menu: zhMenu,
 		models: zhModels,
@@ -64,6 +67,7 @@ const resources = {
 		common: enCommon,
 		error: enError,
 		home: enHome,
+		logviewer: enLogviewer,
 		mcp: enMcp,
 		menu: enMenu,
 		models: enModels,
@@ -84,6 +88,7 @@ const allNamespaces = [
 	"common",
 	"error",
 	"home",
+	"logviewer",
 	"mcp",
 	"menu",
 	"models",
