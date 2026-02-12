@@ -197,7 +197,8 @@ function createLogViewerWindow(): void {
 		minWidth: 800,
 		minHeight: 500,
 		frame: false,
-		titleBarStyle: "hidden",
+		titleBarStyle: "hiddenInset",
+		trafficLightPosition: { x: -20, y: -20 },
 		icon: getAppIconPath(),
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),

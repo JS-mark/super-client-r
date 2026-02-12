@@ -1,13 +1,16 @@
 /**
  * LogDetailDrawer - Slide-out drawer showing full log entry details
+ * Clean, well-organized layout with visual hierarchy
  */
 
 import { CopyOutlined } from "@ant-design/icons";
-import { Button, Descriptions, Drawer, message, Tag } from "antd";
+import { Button, Drawer, Tag, message, theme } from "antd";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLogViewerStore } from "../../stores/logViewerStore";
+
+const { useToken } = theme;
 
 const LEVEL_COLORS: Record<string, string> = {
 	DEBUG: "default",
@@ -18,6 +21,7 @@ const LEVEL_COLORS: Record<string, string> = {
 
 export const LogDetailDrawer: React.FC = () => {
 	const { t } = useTranslation("logviewer");
+	const { token } = useToken();
 	const record = useLogViewerStore((s) => s.selectedRecord);
 	const detailOpen = useLogViewerStore((s) => s.detailOpen);
 	const setDetailOpen = useLogViewerStore((s) => s.setDetailOpen);
@@ -60,98 +64,196 @@ export const LogDetailDrawer: React.FC = () => {
 
 	return (
 		<Drawer
-			title={t("detail.title")}
+			title={
+				<div className="flex items-center gap-2">
+					<Tag
+						color={LEVEL_COLORS[record.level] || "default"}
+						className="!rounded-full !px-2.5 !m-0"
+						bordered={false}
+					>
+						{record.level}
+					</Tag>
+					<span style={{ color: token.colorText, fontWeight: 600, fontSize: 14 }}>
+						{t("detail.title")}
+					</span>
+				</div>
+			}
 			open={detailOpen}
 			onClose={handleClose}
-			width={520}
+			width={540}
 			extra={
 				<Button
 					icon={<CopyOutlined />}
 					size="small"
 					onClick={handleCopyAll}
+					type="text"
 				>
 					{t("detail.copyAll")}
 				</Button>
 			}
 		>
-			<Descriptions column={1} size="small" bordered>
-				<Descriptions.Item label={t("detail.timestamp")}>
-					<span className="font-mono text-xs">{record.timestamp}</span>
-				</Descriptions.Item>
-				<Descriptions.Item label={t("detail.level")}>
-					<Tag color={LEVEL_COLORS[record.level] || "default"}>
-						{record.level}
-					</Tag>
-				</Descriptions.Item>
-				<Descriptions.Item label={t("detail.process")}>
-					<Tag
-						color={record.process === "main" ? "geekblue" : "purple"}
-					>
-						{record.process}
-					</Tag>
-				</Descriptions.Item>
-				<Descriptions.Item label={t("detail.module")}>
-					{record.module || "-"}
-				</Descriptions.Item>
-			</Descriptions>
-
-			<div className="mt-4 space-y-4">
-				{/* Message */}
-				<div>
-					<div className="text-xs font-medium text-gray-500 mb-1">
-						{t("detail.message")}
-					</div>
-					<div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-sm break-all whitespace-pre-wrap">
-						{record.message}
-					</div>
-				</div>
-
-				{/* Metadata */}
-				{parsedMeta && (
-					<div>
-						<div className="text-xs font-medium text-gray-500 mb-1">
-							{t("detail.metadata")}
-						</div>
-						<pre className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-xs overflow-auto max-h-60 font-mono">
-							{parsedMeta}
-						</pre>
-					</div>
-				)}
-
-				{/* Error */}
-				{record.error_message && (
-					<div>
-						<div className="text-xs font-medium text-red-500 mb-1">
-							{t("detail.errorMessage")}
-						</div>
-						<div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-sm text-red-600 dark:text-red-400 break-all">
-							{record.error_message}
-						</div>
-					</div>
-				)}
-
-				{/* Error Stack */}
-				{record.error_stack && (
-					<div>
-						<div className="text-xs font-medium text-red-500 mb-1">
-							{t("detail.errorStack")}
-						</div>
-						<pre className="bg-gray-900 rounded-lg p-3 text-xs text-green-400 overflow-auto max-h-80 font-mono whitespace-pre-wrap">
-							{record.error_stack}
-						</pre>
-					</div>
-				)}
-
-				{/* Session ID */}
+			{/* Metadata header grid */}
+			<div
+				className="grid grid-cols-2 gap-3 p-3 rounded-xl mb-4"
+				style={{ background: token.colorFillQuaternary }}
+			>
+				<MetaField
+					label={t("detail.timestamp")}
+					value={
+						<span className="font-mono text-xs" style={{ color: token.colorText }}>
+							{record.timestamp}
+						</span>
+					}
+					token={token}
+				/>
+				<MetaField
+					label={t("detail.process")}
+					value={
+						<Tag
+							color={record.process === "main" ? "geekblue" : "purple"}
+							className="!text-xs !rounded-full !px-2 !m-0"
+							bordered={false}
+						>
+							{record.process}
+						</Tag>
+					}
+					token={token}
+				/>
+				<MetaField
+					label={t("detail.module")}
+					value={
+						record.module ? (
+							<span
+								className="text-xs font-medium px-1.5 py-0.5 rounded"
+								style={{
+									background: token.colorFillTertiary,
+									color: token.colorTextSecondary,
+								}}
+							>
+								{record.module}
+							</span>
+						) : (
+							<span style={{ color: token.colorTextQuaternary }}>-</span>
+						)
+					}
+					token={token}
+				/>
 				{record.session_id && (
-					<div>
-						<div className="text-xs font-medium text-gray-500 mb-1">
-							{t("detail.sessionId")}
-						</div>
-						<span className="font-mono text-xs">{record.session_id}</span>
-					</div>
+					<MetaField
+						label={t("detail.sessionId")}
+						value={
+							<span className="font-mono text-xs" style={{ color: token.colorTextSecondary }}>
+								{record.session_id.slice(0, 12)}...
+							</span>
+						}
+						token={token}
+					/>
 				)}
 			</div>
+
+			{/* Message section */}
+			<DetailSection label={t("detail.message")} token={token}>
+				<div
+					className="rounded-lg p-3 text-sm break-all whitespace-pre-wrap leading-relaxed"
+					style={{
+						background: token.colorFillQuaternary,
+						color: token.colorText,
+					}}
+				>
+					{record.message}
+				</div>
+			</DetailSection>
+
+			{/* Metadata section */}
+			{parsedMeta && (
+				<DetailSection label={t("detail.metadata")} token={token}>
+					<pre
+						className="rounded-lg p-3 text-xs overflow-auto max-h-60 font-mono leading-relaxed"
+						style={{
+							background: token.colorFillQuaternary,
+							color: token.colorTextSecondary,
+						}}
+					>
+						{parsedMeta}
+					</pre>
+				</DetailSection>
+			)}
+
+			{/* Error section */}
+			{record.error_message && (
+				<DetailSection label={t("detail.errorMessage")} token={token} isError>
+					<div
+						className="rounded-lg p-3 text-sm break-all leading-relaxed"
+						style={{
+							background: token.colorErrorBg,
+							color: token.colorError,
+						}}
+					>
+						{record.error_message}
+					</div>
+				</DetailSection>
+			)}
+
+			{/* Error Stack section */}
+			{record.error_stack && (
+				<DetailSection label={t("detail.errorStack")} token={token} isError>
+					<pre
+						className="rounded-lg p-3 text-xs overflow-auto max-h-80 font-mono whitespace-pre-wrap leading-relaxed"
+						style={{
+							background: "#1e1e1e",
+							color: "#4ec9b0",
+						}}
+					>
+						{record.error_stack}
+					</pre>
+				</DetailSection>
+			)}
 		</Drawer>
 	);
 };
+
+function MetaField({
+	label,
+	value,
+	token,
+}: {
+	label: string;
+	value: React.ReactNode;
+	token: ReturnType<typeof useToken>["token"];
+}) {
+	return (
+		<div>
+			<div
+				className="text-[11px] font-medium mb-1"
+				style={{ color: token.colorTextTertiary }}
+			>
+				{label}
+			</div>
+			{value}
+		</div>
+	);
+}
+
+function DetailSection({
+	label,
+	children,
+	token,
+	isError,
+}: {
+	label: string;
+	children: React.ReactNode;
+	token: ReturnType<typeof useToken>["token"];
+	isError?: boolean;
+}) {
+	return (
+		<div className="mb-4">
+			<div
+				className="text-xs font-semibold mb-2"
+				style={{ color: isError ? token.colorError : token.colorTextTertiary }}
+			>
+				{label}
+			</div>
+			{children}
+		</div>
+	);
+}

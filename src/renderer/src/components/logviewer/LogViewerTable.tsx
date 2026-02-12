@@ -1,14 +1,18 @@
 /**
  * LogViewerTable - Ant Design Table with server-side pagination
+ * Clean, readable log table with proper styling
  */
 
-import { Empty, Table, Tag } from "antd";
+import { FileSearchOutlined } from "@ant-design/icons";
+import { Empty, Table, Tag, theme } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { LogRecord } from "../../services/logService";
 import { useLogViewerStore } from "../../stores/logViewerStore";
+
+const { useToken } = theme;
 
 const LEVEL_COLORS: Record<string, string> = {
 	DEBUG: "default",
@@ -30,6 +34,7 @@ function formatDate(timestamp: string): string {
 
 export const LogViewerTable: React.FC = () => {
 	const { t } = useTranslation("logviewer");
+	const { token } = useToken();
 	const records = useLogViewerStore((s) => s.records);
 	const total = useLogViewerStore((s) => s.total);
 	const page = useLogViewerStore((s) => s.page);
@@ -52,11 +57,11 @@ export const LogViewerTable: React.FC = () => {
 				title: t("columns.time"),
 				dataIndex: "timestamp",
 				key: "timestamp",
-				width: 180,
+				width: 170,
 				render: (timestamp: string) => (
-					<span className="font-mono text-xs whitespace-nowrap">
-						<span className="opacity-50">{formatDate(timestamp)}</span>{" "}
-						{formatTime(timestamp)}
+					<span className="font-mono text-xs whitespace-nowrap" style={{ color: token.colorTextSecondary }}>
+						<span style={{ opacity: 0.5 }}>{formatDate(timestamp)}</span>{" "}
+						<span style={{ color: token.colorText }}>{formatTime(timestamp)}</span>
 					</span>
 				),
 			},
@@ -66,7 +71,11 @@ export const LogViewerTable: React.FC = () => {
 				key: "level",
 				width: 80,
 				render: (level: string) => (
-					<Tag color={LEVEL_COLORS[level] || "default"} className="!text-xs">
+					<Tag
+						color={LEVEL_COLORS[level] || "default"}
+						className="!text-xs !rounded-full !px-2 !m-0"
+						bordered={false}
+					>
 						{level}
 					</Tag>
 				),
@@ -79,7 +88,8 @@ export const LogViewerTable: React.FC = () => {
 				render: (process: string) => (
 					<Tag
 						color={process === "main" ? "geekblue" : "purple"}
-						className="!text-xs"
+						className="!text-xs !rounded-full !px-2 !m-0"
+						bordered={false}
 					>
 						{process}
 					</Tag>
@@ -89,12 +99,20 @@ export const LogViewerTable: React.FC = () => {
 				title: t("columns.module"),
 				dataIndex: "module",
 				key: "module",
-				width: 120,
+				width: 140,
 				render: (module: string) =>
 					module ? (
-						<span className="text-xs font-medium">{module}</span>
+						<span
+							className="text-xs font-medium px-1.5 py-0.5 rounded"
+							style={{
+								background: token.colorFillQuaternary,
+								color: token.colorTextSecondary,
+							}}
+						>
+							{module}
+						</span>
 					) : (
-						<span className="text-xs opacity-30">-</span>
+						<span style={{ color: token.colorTextQuaternary }}>-</span>
 					),
 			},
 			{
@@ -102,51 +120,81 @@ export const LogViewerTable: React.FC = () => {
 				dataIndex: "message",
 				key: "message",
 				ellipsis: true,
-				render: (message: string, record: LogRecord) => (
-					<div className="text-xs">
-						<span className="break-all">{message}</span>
+				render: (msg: string, record: LogRecord) => (
+					<div className="text-xs leading-relaxed">
+						<span style={{ color: token.colorText }}>{msg}</span>
 						{record.error_message && (
-							<span className="text-red-500 ml-1">
-								[{record.error_message}]
+							<span
+								className="ml-1.5 px-1.5 py-0.5 rounded text-xs"
+								style={{
+									background: token.colorErrorBg,
+									color: token.colorError,
+								}}
+							>
+								{record.error_message}
 							</span>
 						)}
 					</div>
 				),
 			},
 		],
-		[t],
+		[t, token],
 	);
 
 	return (
-		<Table<LogRecord>
-			columns={columns}
-			dataSource={records}
-			rowKey="id"
-			size="small"
-			loading={isLoading}
-			locale={{ emptyText: <Empty description={t("noLogs")} /> }}
-			pagination={{
-				current: page,
-				pageSize,
-				total,
-				showSizeChanger: true,
-				showTotal: (total) => `${total}`,
-				pageSizeOptions: [20, 50, 100],
-				size: "small",
-				onChange: (p, ps) => {
-					if (ps !== pageSize) {
-						setPageSize(ps);
-					} else {
-						setPage(p);
-					}
-				},
+		<div
+			className="h-full rounded-xl overflow-hidden"
+			style={{
+				background: token.colorBgContainer,
+				border: `1px solid ${token.colorBorderSecondary}`,
 			}}
-			onRow={(record) => ({
-				onClick: () => handleRowClick(record),
-				className: "cursor-pointer",
-			})}
-			scroll={{ y: "calc(100vh - 260px)" }}
-			className="log-viewer-table"
-		/>
+		>
+			<Table<LogRecord>
+				columns={columns}
+				dataSource={records}
+				rowKey="id"
+				size="small"
+				loading={isLoading}
+				locale={{
+					emptyText: (
+						<Empty
+							image={<FileSearchOutlined style={{ fontSize: 48, color: token.colorTextQuaternary }} />}
+							description={
+								<span style={{ color: token.colorTextTertiary }}>
+									{t("noLogs")}
+								</span>
+							}
+							className="!my-16"
+						/>
+					),
+				}}
+				pagination={{
+					current: page,
+					pageSize,
+					total,
+					showSizeChanger: true,
+					showTotal: (total) => (
+						<span style={{ color: token.colorTextTertiary }} className="text-xs">
+							{total.toLocaleString()} {t("stats.total", { defaultValue: "total" })}
+						</span>
+					),
+					pageSizeOptions: [20, 50, 100],
+					size: "small",
+					onChange: (p, ps) => {
+						if (ps !== pageSize) {
+							setPageSize(ps);
+						} else {
+							setPage(p);
+						}
+					},
+				}}
+				onRow={(record) => ({
+					onClick: () => handleRowClick(record),
+					style: { cursor: "pointer" },
+				})}
+				scroll={{ y: "calc(100vh - 300px)" }}
+				className="log-viewer-table"
+			/>
+		</div>
 	);
 };

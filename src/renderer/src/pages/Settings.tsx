@@ -1,7 +1,6 @@
 import {
 	ApiOutlined,
 	BugOutlined,
-	FileTextOutlined,
 	GlobalOutlined,
 	InfoCircleOutlined,
 	KeyOutlined,
@@ -9,9 +8,11 @@ import {
 	SearchOutlined,
 	SettingOutlined,
 } from "@ant-design/icons";
-import { Card, Tabs } from "antd";
+import { Card, Tabs, theme } from "antd";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+
+const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { AboutModal } from "../components/AboutModal";
@@ -22,7 +23,6 @@ import { ApiKeysConfig } from "../components/settings/ApiKeysConfig";
 import { ApiServiceSettings } from "../components/settings/ApiServiceSettings";
 import { DebugTools } from "../components/settings/DebugTools";
 import { GeneralSettings } from "../components/settings/GeneralSettings";
-import { LogViewer } from "../components/settings/LogViewer";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
@@ -35,6 +35,7 @@ const Settings: React.FC = () => {
 	const [activeTab, setActiveTab] = useState("general");
 	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 	const [aboutModalOpen, setAboutModalOpen] = useState(false);
+	const { token } = useToken();
 
 	const pageTitle = useMemo(
 		() => (
@@ -42,12 +43,15 @@ const Settings: React.FC = () => {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center">
 					<SettingOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
 					{t("title", "设置", { ns: "settings" })}
 				</span>
 			</div>
 		),
-		[t],
+		[t, token.colorText],
 	);
 
 	useTitle(pageTitle);
@@ -63,7 +67,6 @@ const Settings: React.FC = () => {
 		const handleNavigate = (_event: unknown, ...args: unknown[]) => {
 			const path = args[0] as string;
 			if (path.includes("tab=about")) setActiveTab("about");
-			else if (path.includes("tab=logs")) setActiveTab("logs");
 			else if (path.includes("tab=debug")) setActiveTab("debug");
 		};
 
@@ -112,11 +115,6 @@ const Settings: React.FC = () => {
 			key: "shortcuts",
 			label: <TabLabel icon={<KeyOutlined />} text={t("shortcuts", "Shortcuts", { ns: "settings" })} />,
 			children: <Card className="!border-0 !shadow-none !bg-transparent"><ShortcutSettings /></Card>,
-		},
-		{
-			key: "logs",
-			label: <TabLabel icon={<FileTextOutlined />} text={t("logs", "Logs", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><LogViewer /></Card>,
 		},
 		{
 			key: "debug",

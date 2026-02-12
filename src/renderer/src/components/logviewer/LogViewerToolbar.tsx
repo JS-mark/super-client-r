@@ -1,11 +1,13 @@
 /**
- * LogViewerToolbar - Filter controls for the log viewer
+ * LogViewerToolbar - Filter controls and actions for the log viewer
+ * Clean, single-row layout with grouped controls
  */
 
 import {
 	ClearOutlined,
 	ExportOutlined,
 	ReloadOutlined,
+	SearchOutlined,
 	SortAscendingOutlined,
 	SortDescendingOutlined,
 } from "@ant-design/icons";
@@ -16,8 +18,8 @@ import {
 	message,
 	Popconfirm,
 	Select,
-	Space,
 	Tooltip,
+	theme,
 } from "antd";
 import type React from "react";
 import { useCallback, useRef } from "react";
@@ -25,16 +27,18 @@ import { useTranslation } from "react-i18next";
 import { useLogViewerStore } from "../../stores/logViewerStore";
 
 const { RangePicker } = DatePicker;
+const { useToken } = theme;
 
 const LEVEL_OPTIONS = [
-	{ value: "DEBUG", label: "DEBUG", color: "#8c8c8c" },
-	{ value: "INFO", label: "INFO", color: "#1677ff" },
-	{ value: "WARN", label: "WARN", color: "#fa8c16" },
-	{ value: "ERROR", label: "ERROR", color: "#ff4d4f" },
+	{ value: "DEBUG", label: "DEBUG" },
+	{ value: "INFO", label: "INFO" },
+	{ value: "WARN", label: "WARN" },
+	{ value: "ERROR", label: "ERROR" },
 ];
 
 export const LogViewerToolbar: React.FC = () => {
 	const { t } = useTranslation("logviewer");
+	const { token } = useToken();
 	const filters = useLogViewerStore((s) => s.filters);
 	const sortOrder = useLogViewerStore((s) => s.sortOrder);
 	const modules = useLogViewerStore((s) => s.modules);
@@ -110,24 +114,30 @@ export const LogViewerToolbar: React.FC = () => {
 		const result = await exportLogs();
 		if (result.success && result.count !== undefined) {
 			message.success(t("exportSuccess", { count: result.count }));
-		} else if (!result.success) {
-			// User cancelled or error
 		}
 	}, [exportLogs, t]);
 
 	return (
-		<div className="flex flex-wrap items-center gap-2">
-			{/* Keyword search */}
+		<div
+			className="flex items-center gap-2 px-3 py-2 rounded-xl shrink-0"
+			style={{
+				background: token.colorBgContainer,
+				border: `1px solid ${token.colorBorderSecondary}`,
+			}}
+		>
+			{/* Search */}
 			<Input
+				prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
 				placeholder={t("keywordPlaceholder")}
 				allowClear
 				onChange={handleKeywordChange}
 				defaultValue={filters.keyword}
-				className="!w-52"
+				className="!w-48"
 				size="small"
+				variant="filled"
 			/>
 
-			{/* Level filter */}
+			{/* Filter group */}
 			<Select
 				mode="multiple"
 				placeholder={t("allLevels")}
@@ -136,11 +146,11 @@ export const LogViewerToolbar: React.FC = () => {
 				options={LEVEL_OPTIONS}
 				maxTagCount={1}
 				allowClear
-				className="!min-w-[120px]"
+				className="!min-w-[110px]"
 				size="small"
+				variant="filled"
 			/>
 
-			{/* Module filter */}
 			<Select
 				mode="multiple"
 				placeholder={t("allModules")}
@@ -149,11 +159,11 @@ export const LogViewerToolbar: React.FC = () => {
 				options={modules.map((m) => ({ value: m, label: m }))}
 				maxTagCount={1}
 				allowClear
-				className="!min-w-[120px]"
+				className="!min-w-[110px]"
 				size="small"
+				variant="filled"
 			/>
 
-			{/* Process filter */}
 			<Select
 				mode="multiple"
 				placeholder={t("allProcesses")}
@@ -167,20 +177,21 @@ export const LogViewerToolbar: React.FC = () => {
 				allowClear
 				className="!min-w-[100px]"
 				size="small"
+				variant="filled"
 			/>
 
-			{/* Time range */}
 			<RangePicker
 				showTime
 				onChange={handleTimeRangeChange}
 				size="small"
-				className="!w-auto"
+				variant="filled"
 			/>
 
+			{/* Spacer */}
 			<div className="flex-1" />
 
-			{/* Action buttons */}
-			<Space size="small">
+			{/* Actions */}
+			<div className="flex items-center gap-1">
 				<Tooltip title={sortOrder === "desc" ? t("sortDesc") : t("sortAsc")}>
 					<Button
 						icon={
@@ -192,41 +203,45 @@ export const LogViewerToolbar: React.FC = () => {
 						}
 						onClick={handleToggleSort}
 						size="small"
+						type="text"
 					/>
 				</Tooltip>
 
-				<Button
-					icon={<ReloadOutlined />}
-					onClick={refresh}
-					loading={isLoading}
-					size="small"
-				>
-					{t("refresh")}
-				</Button>
+				<Tooltip title={t("refresh")}>
+					<Button
+						icon={<ReloadOutlined />}
+						onClick={refresh}
+						loading={isLoading}
+						size="small"
+						type="text"
+					/>
+				</Tooltip>
 
-				<Button
-					icon={<ExportOutlined />}
-					onClick={handleExport}
-					size="small"
-				>
-					{t("export")}
-				</Button>
+				<Tooltip title={t("export")}>
+					<Button
+						icon={<ExportOutlined />}
+						onClick={handleExport}
+						size="small"
+						type="text"
+					/>
+				</Tooltip>
 
 				<Popconfirm
 					title={t("clearConfirm")}
 					onConfirm={handleClear}
 					okText={t("clear")}
-					cancelText={t("cancel", { ns: "common", defaultValue: "取消" })}
+					cancelText={t("cancel", { ns: "common", defaultValue: "Cancel" })}
 				>
-					<Button
-						icon={<ClearOutlined />}
-						danger
-						size="small"
-					>
-						{t("clear")}
-					</Button>
+					<Tooltip title={t("clear")}>
+						<Button
+							icon={<ClearOutlined />}
+							danger
+							size="small"
+							type="text"
+						/>
+					</Tooltip>
 				</Popconfirm>
-			</Space>
+			</div>
 		</div>
 	);
 };
