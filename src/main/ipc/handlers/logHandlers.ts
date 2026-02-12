@@ -13,6 +13,12 @@ import type {
 } from "../types";
 import { logDatabaseService } from "../../services/log";
 
+let openViewerCallback: (() => void) | null = null;
+
+export function setLogViewerOpener(callback: () => void): void {
+	openViewerCallback = callback;
+}
+
 export function registerLogHandlers(): void {
 	// Query logs with pagination and filters
 	ipcMain.handle(
@@ -134,9 +140,11 @@ export function registerLogHandlers(): void {
 		},
 	);
 
-	// Open log viewer window (handled in main.ts via IPC event)
+	// Open log viewer window - uses callback set by main.ts
 	ipcMain.handle(LOG_CHANNELS.OPEN_VIEWER, async () => {
-		// This will be handled by main.ts which listens for this channel
+		if (openViewerCallback) {
+			openViewerCallback();
+		}
 		return { success: true };
 	});
 }

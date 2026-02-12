@@ -16,6 +16,7 @@ import {
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
 import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
+import { setLogViewerOpener } from "./ipc/handlers/logHandlers";
 import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
 import { localServer } from "./server";
 import { pathService } from "./services/pathService";
@@ -65,6 +66,7 @@ if (!gotTheLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let floatingWindow: BrowserWindow | null = null;
+let logViewerWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -179,6 +181,46 @@ function createFloatingWindow(): void {
 	setFloatingWindow(floatingWindow);
 
 	// floatingWindow.webContents.openDevTools({ mode: 'detach' })
+}
+
+function createLogViewerWindow(): void {
+	// Single instance: if exists, focus it
+	if (logViewerWindow && !logViewerWindow.isDestroyed()) {
+		logViewerWindow.show();
+		logViewerWindow.focus();
+		return;
+	}
+
+	logViewerWindow = new BrowserWindow({
+		width: 1100,
+		height: 700,
+		minWidth: 800,
+		minHeight: 500,
+		frame: false,
+		titleBarStyle: "hidden",
+		icon: getAppIconPath(),
+		webPreferences: {
+			preload: join(__dirname, "../preload/index.js"),
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: !app.isPackaged,
+			webSecurity: true,
+		},
+	});
+
+	if (process.env["ELECTRON_RENDERER_URL"]) {
+		logViewerWindow.loadURL(
+			`${process.env["ELECTRON_RENDERER_URL"]}/#/log-viewer`,
+		);
+	} else {
+		logViewerWindow.loadFile(join(__dirname, "../renderer/index.html"), {
+			hash: "log-viewer",
+		});
+	}
+
+	logViewerWindow.on("closed", () => {
+		logViewerWindow = null;
+	});
 }
 
 function createTray(): void {
@@ -321,6 +363,12 @@ function createMenu(): void {
 							mainWindow?.webContents.send("navigate-to", "/settings?tab=shortcuts");
 						},
 					},
+					{
+						label: "查看日志",
+						click: () => {
+							createLogViewerWindow();
+						},
+					},
 					{ type: "separator" },
 					{
 						label: "发送反馈",
@@ -376,6 +424,7 @@ app.whenReady().then(async () => {
 	// 注册 IPC 处理器
 	registerIpcHandlers();
 	registerWindowHandlers();
+	setLogViewerOpener(createLogViewerWindow);
 	logger.info("IPC handlers registered");
 
 	// 初始化技能服务

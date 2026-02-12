@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { createHashRouter } from "react-router-dom";
 import Bookmarks from "./pages/Bookmarks";
 import Chat from "./pages/Chat";
@@ -10,6 +11,8 @@ import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
 import Workspaces from "./pages/Workspaces";
+
+const LogViewer = lazy(() => import("./pages/LogViewer"));
 
 export const router = createHashRouter([
 	{
@@ -71,5 +74,11 @@ export const router = createHashRouter([
 		element: <Settings />,
 		errorElement: <ErrorPage />,
 		handle: { title: "设置" },
+	},
+	{
+		path: "/log-viewer",
+		element: <LogViewer />,
+		errorElement: <ErrorPage />,
+		handle: { title: "日志查看器" },
 	},
 ]);
