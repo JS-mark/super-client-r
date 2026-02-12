@@ -1,0 +1,206 @@
+import {
+	ApiOutlined,
+	AppstoreOutlined,
+	CloudOutlined,
+	CodeOutlined,
+	DatabaseOutlined,
+	FileTextOutlined,
+	FolderOutlined,
+	HomeOutlined,
+	MessageOutlined,
+	PlusOutlined,
+	RocketOutlined,
+	SettingOutlined,
+	StarOutlined,
+	UserOutlined,
+} from "@ant-design/icons";
+import { Button, Input } from "antd";
+import type React from "react";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
+import type { MenuItemConfig, MenuItemIconType } from "../../types/menu";
+
+/**
+ * Ant Design icon map for rendering "default" type icons
+ */
+export const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+	MessageOutlined,
+	AppstoreOutlined,
+	RocketOutlined,
+	SettingOutlined,
+	ApiOutlined,
+	StarOutlined,
+	FolderOutlined,
+	HomeOutlined,
+	UserOutlined,
+	CodeOutlined,
+	FileTextOutlined,
+	CloudOutlined,
+	DatabaseOutlined,
+};
+
+// Icon type options for Segmented
+export const ICON_TYPE_OPTIONS = [
+	{ label: "预设图标", value: "default" as MenuItemIconType },
+	{ label: "Emoji", value: "emoji" as MenuItemIconType },
+	{ label: "图片", value: "image" as MenuItemIconType },
+];
+
+// Available preset icons
+export const AVAILABLE_ICONS = [
+	{ label: "💬 消息", value: "MessageOutlined" },
+	{ label: "📦 应用", value: "AppstoreOutlined" },
+	{ label: "🚀 火箭", value: "RocketOutlined" },
+	{ label: "⚙️ 设置", value: "SettingOutlined" },
+	{ label: "🏠 首页", value: "HomeOutlined" },
+	{ label: "👤 用户", value: "UserOutlined" },
+	{ label: "💻 代码", value: "CodeOutlined" },
+	{ label: "📄 文档", value: "FileTextOutlined" },
+	{ label: "☁️ 云", value: "CloudOutlined" },
+	{ label: "🗄️ 数据库", value: "DatabaseOutlined" },
+];
+
+/**
+ * Render an icon for a menu item
+ */
+export function renderItemIcon(
+	item: MenuItemConfig,
+	size: "sm" | "md" = "md",
+): React.ReactNode {
+	const sizeClass = size === "sm" ? "text-base" : "text-xl";
+
+	if (item.iconType === "emoji") {
+		return <span className={sizeClass}>{item.iconContent || "🎯"}</span>;
+	}
+	if (item.iconType === "image" && item.iconContent) {
+		const imgSize = size === "sm" ? "w-4 h-4" : "w-5 h-5";
+		return (
+			<img
+				src={item.iconContent}
+				alt={item.label}
+				className={`${imgSize} object-contain rounded`}
+			/>
+		);
+	}
+	// Default: Ant Design icon
+	const iconKey = item.iconContent || "MessageOutlined";
+	const IconComponent = ICON_MAP[iconKey] || MessageOutlined;
+	return <IconComponent className={sizeClass} />;
+}
+
+/**
+ * Icon selector component
+ */
+interface IconSelectorProps {
+	value: string;
+	type: MenuItemIconType;
+	onChange: (value: string) => void;
+}
+
+export const IconSelector: React.FC<IconSelectorProps> = ({
+	value,
+	type,
+	onChange,
+}) => {
+	const { t } = useTranslation();
+	const [previewUrl, setPreviewUrl] = useState("");
+
+	const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (file) {
+			const reader = new FileReader();
+			reader.onload = (event) => {
+				const base64 = event.target?.result as string;
+				onChange(base64);
+				setPreviewUrl(base64);
+			};
+			reader.readAsDataURL(file);
+		}
+	};
+
+	// Emoji input
+	if (type === "emoji") {
+		return (
+			<div className="flex items-center gap-3">
+				<div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center text-3xl shadow-inner">
+					{value || "🎯"}
+				</div>
+				<Input
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					placeholder="输入 Emoji..."
+					className="flex-1 h-12 text-base"
+					maxLength={4}
+				/>
+			</div>
+		);
+	}
+
+	// Image upload
+	if (type === "image") {
+		return (
+			<div className="flex items-center gap-4">
+				<div
+					className={cn(
+						"w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center",
+						"bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30",
+						!previewUrl &&
+						!value &&
+						"border-2 border-dashed border-blue-300 dark:border-blue-700",
+					)}
+				>
+					{previewUrl || value ? (
+						<img
+							src={previewUrl || value}
+							alt="Preview"
+							className="w-full h-full object-cover"
+						/>
+					) : (
+						<PlusOutlined className="text-xl text-blue-400" />
+					)}
+				</div>
+				<Button
+					size="large"
+					type="dashed"
+					icon={<PlusOutlined />}
+					onClick={() => {
+						const input = document.createElement("input");
+						input.type = "file";
+						input.accept = "image/*";
+						input.onchange = (e) =>
+							handleImageUpload(
+								e as unknown as React.ChangeEvent<HTMLInputElement>,
+							);
+						input.click();
+					}}
+					className="flex-1 h-12"
+				>
+					{t("selectImage", { ns: "settings" })}
+				</Button>
+			</div>
+		);
+	}
+
+	// Preset icons - grid selection
+	return (
+		<div className="grid grid-cols-5 gap-2">
+			{AVAILABLE_ICONS.map((icon) => (
+				<button
+					key={icon.value}
+					onClick={() => onChange(icon.value)}
+					className={cn(
+						"h-12 rounded-xl flex items-center justify-center text-lg transition-all",
+						"hover:scale-105 hover:shadow-md",
+						value === icon.value
+							? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300 ring-offset-2 dark:ring-offset-slate-800"
+							: "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600",
+					)}
+					title={icon.label}
+				>
+					{icon.label.split(" ")[0]}
+				</button>
+			))}
+		</div>
+	);
+};
