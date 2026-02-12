@@ -1,24 +1,13 @@
 import {
-	CheckOutlined,
-	ClockCircleOutlined,
-	CopyOutlined,
-	DeleteOutlined,
-	EditOutlined,
-	ExportOutlined,
 	FolderOutlined,
 	ImportOutlined,
-	MessageOutlined,
-	MoreOutlined,
 	PlusOutlined,
 	SearchOutlined,
-	SettingOutlined,
-	StarOutlined,
 } from "@ant-design/icons";
 import {
 	Button,
 	Card,
 	Col,
-	Dropdown,
 	Empty,
 	Form,
 	Input,
@@ -27,12 +16,12 @@ import {
 	Radio,
 	Row,
 	Statistic,
-	Tag,
-	Tooltip,
 } from "antd";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
+import { EditWorkspaceModal } from "../components/workspace/EditWorkspaceModal";
+import { WorkspaceCard, WORKSPACE_TYPE_OPTIONS } from "../components/workspace/WorkspaceCard";
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 import {
@@ -40,288 +29,11 @@ import {
 	WORKSPACE_COLORS,
 	type Workspace,
 	type WorkspaceExportData,
-	type WorkspaceType,
 } from "../stores/workspaceStore";
 
-const WORKSPACE_TYPE_OPTIONS: {
-	value: WorkspaceType;
-	label: string;
-	icon: string;
-}[] = [
-		{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
-		{ value: "work", label: "workspaces.type.work", icon: "💼" },
-		{ value: "project", label: "workspaces.type.project", icon: "📁" },
-		{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
-	];
-
-// 工作区卡片
-function WorkspaceCard({
-	workspace,
-	isDefault,
-	isCurrent,
-	onSwitch,
-	onEdit,
-	onDuplicate,
-	onDelete,
-	onExport,
-	onSetDefault,
-}: {
-	workspace: Workspace;
-	isDefault: boolean;
-	isCurrent: boolean;
-	onSwitch: () => void;
-	onEdit: () => void;
-	onDuplicate: () => void;
-	onDelete: () => void;
-	onExport: () => void;
-	onSetDefault: () => void;
-}) {
-	const { t } = useTranslation();
-	const stats = useWorkspaceStore().getWorkspaceStats(workspace.id);
-
-	const typeOption = WORKSPACE_TYPE_OPTIONS.find(
-		(t) => t.value === workspace.type,
-	);
-
-	const menuItems = [
-		{
-			key: "switch",
-			label: t("workspaces.actions.switch", "切换到此工作区", { ns: "workspaces" }),
-			icon: <CheckOutlined />,
-			onClick: onSwitch,
-			disabled: isCurrent,
-		},
-		{
-			key: "edit",
-			label: t("edit", "编辑", { ns: "common" }),
-			icon: <EditOutlined />,
-			onClick: onEdit,
-		},
-		{
-			key: "duplicate",
-			label: t("workspaces.actions.duplicate", "复制", { ns: "workspaces" }),
-			icon: <CopyOutlined />,
-			onClick: onDuplicate,
-		},
-		{
-			key: "export",
-			label: t("workspaces.actions.export", "导出", { ns: "workspaces" }),
-			icon: <ExportOutlined />,
-			onClick: onExport,
-		},
-		{
-			key: "setDefault",
-			label: t("workspaces.actions.setDefault", "设为默认", { ns: "workspaces" }),
-			icon: <StarOutlined />,
-			onClick: onSetDefault,
-			disabled: isDefault,
-		},
-		{ type: "divider" as const },
-		{
-			key: "delete",
-			label: t("delete", "删除", { ns: "common" }),
-			icon: <DeleteOutlined className="text-red-500" />,
-			onClick: onDelete,
-			danger: true,
-			disabled: isDefault,
-		},
-	];
-
-	return (
-		<Card
-			className={cn(
-				"relative overflow-hidden transition-all hover:shadow-lg",
-				isCurrent && "ring-2 ring-blue-500",
-			)}
-			bodyStyle={{ padding: 0 }}
-		>
-			{/* 顶部颜色条 */}
-			<div className="h-2" style={{ backgroundColor: workspace.color }} />
-
-			<div className="p-5">
-				{/* 头部 */}
-				<div className="flex items-start justify-between mb-4">
-					<div className="flex items-center gap-3">
-						<div
-							className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl text-white font-bold"
-							style={{ backgroundColor: workspace.color }}
-						>
-							{workspace.icon || workspace.name.charAt(0).toUpperCase()}
-						</div>
-						<div>
-							<div className="flex items-center gap-2">
-								<h3 className="font-semibold text-slate-800 dark:text-slate-200">
-									{workspace.name}
-								</h3>
-								{isDefault && (
-									<Tag color="gold" className="text-xs">
-										{t("workspaces.default", "默认", { ns: "workspaces" })}
-									</Tag>
-								)}
-								{isCurrent && (
-									<Tag color="blue" className="text-xs">
-										{t("workspaces.current", "当前", { ns: "workspaces" })}
-									</Tag>
-								)}
-							</div>
-							<Tag className="mt-1 text-xs">
-								{typeOption?.icon} {t(typeOption?.label || "")}
-							</Tag>
-						</div>
-					</div>
-					<Dropdown menu={{ items: menuItems }} placement="bottomRight">
-						<Button type="text" icon={<MoreOutlined />} />
-					</Dropdown>
-				</div>
-
-				{/* 描述 */}
-				{workspace.description && (
-					<p className="text-sm text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
-						{workspace.description}
-					</p>
-				)}
-
-				{/* 统计 */}
-				<div className="grid grid-cols-2 gap-4 mb-4">
-					<div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-						<MessageOutlined />
-						<span>
-							{stats.totalSessions} {t("workspaces.stats.sessions", "会话", { ns: "workspaces" })}
-						</span>
-					</div>
-					<div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-						<ClockCircleOutlined />
-						<span>{new Date(workspace.updatedAt).toLocaleDateString()}</span>
-					</div>
-				</div>
-
-				{/* 操作按钮 */}
-				<div className="flex gap-2">
-					<Button
-						type={isCurrent ? "default" : "primary"}
-						onClick={onSwitch}
-						disabled={isCurrent}
-						className="flex-1"
-					>
-						{isCurrent
-							? t("workspaces.current", "当前工作区")
-							: t("workspaces.actions.switch", "切换", { ns: "workspaces" })}
-					</Button>
-				</div>
-			</div>
-		</Card>
-	);
-}
-
-// 编辑工作区弹窗
-function EditWorkspaceModal({
-	workspace,
-	open,
-	onClose,
-	onSave,
-}: {
-	workspace: Workspace | null;
-	open: boolean;
-	onClose: () => void;
-	onSave: (data: Partial<Workspace>) => void;
-}) {
-	const { t } = useTranslation();
-	const [form] = Form.useForm();
-	const [color, setColor] = useState(workspace?.color || WORKSPACE_COLORS[0]);
-
-	// 重置表单当workspace变化时
-	useState(() => {
-		if (workspace) {
-			form.setFieldsValue({
-				name: workspace.name,
-				description: workspace.description,
-				type: workspace.type,
-			});
-			setColor(workspace.color || WORKSPACE_COLORS[0]);
-		}
-	});
-
-	const handleSubmit = () => {
-		form.validateFields().then((values) => {
-			onSave({ ...values, color });
-			onClose();
-		});
-	};
-
-	if (!workspace) return null;
-
-	return (
-		<Modal
-			title={t("workspaces.edit.title", "编辑工作区", { ns: "workspaces" })}
-			open={open}
-			onOk={handleSubmit}
-			onCancel={onClose}
-			okText={t("common.save", "保存")}
-			cancelText={t("cancel", "取消", { ns: "common" })}
-		>
-			<Form form={form} layout="vertical" className="mt-4">
-				<Form.Item
-					name="name"
-					label={t("workspaces.name", "名称", { ns: "workspaces" })}
-					rules={[{ required: true, message: "请输入工作区名称" }]}
-				>
-					<Input />
-				</Form.Item>
-
-				<Form.Item
-					name="description"
-					label={t("workspaces.description", "描述", { ns: "workspaces" })}
-				>
-					<Input.TextArea rows={3} />
-				</Form.Item>
-
-				<Form.Item name="type" label={t("workspaces.type.label", "类型", { ns: "workspaces" })}>
-					<Radio.Group>
-						<div className="grid grid-cols-2 gap-2">
-							{WORKSPACE_TYPE_OPTIONS.map((type) => (
-								<Radio.Button
-									key={type.value}
-									value={type.value}
-									className="!h-auto"
-								>
-									<div className="flex items-center gap-2 py-1">
-										<span>{type.icon}</span>
-										<span>{t(type.label)}</span>
-									</div>
-								</Radio.Button>
-							))}
-						</div>
-					</Radio.Group>
-				</Form.Item>
-
-				<Form.Item label={t("workspaces.color", "颜色", { ns: "workspaces" })}>
-					<div className="flex flex-wrap gap-2">
-						{WORKSPACE_COLORS.map((c) => (
-							<button
-								key={c}
-								type="button"
-								onClick={() => setColor(c)}
-								className={cn(
-									"w-8 h-8 rounded-lg transition-all",
-									color === c
-										? "ring-2 ring-offset-2 ring-slate-400 scale-110"
-										: "hover:scale-105",
-								)}
-								style={{ backgroundColor: c }}
-							/>
-						))}
-					</div>
-				</Form.Item>
-			</Form>
-		</Modal>
-	);
-}
-
-// 主页面
 export default function Workspaces() {
 	const { t } = useTranslation();
 
-	// 设置标题栏
 	const pageTitle = useMemo(
 		() => (
 			<div className="flex items-center gap-2">
@@ -336,6 +48,7 @@ export default function Workspaces() {
 		[t],
 	);
 	useTitle(pageTitle);
+
 	const {
 		workspaces,
 		currentWorkspaceId,
@@ -352,13 +65,10 @@ export default function Workspaces() {
 
 	const [searchQuery, setSearchQuery] = useState("");
 	const [createModalOpen, setCreateModalOpen] = useState(false);
-	const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(
-		null,
-	);
+	const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
 	const [form] = Form.useForm();
 	const [color, setColor] = useState(WORKSPACE_COLORS[0]);
 
-	// 过滤工作区
 	const filteredWorkspaces = useMemo(() => {
 		return workspaces
 			.filter(
@@ -369,7 +79,6 @@ export default function Workspaces() {
 			.sort((a, b) => a.order - b.order);
 	}, [workspaces, searchQuery]);
 
-	// 统计
 	const stats = useMemo(() => {
 		return {
 			total: workspaces.length,
@@ -389,10 +98,6 @@ export default function Workspaces() {
 		});
 	};
 
-	const handleEdit = (workspace: Workspace) => {
-		setEditingWorkspace(workspace);
-	};
-
 	const handleSaveEdit = (data: Partial<Workspace>) => {
 		if (editingWorkspace) {
 			updateWorkspace(editingWorkspace.id, data);
@@ -408,18 +113,12 @@ export default function Workspaces() {
 
 	const handleDelete = (workspace: Workspace) => {
 		if (workspace.id === defaultWorkspaceId) {
-			message.error(
-				t("workspaces.delete.cannotDeleteDefault", "不能删除默认工作区", { ns: "workspaces" }),
-			);
+			message.error(t("workspaces.delete.cannotDeleteDefault", "不能删除默认工作区", { ns: "workspaces" }));
 			return;
 		}
-
 		Modal.confirm({
 			title: t("workspaces.delete.confirmTitle", "删除工作区", { ns: "workspaces" }),
-			content: t(
-				"workspaces.delete.confirmContent",
-				`确定要删除工作区 "${workspace.name}" 吗？`,
-			),
+			content: t("workspaces.delete.confirmContent", `确定要删除工作区 "${workspace.name}" 吗？`),
 			onOk: () => {
 				const success = deleteWorkspace(workspace.id);
 				if (success) {
@@ -432,9 +131,7 @@ export default function Workspaces() {
 	const handleExport = (workspace: Workspace) => {
 		try {
 			const data = exportWorkspace(workspace.id);
-			const blob = new Blob([JSON.stringify(data, null, 2)], {
-				type: "application/json",
-			});
+			const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement("a");
 			a.href = url;
@@ -459,16 +156,12 @@ export default function Workspaces() {
 				const reader = new FileReader();
 				reader.onload = (event) => {
 					try {
-						const data = JSON.parse(
-							event.target?.result as string,
-						) as WorkspaceExportData;
+						const data = JSON.parse(event.target?.result as string) as WorkspaceExportData;
 						if (data.version && data.workspace) {
 							importWorkspace(data);
 							message.success(t("workspaces.import.success", "工作区导入成功", { ns: "workspaces" }));
 						} else {
-							message.error(
-								t("workspaces.import.invalidFormat", "无效的工作区文件格式", { ns: "workspaces" }),
-							);
+							message.error(t("workspaces.import.invalidFormat", "无效的工作区文件格式", { ns: "workspaces" }));
 						}
 					} catch (error) {
 						message.error(t("workspaces.import.error", "导入失败", { ns: "workspaces" }));
@@ -480,15 +173,10 @@ export default function Workspaces() {
 		input.click();
 	};
 
-	const handleSetDefault = (workspace: Workspace) => {
-		setDefaultWorkspace(workspace.id);
-		message.success(t("workspaces.setDefault.success", "已设为默认工作区", { ns: "workspaces" }));
-	};
-
 	return (
 		<MainLayout>
 			<div className="h-full flex flex-col bg-slate-50/50 dark:bg-slate-950 p-6">
-				{/* 头部 */}
+				{/* Header */}
 				<div className="mb-6">
 					<div className="flex items-center justify-between mb-4">
 						<div>
@@ -503,54 +191,37 @@ export default function Workspaces() {
 							<Button icon={<ImportOutlined />} onClick={handleImport}>
 								{t("workspaces.import", "导入", { ns: "workspaces" })}
 							</Button>
-							<Button
-								type="primary"
-								icon={<PlusOutlined />}
-								onClick={() => setCreateModalOpen(true)}
-							>
+							<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
 								{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}
 							</Button>
 						</div>
 					</div>
 
-					{/* 统计 */}
+					{/* Stats */}
 					<Row gutter={16} className="mb-4">
 						<Col span={6}>
 							<Card>
-								<Statistic
-									title={t("workspaces.stats.total", "工作区总数", { ns: "workspaces" })}
-									value={stats.total}
-									prefix={<FolderOutlined />}
-								/>
+								<Statistic title={t("workspaces.stats.total", "工作区总数", { ns: "workspaces" })} value={stats.total} prefix={<FolderOutlined />} />
 							</Card>
 						</Col>
 						<Col span={6}>
 							<Card>
-								<Statistic
-									title={t("workspaces.stats.personal", "个人", { ns: "workspaces" })}
-									value={stats.personal}
-								/>
+								<Statistic title={t("workspaces.stats.personal", "个人", { ns: "workspaces" })} value={stats.personal} />
 							</Card>
 						</Col>
 						<Col span={6}>
 							<Card>
-								<Statistic
-									title={t("workspaces.stats.work", "工作", { ns: "workspaces" })}
-									value={stats.work}
-								/>
+								<Statistic title={t("workspaces.stats.work", "工作", { ns: "workspaces" })} value={stats.work} />
 							</Card>
 						</Col>
 						<Col span={6}>
 							<Card>
-								<Statistic
-									title={t("workspaces.stats.project", "项目", { ns: "workspaces" })}
-									value={stats.project}
-								/>
+								<Statistic title={t("workspaces.stats.project", "项目", { ns: "workspaces" })} value={stats.project} />
 							</Card>
 						</Col>
 					</Row>
 
-					{/* 搜索 */}
+					{/* Search */}
 					<Input
 						prefix={<SearchOutlined className="text-slate-400" />}
 						placeholder={t("workspaces.search", "搜索工作区...", { ns: "workspaces" })}
@@ -561,7 +232,7 @@ export default function Workspaces() {
 					/>
 				</div>
 
-				{/* 工作区列表 */}
+				{/* Workspace list */}
 				{filteredWorkspaces.length === 0 ? (
 					<Empty
 						description={
@@ -571,11 +242,7 @@ export default function Workspaces() {
 						}
 						image={Empty.PRESENTED_IMAGE_SIMPLE}
 					>
-						<Button
-							type="primary"
-							icon={<PlusOutlined />}
-							onClick={() => setCreateModalOpen(true)}
-						>
+						<Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
 							{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}
 						</Button>
 					</Empty>
@@ -588,67 +255,41 @@ export default function Workspaces() {
 								isDefault={workspace.id === defaultWorkspaceId}
 								isCurrent={workspace.id === currentWorkspaceId}
 								onSwitch={() => switchWorkspace(workspace.id)}
-								onEdit={() => handleEdit(workspace)}
+								onEdit={() => setEditingWorkspace(workspace)}
 								onDuplicate={() => handleDuplicate(workspace)}
 								onDelete={() => handleDelete(workspace)}
 								onExport={() => handleExport(workspace)}
-								onSetDefault={() => handleSetDefault(workspace)}
+								onSetDefault={() => {
+									setDefaultWorkspace(workspace.id);
+									message.success(t("workspaces.setDefault.success", "已设为默认工作区", { ns: "workspaces" }));
+								}}
 							/>
 						))}
 					</div>
 				)}
 			</div>
 
-			{/* 创建工作区弹窗 */}
+			{/* Create workspace modal */}
 			<Modal
 				title={t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}
 				open={createModalOpen}
 				onOk={handleCreate}
-				onCancel={() => {
-					setCreateModalOpen(false);
-					form.resetFields();
-					setColor(WORKSPACE_COLORS[0]);
-				}}
+				onCancel={() => { setCreateModalOpen(false); form.resetFields(); setColor(WORKSPACE_COLORS[0]); }}
 				okText={t("common.create", "创建")}
 				cancelText={t("cancel", "取消", { ns: "common" })}
 			>
 				<Form form={form} layout="vertical" className="mt-4">
-					<Form.Item
-						name="name"
-						label={t("workspaces.name", "名称", { ns: "workspaces" })}
-						rules={[{ required: true, message: "请输入工作区名称" }]}
-					>
-						<Input
-							placeholder={t("workspaces.namePlaceholder", "我的工作区", { ns: "workspaces" })}
-						/>
+					<Form.Item name="name" label={t("workspaces.name", "名称", { ns: "workspaces" })} rules={[{ required: true, message: "请输入工作区名称" }]}>
+						<Input placeholder={t("workspaces.namePlaceholder", "我的工作区", { ns: "workspaces" })} />
 					</Form.Item>
-
-					<Form.Item
-						name="description"
-						label={t("workspaces.description", "描述", { ns: "workspaces" })}
-					>
-						<Input.TextArea
-							rows={2}
-							placeholder={t(
-								"workspaces.descriptionPlaceholder",
-								"工作区描述...",
-							)}
-						/>
+					<Form.Item name="description" label={t("workspaces.description", "描述", { ns: "workspaces" })}>
+						<Input.TextArea rows={2} placeholder={t("workspaces.descriptionPlaceholder", "工作区描述...")} />
 					</Form.Item>
-
-					<Form.Item
-						name="type"
-						label={t("workspaces.type.label", "类型", { ns: "workspaces" })}
-						initialValue="personal"
-					>
+					<Form.Item name="type" label={t("workspaces.type.label", "类型", { ns: "workspaces" })} initialValue="personal">
 						<Radio.Group>
 							<div className="grid grid-cols-2 gap-2">
 								{WORKSPACE_TYPE_OPTIONS.map((type) => (
-									<Radio.Button
-										key={type.value}
-										value={type.value}
-										className="!h-auto"
-									>
+									<Radio.Button key={type.value} value={type.value} className="!h-auto">
 										<div className="flex items-center gap-2 py-1">
 											<span>{type.icon}</span>
 											<span>{t(type.label)}</span>
@@ -658,7 +299,6 @@ export default function Workspaces() {
 							</div>
 						</Radio.Group>
 					</Form.Item>
-
 					<Form.Item label={t("workspaces.color", "颜色", { ns: "workspaces" })}>
 						<div className="flex flex-wrap gap-2">
 							{WORKSPACE_COLORS.map((c) => (
@@ -668,9 +308,7 @@ export default function Workspaces() {
 									onClick={() => setColor(c)}
 									className={cn(
 										"w-8 h-8 rounded-lg transition-all",
-										color === c
-											? "ring-2 ring-offset-2 ring-slate-400 scale-110"
-											: "hover:scale-105",
+										color === c ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : "hover:scale-105",
 									)}
 									style={{ backgroundColor: c }}
 								/>
@@ -680,7 +318,7 @@ export default function Workspaces() {
 				</Form>
 			</Modal>
 
-			{/* 编辑工作区弹窗 */}
+			{/* Edit workspace modal */}
 			<EditWorkspaceModal
 				workspace={editingWorkspace}
 				open={!!editingWorkspace}
