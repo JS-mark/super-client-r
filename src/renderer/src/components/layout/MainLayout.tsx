@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
+import { type AppInfo, appService } from "../../services/appService";
 import { useMenuStore } from "../../stores/menuStore";
 import {
 	getAvatarColor,
@@ -22,7 +23,6 @@ import {
 import type { MenuItemConfig } from "../../types/menu";
 import { AboutModal } from "../AboutModal";
 import { TitleBar } from "./TitleBar";
-import { appService, type AppInfo } from "../../services/appService";
 
 const { Sider, Content } = Layout;
 
@@ -129,7 +129,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const handleLogout = () => {
 		logout();
 		// 导航到登录页
-		navigate('/');
+		navigate("/");
 	};
 
 	// 右键菜单项
@@ -173,8 +173,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	};
 
 	return (
-		<Layout className="h-full bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-
+		<Layout className="h-screen bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
 			{/* 左侧边栏 - 全高 */}
 			<Sider
 				width={80}
@@ -262,7 +261,16 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 
 				{/* 内容区域 */}
 				<Content className="flex-1 overflow-auto">
-					<div className={cn("h-full", "animate-fade-in", "!bg-white", "dark:!bg-slate-800")}>{children}</div>
+					<div
+						className={cn(
+							"h-[calc(100vh-52px)]",
+							"animate-fade-in",
+							"!bg-white",
+							"dark:!bg-slate-800",
+						)}
+					>
+						{children}
+					</div>
 				</Content>
 			</Layout>
 

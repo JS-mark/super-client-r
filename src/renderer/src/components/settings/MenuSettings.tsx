@@ -78,7 +78,7 @@ const IconSelector: React.FC<IconSelectorProps> = ({
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder="🎯"
-				className="!w-24"
+				className="w-24!"
 				maxLength={4}
 			/>
 		);
@@ -116,7 +116,7 @@ const IconSelector: React.FC<IconSelectorProps> = ({
 				label: icon.label,
 				value: icon.value,
 			}))}
-			className="!w-48"
+			className="w-48!"
 		/>
 	);
 };
@@ -338,7 +338,6 @@ export const MenuSettings: React.FC<{
 				{/* 菜单项列表（不含设置项，设置按钮固定在底部） */}
 				<div className="space-y-2">
 					{configurableItems.map((item, index) => (
-						// biome-ignore lint/a11y/noStaticElementInteractions: <explanation>
 						<div
 							key={item.id}
 							className={`p-4 rounded-xl border transition-all
@@ -405,7 +404,7 @@ export const MenuSettings: React.FC<{
 								{renderIcon(item)}
 
 								{/* 标签名称 */}
-								<span className="flex-1 font-medium">{t(item.label)}</span>
+								<span className="flex-1 font-medium">{t(item.label, { ns: "settings" })}</span>
 
 								{/* 操作按钮 */}
 								<div className="flex items-center gap-2">

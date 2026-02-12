@@ -1,47 +1,63 @@
-import { useEffect, useState, useCallback } from "react";
-import { useTranslation } from "react-i18next";
 import {
-	Button,
-	Card,
-	Switch,
-	Input,
-	message,
-	Modal,
-	Tag,
-	Tooltip,
-	Empty,
-	Alert,
-} from "antd";
-import {
-	KeyOutlined,
-	ReloadOutlined,
-	EditOutlined,
-	WarningOutlined,
 	CheckOutlined,
-	GlobalOutlined,
-	MessageOutlined,
 	CompassOutlined,
 	EditFilled,
+	EditOutlined,
+	GlobalOutlined,
+	KeyOutlined,
+	MessageOutlined,
+	ReloadOutlined,
+	WarningOutlined,
 } from "@ant-design/icons";
 import {
-	useShortcutStore,
+	Alert,
+	Button,
+	Card,
+	Empty,
+	Input,
+	Modal,
+	message,
+	Switch,
+	Tag,
+	Tooltip,
+} from "antd";
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { cn } from "../../lib/utils";
+import {
+	DEFAULT_SHORTCUTS,
 	formatShortcut,
 	normalizeShortcut,
-	DEFAULT_SHORTCUTS,
-	type ShortcutScope,
 	type Shortcut,
+	type ShortcutScope,
+	useShortcutStore,
 } from "../../stores/shortcutStore";
-import { cn } from "../../lib/utils";
 
 // 作用域配置
 const SCOPE_CONFIG: Record<
 	ShortcutScope,
 	{ labelKey: string; icon: React.ReactNode; color: string }
 > = {
-	global: { labelKey: "shortcuts.scope.global", icon: <GlobalOutlined />, color: "blue" },
-	chat: { labelKey: "shortcuts.scope.chat", icon: <MessageOutlined />, color: "green" },
-	navigation: { labelKey: "shortcuts.scope.navigation", icon: <CompassOutlined />, color: "purple" },
-	input: { labelKey: "shortcuts.scope.input", icon: <EditFilled />, color: "orange" },
+	global: {
+		labelKey: "scope.global",
+		icon: <GlobalOutlined />,
+		color: "blue",
+	},
+	chat: {
+		labelKey: "scope.chat",
+		icon: <MessageOutlined />,
+		color: "green",
+	},
+	navigation: {
+		labelKey: "scope.navigation",
+		icon: <CompassOutlined />,
+		color: "purple",
+	},
+	input: {
+		labelKey: "scope.input",
+		icon: <EditFilled />,
+		color: "orange",
+	},
 };
 
 // 快捷键输入组件
@@ -71,7 +87,7 @@ function ShortcutInput({
 				<div
 					className={cn(
 						"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse",
-						conflict && "border-red-500 bg-red-50 dark:bg-red-900/20"
+						conflict && "border-red-500 bg-red-50 dark:bg-red-900/20",
 					)}
 				>
 					<span className="text-sm font-medium text-blue-600 dark:text-blue-400">
@@ -93,7 +109,7 @@ function ShortcutInput({
 			<div
 				className={cn(
 					"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-sm",
-					conflict && "border-red-500 text-red-500"
+					conflict && "border-red-500 text-red-500",
 				)}
 			>
 				{displayValue}
@@ -141,18 +157,18 @@ function ShortcutItem({
 				"flex items-center justify-between p-4 rounded-xl border transition-all",
 				shortcut.enabled
 					? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-					: "bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
+					: "bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60",
 			)}
 		>
 			<div className="flex-1 min-w-0">
 				<div className="flex items-center gap-2 mb-1">
 					<Tag color={scopeConfig.color} className="text-xs">
 						{scopeConfig.icon}
-						<span className="ml-1">{t(scopeConfig.labelKey)}</span>
+						<span className="ml-1">{t(scopeConfig.labelKey, { ns: "shortcuts" })}</span>
 					</Tag>
 					{isModified && (
 						<Tag color="orange" className="text-xs">
-							{t("shortcuts.modified", "已修改")}
+							{t("smodified", "已修改", { ns: 'shortcuts' })}
 						</Tag>
 					)}
 				</div>
@@ -168,7 +184,7 @@ function ShortcutItem({
 				<div className="w-[180px]">
 					<ShortcutInput
 						value={shortcut.currentKey}
-						onChange={() => {}}
+						onChange={() => { }}
 						isRecording={isRecording && recordingId === shortcut.id}
 						onStartRecording={() => onStartRecording(shortcut.id)}
 						onStopRecording={onStopRecording}
@@ -184,7 +200,7 @@ function ShortcutItem({
 					/>
 
 					{isModified && (
-						<Tooltip title={t("common.reset", "重置")}>
+						<Tooltip title={t("reset", "重置", { ns: "common" })}>
 							<Button
 								size="small"
 								onClick={() => onReset(shortcut.id)}
@@ -215,7 +231,9 @@ export function ShortcutSettings() {
 	} = useShortcutStore();
 
 	const [searchQuery, setSearchQuery] = useState("");
-	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">("all");
+	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">(
+		"all",
+	);
 	const [conflict, setConflict] = useState<Shortcut | null>(null);
 
 	// 初始化默认快捷键
@@ -231,7 +249,7 @@ export function ShortcutSettings() {
 			message.warning(
 				t("shortcuts.conflictWarning", "与 {{name}} 快捷键冲突", {
 					name: t(conflictWith.nameKey, conflictWith.name),
-				})
+				}),
 			);
 		};
 
@@ -247,7 +265,7 @@ export function ShortcutSettings() {
 			setConflict(null);
 			startRecording(id);
 		},
-		[startRecording]
+		[startRecording],
 	);
 
 	// 处理停止录制
@@ -258,16 +276,16 @@ export function ShortcutSettings() {
 	// 处理重置所有
 	const handleResetAll = useCallback(() => {
 		Modal.confirm({
-			title: t("shortcuts.resetAllTitle", "重置所有快捷键"),
+			title: t("shortcuts.resetAllTitle", "重置所有快捷键", { ns: "settings" }),
 			content: t(
 				"shortcuts.resetAllConfirm",
-				"确定要重置所有快捷键为默认值吗？此操作不可撤销。"
+				"确定要重置所有快捷键为默认值吗？此操作不可撤销。",
 			),
 			okText: t("common.confirm", "确认"),
-			cancelText: t("common.cancel", "取消"),
+			cancelText: t("cancel", "取消", { ns: "common" }),
 			onOk: () => {
 				resetAllShortcuts();
-				message.success(t("shortcuts.resetAllSuccess", "所有快捷键已重置"));
+				message.success(t("shortcuts.resetAllSuccess", "所有快捷键已重置", { ns: "settings" }));
 			},
 		});
 	}, [resetAllShortcuts, t]);
@@ -277,19 +295,24 @@ export function ShortcutSettings() {
 		const matchesSearch =
 			!searchQuery ||
 			t(s.nameKey, s.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
-			t(s.descriptionKey, s.description).toLowerCase().includes(searchQuery.toLowerCase());
+			t(s.descriptionKey, s.description)
+				.toLowerCase()
+				.includes(searchQuery.toLowerCase());
 		const matchesScope = selectedScope === "all" || s.scope === selectedScope;
 		return matchesSearch && matchesScope;
 	});
 
 	// 按作用域分组
-	const groupedShortcuts = filteredShortcuts.reduce((acc, shortcut) => {
-		if (!acc[shortcut.scope]) {
-			acc[shortcut.scope] = [];
-		}
-		acc[shortcut.scope].push(shortcut);
-		return acc;
-	}, {} as Record<ShortcutScope, Shortcut[]>);
+	const groupedShortcuts = filteredShortcuts.reduce(
+		(acc, shortcut) => {
+			if (!acc[shortcut.scope]) {
+				acc[shortcut.scope] = [];
+			}
+			acc[shortcut.scope].push(shortcut);
+			return acc;
+		},
+		{} as Record<ShortcutScope, Shortcut[]>,
+	);
 
 	// 统计信息
 	const stats = {
@@ -305,19 +328,20 @@ export function ShortcutSettings() {
 				<div>
 					<h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
 						<KeyOutlined />
-						{t("shortcuts.title", "快捷键设置")}
+						{t("shortcuts.title", "快捷键设置", { ns: "settings" })}
 					</h3>
 					<p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-						{t("shortcuts.subtitle", "自定义您的键盘快捷键")}
+						{t("shortcuts.subtitle", "自定义您的键盘快捷键", { ns: "settings" })}
 					</p>
 				</div>
 				<div className="flex items-center gap-4 text-sm text-slate-500">
 					<span>
-						{t("shortcuts.stats.enabled", "已启用")}: {stats.enabled}/{stats.total}
+						{t("shortcuts.stats.enabled", "已启用", { ns: "settings" })}: {stats.enabled}/
+						{stats.total}
 					</span>
 					{stats.modified > 0 && (
 						<span className="text-orange-500">
-							{t("shortcuts.stats.modified", "已修改")}: {stats.modified}
+							{t("shortcuts.stats.modified", "已修改", { ns: "settings" })}: {stats.modified}
 						</span>
 					)}
 				</div>
@@ -325,12 +349,17 @@ export function ShortcutSettings() {
 
 			{/* 提示信息 */}
 			<Alert
-				message={t("shortcuts.tips.title", "快捷键提示")}
+				message={t("shortcuts.tips.title", "快捷键提示", { ns: "settings" })}
 				description={
 					<div className="text-sm space-y-1">
-						<p>{t("shortcuts.tips.line1", "• 点击编辑按钮录制新的快捷键")}</p>
-						<p>{t("shortcuts.tips.line2", "• Mod 键在 Mac 上为 ⌘，在 Windows/Linux 上为 Ctrl")}</p>
-						<p>{t("shortcuts.tips.line3", "• 全局快捷键在任何页面都可用")}</p>
+						<p>{t("shortcuts.tips.line1", "• 点击编辑按钮录制新的快捷键", { ns: "settings" })}</p>
+						<p>
+							{t(
+								"shortcuts.tips.line2",
+								"• Mod 键在 Mac 上为 ⌘，在 Windows/Linux 上为 Ctrl",
+							)}
+						</p>
+						<p>{t("shortcuts.tips.line3", "• 全局快捷键在任何页面都可用", { ns: "settings" })}</p>
 					</div>
 				}
 				type="info"
@@ -341,7 +370,7 @@ export function ShortcutSettings() {
 			{/* 过滤器和搜索 */}
 			<div className="flex items-center gap-4">
 				<Input
-					placeholder={t("shortcuts.search", "搜索快捷键...")}
+					placeholder={t("shortcuts.search", "搜索快捷键...", { ns: "settings" })}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 					className="flex-1"
@@ -369,7 +398,7 @@ export function ShortcutSettings() {
 			<div className="space-y-4">
 				{filteredShortcuts.length === 0 ? (
 					<Empty
-						description={t("shortcuts.noResults", "没有找到匹配的快捷键")}
+						description={t("shortcuts.noResults", "没有找到匹配的快捷键", { ns: "settings" })}
 						image={Empty.PRESENTED_IMAGE_SIMPLE}
 					/>
 				) : (
@@ -410,14 +439,14 @@ export function ShortcutSettings() {
 					{isRecording && (
 						<span className="flex items-center gap-2 text-blue-500">
 							<WarningOutlined className="animate-pulse" />
-							{t("shortcuts.recordingHint", "按下要设置的快捷键组合...")}
+							{t("shortcuts.recordingHint", "按下要设置的快捷键组合...", { ns: "settings" })}
 						</span>
 					)}
 				</div>
 				{stats.modified > 0 && (
 					<Button onClick={handleResetAll} danger>
 						<ReloadOutlined />
-						{t("shortcuts.resetAll", "重置所有")}
+						{t("shortcuts.resetAll", "重置所有", { ns: "settings" })}
 					</Button>
 				)}
 			</div>

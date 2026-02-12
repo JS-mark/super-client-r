@@ -130,7 +130,7 @@ export function ImageGallery({
 					</div>
 					<div className="flex items-center gap-2">
 						{allowDownload && (
-							<Tooltip title={t("common.download", "下载")}>
+							<Tooltip title={t("download", "下载", { ns: "common" })}>
 								<Button
 									type="text"
 									icon={<DownloadOutlined />}
@@ -140,7 +140,7 @@ export function ImageGallery({
 							</Tooltip>
 						)}
 						{allowDelete && (
-							<Tooltip title={t("common.delete", "删除")}>
+							<Tooltip title={t("delete", "删除", { ns: "common" })}>
 								<Button
 									type="text"
 									icon={<DeleteOutlined />}
@@ -149,7 +149,7 @@ export function ImageGallery({
 								/>
 							</Tooltip>
 						)}
-						<Tooltip title={t("common.close", "关闭")}>
+						<Tooltip title={t("close", "关闭", { ns: "common" })}>
 							<Button
 								type="text"
 								icon={<CloseOutlined />}
@@ -207,7 +207,7 @@ export function ImageGallery({
 						className="text-white hover:text-white/80"
 						disabled={scale <= 0.5}
 					>
-						{t("common.zoomOut", "缩小")}
+						{t("zoomOut", "缩小", { ns: "common" })}
 					</Button>
 					<span className="text-white/60 min-w-[60px] text-center">
 						{Math.round(scale * 100)}%
@@ -219,7 +219,7 @@ export function ImageGallery({
 						className="text-white hover:text-white/80"
 						disabled={scale >= 3}
 					>
-						{t("common.zoomIn", "放大")}
+						{t("zoomIn", "放大", { ns: "common" })}
 					</Button>
 				</div>
 			</div>

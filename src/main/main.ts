@@ -312,6 +312,72 @@ function createMenu(): void {
 					{ role: "window" },
 				],
 			},
+			{
+				label: "工具",
+				submenu: [
+					{
+						label: "开发者工具",
+						accelerator: "Alt+CmdOrCtrl+I",
+						click: () => {
+							mainWindow?.webContents.toggleDevTools();
+						},
+					},
+					{ type: "separator" },
+					{
+						label: "重新加载",
+						accelerator: "CmdOrCtrl+R",
+						click: () => {
+							mainWindow?.webContents.reload();
+						},
+					},
+					{ type: "separator" },
+					{
+						label: "显示悬浮窗",
+						click: () => {
+							mainWindow?.webContents.send("toggle-float-widget", true);
+						},
+					},
+					{
+						label: "隐藏悬浮窗",
+						click: () => {
+							mainWindow?.webContents.send("toggle-float-widget", false);
+						},
+					},
+				],
+			},
+			{
+				label: "帮助",
+				submenu: [
+					{
+						label: "使用文档",
+						click: () => {
+							shell.openExternal("https://js-mark.com/super-client-r/");
+						},
+					},
+					{
+						label: "快捷键说明",
+						click: () => {
+							mainWindow?.show();
+							mainWindow?.webContents.send("navigate-to", "/settings?tab=shortcuts");
+						},
+					},
+					{ type: "separator" },
+					{
+						label: "发送反馈",
+						click: () => {
+							shell.openExternal("https://github.com/js-mark/super-client-r/issues");
+						},
+					},
+					{ type: "separator" },
+					{
+						label: "关于",
+						click: () => {
+							mainWindow?.show();
+							mainWindow?.webContents.send("navigate-to", "/settings?tab=about");
+						},
+					},
+				],
+			},
 		];
 		const menu = Menu.buildFromTemplate(template);
 		Menu.setApplicationMenu(menu);

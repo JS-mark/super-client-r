@@ -208,7 +208,7 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 						<span>{t("about.team", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-lg !border-slate-200 dark:!border-slate-700"
+				className="rounded-lg! border-slate-200! dark:border-slate-700!"
 			>
 				<div className="text-center py-3">
 					<div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-2">

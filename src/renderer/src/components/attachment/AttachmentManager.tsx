@@ -108,9 +108,9 @@ export function AttachmentManager({
 	const handleDelete = async (id: string) => {
 		const success = await deleteAttachment(id);
 		if (success) {
-			message.success(t("attachment.delete.success"));
+			message.success(t("attachment.delete.success", { ns: "attachment" }));
 		} else {
-			message.error(t("attachment.delete.error"));
+			message.error(t("attachment.delete.error", { ns: "attachment" }));
 		}
 	};
 
@@ -122,7 +122,7 @@ export function AttachmentManager({
 			document.body.appendChild(link);
 			link.click();
 			document.body.removeChild(link);
-			message.success(t("attachment.download.success"));
+			message.success(t("attachment.download.success", { ns: "attachment" }));
 		} else {
 			openAttachment(attachment.id);
 		}
@@ -156,7 +156,7 @@ export function AttachmentManager({
 				<div className="flex-1 relative">
 					<Input
 						prefix={<SearchOutlined className="text-slate-400" />}
-						placeholder={t("attachment.search.placeholder")}
+						placeholder={t("attachment.search.placeholder", { ns: "attachment" })}
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						allowClear
@@ -174,7 +174,7 @@ export function AttachmentManager({
 					trigger={["click"]}
 				>
 					<Button icon={<FilterOutlined />}>
-						{t("attachment.filter.label", "筛选")}
+						{t("attachment.filter.label", "筛选", { ns: "attachment" })}
 					</Button>
 				</Dropdown>
 			</div>
@@ -211,7 +211,7 @@ export function AttachmentManager({
 								<PaperClipOutlined />
 							</div>
 						}
-						description={t("attachment.empty.description", "暂无附件")}
+						description={t("attachment.empty.description", "暂无附件", { ns: "attachment" })}
 						className="mt-12"
 					/>
 				) : (
@@ -249,10 +249,10 @@ export function AttachmentManager({
 					</span>
 					<div className="flex gap-2">
 						<Button onClick={clearSelection}>
-							{t("common.cancel", "取消")}
+							{t("cancel", "取消", { ns: "common" })}
 						</Button>
 						<Button type="primary" onClick={handleConfirmSelection}>
-							{t("common.confirm", "确认")}
+							{t("confirm", "确认", { ns: "common" })}
 						</Button>
 					</div>
 				</div>
@@ -300,19 +300,19 @@ function AttachmentItem({
 		{
 			key: "open",
 			icon: <EyeOutlined />,
-			label: t("common.open", "打开"),
+			label: t("open", "打开", { ns: "common" }),
 			onClick: onOpen,
 		},
 		{
 			key: "download",
 			icon: <DownloadOutlined />,
-			label: t("common.download", "下载"),
+			label: t("download", "下载", { ns: "common" }),
 			onClick: onDownload,
 		},
 		{
 			key: "delete",
 			icon: <DeleteOutlined />,
-			label: t("common.delete", "删除"),
+			label: t("delete", "删除", { ns: "common" }),
 			danger: true,
 			onClick: onDelete,
 		},
@@ -366,7 +366,7 @@ function AttachmentItem({
 								onOpen?.();
 							}}
 							className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500"
-							title={t("common.open", "打开")}
+							title={t("open", "打开", { ns: "common" })}
 						>
 							<EyeOutlined />
 						</button>

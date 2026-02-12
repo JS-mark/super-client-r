@@ -14,7 +14,7 @@ const ErrorPage: React.FC = () => {
 				status="500"
 				title={t("title", "Something went wrong", { ns: "error" })}
 				subTitle={
-					error?.statusText || error?.message || t("defaultMessage")
+					error?.statusText || error?.message || t("defaultMessage", { ns: "common" })
 				}
 				extra={
 					<Button type="primary" onClick={() => navigate("/")}>

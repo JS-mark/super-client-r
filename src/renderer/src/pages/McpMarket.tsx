@@ -725,7 +725,7 @@ const McpMarket: React.FC = () => {
 				transport: values.transport,
 				url: values.transport !== "stdio" ? values.url : undefined,
 				command: values.transport === "stdio" ? values.command : undefined,
-				args: values.transport === "stdio" && values.args ? values.args.split(" ").filter(Boolean) : undefined,
+				args: values.transport === "stdio" && values.args ? values.args.split(" ", { ns: "mcp" }).filter(Boolean) : undefined,
 			});
 			message.success(t("messages.updated", { ns: "mcp", name: values.name }));
 		} else {
@@ -740,7 +740,7 @@ const McpMarket: React.FC = () => {
 				description: values.description,
 				url: values.transport !== "stdio" ? values.url : undefined,
 				command: values.transport === "stdio" ? values.command : undefined,
-				args: values.transport === "stdio" && values.args ? values.args.split(" ").filter(Boolean) : undefined,
+				args: values.transport === "stdio" && values.args ? values.args.split(" ", { ns: "mcp" }).filter(Boolean) : undefined,
 			};
 			addServer(newServer);
 			message.success(t("messages.added", { ns: "mcp", name: values.name }));

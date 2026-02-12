@@ -105,7 +105,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
 					description={
 						<span className="text-gray-500 dark:text-gray-400">
-							{t("empty", "No models configured yet")}
+							{t("empty", "No models configured yet", { ns: "models" })}
 						</span>
 					}
 				>

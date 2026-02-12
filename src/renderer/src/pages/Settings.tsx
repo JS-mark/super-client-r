@@ -1020,7 +1020,7 @@ const PerformanceMonitorTab: React.FC = () => {
               {t("memoryUsage", "内存使用", { ns: "settings" })}
             </span>
           }
-          className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+          className="rounded-xl! border-slate-200! dark:border-slate-700!"
         >
           <div className="space-y-4">
             <Progress
@@ -1566,7 +1566,7 @@ const Settings: React.FC = () => {
       label: (
         <span className="flex items-center gap-2 font-medium">
           <SearchOutlined />
-          {t("search", "Search", { ns: "settings" })}
+          {t("search.title", "Search", { ns: "settings" })}
         </span>
       ),
       children: (

@@ -42,7 +42,7 @@ const Home = () => {
           <HomeOutlined className="text-white text-xs" />
         </div>
         <span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
-          {t("menu.home", "首页")}
+          {t("home", "首页", { ns: "menu" })}
         </span>
       </div>
     ),

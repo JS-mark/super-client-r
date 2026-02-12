@@ -32,7 +32,7 @@ export interface LogWorkerResponse {
  * 解析日志内容，提取行信息
  */
 function parseLogLines(content: string): string[] {
-  return content.split('\n').filter(line => line.trim() !== '');
+  return content.split("\n").filter(line => line.trim() !== '');
 }
 
 /**
@@ -49,7 +49,7 @@ function handleLoadLogs(payload: LogWorkerRequest['payload']): LogWorkerResponse
 
   // 如果指定了 tail，只保留最后 N 行
   if (tail && tail > 0) {
-    const lines = content.split('\n');
+    const lines = content.split("\n");
     processedContent = lines.slice(-tail).join('\n');
   }
 
@@ -90,7 +90,7 @@ function handleFilterLogs(payload: LogWorkerRequest['payload']): LogWorkerRespon
     return { content, lines: parseLogLines(content || ''), totalLines: 0 };
   }
 
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   const filteredLines = lines.filter(line =>
     line.toLowerCase().includes(filter.toLowerCase())
   );

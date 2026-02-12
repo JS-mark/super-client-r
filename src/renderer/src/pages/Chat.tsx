@@ -326,7 +326,7 @@ const Chat: React.FC = () => {
 				// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 				style={{ WebkitAppRegion: "no-drag" }}
 			>
-				<Tooltip title={t("chat.toolbar.searchMessages", "搜索消息")}>
+				<Tooltip title={t("chat.toolbar.searchMessages", "搜索消息", { ns: "chat" })}>
 					<Button
 						type="text"
 						icon={<span className="text-slate-700 dark:text-slate-200"><SearchOutlined /></span>}
@@ -335,7 +335,7 @@ const Chat: React.FC = () => {
 						className="rounded-lg"
 					/>
 				</Tooltip>
-				<Tooltip title={t("chat.toolbar.export", "导出")}>
+				<Tooltip title={t("chat.toolbar.export", "导出", { ns: "chat" })}>
 					<Button
 						type="text"
 						icon={<span className="text-slate-700 dark:text-slate-200"><ExportOutlined /></span>}
@@ -344,7 +344,7 @@ const Chat: React.FC = () => {
 						className="rounded-lg"
 					/>
 				</Tooltip>
-				<Tooltip title={t("chat.toolbar.clear", "清空")}>
+				<Tooltip title={t("chat.toolbar.clear", "清空", { ns: "chat" })}>
 					<Button
 						type="text"
 						icon={<span className="text-slate-700 dark:text-slate-200"><ClearOutlined /></span>}
@@ -646,7 +646,7 @@ const Chat: React.FC = () => {
 				break;
 			case "doc":
 				// Open document selector
-				message.info(t("toolbar.docComingSoon", "文档功能即将推出"));
+				message.info(t("toolbar.docComingSoon", "文档功能即将推出", { ns: "chat" }));
 				break;
 			default:
 				break;
@@ -727,7 +727,7 @@ const Chat: React.FC = () => {
 									conversationId={conversationId}
 									onDelete={(msgId) => {
 										// TODO: Implement message deletion
-										message.info(t("chat.messageDeleteNotImplemented", "消息删除功能待实现"));
+										message.info(t("chat.messageDeleteNotImplemented", "消息删除功能待实现", { ns: "chat" }));
 									}}
 								/>
 							))}
@@ -826,7 +826,7 @@ const Chat: React.FC = () => {
 									))}
 
 									{/* Search engine toggle button */}
-									<Tooltip title={t("chat.toolbar.search", "搜索")}>
+									<Tooltip title={t("chat.toolbar.search", "搜索", { ns: "chat" })}>
 										<button
 											onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
 											className={cn(
@@ -871,7 +871,7 @@ const Chat: React.FC = () => {
 				onClose={() => setIsSearchOpen(false)}
 				onJumpToMessage={(messageId) => {
 					// TODO: Implement scroll to message
-					message.info(`${t("chat.jumpToMessage", "跳转到消息")}: ${messageId}`);
+					message.info(`${t("chat.jumpToMessage", "跳转到消息", { ns: "chat" })}: ${messageId}`);
 				}}
 			/>
 

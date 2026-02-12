@@ -114,35 +114,35 @@ function CreateWorkspaceModal({
 
 	return (
 		<Modal
-			title={t("workspaces.create.title", "创建工作区")}
+			title={t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}
 			open={open}
 			onOk={handleSubmit}
 			onCancel={onClose}
 			okText={t("common.create", "创建")}
-			cancelText={t("common.cancel", "取消")}
+			cancelText={t("cancel", "取消", { ns: "common" })}
 		>
 			<Form form={form} layout="vertical" className="mt-4">
 				<Form.Item
 					name="name"
-					label={t("workspaces.name", "名称")}
+					label={t("workspaces.name", "名称", { ns: "workspaces" })}
 					rules={[{ required: true, message: "请输入工作区名称" }]}
 				>
-					<Input placeholder={t("workspaces.namePlaceholder", "我的工作区")} />
+					<Input placeholder={t("workspaces.namePlaceholder", "我的工作区", { ns: "workspaces" })} />
 				</Form.Item>
 
 				<Form.Item
 					name="description"
-					label={t("workspaces.description", "描述")}
+					label={t("workspaces.description", "描述", { ns: "workspaces" })}
 				>
 					<Input.TextArea
 						rows={2}
-						placeholder={t("workspaces.descriptionPlaceholder", "工作区描述...")}
+						placeholder={t("workspaces.descriptionPlaceholder", "工作区描述...", { ns: "workspaces" })}
 					/>
 				</Form.Item>
 
 				<Form.Item
 					name="type"
-					label={t("workspaces.type.label", "类型")}
+					label={t("workspaces.type.label", "类型", { ns: "workspaces" })}
 					initialValue="personal"
 				>
 					<Radio.Group>
@@ -159,7 +159,7 @@ function CreateWorkspaceModal({
 					</Radio.Group>
 				</Form.Item>
 
-				<Form.Item label={t("workspaces.color", "颜色")}>
+				<Form.Item label={t("workspaces.color", "颜色", { ns: "workspaces" })}>
 					<div className="flex flex-wrap gap-2">
 						{WORKSPACE_COLORS.map((c) => (
 							<button
@@ -205,13 +205,13 @@ export function WorkspaceSwitcher() {
 
 	const handleCreate = (data: WorkspaceFormData) => {
 		const id = createWorkspace(data);
-		message.success(t("workspaces.create.success", "工作区创建成功"));
+		message.success(t("workspaces.create.success", "工作区创建成功", { ns: "workspaces" }));
 		setDropdownOpen(false);
 	};
 
 	const handleDuplicate = (workspace: Workspace) => {
 		duplicateWorkspace(workspace.id);
-		message.success(t("workspaces.duplicate.success", "工作区已复制"));
+		message.success(t("workspaces.duplicate.success", "工作区已复制", { ns: "workspaces" }));
 	};
 
 	const handleDelete = (workspace: Workspace) => {
@@ -221,7 +221,7 @@ export function WorkspaceSwitcher() {
 		}
 
 		Modal.confirm({
-			title: t("workspaces.delete.confirmTitle", "删除工作区"),
+			title: t("workspaces.delete.confirmTitle", "删除工作区", { ns: "workspaces" }),
 			content: t(
 				"workspaces.delete.confirmContent",
 				"确定要删除工作区 \"{{name}}\" 吗？此操作不可撤销。",
@@ -230,7 +230,7 @@ export function WorkspaceSwitcher() {
 			onOk: () => {
 				const success = deleteWorkspace(workspace.id);
 				if (success) {
-					message.success(t("workspaces.delete.success", "工作区已删除"));
+					message.success(t("workspaces.delete.success", "工作区已删除", { ns: "workspaces" }));
 				}
 			},
 		});
@@ -251,7 +251,7 @@ export function WorkspaceSwitcher() {
 			URL.revokeObjectURL(url);
 			message.success(t("workspaces.export.success", "工作区已导出"));
 		} catch (error) {
-			message.error(t("workspaces.export.error", "导出失败"));
+			message.error(t("workspaces.export.error", "导出失败", { ns: "workspaces" }));
 		}
 	};
 
@@ -260,7 +260,7 @@ export function WorkspaceSwitcher() {
 			key: "header",
 			label: (
 				<div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 mb-1">
-					{t("workspaces.switch.title", "切换工作区")}
+					{t("workspaces.switch.title", "切换工作区", { ns: "workspaces" })}
 				</div>
 			),
 			disabled: true,
@@ -287,7 +287,7 @@ export function WorkspaceSwitcher() {
 
 					{/* 操作按钮 */}
 					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-						<Tooltip title={t("workspaces.duplicate", "复制")}>
+						<Tooltip title={t("workspaces.duplicate", "复制", { ns: "workspaces" })}>
 							<button
 								onClick={(e) => {
 									e.stopPropagation();
@@ -298,7 +298,7 @@ export function WorkspaceSwitcher() {
 								<CopyOutlined className="text-xs" />
 							</button>
 						</Tooltip>
-						<Tooltip title={t("workspaces.export", "导出")}>
+						<Tooltip title={t("workspaces.export", "导出", { ns: "workspaces" })}>
 							<button
 								onClick={(e) => {
 									e.stopPropagation();
@@ -310,7 +310,7 @@ export function WorkspaceSwitcher() {
 							</button>
 						</Tooltip>
 						{workspace.id !== defaultWorkspaceId && (
-							<Tooltip title={t("common.delete", "删除")}>
+							<Tooltip title={t("delete", "删除", { ns: "common" })}>
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
@@ -341,7 +341,7 @@ export function WorkspaceSwitcher() {
 					className="flex items-center gap-2 text-blue-600 dark:text-blue-400 w-full text-left"
 				>
 					<PlusOutlined />
-					<span>{t("workspaces.create.title", "创建工作区")}</span>
+					<span>{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}</span>
 				</button>
 			),
 		},
@@ -357,7 +357,7 @@ export function WorkspaceSwitcher() {
 					className="flex items-center gap-2 text-slate-600 dark:text-slate-400 w-full text-left"
 				>
 					<SettingOutlined />
-					<span>{t("workspaces.manage", "管理工作区")}</span>
+					<span>{t("workspaces.manage", "管理工作区", { ns: "workspaces" })}</span>
 				</button>
 			),
 		},

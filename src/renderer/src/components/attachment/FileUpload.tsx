@@ -219,7 +219,7 @@ export function FileUpload({
 						<>
 							<UploadOutlined className="text-2xl" />
 							<span className="text-sm">
-								{t("attachment.upload.dragOrClick", "点击或拖拽文件到此处上传")}
+								{t("attachment.upload.dragOrClick", "点击或拖拽文件到此处上传", { ns: "attachment" })}
 							</span>
 							<span className="text-xs text-slate-400">
 								{t("attachment.upload.maxSize", "最大 {{size}}", { size: formatFileSize(maxSize) })}
@@ -375,7 +375,7 @@ export function FileUploadButton({
 				icon={<PaperClipOutlined />}
 				onClick={() => fileInputRef.current?.click()}
 				className={className}
-				title={t("attachment.upload.title", "上传文件")}
+				title={t("attachment.upload.title", "上传文件", { ns: "attachment" })}
 			/>
 		</>
 	);

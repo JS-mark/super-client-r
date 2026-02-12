@@ -174,7 +174,7 @@ export function SearchSettings() {
 				message.error(result.error || t("search.loadError", "加载搜索配置失败"));
 			}
 		} catch (error) {
-			message.error(t("search.loadError", "加载搜索配置失败"));
+			message.error(t("search.loadError", "加载搜索配置失败", { ns: "settings" }));
 		} finally {
 			setLoading(false);
 		}
@@ -225,14 +225,14 @@ export function SearchSettings() {
 
 			const result = await searchService.saveConfig(config);
 			if (result.success) {
-				message.success(t("search.saveSuccess", "保存成功"));
+				message.success(t("search.saveSuccess", "保存成功", { ns: "settings" }));
 				setModalOpen(false);
 				loadConfigs();
 			} else {
 				message.error(result.error || t("search.saveError", "保存失败"));
 			}
 		} catch (error) {
-			message.error(t("search.saveError", "保存失败"));
+			message.error(t("search.saveError", "保存失败", { ns: "settings" }));
 		} finally {
 			setSaving(false);
 		}
@@ -243,13 +243,13 @@ export function SearchSettings() {
 		try {
 			const result = await searchService.deleteConfig(id);
 			if (result.success) {
-				message.success(t("search.deleteSuccess", "删除成功"));
+				message.success(t("search.deleteSuccess", "删除成功", { ns: "settings" }));
 				loadConfigs();
 			} else {
 				message.error(result.error || t("search.deleteError", "删除失败"));
 			}
 		} catch (error) {
-			message.error(t("search.deleteError", "删除失败"));
+			message.error(t("search.deleteError", "删除失败", { ns: "settings" }));
 		}
 	}, [loadConfigs, t]);
 
@@ -260,13 +260,13 @@ export function SearchSettings() {
 			if (result.success) {
 				message.success(provider
 					? t("search.setDefaultSuccess", "设置默认成功")
-					: t("search.clearDefaultSuccess", "已取消默认"));
+					: t("search.clearDefaultSuccess", "已取消默认", { ns: "settings" }));
 				loadConfigs();
 			} else {
 				message.error(result.error || t("search.setDefaultError", "设置失败"));
 			}
 		} catch (error) {
-			message.error(t("search.setDefaultError", "设置失败"));
+			message.error(t("search.setDefaultError", "设置失败", { ns: "settings" }));
 		}
 	}, [loadConfigs, t]);
 
@@ -274,7 +274,7 @@ export function SearchSettings() {
 	const handleValidateConfig = useCallback(async () => {
 		const values = form.getFieldsValue();
 		if (!values.provider) {
-			message.warning(t("search.selectProviderFirst", "请先选择服务商"));
+			message.warning(t("search.selectProviderFirst", "请先选择服务商", { ns: "settings" }));
 			return;
 		}
 
@@ -292,12 +292,12 @@ export function SearchSettings() {
 
 			const result = await searchService.validateConfig(config);
 			if (result.success && result.data?.valid) {
-				message.success(t("search.validateSuccess", "API Key 有效"));
+				message.success(t("search.validateSuccess", "API Key 有效", { ns: "settings" }));
 			} else {
 				message.error(result.data?.error || result.error || t("search.validateError", "验证失败"));
 			}
 		} catch (error) {
-			message.error(t("search.validateError", "验证失败"));
+			message.error(t("search.validateError", "验证失败", { ns: "settings" }));
 		} finally {
 			setValidating(false);
 		}
@@ -326,10 +326,7 @@ export function SearchSettings() {
 			{/* 提示信息 */}
 			<Alert
 				message={t("search.title", "网络搜索配置")}
-				description={t(
-					"search.description",
-					"配置第三方搜索服务，让 AI 能够获取最新的网络信息。支持 API 搜索和传统搜索引擎。"
-				)}
+				description={t("search.description", "配置第三方搜索服务，让 AI 能够获取最新的网络信息。支持 API 搜索和传统搜索引擎。", { ns: "settings" })}
 				type="info"
 				showIcon
 				className="mb-4"
@@ -344,7 +341,7 @@ export function SearchSettings() {
 								{getProviderInfo(defaultProvider)?.icon || "🔍"}
 							</div>
 							<div>
-								<div className="text-sm text-slate-500">{t("search.currentDefault", "当前默认搜索引擎")}</div>
+								<div className="text-sm text-slate-500">{t("search.currentDefault", "当前默认搜索引擎", { ns: "settings" })}</div>
 								<div className="font-semibold text-slate-800 dark:text-slate-200">
 									{getProviderInfo(defaultProvider)?.name || defaultProvider}
 								</div>
@@ -355,7 +352,7 @@ export function SearchSettings() {
 							onClick={() => handleSetDefault(null)}
 							size="small"
 						>
-							{t("search.clearDefault", "取消默认")}
+							{t("search.clearDefault", "取消默认", { ns: "settings" })}
 						</Button>
 					</div>
 				</Card>
@@ -367,7 +364,7 @@ export function SearchSettings() {
 					<div className="flex items-center justify-between">
 						<span className="flex items-center gap-2">
 							<SettingOutlined />
-							{t("search.configList", "搜索配置")}
+							{t("search.configList", "搜索配置", { ns: "settings" })}
 						</span>
 						<Button
 							type="primary"
@@ -375,7 +372,7 @@ export function SearchSettings() {
 							onClick={handleAddConfig}
 							size="small"
 						>
-							{t("search.addConfig", "添加配置")}
+							{t("search.addConfig", "添加配置", { ns: "settings" })}
 						</Button>
 					</div>
 				}
@@ -391,7 +388,7 @@ export function SearchSettings() {
 						return (
 							<List.Item
 								actions={[
-									<Tooltip key="default" title={isDefault ? t("search.isDefault", "默认") : t("search.setAsDefault", "设为默认")}>
+									<Tooltip key="default" title={isDefault ? t("search.isDefault", "默认") : t("search.setAsDefault", "设为默认", { ns: "settings" })}>
 										<Button
 											icon={isDefault ? <StarFilled className="text-yellow-500" /> : <StarOutlined />}
 											onClick={() => handleSetDefault(isDefault ? null : config.provider)}
@@ -400,7 +397,7 @@ export function SearchSettings() {
 											disabled={isDefault}
 										/>
 									</Tooltip>,
-									<Tooltip key="edit" title={t("common.edit", "编辑")}>
+									<Tooltip key="edit" title={t("edit", "编辑", { ns: "common" })}>
 										<Button
 											icon={<EditOutlined />}
 											onClick={() => handleEditConfig(config)}
@@ -409,12 +406,12 @@ export function SearchSettings() {
 									</Tooltip>,
 									<Popconfirm
 										key="delete"
-										title={t("search.confirmDelete", "确定要删除此配置吗？")}
+										title={t("search.confirmDelete", "确定要删除此配置吗？", { ns: "settings" })}
 										onConfirm={() => handleDeleteConfig(config.id)}
-										okText={t("common.confirm", "确定")}
+										okText={t("confirm", "确定", { ns: "common" })}
 										cancelText={t("common.cancel", "取消")}
 									>
-										<Tooltip title={t("common.delete", "删除")}>
+										<Tooltip title={t("delete", "删除", { ns: "common" })}>
 											<Button icon={<DeleteOutlined />} danger size="small" />
 										</Tooltip>
 									</Popconfirm>,
@@ -431,12 +428,12 @@ export function SearchSettings() {
 											<span className="font-medium">{config.name}</span>
 											{isDefault && (
 												<Tag color="blue" className="!text-xs">
-													{t("search.default", "默认")}
+													{t("search.default", "默认", { ns: "settings" })}
 												</Tag>
 											)}
 											{!config.enabled && (
 												<Tag color="default" className="!text-xs">
-													{t("search.disabled", "已禁用")}
+													{t("search.disabled", "已禁用", { ns: "settings" })}
 												</Tag>
 											)}
 										</div>
@@ -459,9 +456,9 @@ export function SearchSettings() {
 						emptyText: (
 							<div className="text-center py-8 text-slate-400">
 								<SearchOutlined className="text-4xl mb-2" />
-								<p>{t("search.noConfigs", "暂无搜索配置")}</p>
+								<p>{t("search.noConfigs", "暂无搜索配置", { ns: "settings" })}</p>
 								<Button type="primary" icon={<PlusOutlined />} onClick={handleAddConfig} className="mt-4">
-									{t("search.addConfig", "添加配置")}
+									{t("search.addConfig", "添加配置", { ns: "settings" })}
 								</Button>
 							</div>
 						),
@@ -476,7 +473,7 @@ export function SearchSettings() {
 						<SearchOutlined />
 						{editingConfig
 							? t("search.editConfig", "编辑搜索配置")
-							: t("search.addConfig", "添加搜索配置")}
+							: t("search.addConfig", "添加搜索配置", { ns: "settings" })}
 					</div>
 				}
 				open={modalOpen}
@@ -494,16 +491,16 @@ export function SearchSettings() {
 					{/* 服务商选择 */}
 					<Form.Item
 						name="provider"
-						label={t("search.provider", "搜索服务商")}
+						label={t("search.provider", "搜索服务商", { ns: "settings" })}
 						rules={[{ required: true, message: t("search.providerRequired", "请选择搜索服务商") }]}
 					>
 						<Select
-							placeholder={t("search.selectProvider", "请选择服务商")}
+							placeholder={t("search.selectProvider", "请选择服务商", { ns: "settings" })}
 							onChange={handleProviderChange}
 							disabled={!!editingConfig}
 							options={[
 								{
-									label: t("search.apiSearch", "API 搜索"),
+									label: t("search.apiSearch", "API 搜索", { ns: "settings" }),
 									options: apiSearchProviders.map((p) => ({
 										value: p.id,
 										label: (
@@ -515,7 +512,7 @@ export function SearchSettings() {
 									})),
 								},
 								{
-									label: t("search.traditionalSearch", "传统搜索"),
+									label: t("search.traditionalSearch", "传统搜索", { ns: "settings" }),
 									options: localSearchProviders.map((p) => ({
 										value: p.id,
 										label: (
@@ -543,7 +540,7 @@ export function SearchSettings() {
 										className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
 									>
 										<QuestionCircleOutlined />
-										{t("search.getApiKey", "获取 API Key")}
+										{t("search.getApiKey", "获取 API Key", { ns: "settings" })}
 									</a>
 								)}
 							</div>
@@ -553,10 +550,10 @@ export function SearchSettings() {
 					{/* 配置名称 */}
 					<Form.Item
 						name="name"
-						label={t("search.configName", "配置名称")}
+						label={t("search.configName", "配置名称", { ns: "settings" })}
 						rules={[{ required: true, message: t("search.nameRequired", "请输入配置名称") }]}
 					>
-						<Input placeholder={t("search.namePlaceholder", "例如：我的 Tavily 搜索")} />
+						<Input placeholder={t("search.namePlaceholder", "例如：我的 Tavily 搜索", { ns: "settings" })} />
 					</Form.Item>
 
 					{/* API Key */}
@@ -569,7 +566,7 @@ export function SearchSettings() {
 									{currentProvider?.apiKeyLabel || "API Key"}
 								</div>
 							}
-							rules={currentProvider?.requiresApiKey ? [{ required: true, message: t("search.apiKeyRequired", "请输入 API Key") }] : []}
+							rules={currentProvider?.requiresApiKey ? [{ required: true, message: t("search.apiKeyRequired", "请输入 API Key", { ns: "settings" }) }] : []}
 						>
 							<Input.Password
 								placeholder={currentProvider?.apiKeyPlaceholder}
@@ -581,7 +578,7 @@ export function SearchSettings() {
 										disabled={!form.getFieldValue("apiKey")}
 									>
 										<CheckCircleOutlined />
-										{t("search.validate", "检测")}
+										{t("search.validate", "检测", { ns: "settings" })}
 									</Button>
 								}
 							/>
@@ -598,7 +595,7 @@ export function SearchSettings() {
 									{currentProvider?.apiUrlLabel || "API URL"}
 								</div>
 							}
-							rules={[{ required: true, message: t("search.apiUrlRequired", "请输入 API URL") }]}
+							rules={[{ required: true, message: t("search.apiUrlRequired", "请输入 API URL", { ns: "settings" }) }]}
 						>
 							<Input placeholder={currentProvider?.apiUrlPlaceholder} />
 						</Form.Item>
@@ -608,7 +605,7 @@ export function SearchSettings() {
 					<Form.Item name="enabled" valuePropName="checked">
 						<Switch
 							checkedChildren={t("search.enabled", "已启用")}
-							unCheckedChildren={t("search.disabled", "已禁用")}
+							unCheckedChildren={t("search.disabled", "已禁用", { ns: "settings" })}
 							defaultChecked
 						/>
 					</Form.Item>
@@ -616,10 +613,10 @@ export function SearchSettings() {
 					{/* 按钮 */}
 					<div className="flex justify-end gap-2 mt-6">
 						<Button onClick={() => setModalOpen(false)}>
-							{t("common.cancel", "取消")}
+							{t("cancel", "取消", { ns: "common" })}
 						</Button>
 						<Button type="primary" htmlType="submit" loading={saving} icon={<SaveOutlined />}>
-							{t("common.save", "保存")}
+							{t("save", "保存", { ns: "common" })}
 						</Button>
 					</div>
 				</Form>

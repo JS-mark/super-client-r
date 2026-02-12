@@ -90,7 +90,7 @@ export const TitleBar: React.FC = () => {
 					// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 					style={{ WebkitAppRegion: "no-drag" }}
 				>
-					<Tooltip title={t("minimize", "最小化")} placement="bottom">
+					<Tooltip title={t("minimize", "最小化", { ns: "menu" })} placement="bottom">
 						<button
 							type="button"
 							onClick={handleMinimize}
@@ -101,7 +101,7 @@ export const TitleBar: React.FC = () => {
 					</Tooltip>
 
 					<Tooltip
-						title={isMaximized ? t("restore", "还原") : t("maximize", "最大化")}
+						title={isMaximized ? t("restore", "还原") : t("maximize", "最大化", { ns: "menu" })}
 						placement="bottom"
 					>
 						<button

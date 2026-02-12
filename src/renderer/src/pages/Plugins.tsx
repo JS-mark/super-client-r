@@ -1,25 +1,37 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
-import { useTranslation } from "react-i18next";
-import { Button, Input, Tabs, List, Card, Badge, Tag, Empty, Spin, message, Switch, Popconfirm } from "antd";
 import {
-	SearchOutlined,
-	PlusOutlined,
-	DownloadOutlined,
-	SettingOutlined,
-	DeleteOutlined,
-	ReloadOutlined,
+	AppstoreOutlined,
 	CheckCircleOutlined,
+	DeleteOutlined,
+	DownloadOutlined,
 	ExclamationCircleOutlined,
 	LoadingOutlined,
-	AppstoreOutlined,
+	PlusOutlined,
+	ReloadOutlined,
+	SearchOutlined,
+	SettingOutlined,
 } from "@ant-design/icons";
+import {
+	Badge,
+	Button,
+	Card,
+	Empty,
+	Input,
+	List,
+	message,
+	Popconfirm,
+	Spin,
+	Switch,
+	Tabs,
+	Tag,
+} from "antd";
+import { Children, useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
-import { pluginService } from "../services/pluginService";
 import { useTitle } from "../hooks/useTitle";
-import type { PluginInfo, MarketPlugin } from "../types/plugin";
 import { cn } from "../lib/utils";
+import { pluginService } from "../services/pluginService";
+import type { MarketPlugin, PluginInfo } from "../types/plugin";
 
-const { TabPane } = Tabs;
 const { Search } = Input;
 
 // 插件状态标签
@@ -43,14 +55,19 @@ export default function Plugins() {
 	const { t } = useTranslation();
 
 	// 设置标题栏
-	const pageTitle = useMemo(() => (
-		<div className="flex items-center gap-2">
-			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-				<AppstoreOutlined className="text-white text-xs" />
+	const pageTitle = useMemo(
+		() => (
+			<div className="flex items-center gap-2">
+				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+					<AppstoreOutlined className="text-white text-xs" />
+				</div>
+				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+					{t("plugins", "插件", { ns: "menu" })}
+				</span>
 			</div>
-			<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("menu.plugins", "插件")}</span>
-		</div>
-	), [t]);
+		),
+		[t],
+	);
 	useTitle(pageTitle);
 
 	// 状态
@@ -145,6 +162,204 @@ export default function Plugins() {
 		}
 	};
 
+	const tabContent = [
+		{
+			key: "market",
+			label: t("plugins.market", "插件市场", { ns: "plugins" }),
+			children: (
+				<>
+					<div className="mb-4">
+						<Search
+							placeholder={t("plugins.searchPlaceholder", "搜索插件...", { ns: "plugins" })}
+							allowClear
+							onSearch={loadMarketPlugins}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							style={{ maxWidth: 400 }}
+						/>
+					</div>
+
+					{marketLoading ? (
+						<div className="flex justify-center py-12">
+							<Spin size="large" />
+						</div>
+					) : marketPlugins.length === 0 ? (
+						<Empty
+							description={t("plugins.noMarketPlugins", "暂无可用插件", { ns: "plugins" })}
+						/>
+					) : (
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+							{marketPlugins.map((plugin) => (
+								<Card
+									key={plugin.id}
+									hoverable
+									className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+									actions={[
+										plugin.installed ? (
+											<Button
+												key="installed"
+												disabled
+												icon={<CheckCircleOutlined />}
+											>
+												{t("plugins.installed", "已安装", { ns: "plugins" })}
+											</Button>
+										) : (
+											<Button
+												key="install"
+												type="primary"
+												icon={<DownloadOutlined />}
+												onClick={() => handleInstallFromMarket(plugin.id)}
+												loading={loading}
+											>
+												{t("plugins.install", "安装", { ns: "plugins" })}
+											</Button>
+										),
+									]}
+								>
+									<Card.Meta
+										title={
+											<div className="flex items-center gap-2">
+												<span className="text-lg">
+													{plugin.icon || "🔌"}
+												</span>
+												<span>{plugin.displayName}</span>
+											</div>
+										}
+										description={
+											<div className="space-y-2">
+												<p className="text-slate-500 line-clamp-2">
+													{plugin.description}
+												</p>
+												<div className="flex items-center gap-2 text-xs text-slate-400">
+													<span>v{plugin.version}</span>
+													<span>·</span>
+													<span>{plugin.author}</span>
+												</div>
+												<div className="flex items-center gap-1">
+													{plugin.categories.map((cat: string) => (
+														<Tag key={cat}>{cat}</Tag>
+													))}
+												</div>
+												<div className="flex items-center gap-4 text-xs text-slate-400">
+													<span>⬇️ {plugin.downloads}</span>
+													<span>⭐ {plugin.rating}</span>
+												</div>
+											</div>
+										}
+									/>
+								</Card>
+							))}
+						</div>
+					)}
+				</>
+			)
+		},
+		{
+			key: "installed",
+			label: (
+				<span>
+					{t("plugins.installed", "已安装", { ns: "plugins" })}
+					{installedPlugins.length > 0 && (
+						<Badge count={installedPlugins.length} className="ml-1" />
+					)}
+				</span>
+			),
+			children: (
+				<>
+					{installedLoading ? (
+						<div className="flex justify-center py-12">
+							<Spin size="large" />
+						</div>
+					) : installedPlugins.length === 0 ? (
+						<Empty
+							description={t(
+								"plugins.noInstalledPlugins",
+								"暂无已安装插件",
+							)}
+							image={Empty.PRESENTED_IMAGE_SIMPLE}
+						>
+							<Button type="primary" onClick={() => setActiveTab("market")}>
+								{t("plugins.browseMarket", "浏览插件市场", { ns: "plugins" })}
+							</Button>
+						</Empty>
+					) : (
+						<List
+							grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3 }}
+							dataSource={installedPlugins}
+							renderItem={(plugin) => (
+								<List.Item>
+									<Card
+										className={cn(
+											"w-full",
+											plugin.enabled &&
+											"border-blue-500 dark:border-blue-500",
+										)}
+										actions={[
+											<Switch
+												key="toggle"
+												checked={plugin.enabled}
+												onChange={() => handleTogglePlugin(plugin)}
+												checkedChildren="启用"
+												unCheckedChildren="禁用"
+											/>,
+											<Popconfirm
+												key="delete"
+												title={t(
+													"plugins.confirmUninstall",
+													"确定要卸载此插件吗？",
+												)}
+												onConfirm={() => handleUninstallPlugin(plugin.id)}
+												okText={t("common.yes", "是")}
+												cancelText={t("no", "否", { ns: "common" })}
+											>
+												<Button danger icon={<DeleteOutlined />}>
+													{t("uninstall", "卸载", { ns: "common" })}
+												</Button>
+											</Popconfirm>,
+										]}
+									>
+										<Card.Meta
+											avatar={
+												<div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg">
+													{plugin.manifest.icon || "🔌"}
+												</div>
+											}
+											title={
+												<div className="flex items-center gap-2">
+													<span>{plugin.manifest.displayName}</span>
+													<PluginStateBadge state={plugin.state} />
+												</div>
+											}
+											description={
+												<div className="space-y-1">
+													<p className="text-slate-500 text-sm line-clamp-2">
+														{plugin.manifest.description}
+													</p>
+													<div className="flex items-center gap-2 text-xs text-slate-400">
+														<span>v{plugin.manifest.version}</span>
+														{plugin.isBuiltin && (
+															<Tag color="blue">内置</Tag>
+														)}
+														{plugin.isDev && <Tag color="orange">开发</Tag>}
+													</div>
+													{plugin.error && (
+														<div className="text-red-500 text-xs flex items-center gap-1">
+															<ExclamationCircleOutlined />
+															{plugin.error}
+														</div>
+													)}
+												</div>
+											}
+										/>
+									</Card>
+								</List.Item>
+							)}
+						/>
+					)}
+				</>
+			)
+		}
+	]
+
 	// 初始加载
 	useEffect(() => {
 		loadInstalledPlugins();
@@ -159,10 +374,10 @@ export default function Plugins() {
 					<div className="flex items-center justify-between">
 						<div>
 							<h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-								{t("plugins.title", "插件中心")}
+								{t("plugins.title", "插件中心", { ns: "plugins" })}
 							</h1>
 							<p className="text-sm text-slate-500 mt-1">
-								{t("plugins.subtitle", "管理和安装插件以扩展应用功能")}
+								{t("plugins.subtitle", "管理和安装插件以扩展应用功能", { ns: "plugins" })}
 							</p>
 						</div>
 						<div className="flex gap-2">
@@ -173,14 +388,14 @@ export default function Plugins() {
 									loadMarketPlugins();
 								}}
 							>
-								{t("common.refresh", "刷新")}
+								{t("refresh", "刷新", { ns: "common" })}
 							</Button>
 							<Button
 								type="primary"
 								icon={<PlusOutlined />}
 								onClick={handleInstallPlugin}
 							>
-								{t("plugins.installLocal", "安装本地插件")}
+								{t("plugins.installLocal", "安装本地插件", { ns: "plugins" })}
 							</Button>
 						</div>
 					</div>
@@ -188,195 +403,7 @@ export default function Plugins() {
 
 				{/* Content */}
 				<div className="flex-1 overflow-auto p-6">
-					<Tabs activeKey={activeTab} onChange={setActiveTab}>
-						<TabPane tab={t("plugins.market", "插件市场")} key="market">
-							<div className="mb-4">
-								<Search
-									placeholder={t("plugins.searchPlaceholder", "搜索插件...")}
-									allowClear
-									onSearch={loadMarketPlugins}
-									onChange={(e) => setSearchQuery(e.target.value)}
-									style={{ maxWidth: 400 }}
-								/>
-							</div>
-
-							{marketLoading ? (
-								<div className="flex justify-center py-12">
-									<Spin size="large" />
-								</div>
-							) : marketPlugins.length === 0 ? (
-								<Empty description={t("plugins.noMarketPlugins", "暂无可用插件")} />
-							) : (
-								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-									{marketPlugins.map((plugin) => (
-										<Card
-											key={plugin.id}
-											hoverable
-											className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-											actions={[
-												plugin.installed ? (
-													<Button
-														key="installed"
-														disabled
-														icon={<CheckCircleOutlined />}
-													>
-														{t("plugins.installed", "已安装")}
-													</Button>
-												) : (
-													<Button
-														key="install"
-														type="primary"
-														icon={<DownloadOutlined />}
-														onClick={() => handleInstallFromMarket(plugin.id)}
-														loading={loading}
-													>
-														{t("plugins.install", "安装")}
-													</Button>
-												),
-											]}
-										>
-											<Card.Meta
-												title={
-													<div className="flex items-center gap-2">
-														<span className="text-lg">{plugin.icon || "🔌"}</span>
-														<span>{plugin.displayName}</span>
-													</div>
-												}
-												description={
-													<div className="space-y-2">
-														<p className="text-slate-500 line-clamp-2">
-															{plugin.description}
-														</p>
-														<div className="flex items-center gap-2 text-xs text-slate-400">
-															<span>v{plugin.version}</span>
-															<span>·</span>
-															<span>{plugin.author}</span>
-														</div>
-														<div className="flex items-center gap-1">
-															{plugin.categories.map((cat: string) => (
-																<Tag key={cat}>
-																	{cat}
-																</Tag>
-															))}
-														</div>
-														<div className="flex items-center gap-4 text-xs text-slate-400">
-															<span>⬇️ {plugin.downloads}</span>
-															<span>⭐ {plugin.rating}</span>
-														</div>
-													</div>
-												}
-											/>
-										</Card>
-									))}
-								</div>
-							)}
-						</TabPane>
-
-						<TabPane
-							tab={
-								<span>
-									{t("plugins.installed", "已安装")}
-									{installedPlugins.length > 0 && (
-										<Badge count={installedPlugins.length} className="ml-1" />
-									)}
-								</span>
-							}
-							key="installed"
-						>
-							{installedLoading ? (
-								<div className="flex justify-center py-12">
-									<Spin size="large" />
-								</div>
-							) : installedPlugins.length === 0 ? (
-								<Empty
-									description={t("plugins.noInstalledPlugins", "暂无已安装插件")}
-									image={Empty.PRESENTED_IMAGE_SIMPLE}
-								>
-									<Button
-										type="primary"
-										onClick={() => setActiveTab("market")}
-									>
-										{t("plugins.browseMarket", "浏览插件市场")}
-									</Button>
-								</Empty>
-							) : (
-								<List
-									grid={{ gutter: 16, xs: 1, sm: 2, md: 3, lg: 3 }}
-									dataSource={installedPlugins}
-									renderItem={(plugin) => (
-										<List.Item>
-											<Card
-												className={cn(
-													"w-full",
-													plugin.enabled && "border-blue-500 dark:border-blue-500"
-												)}
-												actions={[
-													<Switch
-														key="toggle"
-														checked={plugin.enabled}
-														onChange={() => handleTogglePlugin(plugin)}
-														checkedChildren="启用"
-														unCheckedChildren="禁用"
-													/>,
-													<Popconfirm
-														key="delete"
-														title={t("plugins.confirmUninstall", "确定要卸载此插件吗？")}
-														onConfirm={() => handleUninstallPlugin(plugin.id)}
-														okText={t("common.yes", "是")}
-														cancelText={t("common.no", "否")}
-													>
-														<Button danger icon={<DeleteOutlined />}>
-															{t("common.uninstall", "卸载")}
-														</Button>
-													</Popconfirm>,
-												]}
-											>
-												<Card.Meta
-													avatar={
-														<div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg">
-															{plugin.manifest.icon || "🔌"}
-														</div>
-													}
-													title={
-														<div className="flex items-center gap-2">
-															<span>{plugin.manifest.displayName}</span>
-															<PluginStateBadge state={plugin.state} />
-														</div>
-													}
-													description={
-														<div className="space-y-1">
-															<p className="text-slate-500 text-sm line-clamp-2">
-																{plugin.manifest.description}
-															</p>
-															<div className="flex items-center gap-2 text-xs text-slate-400">
-																<span>v{plugin.manifest.version}</span>
-																{plugin.isBuiltin && (
-																	<Tag color="blue">
-																		内置
-																	</Tag>
-																)}
-																{plugin.isDev && (
-																	<Tag color="orange">
-																		开发
-																	</Tag>
-																)}
-															</div>
-															{plugin.error && (
-																<div className="text-red-500 text-xs flex items-center gap-1">
-																	<ExclamationCircleOutlined />
-																	{plugin.error}
-																</div>
-															)}
-														</div>
-													}
-												/>
-											</Card>
-										</List.Item>
-									)}
-								/>
-							)}
-						</TabPane>
-					</Tabs>
+					<Tabs items={tabContent} activeKey={activeTab} onChange={setActiveTab}></Tabs>
 				</div>
 			</div>
 		</MainLayout>

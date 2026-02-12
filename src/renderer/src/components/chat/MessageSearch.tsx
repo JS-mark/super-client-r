@@ -82,7 +82,7 @@ export function MessageSearch({
 
   return (
     <Modal
-      title={t("chat.searchMessages", "搜索消息")}
+      title={t("chat.searchMessages", "搜索消息", { ns: "chat" })}
       open={isOpen}
       onCancel={onClose}
       footer={null}
@@ -93,7 +93,7 @@ export function MessageSearch({
         {/* 搜索输入 */}
         <Input
           prefix={<SearchOutlined className="text-slate-400" />}
-          placeholder={t("chat.searchPlaceholder", "搜索聊天记录...")}
+          placeholder={t("chat.searchPlaceholder", "搜索聊天记录...", { ns: "chat" })}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           allowClear
@@ -106,14 +106,14 @@ export function MessageSearch({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-slate-500">
-                {t("chat.searchHistory", "搜索历史")}
+                {t("chat.searchHistory", "搜索历史", { ns: "chat" })}
               </span>
               <Button
                 type="link"
                 size="small"
                 onClick={clearSearchHistory}
               >
-                {t("common.clear", "清空")}
+                {t("clear", "清空", { ns: "common" })}
               </Button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -136,7 +136,7 @@ export function MessageSearch({
           <div>
             <div className="text-sm text-slate-500 mb-2">
               {isSearching
-                ? t("chat.searching", "搜索中...")
+                ? t("chat.searching", "搜索中...", { ns: "chat" })
                 : t("chat.searchResults", "找到 {{count}} 条结果", {
                     count: results.length,
                   })}
@@ -144,7 +144,7 @@ export function MessageSearch({
 
             {results.length === 0 && !isSearching ? (
               <Empty
-                description={t("chat.noSearchResults", "未找到相关消息")}
+                description={t("chat.noSearchResults", "未找到相关消息", { ns: "chat" })}
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             ) : (
@@ -163,7 +163,7 @@ export function MessageSearch({
                         >
                           {msg.role === "user"
                             ? t("chat.user", "用户")
-                            : t("chat.assistant", "助手")}
+                            : t("chat.assistant", "助手", { ns: "chat" })}
                         </Tag>
                         <span className="text-xs text-slate-400">
                           {new Date(msg.timestamp).toLocaleString()}

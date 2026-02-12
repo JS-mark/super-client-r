@@ -3,8 +3,8 @@ import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TitleProvider } from "./hooks/useTitle";
-import { useThemeStore, initSystemThemeDetection } from "./stores/themeStore";
 import { router } from "./router";
+import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
 
 const { darkAlgorithm, compactAlgorithm, defaultAlgorithm } = theme;
 
@@ -52,7 +52,10 @@ function App() {
 			colorError: "#f5222d",
 			colorInfo: "#1890ff",
 			// 文字颜色
-			colorTextBase: actualTheme === "dark" ? "rgba(255, 255, 255, 0.88)" : "rgba(0, 0, 0, 0.88)",
+			colorTextBase:
+				actualTheme === "dark"
+					? "rgba(255, 255, 255, 0.88)"
+					: "rgba(0, 0, 0, 0.88)",
 			colorBgBase: actualTheme === "dark" ? "#141414" : "#ffffff",
 			// 圆角
 			borderRadius: 6,
@@ -65,7 +68,10 @@ function App() {
 				headerBg: actualTheme === "dark" ? "#1f1f1f" : "#ffffff",
 				siderBg: actualTheme === "dark" ? "#141414" : "#f5f5f5",
 				triggerBg: actualTheme === "dark" ? "#262626" : "#ffffff",
-				triggerColor: actualTheme === "dark" ? "rgba(255, 255, 255, 0.65)" : "rgba(0, 0, 0, 0.65)",
+				triggerColor:
+					actualTheme === "dark"
+						? "rgba(255, 255, 255, 0.65)"
+						: "rgba(0, 0, 0, 0.65)",
 			},
 			Menu: {
 				darkItemBg: "#141414",
@@ -108,7 +114,8 @@ function App() {
 				colorSplit: actualTheme === "dark" ? "#424242" : "#f0f0f0",
 			},
 			Tooltip: {
-				colorBgSpotlight: actualTheme === "dark" ? "#434343" : "rgba(0, 0, 0, 0.75)",
+				colorBgSpotlight:
+					actualTheme === "dark" ? "#434343" : "rgba(0, 0, 0, 0.75)",
 			},
 			Popover: {
 				colorBgElevated: actualTheme === "dark" ? "#1f1f1f" : "#ffffff",

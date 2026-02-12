@@ -47,7 +47,7 @@ export function MessageContextMenu({
 
 	const handleCopy = () => {
 		navigator.clipboard.writeText(message.content);
-		antdMessage.success(t("chat.messageCopied", "消息已复制"));
+		antdMessage.success(t("chat.messageCopied", "消息已复制", { ns: "chat" }));
 	};
 
 	const handleBookmark = () => {
@@ -55,7 +55,7 @@ export function MessageContextMenu({
 			const bm = getBookmarkByMessageId(message.id);
 			if (bm) {
 				removeBookmark(bm.id);
-				antdMessage.success(t("chat.bookmarkRemoved", "已取消收藏"));
+				antdMessage.success(t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }));
 			}
 		} else {
 			// Only allow bookmarking user or assistant messages
@@ -67,7 +67,7 @@ export function MessageContextMenu({
 					role: message.role,
 					timestamp: message.timestamp,
 				});
-				antdMessage.success(t("chat.bookmarkAdded", "已收藏消息"));
+				antdMessage.success(t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }));
 			}
 		}
 	};
@@ -80,7 +80,7 @@ export function MessageContextMenu({
 	const handleSaveNote = () => {
 		if (bookmark) {
 			updateBookmark(bookmark.id, { note });
-			antdMessage.success(t("chat.noteSaved", "备注已保存"));
+			antdMessage.success(t("chat.noteSaved", "备注已保存", { ns: "chat" }));
 		}
 		setIsNoteModalOpen(false);
 	};
@@ -96,20 +96,20 @@ export function MessageContextMenu({
 		a.click();
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
-		antdMessage.success(t("chat.messageExported", "消息已导出"));
+		antdMessage.success(t("chat.messageExported", "消息已导出", { ns: "chat" }));
 	};
 
 	const menuItems: MenuItem[] = [
 		{
 			key: "copy",
 			icon: <CopyOutlined />,
-			label: t("chat.copyMessage", "复制消息"),
+			label: t("chat.copyMessage", "复制消息", { ns: "chat" }),
 			onClick: handleCopy,
 		},
 		{
 			key: "bookmark",
 			icon: bookmarked ? <StarFilled className="text-yellow-500" /> : <StarOutlined />,
-			label: bookmarked ? t("chat.removeBookmark", "取消收藏") : t("chat.addBookmark", "收藏消息"),
+			label: bookmarked ? t("chat.removeBookmark", "取消收藏") : t("chat.addBookmark", "收藏消息", { ns: "chat" }),
 			onClick: handleBookmark,
 		},
 		...(bookmarked
@@ -117,7 +117,7 @@ export function MessageContextMenu({
 					{
 						key: "note",
 						icon: <EditOutlined />,
-						label: t("chat.addNote", "添加备注"),
+						label: t("chat.addNote", "添加备注", { ns: "chat" }),
 						onClick: handleAddNote,
 					},
 				]
@@ -125,7 +125,7 @@ export function MessageContextMenu({
 		{
 			key: "export",
 			icon: <DownloadOutlined />,
-			label: t("chat.exportMessage", "导出消息"),
+			label: t("chat.exportMessage", "导出消息", { ns: "chat" }),
 			onClick: handleExport,
 		},
 		...(onEdit
@@ -133,7 +133,7 @@ export function MessageContextMenu({
 					{
 						key: "edit",
 						icon: <EditOutlined />,
-						label: t("chat.editMessage", "编辑消息"),
+						label: t("chat.editMessage", "编辑消息", { ns: "chat" }),
 						onClick: onEdit,
 					},
 				]
@@ -143,7 +143,7 @@ export function MessageContextMenu({
 					{
 						key: "delete",
 						icon: <DeleteOutlined className="text-red-500" />,
-						label: <span className="text-red-500">{t("chat.deleteMessage", "删除消息")}</span>,
+						label: <span className="text-red-500">{t("chat.deleteMessage", "删除消息", { ns: "chat" })}</span>,
 						onClick: onDelete,
 					},
 				]
@@ -161,17 +161,17 @@ export function MessageContextMenu({
 			</Dropdown>
 
 			<Modal
-				title={t("chat.addNote", "添加备注")}
+				title={t("chat.addNote", "添加备注", { ns: "chat" })}
 				open={isNoteModalOpen}
 				onOk={handleSaveNote}
 				onCancel={() => setIsNoteModalOpen(false)}
 				okText={t("common.save", "保存")}
-				cancelText={t("common.cancel", "取消")}
+				cancelText={t("cancel", "取消", { ns: "common" })}
 			>
 				<Input.TextArea
 					value={note}
 					onChange={(e) => setNote(e.target.value)}
-					placeholder={t("chat.notePlaceholder", "输入备注...")}
+					placeholder={t("chat.notePlaceholder", "输入备注...", { ns: "chat" })}
 					rows={4}
 				/>
 			</Modal>
