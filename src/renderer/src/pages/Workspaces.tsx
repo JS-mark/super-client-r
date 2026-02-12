@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useTitle } from "../hooks/useTitle";
 import {
 	Button,
 	Card,
@@ -306,6 +307,17 @@ function EditWorkspaceModal({
 // 主页面
 export default function Workspaces() {
 	const { t } = useTranslation();
+
+	// 设置标题栏
+	const pageTitle = useMemo(() => (
+		<div className="flex items-center gap-2">
+			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+				<FolderOutlined className="text-white text-xs" />
+			</div>
+			<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("menu.workspaces", "工作区")}</span>
+		</div>
+	), [t]);
+	useTitle(pageTitle);
 	const {
 		workspaces,
 		currentWorkspaceId,

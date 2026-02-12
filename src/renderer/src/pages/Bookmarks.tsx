@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { List, Card, Tag, Button, Empty, Input, Modal, message } from "antd";
 import {
@@ -7,13 +7,26 @@ import {
 	EditOutlined,
 	ExportOutlined,
 	SearchOutlined,
+	StarOutlined,
 } from "@ant-design/icons";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useMessageStore, type BookmarkedMessage } from "../stores/messageStore";
+import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 
 export default function Bookmarks() {
 	const { t } = useTranslation();
+
+	// 设置标题栏
+	const pageTitle = useMemo(() => (
+		<div className="flex items-center gap-2">
+			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
+				<StarOutlined className="text-white text-xs" />
+			</div>
+			<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("bookmarks.title", "收藏消息")}</span>
+		</div>
+	), [t]);
+	useTitle(pageTitle);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [editingBookmark, setEditingBookmark] = useState<BookmarkedMessage | null>(null);
 	const [editNote, setEditNote] = useState("");

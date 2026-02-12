@@ -2,6 +2,7 @@ import {
   ApiOutlined,
   CloudOutlined,
   CodeOutlined,
+  HomeOutlined,
   MessageOutlined,
   RobotOutlined,
   SettingOutlined,
@@ -9,10 +10,11 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Statistic, Tag } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
+import { useTitle } from "../hooks/useTitle";
 import { type ApiStatus, apiService } from "../services/apiService";
 import { useChatStore } from "../stores/chatStore";
 import { useMcpStore } from "../stores/mcpStore";
@@ -31,6 +33,22 @@ interface QuickAction {
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+
+  // 设置标题栏
+  const pageTitle = useMemo(
+    () => (
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+          <HomeOutlined className="text-white text-xs" />
+        </div>
+        <span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+          {t("menu.home", "首页")}
+        </span>
+      </div>
+    ),
+    [t],
+  );
+  useTitle(pageTitle);
   const messages = useChatStore((state) => state.messages);
   const servers = useMcpStore((state) => state.servers);
   const installedSkills = useSkillStore((state) => state.installedSkills);

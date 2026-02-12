@@ -370,6 +370,14 @@ const Chat: React.FC = () => {
 	// Attachment state
 	const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
 
+	// Toolbar feature states
+	const [isPromptSelectorOpen, setIsPromptSelectorOpen] = useState(false);
+	const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
+	const [isQuoteSelectorOpen, setIsQuoteSelectorOpen] = useState(false);
+
+	// Active tools state
+	const [activeTools, setActiveTools] = useState<string[]>([]);
+
 	// Conversation ID for message operations
 	const conversationId = "default"; // TODO: Use actual conversation ID
 
@@ -606,6 +614,69 @@ const Chat: React.FC = () => {
 		}
 	};
 
+	// Common prompts for quick selection
+	const commonPrompts = [
+		{ id: "explain", name: "解释", icon: "💡", prompt: "请解释以下内容：" },
+		{ id: "summarize", name: "总结", icon: "📝", prompt: "请总结以下内容：" },
+		{ id: "translate", name: "翻译", icon: "🌐", prompt: "请将以下内容翻译成中文：" },
+		{ id: "code", name: "写代码", icon: "💻", prompt: "请编写代码实现以下功能：" },
+		{ id: "debug", name: "调试", icon: "🐛", prompt: "请帮我调试以下代码：" },
+		{ id: "optimize", name: "优化", icon: "⚡", prompt: "请优化以下内容：" },
+	];
+
+	// Available tools
+	const availableTools = [
+		{ id: "search", name: "网络搜索", icon: "🔍", description: "搜索互联网获取最新信息" },
+		{ id: "code", name: "代码执行", icon: "💻", description: "执行代码并返回结果" },
+		{ id: "file", name: "文件分析", icon: "📄", description: "分析上传的文件内容" },
+		{ id: "image", name: "图像生成", icon: "🎨", description: "根据描述生成图像" },
+	];
+
+	// Handle toolbar item click
+	const handleToolbarClick = useCallback((itemId: string) => {
+		switch (itemId) {
+			case "prompt":
+				setIsPromptSelectorOpen(true);
+				break;
+			case "tools":
+				setIsToolSelectorOpen(true);
+				break;
+			case "quote":
+				setIsQuoteSelectorOpen(true);
+				break;
+			case "doc":
+				// Open document selector
+				message.info(t("toolbar.docComingSoon", "文档功能即将推出"));
+				break;
+			default:
+				break;
+		}
+	}, [t]);
+
+	// Handle prompt selection
+	const handlePromptSelect = useCallback((prompt: string) => {
+		setInput((prev) => prev + (prev ? " " : "") + prompt);
+		setIsPromptSelectorOpen(false);
+	}, [setInput]);
+
+	// Handle tool toggle
+	const handleToolToggle = useCallback((toolId: string) => {
+		setActiveTools((prev) =>
+			prev.includes(toolId)
+				? prev.filter((id) => id !== toolId)
+				: [...prev, toolId]
+		);
+	}, []);
+
+	// Handle quote selection
+	const handleQuoteSelect = useCallback((messageId: string) => {
+		const message = messages.find((m) => m.id === messageId);
+		if (message) {
+			setInput((prev) => prev + (prev ? "\n\n" : "") + "> " + message.content.slice(0, 200) + (message.content.length > 200 ? "..." : ""));
+		}
+		setIsQuoteSelectorOpen(false);
+	}, [messages, setInput]);
+
 	return (
 		<MainLayout>
 			<div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950">
@@ -736,13 +807,7 @@ const Chat: React.FC = () => {
 									{TOOLBAR_ITEMS.map((item) => (
 										<Tooltip key={item.id} title={t(item.label, { ns: "chat" })}>
 											<button
-												onClick={() => {
-													// Handle toolbar item click
-													if (item.id === "prompt") {
-														// Toggle prompt mode or show prompt selector
-														setChatMode("skill");
-													}
-												}}
+												onClick={() => handleToolbarClick(item.id)}
 												className={cn(
 													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600",
 													item.color && "hover:text-[var(--hover-color)]",

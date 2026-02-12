@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Input, Tabs, List, Card, Badge, Tag, Empty, Spin, message, Switch, Popconfirm } from "antd";
 import {
@@ -11,9 +11,11 @@ import {
 	CheckCircleOutlined,
 	ExclamationCircleOutlined,
 	LoadingOutlined,
+	AppstoreOutlined,
 } from "@ant-design/icons";
 import { MainLayout } from "../components/layout/MainLayout";
 import { pluginService } from "../services/pluginService";
+import { useTitle } from "../hooks/useTitle";
 import type { PluginInfo, MarketPlugin } from "../types/plugin";
 import { cn } from "../lib/utils";
 
@@ -39,6 +41,17 @@ const PluginStateBadge = ({ state }: { state: PluginInfo["state"] }) => {
 
 export default function Plugins() {
 	const { t } = useTranslation();
+
+	// 设置标题栏
+	const pageTitle = useMemo(() => (
+		<div className="flex items-center gap-2">
+			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+				<AppstoreOutlined className="text-white text-xs" />
+			</div>
+			<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("menu.plugins", "插件")}</span>
+		</div>
+	), [t]);
+	useTitle(pageTitle);
 
 	// 状态
 	const [activeTab, setActiveTab] = useState("market");
