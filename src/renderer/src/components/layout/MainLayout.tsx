@@ -263,10 +263,10 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 				<Content className="flex-1 overflow-auto">
 					<div
 						className={cn(
-							"h-[calc(100vh-52px)]",
+							"h-full",
 							"animate-fade-in",
-							"!bg-white",
-							"dark:!bg-slate-800",
+							"bg-white!",
+							"dark:bg-slate-800!",
 						)}
 					>
 						{children}
