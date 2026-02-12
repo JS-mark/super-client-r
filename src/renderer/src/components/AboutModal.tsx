@@ -1,8 +1,12 @@
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
-import { Button, Modal, message } from "antd";
+import { Button, Modal, message, theme } from "antd";
 import type React from "react";
+import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppInfo } from "../services/appService";
+import { logService } from "../services/logService";
+
+const { useToken } = theme;
 
 interface AboutModalProps {
 	open: boolean;
@@ -16,6 +20,23 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 	appInfo,
 }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
+	const clickCountRef = useRef(0);
+	const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	const handleTitleClick = useCallback(() => {
+		clickCountRef.current += 1;
+
+		if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+		clickTimerRef.current = setTimeout(() => {
+			clickCountRef.current = 0;
+		}, 3000);
+
+		if (clickCountRef.current >= 8) {
+			clickCountRef.current = 0;
+			logService.openViewer();
+		}
+	}, []);
 
 	const handleCopy = () => {
 		if (!appInfo) return;
@@ -77,8 +98,12 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 					/>
 				</div>
 
-				{/* App Name */}
-				<h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-6">
+				{/* App Name - 8 clicks within 3s opens log viewer */}
+				<h2
+					className="text-xl font-semibold mb-6 cursor-default select-none active:opacity-80 transition-opacity"
+					style={{ color: token.colorTextHeading }}
+					onClick={handleTitleClick}
+				>
 					{appInfo?.name || "Super Client"}
 				</h2>
 
@@ -89,10 +114,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 							key={item.label}
 							className="flex items-center justify-between text-sm"
 						>
-							<span className="text-slate-500 dark:text-slate-400">
+							<span style={{ color: token.colorTextSecondary }}>
 								{item.label}
 							</span>
-							<span className="text-slate-700 dark:text-slate-200 font-medium">
+							<span className="font-medium" style={{ color: token.colorText }}>
 								{item.value}
 							</span>
 						</div>
