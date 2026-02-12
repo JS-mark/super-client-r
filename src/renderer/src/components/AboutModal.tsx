@@ -63,7 +63,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 				{/* Logo */}
 				<div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mb-4 shadow-lg">
 					<img
-						src="logo.svg"
+						src="@/assets/icon.svg"
 						alt="Logo"
 						className="w-10 h-10"
 						onError={(e) => {
