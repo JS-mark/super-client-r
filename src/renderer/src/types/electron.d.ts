@@ -142,6 +142,58 @@ export interface McpMarketItem {
 	updatedAt?: string;
 }
 
+export interface LogRecord {
+	id: number;
+	timestamp: string;
+	timestamp_ms: number;
+	level: string;
+	module: string;
+	process: string;
+	message: string;
+	meta: string | null;
+	error_message: string | null;
+	error_stack: string | null;
+	session_id: string | null;
+}
+
+export interface LogQueryParams {
+	page?: number;
+	pageSize?: number;
+	level?: string[];
+	module?: string[];
+	process?: string[];
+	keyword?: string;
+	startTime?: number;
+	endTime?: number;
+	sortOrder?: "asc" | "desc";
+}
+
+export interface LogQueryResult {
+	records: LogRecord[];
+	total: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface LogStats {
+	totalCount: number;
+	countByLevel: Record<string, number>;
+	countByModule: Record<string, number>;
+	countByProcess: Record<string, number>;
+	recentErrorCount: number;
+	timeHistogram: { hour: string; count: number }[];
+}
+
+export interface RendererLogEntry {
+	level: string;
+	message: string;
+	module?: string;
+	meta?: unknown;
+	error_message?: string;
+	error_stack?: string;
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
@@ -263,6 +315,17 @@ export interface ElectronAPI {
 		openAttachment: (attachmentPath: string) => Promise<IPCResponse>;
 		getAttachmentPath: () => Promise<IPCResponse<string>>;
 		copyFile: (filePath: string) => Promise<IPCResponse>;
+	};
+
+	// 日志系统 API
+	log: {
+		query: (params: LogQueryParams) => Promise<LogQueryResult>;
+		getStats: () => Promise<LogStats>;
+		getModules: () => Promise<string[]>;
+		rendererLog: (entry: RendererLogEntry) => Promise<{ success: boolean }>;
+		clearDb: () => Promise<{ success: boolean }>;
+		exportLogs: (params: LogQueryParams) => Promise<{ success: boolean; count?: number; filePath?: string }>;
+		openViewer: () => Promise<{ success: boolean }>;
 	};
 
 	// 通用 IPC

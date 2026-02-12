@@ -147,6 +147,24 @@ export const SEARCH_CHANNELS = {
 	VALIDATE_CONFIG: "search:validate-config",
 } as const;
 
+// 日志系统相关通道
+export const LOG_CHANNELS = {
+	// 查询日志
+	QUERY: "log:query",
+	// 获取统计信息
+	GET_STATS: "log:get-stats",
+	// 获取模块列表
+	GET_MODULES: "log:get-modules",
+	// 渲染进程日志转发
+	RENDERER_LOG: "log:renderer-log",
+	// 清除数据库
+	CLEAR_DB: "log:clear-db",
+	// 导出日志
+	EXPORT: "log:export",
+	// 打开日志查看器窗口
+	OPEN_VIEWER: "log:open-viewer",
+} as const;
+
 // 文件附件相关通道
 export const FILE_CHANNELS = {
 	// 选择文件
@@ -179,4 +197,5 @@ export type IPCChannel =
 	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS]
 	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS]
 	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS]
+	| (typeof LOG_CHANNELS)[keyof typeof LOG_CHANNELS]
 	| (typeof FILE_CHANNELS)[keyof typeof FILE_CHANNELS];

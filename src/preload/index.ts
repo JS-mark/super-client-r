@@ -120,6 +120,17 @@ export interface ElectronAPI {
 		copyFile: (filePath: string) => Promise<IPCResponse>;
 	};
 
+	// 日志系统 API
+	log: {
+		query: (params: LogQueryParams) => Promise<LogQueryResult>;
+		getStats: () => Promise<LogStats>;
+		getModules: () => Promise<string[]>;
+		rendererLog: (entry: RendererLogEntry) => Promise<{ success: boolean }>;
+		clearDb: () => Promise<{ success: boolean }>;
+		exportLogs: (params: LogQueryParams) => Promise<{ success: boolean; count?: number; filePath?: string }>;
+		openViewer: () => Promise<{ success: boolean }>;
+	};
+
 	// 通用 IPC
 	ipc: {
 		on: (channel: string, listener: (...args: unknown[]) => void) => void;
@@ -293,6 +304,58 @@ export interface SearchConfig {
 	config?: Record<string, unknown>;
 }
 
+export interface LogRecord {
+	id: number;
+	timestamp: string;
+	timestamp_ms: number;
+	level: string;
+	module: string;
+	process: string;
+	message: string;
+	meta: string | null;
+	error_message: string | null;
+	error_stack: string | null;
+	session_id: string | null;
+}
+
+export interface LogQueryParams {
+	page?: number;
+	pageSize?: number;
+	level?: string[];
+	module?: string[];
+	process?: string[];
+	keyword?: string;
+	startTime?: number;
+	endTime?: number;
+	sortOrder?: "asc" | "desc";
+}
+
+export interface LogQueryResult {
+	records: LogRecord[];
+	total: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface LogStats {
+	totalCount: number;
+	countByLevel: Record<string, number>;
+	countByModule: Record<string, number>;
+	countByProcess: Record<string, number>;
+	recentErrorCount: number;
+	timeHistogram: { hour: string; count: number }[];
+}
+
+export interface RendererLogEntry {
+	level: string;
+	message: string;
+	module?: string;
+	meta?: unknown;
+	error_message?: string;
+	error_stack?: string;
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
@@ -435,6 +498,17 @@ const electronAPI: ElectronAPI = {
 		openAttachment: (attachmentPath) => ipcRenderer.invoke("file:open-attachment", attachmentPath),
 		getAttachmentPath: () => ipcRenderer.invoke("file:get-attachment-path"),
 		copyFile: (filePath) => ipcRenderer.invoke("file:copy-file", filePath),
+	},
+
+	// 日志系统 API
+	log: {
+		query: (params) => ipcRenderer.invoke("log:query", params),
+		getStats: () => ipcRenderer.invoke("log:get-stats"),
+		getModules: () => ipcRenderer.invoke("log:get-modules"),
+		rendererLog: (entry) => ipcRenderer.invoke("log:renderer-log", entry),
+		clearDb: () => ipcRenderer.invoke("log:clear-db"),
+		exportLogs: (params) => ipcRenderer.invoke("log:export", params),
+		openViewer: () => ipcRenderer.invoke("log:open-viewer"),
 	},
 
 	// 通用 IPC

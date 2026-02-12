@@ -203,6 +203,60 @@ export interface ChatHistory {
 	updatedAt: number;
 }
 
+// ============ Log 相关类型 ============
+
+export interface LogRecord {
+	id: number;
+	timestamp: string;
+	timestamp_ms: number;
+	level: string;
+	module: string;
+	process: string;
+	message: string;
+	meta: string | null;
+	error_message: string | null;
+	error_stack: string | null;
+	session_id: string | null;
+}
+
+export interface LogQueryParams {
+	page?: number;
+	pageSize?: number;
+	level?: string[];
+	module?: string[];
+	process?: string[];
+	keyword?: string;
+	startTime?: number;
+	endTime?: number;
+	sortOrder?: "asc" | "desc";
+}
+
+export interface LogQueryResult {
+	records: LogRecord[];
+	total: number;
+	page: number;
+	pageSize: number;
+	totalPages: number;
+}
+
+export interface LogStats {
+	totalCount: number;
+	countByLevel: Record<string, number>;
+	countByModule: Record<string, number>;
+	countByProcess: Record<string, number>;
+	recentErrorCount: number;
+	timeHistogram: { hour: string; count: number }[];
+}
+
+export interface RendererLogEntry {
+	level: string;
+	message: string;
+	module?: string;
+	meta?: unknown;
+	error_message?: string;
+	error_stack?: string;
+}
+
 // ============ IPC 请求/响应类型 ============
 
 export interface IPCRequest<T = unknown> {
