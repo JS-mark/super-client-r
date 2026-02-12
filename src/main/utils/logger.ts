@@ -14,6 +14,7 @@ import {
 	unlinkSync,
 } from "fs";
 import { join } from "path";
+import { logDatabaseService } from "../services/log";
 
 export enum LogLevel {
 	DEBUG = "DEBUG",
@@ -138,7 +139,7 @@ export class Logger {
 	}
 
 	/**
-	 * Write log entry to file with UTF-8 encoding
+	 * Write log entry to file with UTF-8 encoding and SQLite database
 	 */
 	private write(entry: LogEntry): void {
 		this.ensureInitialized();
@@ -166,6 +167,22 @@ export class Logger {
 			this.currentSize += contentSize;
 		} catch (err) {
 			console.error("Failed to write log:", err instanceof Error ? err.message : String(err));
+		}
+
+		// Dual-write to SQLite database (never let DB errors break file logging)
+		try {
+			logDatabaseService.insert({
+				timestamp: entry.timestamp,
+				level: entry.level,
+				module: entry.module,
+				process: "main",
+				message: entry.message,
+				meta: entry.meta,
+				error_message: entry.error?.message,
+				error_stack: entry.error?.stack,
+			});
+		} catch {
+			// Silently ignore DB write failures
 		}
 	}
 

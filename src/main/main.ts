@@ -28,6 +28,7 @@ import {
 } from "./services/protocolService";
 import { getSkillService } from "./services/skill/SkillService";
 import { storeManager } from "./store/StoreManager";
+import { logDatabaseService } from "./services/log";
 import { logger } from "./utils/logger";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
@@ -364,6 +365,9 @@ function registerWindowHandlers(): void {
  * 应用就绪
  */
 app.whenReady().then(async () => {
+	// Initialize log database before anything else
+	logDatabaseService.initialize();
+
 	logger.info("App is ready");
 
 	// 启动本地服务
@@ -440,6 +444,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
 	isQuitting = true;
 	logger.info("App is quitting");
+	logDatabaseService.close();
 });
 
 /**
