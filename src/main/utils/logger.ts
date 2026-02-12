@@ -268,7 +268,20 @@ export class Logger {
 		this.log(LogLevel.ERROR, message, { module, meta, error });
 	}
 
-
+	/**
+	 * Create a scoped logger with pre-bound context.
+	 *
+	 * Usage:
+	 *   const log = logger.withContext('AgentService');
+	 *   log.info('Session created');           // auto module: 'AgentService'
+	 *   log.info('Details', { sessionId: 1 }); // auto module + meta
+	 *
+	 *   const log2 = logger.withContext('MCP', { serverId: 'abc' });
+	 *   log2.info('Connected');                // module: 'MCP', meta merged with { serverId: 'abc' }
+	 */
+	withContext(module: string, baseMeta?: Record<string, unknown>): ScopedLogger {
+		return new ScopedLogger(this, module, baseMeta);
+	}
 
 	/**
 	 * Get log directory path
@@ -372,6 +385,58 @@ export class Logger {
 		} catch (err) {
 			console.error("Failed to clear logs:", err instanceof Error ? err.message : String(err));
 		}
+	}
+}
+
+/**
+ * Scoped logger with pre-bound module and optional base metadata.
+ * Created via logger.withContext('ModuleName').
+ */
+export class ScopedLogger {
+	private logger: Logger;
+	private module: string;
+	private baseMeta?: Record<string, unknown>;
+
+	constructor(logger: Logger, module: string, baseMeta?: Record<string, unknown>) {
+		this.logger = logger;
+		this.module = module;
+		this.baseMeta = baseMeta;
+	}
+
+	private mergeMeta(meta?: unknown): unknown {
+		if (!this.baseMeta) return meta;
+		if (meta === undefined || meta === null) return this.baseMeta;
+		if (typeof meta === "object" && !Array.isArray(meta)) {
+			return { ...this.baseMeta, ...(meta as Record<string, unknown>) };
+		}
+		return meta;
+	}
+
+	debug(message: string, meta?: unknown): void {
+		this.logger.debug(message, this.mergeMeta(meta), this.module);
+	}
+
+	info(message: string, meta?: unknown): void {
+		this.logger.info(message, this.mergeMeta(meta), this.module);
+	}
+
+	warn(message: string, meta?: unknown): void {
+		this.logger.warn(message, this.mergeMeta(meta), this.module);
+	}
+
+	error(message: string, error?: Error, meta?: unknown): void {
+		this.logger.error(message, error, this.mergeMeta(meta), this.module);
+	}
+
+	/**
+	 * Create a child scoped logger that inherits this context and adds more.
+	 */
+	withContext(subModule: string, extraMeta?: Record<string, unknown>): ScopedLogger {
+		const childModule = `${this.module}:${subModule}`;
+		const childMeta = extraMeta
+			? { ...this.baseMeta, ...extraMeta }
+			: this.baseMeta;
+		return new ScopedLogger(this.logger, childModule, childMeta);
 	}
 }
 

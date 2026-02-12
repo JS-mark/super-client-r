@@ -45,6 +45,58 @@ export interface LogStats {
 	timeHistogram: { hour: string; count: number }[];
 }
 
+/**
+ * Create a scoped logger for use in renderer process components/services.
+ * Logs are forwarded to the main process via IPC and stored in SQLite.
+ *
+ * Usage:
+ *   const log = createLogger('ChatPage');
+ *   log.info('Message sent');
+ *   log.error('Failed to send', error);
+ *   log.info('Details', { userId: 123 });
+ *
+ *   // Child context for sub-modules:
+ *   const subLog = log.child('MessageList');
+ *   subLog.debug('Rendering');  // module: 'ChatPage:MessageList'
+ */
+export function createLogger(module: string, baseMeta?: Record<string, unknown>) {
+	const mergeMeta = (meta?: unknown): unknown => {
+		if (!baseMeta) return meta;
+		if (meta === undefined || meta === null) return baseMeta;
+		if (typeof meta === "object" && !Array.isArray(meta)) {
+			return { ...baseMeta, ...(meta as Record<string, unknown>) };
+		}
+		return meta;
+	};
+
+	const send = (level: string, message: string, meta?: unknown, error?: Error) => {
+		window.electron.log.rendererLog({
+			level,
+			message,
+			module,
+			meta: mergeMeta(meta),
+			error_message: error?.message,
+			error_stack: error?.stack,
+		});
+	};
+
+	return {
+		debug: (message: string, meta?: unknown) => send("DEBUG", message, meta),
+		info: (message: string, meta?: unknown) => send("INFO", message, meta),
+		warn: (message: string, meta?: unknown) => send("WARN", message, meta),
+		error: (message: string, error?: Error, meta?: unknown) => send("ERROR", message, meta, error),
+		child: (subModule: string, extraMeta?: Record<string, unknown>) => {
+			const childModule = `${module}:${subModule}`;
+			const childMeta = extraMeta
+				? { ...baseMeta, ...extraMeta }
+				: baseMeta;
+			return createLogger(childModule, childMeta);
+		},
+	};
+}
+
+export type RendererLogger = ReturnType<typeof createLogger>;
+
 export const logService = {
 	query: (params: LogQueryParams): Promise<LogQueryResult> =>
 		window.electron.log.query(params),
