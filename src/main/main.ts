@@ -274,34 +274,6 @@ function createMenu(): void {
 				],
 			},
 			{
-				label: "编辑",
-				submenu: [
-					{ role: "undo" },
-					{ role: "redo" },
-					{ type: "separator" },
-					{ role: "cut" },
-					{ role: "copy" },
-					{ role: "paste" },
-					{ role: "pasteAndMatchStyle" },
-					{ role: "delete" },
-					{ role: "selectAll" },
-				],
-			},
-			{
-				label: "视图",
-				submenu: [
-					{ role: "reload" },
-					{ role: "forceReload" },
-					{ role: "toggleDevTools" },
-					{ type: "separator" },
-					{ role: "resetZoom" },
-					{ role: "zoomIn" },
-					{ role: "zoomOut" },
-					{ type: "separator" },
-					{ role: "togglefullscreen" },
-				],
-			},
-			{
 				label: "窗口",
 				submenu: [
 					{ role: "minimize" },
@@ -328,19 +300,6 @@ function createMenu(): void {
 						accelerator: "CmdOrCtrl+R",
 						click: () => {
 							mainWindow?.webContents.reload();
-						},
-					},
-					{ type: "separator" },
-					{
-						label: "显示悬浮窗",
-						click: () => {
-							mainWindow?.webContents.send("toggle-float-widget", true);
-						},
-					},
-					{
-						label: "隐藏悬浮窗",
-						click: () => {
-							mainWindow?.webContents.send("toggle-float-widget", false);
 						},
 					},
 				],
@@ -373,7 +332,7 @@ function createMenu(): void {
 						label: "关于",
 						click: () => {
 							mainWindow?.show();
-							mainWindow?.webContents.send("navigate-to", "/settings?tab=about");
+							mainWindow?.webContents.send("show-about-modal");
 						},
 					},
 				],
