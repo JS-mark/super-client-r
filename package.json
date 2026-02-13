@@ -90,7 +90,6 @@
     "dotenv": "^17.2.3",
     "electron": "^38.7.2",
     "electron-builder": "^26.4.0",
-    "electron-devtools-installer": "^4.0.0",
     "electron-vite": "^5.0.0",
     "jsdom": "^25.0.1",
     "oxlint": "^1.41.0",

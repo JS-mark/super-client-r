@@ -10,19 +10,17 @@ import {
 	Menu,
 	nativeImage,
 	screen,
-	session,
 	shell,
 	Tray,
 } from "electron";
+import { homedir } from "os";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
-import installExtension, { REACT_DEVELOPER_TOOLS } from "electron-devtools-installer";
-import { existsSync, mkdirSync } from "fs";
-import { homedir } from "os";
 import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
 import { setLogViewerOpener } from "./ipc/handlers/logHandlers";
 import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
 import { localServer } from "./server";
+import { logDatabaseService } from "./services/log";
 import { pathService } from "./services/pathService";
 import {
 	handleOpenUrl,
@@ -33,7 +31,6 @@ import {
 } from "./services/protocolService";
 import { getSkillService } from "./services/skill/SkillService";
 import { storeManager } from "./store/StoreManager";
-import { logDatabaseService } from "./services/log";
 import { logger } from "./utils/logger";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
@@ -365,7 +362,10 @@ function createMenu(): void {
 						label: "快捷键说明",
 						click: () => {
 							mainWindow?.show();
-							mainWindow?.webContents.send("navigate-to", "/settings?tab=shortcuts");
+							mainWindow?.webContents.send(
+								"navigate-to",
+								"/settings?tab=shortcuts",
+							);
 						},
 					},
 					{
@@ -378,7 +378,9 @@ function createMenu(): void {
 					{
 						label: "发送反馈",
 						click: () => {
-							shell.openExternal("https://github.com/js-mark/super-client-r/issues");
+							shell.openExternal(
+								"https://github.com/js-mark/super-client-r/issues",
+							);
 						},
 					},
 					{ type: "separator" },
@@ -447,24 +449,11 @@ app.whenReady().then(async () => {
 	createTray();
 	createMenu();
 
-	// 开发环境安装 React DevTools (在窗口创建后安装，确保 session 已初始化)
-	if (!app.isPackaged && mainWindow) {
-		// 延迟安装，确保窗口完全加载
-		setTimeout(async () => {
-			try {
-				const name = await installExtension(REACT_DEVELOPER_TOOLS, {
-					loadExtensionOptions: {
-						allowFileAccess: true,
-					},
-				});
-				logger.info(`React DevTools installed: ${name}`);
-				// 安装成功后重新加载窗口以激活扩展
-				mainWindow?.webContents.reload();
-			} catch (err) {
-				logger.error("Failed to install React DevTools:", err instanceof Error ? err : new Error(String(err)));
-				logger.info("React DevTools install failed. Use Chrome remote debugging: http://localhost:9223");
-			}
-		}, 2000);
+	// 开发环境提示 React DevTools 使用方法
+	if (!app.isPackaged) {
+		logger.info("[Dev] React DevTools can be accessed via:");
+		logger.info("[Dev] 1. Chrome remote debugging: http://localhost:9223");
+		logger.info("[Dev] 2. Built-in DevTools Components tab (if available)");
 	}
 
 	// 根据设置决定是否显示悬浮窗
