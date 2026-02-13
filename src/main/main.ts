@@ -449,11 +449,11 @@ app.whenReady().then(async () => {
 	createTray();
 	createMenu();
 
-	// 开发环境提示 React DevTools 使用方法
+	// 开发环境启动 React DevTools 独立应用
 	if (!app.isPackaged) {
 		logger.info("[Dev] React DevTools can be accessed via:");
 		logger.info("[Dev] 1. Chrome remote debugging: http://localhost:9223");
-		logger.info("[Dev] 2. Built-in DevTools Components tab (if available)");
+		logger.info("[Dev] 2. Standalone React DevTools: npx react-devtools");
 	}
 
 	// 根据设置决定是否显示悬浮窗
