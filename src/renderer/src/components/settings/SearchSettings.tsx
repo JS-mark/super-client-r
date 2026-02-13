@@ -15,6 +15,7 @@ import {
 	List,
 	Popconfirm,
 	Tag,
+	theme,
 	Tooltip,
 	message,
 } from "antd";
@@ -25,8 +26,11 @@ import type { SearchConfig, SearchProviderType } from "../../types/search";
 import { SearchConfigModal } from "./SearchConfigModal";
 import { getProviderInfo } from "./SearchProviders";
 
+const { useToken } = theme;
+
 export function SearchSettings() {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [configs, setConfigs] = useState<SearchConfig[]>([]);
 	const [defaultProvider, setDefaultProvider] = useState<
 		SearchProviderType | undefined
@@ -147,7 +151,7 @@ export function SearchSettings() {
 
 			{/* Default provider display */}
 			{defaultProvider && (
-				<Card className="!rounded-xl !border-slate-200 dark:!border-slate-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+				<Card className="!rounded-xl !border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-3">
 							<div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg font-bold">
@@ -162,7 +166,7 @@ export function SearchSettings() {
 										{ ns: "settings" },
 									)}
 								</div>
-								<div className="font-semibold text-slate-800 dark:text-slate-200">
+								<div className="font-semibold text-slate-800" style={{ color: token.colorTextHeading }}>
 									{getProviderInfo(defaultProvider)?.name ||
 										defaultProvider}
 								</div>
@@ -205,7 +209,7 @@ export function SearchSettings() {
 						</Button>
 					</div>
 				}
-				className="!rounded-xl !border-slate-200 dark:!border-slate-700"
+				className="!rounded-xl !border-slate-200"
 				loading={loading}
 			>
 				<List
@@ -305,7 +309,7 @@ export function SearchSettings() {
 							>
 								<List.Item.Meta
 									avatar={
-										<div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-lg">
+										<div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg" style={{ backgroundColor: token.colorBgContainer }}>
 											{providerInfo?.icon || "🔍"}
 										</div>
 									}

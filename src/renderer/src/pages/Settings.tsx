@@ -147,7 +147,7 @@ const Settings: React.FC = () => {
 				onChange={setActiveTab}
 				items={items}
 				tabPlacement="start"
-				className="!bg-white dark:!bg-slate-800 h-full !p-6 settings-tabs"
+				className="h-full !p-6 settings-tabs"
 			/>
 			<AboutModal
 				open={aboutModalOpen}

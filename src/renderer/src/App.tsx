@@ -1,4 +1,6 @@
 import { App as AntdApp, ConfigProvider, theme } from "antd";
+import en_US from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -6,12 +8,13 @@ import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
 import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
 
+// for date-picker i18n
+import "dayjs/locale/zh-cn";
 const { darkAlgorithm, compactAlgorithm, defaultAlgorithm } = theme;
 
 function App() {
 	// 从 store 获取实际主题
 	const actualTheme = useThemeStore((state) => state.actualTheme);
-
 	// 初始化主题
 	useEffect(() => {
 		initSystemThemeDetection();
@@ -129,6 +132,7 @@ function App() {
 	return (
 		<ConfigProvider
 			theme={antdTheme}
+			locale={zhCN}
 			// 禁用动画以提高性能
 			wave={{ disabled: true }}
 		>
