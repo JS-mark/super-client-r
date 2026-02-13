@@ -10,11 +10,15 @@ import {
 	Menu,
 	nativeImage,
 	screen,
+	session,
 	shell,
 	Tray,
 } from "electron";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
+import installExtension, { REACT_DEVELOPER_TOOLS } from "electron-devtools-installer";
+import { existsSync, mkdirSync } from "fs";
+import { homedir } from "os";
 import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
 import { setLogViewerOpener } from "./ipc/handlers/logHandlers";
 import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
@@ -36,6 +40,8 @@ import { logger } from "./utils/logger";
 // 生产环境启用沙箱以提高安全性
 if (!app.isPackaged) {
 	app.commandLine.appendSwitch("no-sandbox");
+	// 启用远程调试端口，允许通过 Chrome 浏览器连接使用 React DevTools
+	app.commandLine.appendSwitch("remote-debugging-port", "9223");
 }
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-software-rasterizer");
@@ -47,8 +53,6 @@ app.commandLine.appendSwitch(
 
 // 开发环境将 userData 设置到用户 home 目录下，避免权限问题
 // dev 环境使用 .scr-data-dev，打包环境使用 .scr-data，实现数据隔离
-import { homedir } from "os";
-
 if (!app.isPackaged) {
 	const userDataPath = join(homedir(), ".scr-data-dev");
 	app.setPath("userData", userDataPath);
@@ -442,6 +446,26 @@ app.whenReady().then(async () => {
 	createFloatingWindow();
 	createTray();
 	createMenu();
+
+	// 开发环境安装 React DevTools (在窗口创建后安装，确保 session 已初始化)
+	if (!app.isPackaged && mainWindow) {
+		// 延迟安装，确保窗口完全加载
+		setTimeout(async () => {
+			try {
+				const name = await installExtension(REACT_DEVELOPER_TOOLS, {
+					loadExtensionOptions: {
+						allowFileAccess: true,
+					},
+				});
+				logger.info(`React DevTools installed: ${name}`);
+				// 安装成功后重新加载窗口以激活扩展
+				mainWindow?.webContents.reload();
+			} catch (err) {
+				logger.error("Failed to install React DevTools:", err instanceof Error ? err : new Error(String(err)));
+				logger.info("React DevTools install failed. Use Chrome remote debugging: http://localhost:9223");
+			}
+		}, 2000);
+	}
 
 	// 根据设置决定是否显示悬浮窗
 	const floatWidgetEnabled = storeManager.getConfig("floatWidgetEnabled");
