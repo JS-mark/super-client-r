@@ -1,9 +1,11 @@
 import { GithubOutlined, GoogleOutlined } from "@ant-design/icons";
-import { Button, Card, Space, Typography } from "antd";
+import { Button, Card, Space, Typography, theme } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useUserStore } from "../stores/userStore";
+
+const { useToken } = theme;
 
 const { Title, Text } = Typography;
 
@@ -11,6 +13,7 @@ const Login: React.FC = () => {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const { login } = useUserStore();
+	const { token } = useToken();
 
 	const handleLogin = (provider: "google" | "github" | "mock") => {
 		console.log(`Login with ${provider}`);
@@ -30,7 +33,7 @@ const Login: React.FC = () => {
 	};
 
 	return (
-		<div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+		<div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
 			{/* Background Decorations - 静态渐变以提高性能 */}
 			<div className="absolute inset-0 overflow-hidden pointer-events-none">
 				<div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl" />
@@ -39,7 +42,10 @@ const Login: React.FC = () => {
 			</div>
 
 			{/* Login Card */}
-			<Card className="w-[420px] shadow-2xl border-0 bg-white dark:bg-gray-900">
+			<Card
+				className="w-[420px] shadow-2xl border-0"
+				style={{ backgroundColor: token.colorBgContainer }}
+			>
 				{/* Logo */}
 				<div className="mb-8 text-center">
 					<div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -78,10 +84,16 @@ const Login: React.FC = () => {
 						<>
 							<div className="relative my-4">
 								<div className="absolute inset-0 flex items-center">
-									<span className="w-full border-t border-gray-200 dark:border-gray-700" />
+									<span
+										className="w-full border-t"
+										style={{ borderColor: token.colorBorder }}
+									/>
 								</div>
 								<div className="relative flex justify-center text-xs uppercase">
-									<span className="bg-white dark:bg-gray-900 px-3 text-gray-400">
+									<span
+										className="px-3 text-gray-400"
+										style={{ backgroundColor: token.colorBgContainer }}
+									>
 										{t("development", { ns: "app" })}
 									</span>
 								</div>

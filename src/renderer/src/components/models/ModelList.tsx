@@ -83,13 +83,13 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const getProviderColor = (provider: string) => {
 		switch (provider) {
 			case "openai":
-				return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+				return "bg-green-100 text-green-700 ";
 			case "anthropic":
-				return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+				return "bg-orange-100 text-orange-700 ";
 			case "gemini":
-				return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+				return "bg-blue-100 text-blue-700 ";
 			default:
-				return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400";
+				return "bg-gray-100 text-gray-700  ";
 		}
 	};
 
@@ -104,7 +104,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
 					description={
-						<span className="text-gray-500 dark:text-gray-400">
+						<span className="text-gray-500 ">
 							{t("empty", "No models configured yet", { ns: "models" })}
 						</span>
 					}
@@ -120,12 +120,12 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				</Empty>
 			) : (
 				<List
-					className="!bg-white dark:!bg-gray-800 !rounded-xl !shadow-sm"
+					className="!bg-white  !rounded-xl !shadow-sm"
 					dataSource={models}
 					renderItem={(item) => (
 						<List.Item
 							key={item.id}
-							className="!px-6 !py-4 !border-b last:!border-b-0 hover:!bg-gray-50 dark:hover:!bg-gray-700/50 transition-colors"
+							className="!px-6 !py-4 !border-b last:!border-b-0 hover:!bg-gray-50  transition-colors"
 							actions={[
 								<Switch
 									key="switch"
@@ -165,7 +165,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 								}
 								title={
 									<div className="flex items-center gap-2">
-										<span className="font-medium text-gray-900 dark:text-gray-100">
+										<span className="font-medium text-gray-900 ">
 											{item.name}
 										</span>
 										<Tag
@@ -184,7 +184,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 									</div>
 								}
 								description={
-									<span className="text-gray-500 dark:text-gray-400">
+									<span className="text-gray-500 ">
 										{item.config.baseUrl || "Default endpoint"}
 									</span>
 								}

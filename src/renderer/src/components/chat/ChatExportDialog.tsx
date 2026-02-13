@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Modal, Radio, Input, Button, message } from "antd";
+import { Modal, Radio, Input, Button, message, theme } from "antd";
 import { FileTextOutlined, CodeOutlined, FileMarkdownOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { useMessageStore, type ExportFormat } from "../../stores/messageStore";
 import type { Message } from "../../stores/chatStore";
+
+const { useToken } = theme;
 
 interface ChatExportDialogProps {
 	messages: Message[];
@@ -20,6 +22,7 @@ export function ChatExportDialog({
 	const [format, setFormat] = useState<ExportFormat>("markdown");
 	const [filename, setFilename] = useState("");
 	const [isExporting, setIsExporting] = useState(false);
+	const { token } = useToken();
 
 	const { exportMessages } = useMessageStore();
 
@@ -88,7 +91,7 @@ export function ChatExportDialog({
 			<div className="space-y-6">
 				{/* 格式选择 */}
 				<div>
-					<label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+					<label className="block text-sm font-medium mb-3" style={{ color: token.colorText }}>
 						{t("chat.exportFormat", "导出格式", { ns: "chat" })}
 					</label>
 					<Radio.Group
@@ -100,11 +103,11 @@ export function ChatExportDialog({
 							{formatOptions.map((option) => (
 								<div
 									key={option.value}
-									className={`flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer ${
-										format === option.value
-											? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-											: "border-slate-200 dark:border-slate-700 hover:border-blue-300"
-									}`}
+									className="flex items-center gap-4 p-4 rounded-lg border transition-colors cursor-pointer"
+									style={{
+										borderColor: format === option.value ? token.colorPrimary : token.colorBorder,
+										backgroundColor: format === option.value ? token.colorInfoBg : undefined,
+									}}
 									onClick={() => setFormat(option.value)}
 								>
 									<Radio value={option.value} className="hidden">{option.label}</Radio>
@@ -138,7 +141,7 @@ export function ChatExportDialog({
 
 				{/* 文件名 */}
 				<div>
-					<label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+					<label className="block text-sm font-medium mb-2" style={{ color: token.colorText }}>
 						{t("chat.exportFilename", "文件名 (可选)", { ns: "chat" })}
 					</label>
 					<Input

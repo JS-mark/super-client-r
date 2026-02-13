@@ -1,11 +1,13 @@
 import { EditOutlined } from "@ant-design/icons";
-import { Switch, Tooltip } from "antd";
+import { Switch, Tooltip, theme } from "antd";
 import type React from "react";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MenuItemConfig } from "../../types/menu";
 import { renderItemIcon } from "./MenuIconConfig";
+
+const { useToken } = theme;
 
 interface MenuRowProps {
 	item: MenuItemConfig;
@@ -33,6 +35,7 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 	onDragEnd,
 }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const rowRef = useRef<HTMLDivElement>(null);
 
 	const handleDragStart = useCallback(
@@ -76,12 +79,29 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 			<div
 				className={cn(
 					"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-					"hover:bg-slate-50 dark:hover:bg-slate-800/50",
 					!item.enabled && "opacity-50",
 				)}
+				style={{
+					backgroundColor: "transparent",
+				}}
+				onMouseEnter={(e) => {
+					e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+				}}
+				onMouseLeave={(e) => {
+					e.currentTarget.style.backgroundColor = "transparent";
+				}}
 			>
 				{/* Drag handle */}
-				<div className="cursor-grab active:cursor-grabbing text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-500 transition-colors shrink-0">
+				<div
+					className="cursor-grab active:cursor-grabbing transition-colors shrink-0"
+					style={{ color: token.colorTextDisabled }}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.color = token.colorTextSecondary;
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.color = token.colorTextDisabled;
+					}}
+				>
 					<svg
 						width="14"
 						height="14"
@@ -101,11 +121,11 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 				<div
 					className={cn(
 						"w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-						"bg-slate-100 dark:bg-slate-700/60",
-						item.enabled
-							? "text-slate-700 dark:text-slate-200"
-							: "text-slate-400 dark:text-slate-500",
 					)}
+					style={{
+						backgroundColor: token.colorBgContainer,
+						color: item.enabled ? token.colorText : token.colorTextDisabled,
+					}}
 				>
 					{renderItemIcon(item, "sm")}
 				</div>
@@ -114,10 +134,10 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 				<span
 					className={cn(
 						"flex-1 text-sm font-medium select-none",
-						item.enabled
-							? "text-slate-700 dark:text-slate-200"
-							: "text-slate-400 dark:text-slate-500",
 					)}
+					style={{
+						color: item.enabled ? token.colorText : token.colorTextDisabled,
+					}}
 				>
 					{t(item.label, { ns: "menu" })}
 				</span>
@@ -133,10 +153,19 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 						<button
 							className={cn(
 								"w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-								"text-slate-400 dark:text-slate-500",
 								"opacity-0 group-hover:opacity-100",
-								"hover:bg-slate-200 dark:hover:bg-slate-600 hover:text-slate-600 dark:hover:text-slate-300",
 							)}
+							style={{
+								color: token.colorTextDisabled,
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+								e.currentTarget.style.color = token.colorText;
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.backgroundColor = "";
+								e.currentTarget.style.color = token.colorTextDisabled;
+							}}
 							onClick={() => onEdit(item)}
 						>
 							<EditOutlined className="text-xs" />

@@ -4,7 +4,7 @@ import {
 	SettingOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Input, Select, Space, message } from "antd";
+import { Button, Card, Input, Select, Space, message, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,8 @@ import { appService } from "../../services/appService";
 import { FloatWidgetSettings } from "./FloatWidgetSettings";
 import { SettingSection } from "./SettingSection";
 import { ThemeSettings } from "./ThemeSettings";
+
+const { useToken } = theme;
 
 // 错误重试工具函数
 async function withRetry<T>(
@@ -35,6 +37,7 @@ async function withRetry<T>(
 
 export const GeneralSettings: React.FC = () => {
 	const { t, i18n } = useTranslation();
+	const { token } = useToken();
 	const [userDataPath, setUserDataPath] = useState("");
 	const [loading, setLoading] = useState(true);
 
@@ -109,7 +112,7 @@ export const GeneralSettings: React.FC = () => {
 								{t("open", "Open", { ns: "settings" })}
 							</Button>
 						</Space.Compact>
-						<p className="text-xs text-slate-500 dark:text-slate-400">
+						<p className="text-xs" style={{ color: token.colorTextSecondary }}>
 							{t(
 								"settings.userDataPathHint",
 								"This directory stores application data and cannot be changed",
@@ -123,8 +126,11 @@ export const GeneralSettings: React.FC = () => {
 					icon={<SettingOutlined />}
 				>
 					<ThemeSettings />
-					<div className="flex items-center justify-between py-2 border-t border-slate-100 dark:border-slate-700">
-						<div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+					<div
+						className="flex items-center justify-between py-2 border-t"
+						style={{ borderColor: token.colorBorder }}
+					>
+						<div className="flex items-center gap-2" style={{ color: token.colorText }}>
 							<GlobalOutlined className="text-sm" />
 							<span className="text-sm">
 								{t("language", "Language", { ns: "settings" })}
@@ -158,7 +164,7 @@ export const GeneralSettings: React.FC = () => {
 					icon={<StarOutlined />}
 				>
 					<div className="flex items-center justify-between">
-						<p className="text-sm text-slate-600 dark:text-slate-400">
+						<p className="text-sm" style={{ color: token.colorTextSecondary }}>
 							{t("checkForUpdates", "Check for application updates", { ns: "settings" })}
 						</p>
 						<Button onClick={handleCheckUpdate} className="!rounded-lg">

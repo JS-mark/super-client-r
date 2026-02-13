@@ -9,9 +9,12 @@ import {
 	Pagination,
 	Spin,
 	Tabs,
+	theme,
 } from "antd";
 import * as React from "react";
 import { useMemo } from "react";
+
+const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { SkillCard } from "../components/skill/SkillCard";
@@ -22,6 +25,7 @@ import type { Skill } from "../types/skills";
 
 const Skills: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const pageTitle = useMemo(() => {
 		return (
@@ -29,12 +33,15 @@ const Skills: React.FC = () => {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
 					<ToolOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
 					{t("title", "技能市场", { ns: "skills" })}
 				</span>
 			</div>
 		);
-	}, [t]);
+	}, [t, token.colorText]);
 	useTitle(pageTitle);
 
 	const {

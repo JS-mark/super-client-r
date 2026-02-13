@@ -80,7 +80,7 @@ export const McpConfig: React.FC<McpConfigProps> = ({ addTrigger }) => {
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
 					description={
-						<span className="text-gray-500 dark:text-gray-400">
+						<span className="text-gray-500 ">
 							{t("empty", "No MCP servers configured yet", { ns: "mcp" })}
 						</span>
 					}
@@ -96,12 +96,12 @@ export const McpConfig: React.FC<McpConfigProps> = ({ addTrigger }) => {
 				</Empty>
 			) : (
 				<List
-					className="!bg-white dark:!bg-gray-800 !rounded-xl !shadow-sm"
+					className="!bg-white  !rounded-xl !shadow-sm"
 					dataSource={servers}
 					renderItem={(item) => (
 						<List.Item
 							key={item.id}
-							className="!px-6 !py-4 !border-b last:!border-b-0 hover:!bg-gray-50 dark:hover:!bg-gray-700/50 transition-colors"
+							className="!px-6 !py-4 !border-b last:!border-b-0 hover:!bg-gray-50  transition-colors"
 							actions={[
 								<Button
 									key="delete"
@@ -121,14 +121,14 @@ export const McpConfig: React.FC<McpConfigProps> = ({ addTrigger }) => {
 								}
 								title={
 									<div className="flex items-center gap-2">
-										<span className="font-medium text-gray-900 dark:text-gray-100">
+										<span className="font-medium text-gray-900 ">
 											{item.name}
 										</span>
 										{getStatusBadge(item.status)}
 									</div>
 								}
 								description={
-									<div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+									<div className="flex items-center gap-2 text-gray-500 ">
 										<LinkOutlined className="text-xs" />
 										<span className="text-sm truncate max-w-md">
 											{item.url}

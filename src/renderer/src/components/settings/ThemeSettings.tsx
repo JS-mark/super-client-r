@@ -1,12 +1,15 @@
 import { DesktopOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";
-import { Select } from "antd";
+import { Select, theme } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { type ThemeMode, useTheme } from "../../hooks/useTheme";
 
+const { useToken } = theme;
+
 export const ThemeSettings: React.FC = () => {
 	const { t } = useTranslation();
 	const { mode, isDark, setThemeMode } = useTheme();
+	const { token } = useToken();
 
 	const themeOptions = [
 		{
@@ -28,7 +31,7 @@ export const ThemeSettings: React.FC = () => {
 
 	return (
 		<div className="flex items-center justify-between py-2">
-			<div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+			<div className="flex items-center gap-2" style={{ color: token.colorText }}>
 				{isDark ? (
 					<MoonOutlined className="text-sm" />
 				) : (

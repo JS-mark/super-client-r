@@ -1,6 +1,8 @@
 import { ReloadOutlined } from "@ant-design/icons";
-import { Alert, Button } from "antd";
+import { Alert, Button, theme } from "antd";
 import type React from "react";
+
+const { useToken } = theme;
 
 // 通用设置区块组件
 export const SettingSection: React.FC<{
@@ -8,18 +10,31 @@ export const SettingSection: React.FC<{
 	icon?: React.ReactNode;
 	children: React.ReactNode;
 	extra?: React.ReactNode;
-}> = ({ title, icon, children, extra }) => (
-	<div className="p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-		<div className="flex items-center justify-between mb-4">
-			<h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-				{icon}
-				{title}
-			</h3>
-			{extra}
+}> = ({ title, icon, children, extra }) => {
+	const { token } = useToken();
+
+	return (
+		<div
+			className="p-3 rounded-2xl border"
+			style={{
+				backgroundColor: token.colorBgContainer,
+				borderColor: token.colorBorder,
+			}}
+		>
+			<div className="flex items-center justify-between mb-4">
+				<h3
+					className="text-lg font-semibold flex items-center gap-2"
+					style={{ color: token.colorTextHeading }}
+				>
+					{icon}
+					{title}
+				</h3>
+				{extra}
+			</div>
+			{children}
 		</div>
-		{children}
-	</div>
-);
+	);
+};
 
 // 错误状态组件
 export const ErrorState: React.FC<{

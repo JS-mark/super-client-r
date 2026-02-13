@@ -23,8 +23,11 @@ import {
 	Switch,
 	Tabs,
 	Tag,
+	theme,
 } from "antd";
 import { Children, useCallback, useEffect, useMemo, useState } from "react";
+
+const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
@@ -53,6 +56,7 @@ const PluginStateBadge = ({ state }: { state: PluginInfo["state"] }) => {
 
 export default function Plugins() {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	// 设置标题栏
 	const pageTitle = useMemo(
@@ -61,12 +65,15 @@ export default function Plugins() {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
 					<AppstoreOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
 					{t("plugins", "插件", { ns: "menu" })}
 				</span>
 			</div>
 		),
-		[t],
+		[t, token.colorText],
 	);
 	useTitle(pageTitle);
 
@@ -192,7 +199,10 @@ export default function Plugins() {
 								<Card
 									key={plugin.id}
 									hoverable
-									className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+									style={{
+										backgroundColor: token.colorBgContainer,
+										borderColor: token.colorBorder,
+									}}
 									actions={[
 										plugin.installed ? (
 											<Button
@@ -291,7 +301,7 @@ export default function Plugins() {
 										className={cn(
 											"w-full",
 											plugin.enabled &&
-											"border-blue-500 dark:border-blue-500",
+											"border-blue-500",
 										)}
 										actions={[
 											<Switch
@@ -368,12 +378,24 @@ export default function Plugins() {
 
 	return (
 		<MainLayout>
-			<div className="h-full flex flex-col bg-slate-50/50 dark:bg-slate-950">
+			<div
+				className="h-full flex flex-col"
+				style={{ backgroundColor: token.colorBgLayout }}
+			>
 				{/* Header */}
-				<div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+				<div
+					className="px-6 py-4 border-b"
+					style={{
+						borderColor: token.colorBorder,
+						backgroundColor: token.colorBgContainer,
+					}}
+				>
 					<div className="flex items-center justify-between">
 						<div>
-							<h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+							<h1
+								className="text-2xl font-bold"
+								style={{ color: token.colorTextHeading }}
+							>
 								{t("plugins.title", "插件中心", { ns: "plugins" })}
 							</h1>
 							<p className="text-sm text-slate-500 mt-1">

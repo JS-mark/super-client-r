@@ -10,6 +10,7 @@ import {
 	Input,
 	Modal,
 	message,
+	theme,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,8 +21,11 @@ import {
 } from "../../stores/shortcutStore";
 import { SCOPE_CONFIG, ShortcutItem } from "./ShortcutItem";
 
+const { useToken } = theme;
+
 export function ShortcutSettings() {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const {
 		shortcuts,
 		isRecording,
@@ -131,11 +135,11 @@ export function ShortcutSettings() {
 			{/* 标题和统计 */}
 			<div className="flex items-center justify-between">
 				<div>
-					<h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+					<h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: token.colorTextHeading }}>
 						<KeyOutlined />
 						{t("shortcuts.title", "快捷键设置", { ns: "settings" })}
 					</h3>
-					<p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+					<p className="text-sm mt-1" style={{ color: token.colorTextSecondary }}>
 						{t("shortcuts.subtitle", "自定义您的键盘快捷键", { ns: "settings" })}
 					</p>
 				</div>
@@ -169,7 +173,10 @@ export function ShortcutSettings() {
 				}
 				type="info"
 				showIcon
-				className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+				style={{
+					backgroundColor: token.colorInfoBg,
+					borderColor: token.colorInfoBorder,
+				}}
 			/>
 
 			{/* 过滤器和搜索 */}
@@ -211,7 +218,7 @@ export function ShortcutSettings() {
 						<div key={scope}>
 							<div className="flex items-center gap-2 mb-3">
 								{SCOPE_CONFIG[scope].icon}
-								<span className="font-medium text-slate-700 dark:text-slate-300">
+								<span className="font-medium" style={{ color: token.colorText }}>
 									{t(SCOPE_CONFIG[scope].labelKey)}
 								</span>
 								<span className="text-xs text-slate-400">
@@ -239,7 +246,7 @@ export function ShortcutSettings() {
 			</div>
 
 			{/* 底部操作 */}
-			<div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700">
+			<div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: token.colorBorder }}>
 				<div className="text-sm text-slate-500">
 					{isRecording && (
 						<span className="flex items-center gap-2 text-blue-500">

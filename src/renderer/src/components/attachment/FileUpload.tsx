@@ -201,8 +201,8 @@ export function FileUpload({
 				className={cn(
 					"border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer",
 					isDragging
-						? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-						: "border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500"
+						? "border-blue-500 bg-blue-50"
+						: "border-slate-300 hover:border-blue-400"
 				)}
 				onClick={() => fileInputRef.current?.click()}
 			>
@@ -214,7 +214,7 @@ export function FileUpload({
 					className="hidden"
 					onChange={(e) => handleFileSelect(e.target.files)}
 				/>
-				<div className="flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
+				<div className="flex flex-col items-center justify-center gap-2 text-slate-500">
 					{children || (
 						<>
 							<UploadOutlined className="text-2xl" />
@@ -235,7 +235,7 @@ export function FileUpload({
 					{uploadingFiles.map((file) => (
 						<div
 							key={file.id}
-							className="flex items-center gap-3 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"
+							className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg"
 						>
 							<FileIcon
 								type={getFileTypeFromName(file.name)}
@@ -261,7 +261,7 @@ export function FileUpload({
 									e.stopPropagation();
 									removeUploadingFile(file.id);
 								}}
-								className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded"
+								className="p-1 hover:bg-slate-200 rounded"
 							>
 								<CloseOutlined className="text-xs" />
 							</button>

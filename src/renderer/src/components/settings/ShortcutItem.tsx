@@ -7,7 +7,7 @@ import {
 	MessageOutlined,
 	ReloadOutlined,
 } from "@ant-design/icons";
-import { Button, Switch, Tag, Tooltip } from "antd";
+import { Button, Switch, Tag, Tooltip, theme } from "antd";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import {
@@ -15,6 +15,8 @@ import {
 	type Shortcut,
 	type ShortcutScope,
 } from "../../stores/shortcutStore";
+
+const { useToken } = theme;
 
 // Scope configuration
 export const SCOPE_CONFIG: Record<
@@ -61,6 +63,7 @@ function ShortcutInput({
 	onStopRecording,
 	conflict,
 }: ShortcutInputProps) {
+	const { token } = useToken();
 	const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 	const displayValue = formatShortcut(value, isMac);
 
@@ -69,11 +72,17 @@ function ShortcutInput({
 			<div className="flex items-center gap-2">
 				<div
 					className={cn(
-						"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border-2 border-blue-500 bg-blue-50 dark:bg-blue-900/20 animate-pulse",
-						conflict && "border-red-500 bg-red-50 dark:bg-red-900/20",
+						"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border-2 border-blue-500 animate-pulse",
 					)}
+					style={{
+						backgroundColor: conflict ? token.colorErrorBg : token.colorInfoBg,
+						borderColor: conflict ? token.colorError : token.colorPrimary,
+					}}
 				>
-					<span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+					<span
+						className="text-sm font-medium"
+						style={{ color: conflict ? token.colorError : token.colorPrimary }}
+					>
 						{conflict ? "快捷键冲突!" : "按下快捷键..."}
 					</span>
 				</div>
@@ -91,9 +100,13 @@ function ShortcutInput({
 		<div className="flex items-center gap-2">
 			<div
 				className={cn(
-					"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-sm",
-					conflict && "border-red-500 text-red-500",
+					"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border font-mono text-sm",
 				)}
+				style={{
+					backgroundColor: token.colorBgContainer,
+					borderColor: conflict ? token.colorError : token.colorBorder,
+					color: conflict ? token.colorError : token.colorText,
+				}}
 			>
 				{displayValue}
 			</div>
@@ -131,6 +144,7 @@ export function ShortcutItem({
 	conflict,
 }: ShortcutItemProps) {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const scopeConfig = SCOPE_CONFIG[shortcut.scope];
 	const isModified = shortcut.currentKey !== shortcut.defaultKey;
 
@@ -138,10 +152,12 @@ export function ShortcutItem({
 		<div
 			className={cn(
 				"flex items-center justify-between p-4 rounded-xl border transition-all",
-				shortcut.enabled
-					? "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-					: "bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60",
 			)}
+			style={{
+				backgroundColor: shortcut.enabled ? token.colorBgContainer : token.colorBgContainer,
+				borderColor: shortcut.enabled ? token.colorBorder : token.colorBorder,
+				opacity: shortcut.enabled ? 1 : 0.6,
+			}}
 		>
 			<div className="flex-1 min-w-0">
 				<div className="flex items-center gap-2 mb-1">
@@ -155,10 +171,10 @@ export function ShortcutItem({
 						</Tag>
 					)}
 				</div>
-				<div className="font-medium text-slate-800 dark:text-slate-200">
+				<div className="font-medium" style={{ color: token.colorText }}>
 					{t(shortcut.nameKey, shortcut.name)}
 				</div>
-				<div className="text-xs text-slate-500 dark:text-slate-400">
+				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
 					{t(shortcut.descriptionKey, shortcut.description)}
 				</div>
 			</div>

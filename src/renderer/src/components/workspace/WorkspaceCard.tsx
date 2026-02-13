@@ -126,7 +126,7 @@ export function WorkspaceCard({
 						</div>
 						<div>
 							<div className="flex items-center gap-2">
-								<h3 className="font-semibold text-slate-800 dark:text-slate-200">
+								<h3 className="font-semibold text-slate-800 ">
 									{workspace.name}
 								</h3>
 								{isDefault && (
@@ -152,20 +152,20 @@ export function WorkspaceCard({
 
 				{/* Description */}
 				{workspace.description && (
-					<p className="text-sm text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
+					<p className="text-sm text-slate-500  mb-4 line-clamp-2">
 						{workspace.description}
 					</p>
 				)}
 
 				{/* Stats */}
 				<div className="grid grid-cols-2 gap-4 mb-4">
-					<div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+					<div className="flex items-center gap-2 text-sm text-slate-600 ">
 						<MessageOutlined />
 						<span>
 							{stats.totalSessions} {t("workspaces.stats.sessions", "会话", { ns: "workspaces" })}
 						</span>
 					</div>
-					<div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+					<div className="flex items-center gap-2 text-sm text-slate-600 ">
 						<ClockCircleOutlined />
 						<span>{new Date(workspace.updatedAt).toLocaleDateString()}</span>
 					</div>

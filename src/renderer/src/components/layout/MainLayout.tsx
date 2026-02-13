@@ -7,7 +7,7 @@ import {
 	SettingOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Dropdown, Layout, type MenuProps, Tooltip } from "antd";
+import { Dropdown, Layout, type MenuProps, theme, Tooltip } from "antd";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,7 @@ import { AboutModal } from "../AboutModal";
 import { TitleBar } from "./TitleBar";
 
 const { Sider, Content } = Layout;
+const { useToken } = theme;
 
 /**
  * 图标映射：图标名称到 Ant Design 图标组件
@@ -76,6 +77,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const { token } = useToken();
 
 	// 从 store 获取菜单配置
 	const menuItems = useMenuStore((state) => state.items);
@@ -173,11 +175,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	};
 
 	return (
-		<Layout className="h-screen bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+		<Layout className="h-screen bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10">
 			{/* 左侧边栏 - 全高 */}
 			<Sider
 				width={80}
-				className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 dark:!from-slate-950 dark:!via-slate-900 dark:!to-slate-950 !border-r !border-slate-700/50 shadow-2xl h-full"
+				className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 !border-r !border-slate-700/50 shadow-2xl h-full"
 			>
 				<div className="flex flex-col h-full pt-[30px]">
 					{/* Logo Area - 用户头像 */}
@@ -218,7 +220,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 										<span
 											className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSelected
 												? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-												: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
+												: "hover:bg-slate-700/50"
 												}`}
 										>
 											{renderMenuItemIcon(item)}
@@ -244,7 +246,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 								<span
 									className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSettingsSelected
 										? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-										: "hover:bg-slate-700/50 dark:hover:bg-slate-800/50"
+										: "hover:bg-slate-700/50"
 										}`}
 								>
 									<SettingOutlined className="text-xl" />
@@ -265,9 +267,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 						className={cn(
 							"h-full",
 							"animate-fade-in",
-							"bg-white!",
-							"dark:bg-slate-800!",
 						)}
+						style={{ background: token.colorBgContainer }}
 					>
 						{children}
 					</div>

@@ -14,12 +14,14 @@ import {
 	StarOutlined,
 	UserOutlined,
 } from "@ant-design/icons";
-import { Button, Input } from "antd";
+import { Button, Input, theme } from "antd";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MenuItemConfig, MenuItemIconType } from "../../types/menu";
+
+const { useToken } = theme;
 
 /**
  * Ant Design icon map for rendering "default" type icons
@@ -104,6 +106,7 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 	onChange,
 }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [previewUrl, setPreviewUrl] = useState("");
 
 	const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +126,10 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 	if (type === "emoji") {
 		return (
 			<div className="flex items-center gap-3">
-				<div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center text-3xl shadow-inner">
+				<div
+					className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner"
+					style={{ backgroundColor: token.colorBgContainer }}
+				>
 					{value || "🎯"}
 				</div>
 				<Input
@@ -144,11 +150,11 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 				<div
 					className={cn(
 						"w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center",
-						"bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30",
 						!previewUrl &&
 						!value &&
-						"border-2 border-dashed border-blue-300 dark:border-blue-700",
+						"border-2 border-dashed",
 					)}
+					style={{ backgroundColor: token.colorBgContainer, borderColor: !previewUrl && !value ? token.colorBorder : undefined }}
 				>
 					{previewUrl || value ? (
 						<img
@@ -192,10 +198,22 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 					className={cn(
 						"h-12 rounded-xl flex items-center justify-center text-lg transition-all",
 						"hover:scale-105 hover:shadow-md",
-						value === icon.value
-							? "bg-blue-500 text-white shadow-lg ring-2 ring-blue-300 ring-offset-2 dark:ring-offset-slate-800"
-							: "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600",
 					)}
+					style={{
+						backgroundColor: value === icon.value ? token.colorPrimary : token.colorBgContainer,
+						color: value === icon.value ? "#fff" : token.colorText,
+						boxShadow: value === icon.value ? `0 0 0 2px ${token.colorPrimary}40` : undefined,
+					}}
+					onMouseEnter={(e) => {
+						if (value !== icon.value) {
+							e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+						}
+					}}
+					onMouseLeave={(e) => {
+						if (value !== icon.value) {
+							e.currentTarget.style.backgroundColor = token.colorBgContainer;
+						}
+					}}
 					title={icon.label}
 				>
 					{icon.label.split(" ")[0]}

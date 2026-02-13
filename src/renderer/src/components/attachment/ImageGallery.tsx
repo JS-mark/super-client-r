@@ -257,8 +257,8 @@ export function ImageThumbnailGrid({
 					<div
 						className={cn(
 							"w-20 h-20 rounded-lg overflow-hidden cursor-pointer",
-							"border border-slate-200 dark:border-slate-700",
-							"hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+							"border border-slate-200",
+							"hover:border-blue-500 transition-colors"
 						)}
 					>
 						<img

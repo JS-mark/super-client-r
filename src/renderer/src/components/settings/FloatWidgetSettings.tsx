@@ -1,12 +1,15 @@
 import { DesktopOutlined } from "@ant-design/icons";
-import { Switch } from "antd";
+import { Switch, theme } from "antd";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingSection } from "./SettingSection";
 
+const { useToken } = theme;
+
 export const FloatWidgetSettings: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [enabled, setEnabled] = useState(false);
 	const [loading, setLoading] = useState(true);
 
@@ -48,10 +51,10 @@ export const FloatWidgetSettings: React.FC = () => {
 		>
 			<div className="flex items-center justify-between">
 				<div>
-					<p className="text-slate-700 dark:text-slate-300 font-medium">
+					<p className="font-medium" style={{ color: token.colorText }}>
 						{t("enableFloatWidget", "Enable Float Widget", { ns: "settings" })}
 					</p>
-					<p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+					<p className="text-xs mt-1" style={{ color: token.colorTextSecondary }}>
 						{t("floatWidgetHint", "Show a floating widget on desktop", {
 							ns: "settings",
 						})}

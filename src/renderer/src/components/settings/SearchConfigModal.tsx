@@ -6,7 +6,7 @@ import {
 	SaveOutlined,
 	SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Select, Switch, message } from "antd";
+import { Button, Form, Input, Modal, Select, Switch, message, theme } from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { searchService } from "../../services/search/searchService";
@@ -16,6 +16,8 @@ import {
 	SEARCH_PROVIDERS,
 	getProviderInfo,
 } from "./SearchProviders";
+
+const { useToken } = theme;
 
 interface SearchConfigModalProps {
 	open: boolean;
@@ -31,6 +33,7 @@ export function SearchConfigModal({
 	onSaved,
 }: SearchConfigModalProps) {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [form] = Form.useForm();
 	const [selectedProvider, setSelectedProvider] =
 		useState<SearchProviderType | null>(null);
@@ -235,7 +238,13 @@ export function SearchConfigModal({
 
 				{/* Provider description */}
 				{currentProvider && (
-					<div className="mb-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 text-sm text-slate-600 dark:text-slate-400">
+					<div
+						className="mb-4 p-3 rounded-lg text-sm"
+						style={{
+							backgroundColor: token.colorBgContainer,
+							color: token.colorTextSecondary,
+						}}
+					>
 						<div className="flex items-center justify-between">
 							<span>{currentProvider.description}</span>
 							{currentProvider.helpUrl && (

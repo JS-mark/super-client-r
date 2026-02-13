@@ -12,7 +12,7 @@ interface MarkdownProps {
 
 export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 	return (
-		<div className={cn("markdown prose dark:prose-invert max-w-none", className)}>
+		<div className={cn("markdown prose  max-w-none", className)}>
 			<ReactMarkdown
 				remarkPlugins={[remarkGfm]}
 				rehypePlugins={[rehypeHighlight, rehypeRaw]}
@@ -20,7 +20,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 					// Custom code block styling
 					pre: ({ node, ...props }) => (
 						<pre
-							className="!bg-gray-100 dark:!bg-gray-800 !p-4 !rounded-lg !overflow-x-auto"
+							className="!bg-gray-100  !p-4 !rounded-lg !overflow-x-auto"
 							{...props}
 						/>
 					),
@@ -29,7 +29,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 						if (isInline) {
 							return (
 								<code
-									className="!bg-gray-100 dark:!bg-gray-800 !px-1.5 !py-0.5 !rounded !text-sm !font-mono"
+									className="!bg-gray-100  !px-1.5 !py-0.5 !rounded !text-sm !font-mono"
 									{...props}
 								>
 									{children}
@@ -54,7 +54,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 					// Custom blockquote styling
 					blockquote: ({ node, ...props }) => (
 						<blockquote
-							className="!border-l-4 !border-blue-500 !pl-4 !italic !my-4 !text-gray-600 dark:!text-gray-400"
+							className="!border-l-4 !border-blue-500 !pl-4 !italic !my-4 !text-gray-600 "
 							{...props}
 						/>
 					),
@@ -62,35 +62,35 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 					table: ({ node, ...props }) => (
 						<div className="!overflow-x-auto !my-4">
 							<table
-								className="!min-w-full !border-collapse !border !border-gray-200 dark:!border-gray-700"
+								className="!min-w-full !border-collapse !border !border-gray-200 "
 								{...props}
 							/>
 						</div>
 					),
 					thead: ({ node, ...props }) => (
 						<thead
-							className="!bg-gray-50 dark:!bg-gray-800"
+							className="!bg-gray-50 "
 							{...props}
 						/>
 					),
 					tbody: ({ node, ...props }) => (
-						<tbody className="!divide-y !divide-gray-200 dark:!divide-gray-700" {...props} />
+						<tbody className="!divide-y !divide-gray-200 " {...props} />
 					),
 					tr: ({ node, ...props }) => (
 						<tr
-							className="!hover:bg-gray-50 dark:!hover:bg-gray-800 !transition-colors"
+							className="!hover:bg-gray-50  !transition-colors"
 							{...props}
 						/>
 					),
 					th: ({ node, ...props }) => (
 						<th
-							className="!px-4 !py-2 !text-left !font-semibold !border !border-gray-200 dark:!border-gray-700"
+							className="!px-4 !py-2 !text-left !font-semibold !border !border-gray-200 "
 							{...props}
 						/>
 					),
 					td: ({ node, ...props }) => (
 						<td
-							className="!px-4 !py-2 !border !border-gray-200 dark:!border-gray-700"
+							className="!px-4 !py-2 !border !border-gray-200 "
 							{...props}
 						/>
 					),
@@ -123,7 +123,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 					),
 					// Custom hr styling
 					hr: ({ node, ...props }) => (
-						<hr className="!my-6 !border-gray-200 dark:!border-gray-700" {...props} />
+						<hr className="!my-6 !border-gray-200 " {...props} />
 					),
 					// Custom image styling
 					img: ({ node, ...props }) => (

@@ -1,4 +1,5 @@
 import { RobotOutlined, StarOutlined } from "@ant-design/icons";
+import { theme } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
@@ -7,6 +8,8 @@ import { useMessageStore } from "../../stores/messageStore";
 import { Markdown } from "../Markdown";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ToolCallCard } from "./ToolCallCard";
+
+const { useToken } = theme;
 
 export const MessageBubble: React.FC<{
 	msg: Message;
@@ -23,6 +26,7 @@ export const MessageBubble: React.FC<{
 		isAssistant && isStreaming && isLast ? streamingContent : msg.content;
 	const { t } = useTranslation();
 	const { isBookmarked } = useMessageStore();
+	const { token } = useToken();
 
 	if (isTool && msg.toolCall) {
 		return <ToolCallCard toolCall={msg.toolCall} />;
@@ -58,8 +62,12 @@ export const MessageBubble: React.FC<{
 						"rounded-2xl px-5 py-3 relative group",
 						isUser
 							? "bg-gradient-to-br from-blue-500 to-purple-500 text-white"
-							: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm",
+							: "border shadow-sm",
 					)}
+					style={!isUser ? {
+						backgroundColor: token.colorBgContainer,
+						borderColor: token.colorBorder,
+					} : undefined}
 				>
 					{/* Bookmark indicator */}
 					{isBookmarked(msg.id) && (
@@ -74,8 +82,11 @@ export const MessageBubble: React.FC<{
 						<div
 							className={cn(
 								"prose prose-sm max-w-none",
-								isUser ? "prose-invert" : "dark:prose-invert",
+								isUser ? "prose-invert" : undefined,
 							)}
+							style={!isUser ? {
+								color: token.colorText,
+							} : undefined}
 						>
 							<Markdown content={displayContent} />
 						</div>

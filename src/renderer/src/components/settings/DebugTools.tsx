@@ -20,6 +20,7 @@ import {
 	Statistic,
 	Tabs,
 	message,
+	theme,
 } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -27,9 +28,12 @@ import { useTranslation } from "react-i18next";
 import { type ApiStatus, apiService } from "../../services/apiService";
 import { type AppInfo, appService } from "../../services/appService";
 
+const { useToken } = theme;
+
 // 快速操作 Tab
 const QuickActionsTab: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const handleOpenDevTools = async () => {
 		try {
@@ -105,24 +109,38 @@ const QuickActionsTab: React.FC = () => {
 			{actions.map((action) => (
 				<div
 					key={action.key}
-					className="flex items-center justify-between p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
+					className="flex items-center justify-between p-4 rounded-xl border hover:shadow-md transition-shadow"
+					style={{
+						backgroundColor: token.colorBgContainer,
+						borderColor: token.colorBorder,
+					}}
 				>
 					<div className="flex items-center gap-4">
 						<div
 							className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.type === "primary"
 								? "bg-blue-500 text-white"
 								: action.danger
-									? "bg-red-100 dark:bg-red-900/30 text-red-500"
-									: "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+									? "text-red-500"
+									: ""
 								}`}
+							style={
+								action.danger
+									? { backgroundColor: token.colorErrorBg }
+									: action.type !== "primary"
+										? {
+												backgroundColor: token.colorBgContainer,
+												color: token.colorText,
+											}
+										: undefined
+							}
 						>
 							{action.icon}
 						</div>
 						<div>
-							<div className="font-medium text-slate-800 dark:text-slate-200">
+							<div className="font-medium" style={{ color: token.colorText }}>
 								{action.label}
 							</div>
-							<div className="text-sm text-slate-500 dark:text-slate-400">
+							<div className="text-sm" style={{ color: token.colorTextSecondary }}>
 								{action.description}
 							</div>
 						</div>
@@ -161,6 +179,7 @@ const QuickActionsTab: React.FC = () => {
 // 系统信息 Tab
 const SystemInfoTab: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(
 		null,
 	);
@@ -283,13 +302,23 @@ const SystemInfoTab: React.FC = () => {
 					{infoItems.map((item) => (
 						<div
 							key={item.value}
-							className={`p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 ${item.fullWidth ? "col-span-2" : ""
+							className={`p-4 rounded-xl border ${item.fullWidth ? "col-span-2" : ""
 								}`}
+							style={{
+								backgroundColor: token.colorBgContainer,
+								borderColor: token.colorBorder,
+							}}
 						>
-							<div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+							<div
+								className="text-xs uppercase tracking-wider mb-1"
+								style={{ color: token.colorTextSecondary }}
+							>
 								{item.label}
 							</div>
-							<div className="text-sm font-medium text-slate-800 dark:text-slate-200 font-mono break-all">
+							<div
+								className="text-sm font-medium font-mono break-all"
+								style={{ color: token.colorText }}
+							>
 								{item.value}
 							</div>
 						</div>
@@ -303,6 +332,7 @@ const SystemInfoTab: React.FC = () => {
 // 性能监控 Tab
 const PerformanceMonitorTab: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [metrics, setMetrics] = useState({
 		pageLoadTime: 0,
 		memoryUsed: 0,
@@ -375,7 +405,7 @@ const PerformanceMonitorTab: React.FC = () => {
 			<Row gutter={[16, 16]}>
 				{statCards.map((card) => (
 					<Col span={12} key={card.value}>
-						<Card className="!rounded-xl !border-slate-200 dark:!border-slate-700">
+						<Card className="!rounded-xl" style={{ borderColor: token.colorBorder }}>
 							<Statistic
 								title={card.title}
 								value={card.value}
@@ -399,7 +429,7 @@ const PerformanceMonitorTab: React.FC = () => {
 							{t("memoryUsage", "内存使用", { ns: "settings" })}
 						</span>
 					}
-					className="rounded-xl! border-slate-200! dark:border-slate-700!"
+					className="rounded-xl!" style={{ borderColor: token.colorBorder }}
 				>
 					<div className="space-y-4">
 						<Progress
@@ -413,7 +443,7 @@ const PerformanceMonitorTab: React.FC = () => {
 										: "#22c55e"
 							}
 						/>
-						<div className="flex justify-between text-sm text-slate-500 dark:text-slate-400">
+						<div className="flex justify-between text-sm" style={{ color: token.colorTextSecondary }}>
 							<span>
 								{t("used", "已使用", { ns: "settings" })}: {metrics.memoryUsed}{" "}
 								MB
@@ -427,14 +457,23 @@ const PerformanceMonitorTab: React.FC = () => {
 				</Card>
 			)}
 
-			<Card className="!rounded-xl !border-slate-200 dark:!border-slate-700 !bg-blue-50 dark:!bg-blue-900/20">
+			<Card
+				className="!rounded-xl"
+				style={{
+					borderColor: token.colorBorder,
+					backgroundColor: token.colorInfoBg,
+				}}
+			>
 				<div className="flex items-start gap-3">
 					<InfoCircleOutlined className="text-blue-500 mt-1" />
 					<div>
-						<div className="font-medium text-slate-800 dark:text-slate-200">
+						<div className="font-medium" style={{ color: token.colorText }}>
 							{t("performanceTips", "性能提示", { ns: "settings" })}
 						</div>
-						<ul className="text-sm text-slate-500 dark:text-slate-400 mt-2 space-y-1 list-disc list-inside">
+						<ul
+							className="text-sm mt-2 space-y-1 list-disc list-inside"
+							style={{ color: token.colorTextSecondary }}
+						>
 							<li>
 								{t("performanceTip1", "定期清理日志文件可以释放磁盘空间", {
 									ns: "settings",

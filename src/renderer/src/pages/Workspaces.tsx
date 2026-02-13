@@ -16,8 +16,11 @@ import {
 	Radio,
 	Row,
 	Statistic,
+	theme,
 } from "antd";
 import { useMemo, useState } from "react";
+
+const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { EditWorkspaceModal } from "../components/workspace/EditWorkspaceModal";
@@ -33,6 +36,7 @@ import {
 
 export default function Workspaces() {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const pageTitle = useMemo(
 		() => (
@@ -40,12 +44,15 @@ export default function Workspaces() {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
 					<FolderOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
 					{t("workspaces", "工作区", { ns: "menu" })}
 				</span>
 			</div>
 		),
-		[t],
+		[t, token.colorText],
 	);
 	useTitle(pageTitle);
 
@@ -175,12 +182,18 @@ export default function Workspaces() {
 
 	return (
 		<MainLayout>
-			<div className="h-full flex flex-col bg-slate-50/50 dark:bg-slate-950 p-6">
+			<div
+				className="h-full flex flex-col p-6"
+				style={{ backgroundColor: token.colorBgLayout }}
+			>
 				{/* Header */}
 				<div className="mb-6">
 					<div className="flex items-center justify-between mb-4">
 						<div>
-							<h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+							<h1
+								className="text-2xl font-bold"
+								style={{ color: token.colorTextHeading }}
+							>
 								{t("workspaces.title", "工作区管理", { ns: "workspaces" })}
 							</h1>
 							<p className="text-sm text-slate-500 mt-1">

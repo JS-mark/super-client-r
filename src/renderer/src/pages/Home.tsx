@@ -9,7 +9,7 @@ import {
   ThunderboltOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Statistic, Tag } from "antd";
+import { Button, Card, Statistic, Tag, theme } from "antd";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -30,9 +30,12 @@ interface QuickAction {
   onClick: () => void;
 }
 
+const { useToken } = theme;
+
 const Home = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { token } = useToken();
 
   // 设置标题栏
   const pageTitle = useMemo(
@@ -41,12 +44,12 @@ const Home = () => {
         <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
           <HomeOutlined className="text-white text-xs" />
         </div>
-        <span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+        <span style={{ color: token.colorText }} className="text-sm font-medium">
           {t("home", "首页", { ns: "menu" })}
         </span>
       </div>
     ),
-    [t],
+    [t, token.colorText],
   );
   useTitle(pageTitle);
   const messages = useChatStore((state) => state.messages);
@@ -178,62 +181,89 @@ const Home = () => {
 
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="!bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 !border-blue-200 dark:!border-blue-800/50 !rounded-2xl">
+          <Card
+            className="!rounded-2xl"
+            style={{
+              background: `linear-gradient(to bottom right, ${token.colorPrimaryBg}, ${token.colorInfoBg})`,
+              borderColor: token.colorPrimaryBorder,
+            }}
+          >
             <Statistic
               title={
-                <span className="text-blue-600 dark:text-blue-400">
+                <span style={{ color: token.colorPrimary }}>
                   {t("stats.messages", "Messages", { ns: "home" })}
                 </span>
               }
               value={messages.length}
               prefix={<MessageOutlined className="mr-2" />}
-              styles={{ content: { color: "#3b82f6" } }}
+              valueStyle={{ color: token.colorPrimary }}
             />
           </Card>
 
-          <Card className="!bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 !border-purple-200 dark:!border-purple-800/50 !rounded-2xl">
+          <Card
+            className="!rounded-2xl"
+            style={{
+              background: `linear-gradient(to bottom right, #f3e8ff, #e9d5ff)`,
+              borderColor: "#c084fc",
+            }}
+          >
             <Statistic
               title={
-                <span className="text-purple-600 dark:text-purple-400">
+                <span style={{ color: "#9333ea" }}>
                   {t("stats.models", "Active Models", { ns: "home" })}
                 </span>
               }
               value={enabledModels}
               prefix={<CloudOutlined className="mr-2" />}
-              styles={{ content: { color: "#9333ea" } }}
+              valueStyle={{ color: "#9333ea" }}
             />
           </Card>
 
-          <Card className="!bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/20 !border-orange-200 dark:!border-orange-800/50 !rounded-2xl">
+          <Card
+            className="!rounded-2xl"
+            style={{
+              background: `linear-gradient(to bottom right, #ffedd5, #fed7aa)`,
+              borderColor: "#fb923c",
+            }}
+          >
             <Statistic
               title={
-                <span className="text-orange-600 dark:text-orange-400">
+                <span style={{ color: "#ea580c" }}>
                   {t("stats.skills", "Skills", { ns: "home" })}
                 </span>
               }
               value={installedSkills.length}
               prefix={<ToolOutlined className="mr-2" />}
-              styles={{ content: { color: "#ea580c" } }}
+              valueStyle={{ color: "#ea580c" }}
             />
           </Card>
 
-          <Card className="!bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/30 dark:to-cyan-800/20 !border-cyan-200 dark:!border-cyan-800/50 !rounded-2xl">
+          <Card
+            className="!rounded-2xl"
+            style={{
+              background: `linear-gradient(to bottom right, #cffafe, #a5f3fc)`,
+              borderColor: "#22d3ee",
+            }}
+          >
             <Statistic
               title={
-                <span className="text-cyan-600 dark:text-cyan-400">
+                <span style={{ color: "#0891b2" }}>
                   {t("stats.mcp", "MCP Connected", { ns: "home" })}
                 </span>
               }
               value={connectedMcpServers}
               prefix={<ApiOutlined className="mr-2" />}
-              styles={{ content: { color: "#0891b2" } }}
+              valueStyle={{ color: "#0891b2" }}
             />
           </Card>
         </div>
 
         {/* Quick Actions */}
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+          <h2
+            className="text-xl font-bold mb-4 flex items-center gap-2"
+            style={{ color: token.colorTextHeading }}
+          >
             <ThunderboltOutlined className="text-yellow-500" />
             {t("quickActions.title", "Quick Actions", { ns: "home" })}
           </h2>
@@ -273,7 +303,8 @@ const Home = () => {
                 </span>
               </div>
             }
-            className="!rounded-2xl !border-slate-200 dark:!border-slate-700"
+            className="!rounded-2xl"
+            style={{ borderColor: token.colorBorder }}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -316,18 +347,25 @@ const Home = () => {
                 </span>
               </div>
             }
-            className="!rounded-2xl !border-slate-200 dark:!border-slate-700"
+            className="!rounded-2xl"
+            style={{ borderColor: token.colorBorder }}
           >
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <MessageOutlined className="text-blue-600 dark:text-blue-400" />
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ backgroundColor: token.colorBgContainer }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: token.colorPrimaryBg }}
+                >
+                  <MessageOutlined style={{ color: token.colorPrimary }} />
                 </div>
                 <div>
                   <div className="font-medium">
                     {t("featured.chat", "Multi-Mode Chat", { ns: "home" })}
                   </div>
-                  <div className="text-sm text-slate-500">
+                  <div style={{ color: token.colorTextSecondary }} className="text-sm">
                     {t(
                       "featured.chatDesc",
                       "Direct, Agent, Skill & MCP modes",
@@ -336,15 +374,21 @@ const Home = () => {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                  <ApiOutlined className="text-purple-600 dark:text-purple-400" />
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ backgroundColor: token.colorBgContainer }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: "#f3e8ff" }}
+                >
+                  <ApiOutlined style={{ color: "#9333ea" }} />
                 </div>
                 <div>
                   <div className="font-medium">
                     {t("featured.mcp", "MCP Integration", { ns: "home" })}
                   </div>
-                  <div className="text-sm text-slate-500">
+                  <div style={{ color: token.colorTextSecondary }} className="text-sm">
                     {t("featured.mcpDesc", "Connect to external tool servers", {
                       ns: "home",
                     })}

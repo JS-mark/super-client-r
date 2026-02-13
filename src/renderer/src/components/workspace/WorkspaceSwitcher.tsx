@@ -72,14 +72,14 @@ function WorkspaceBadge({
 				<div className="flex flex-col">
 					<span
 						className={cn(
-							"font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px]",
+							"font-medium text-slate-800  truncate max-w-[120px]",
 							isSmall && "text-xs"
 						)}
 					>
 						{workspace.name}
 					</span>
 					{!isSmall && (
-						<span className="text-xs text-slate-500 dark:text-slate-400">
+						<span className="text-xs text-slate-500 ">
 							{workspace.sessionIds.length} 个会话
 						</span>
 					)}
@@ -259,7 +259,7 @@ export function WorkspaceSwitcher() {
 		{
 			key: "header",
 			label: (
-				<div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 mb-1">
+				<div className="px-3 py-2 text-xs text-slate-500  border-b border-slate-200  mb-1">
 					{t("workspaces.switch.title", "切换工作区", { ns: "workspaces" })}
 				</div>
 			),
@@ -277,7 +277,7 @@ export function WorkspaceSwitcher() {
 						className="flex items-center gap-2 flex-1 text-left"
 					>
 						<WorkspaceBadge workspace={workspace} size="small" showName={false} />
-						<span className="text-sm text-slate-700 dark:text-slate-200">
+						<span className="text-sm text-slate-700 ">
 							{workspace.name}
 						</span>
 						{workspace.id === currentWorkspaceId && (
@@ -293,7 +293,7 @@ export function WorkspaceSwitcher() {
 									e.stopPropagation();
 									handleDuplicate(workspace);
 								}}
-								className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+								className="p-1 rounded hover:bg-slate-100  text-slate-400 hover:text-slate-600"
 							>
 								<CopyOutlined className="text-xs" />
 							</button>
@@ -304,7 +304,7 @@ export function WorkspaceSwitcher() {
 									e.stopPropagation();
 									handleExport(workspace);
 								}}
-								className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600"
+								className="p-1 rounded hover:bg-slate-100  text-slate-400 hover:text-slate-600"
 							>
 								<ExportOutlined className="text-xs" />
 							</button>
@@ -316,7 +316,7 @@ export function WorkspaceSwitcher() {
 										e.stopPropagation();
 										handleDelete(workspace);
 									}}
-									className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500"
+									className="p-1 rounded hover:bg-slate-100  text-slate-400 hover:text-red-500"
 								>
 									<DeleteOutlined className="text-xs" />
 								</button>
@@ -338,7 +338,7 @@ export function WorkspaceSwitcher() {
 						setCreateModalOpen(true);
 						setDropdownOpen(false);
 					}}
-					className="flex items-center gap-2 text-blue-600 dark:text-blue-400 w-full text-left"
+					className="flex items-center gap-2 text-blue-600  w-full text-left"
 				>
 					<PlusOutlined />
 					<span>{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}</span>
@@ -354,7 +354,7 @@ export function WorkspaceSwitcher() {
 						window.location.hash = "/workspaces";
 						setDropdownOpen(false);
 					}}
-					className="flex items-center gap-2 text-slate-600 dark:text-slate-400 w-full text-left"
+					className="flex items-center gap-2 text-slate-600  w-full text-left"
 				>
 					<SettingOutlined />
 					<span>{t("workspaces.manage", "管理工作区", { ns: "workspaces" })}</span>
@@ -377,7 +377,7 @@ export function WorkspaceSwitcher() {
 			>
 				<Button
 					type="text"
-					className="w-full h-auto py-2 px-3 flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+					className="w-full h-auto py-2 px-3 flex items-center justify-between hover:bg-slate-100  rounded-xl"
 				>
 					<WorkspaceBadge workspace={currentWorkspace} />
 					<DownOutlined className="text-slate-400 text-xs" />

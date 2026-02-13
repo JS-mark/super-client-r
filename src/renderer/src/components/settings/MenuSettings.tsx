@@ -2,7 +2,7 @@ import {
 	ReloadOutlined,
 	SettingOutlined,
 } from "@ant-design/icons";
-import { Popconfirm, Tooltip } from "antd";
+import { Popconfirm, Tooltip, theme } from "antd";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,8 @@ import type { MenuItemConfig } from "../../types/menu";
 import { MenuEditModal } from "./MenuEditModal";
 import { MenuRow } from "./MenuRow";
 
+const { useToken } = theme;
+
 /**
  * Menu configuration component - draggable list
  */
@@ -19,6 +21,7 @@ export const MenuSettings: React.FC<{
 	onEditItem?: (item: MenuItemConfig) => void;
 }> = ({ onEditItem }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const menuItems = useMenuStore((state) => state.items);
 	const setConfig = useMenuStore((state) => state.setConfig);
 	const toggleEnabled = useMenuStore((state) => state.toggleEnabled);
@@ -103,10 +106,19 @@ export const MenuSettings: React.FC<{
 	}, [resetConfig]);
 
 	return (
-		<div className="p-6 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+		<div
+			className="p-6 rounded-2xl border"
+			style={{
+				backgroundColor: token.colorBgContainer,
+				borderColor: token.colorBorder,
+			}}
+		>
 			{/* Header */}
 			<div className="flex items-center justify-between mb-4">
-				<h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+				<h3
+					className="text-lg font-semibold flex items-center gap-2"
+					style={{ color: token.colorTextHeading }}
+				>
 					<SettingOutlined />
 					{t("menuConfig", { ns: "settings" })}
 				</h3>
@@ -121,10 +133,18 @@ export const MenuSettings: React.FC<{
 						<button
 							className={cn(
 								"flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
-								"text-slate-500 dark:text-slate-400",
-								"hover:bg-slate-100 dark:hover:bg-slate-700",
-								"hover:text-slate-700 dark:hover:text-slate-200",
 							)}
+							style={{
+								color: token.colorTextSecondary,
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+								e.currentTarget.style.color = token.colorText;
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.backgroundColor = "";
+								e.currentTarget.style.color = token.colorTextSecondary;
+							}}
 						>
 							<ReloadOutlined className="text-xs" />
 							{t("reset", { ns: "settings" })}
@@ -156,7 +176,10 @@ export const MenuSettings: React.FC<{
 			</div>
 
 			{/* Hint text */}
-			<p className="mt-3 text-xs text-slate-400 dark:text-slate-500 text-center">
+			<p
+				className="mt-3 text-xs text-center"
+				style={{ color: token.colorTextDisabled }}
+			>
 				{t("dragTip", { ns: "settings" })}
 			</p>
 		</div>

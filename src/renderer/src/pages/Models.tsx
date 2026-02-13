@@ -1,7 +1,9 @@
 import { PlusOutlined, SettingOutlined } from "@ant-design/icons";
-import { Button, Tabs } from "antd";
+import { Button, Tabs, theme } from "antd";
 import type * as React from "react";
 import { useMemo, useState } from "react";
+
+const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
@@ -10,6 +12,7 @@ import { useTitle } from "../hooks/useTitle";
 
 const Models: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [activeKey, setActiveKey] = useState("1");
 	const [modelListAddTrigger, setModelListAddTrigger] = useState(0);
 	const [mcpConfigAddTrigger, setMcpConfigAddTrigger] = useState(0);
@@ -21,10 +24,15 @@ const Models: React.FC = () => {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center">
 					<SettingOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("title", { ns: "models" })}</span>
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
+					{t("title", { ns: "models" })}
+				</span>
 			</div>
 		);
-	}, [t]);
+	}, [t, token.colorText]);
 
 	// 设置标题栏
 	useTitle(pageTitle);

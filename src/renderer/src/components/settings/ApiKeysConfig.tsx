@@ -1,12 +1,15 @@
 import { CheckCircleOutlined, KeyOutlined, SaveOutlined } from "@ant-design/icons";
-import { Button, Input, message } from "antd";
+import { Button, Input, message, theme } from "antd";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingSection } from "./SettingSection";
 
+const { useToken } = theme;
+
 export const ApiKeysConfig: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [skillsmpKey, setSkillsmpKey] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [saved, setSaved] = useState(false);
@@ -58,7 +61,10 @@ export const ApiKeysConfig: React.FC = () => {
 			>
 				<div className="space-y-4">
 					<div>
-						<span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+						<span
+							className="block text-sm font-medium mb-2"
+							style={{ color: token.colorText }}
+						>
 							{t("skillsmpApiKey", "API Key", { ns: "settings" })}
 						</span>
 						<Input.Password
@@ -72,7 +78,7 @@ export const ApiKeysConfig: React.FC = () => {
 							size="large"
 							prefix={<KeyOutlined className="text-slate-400" />}
 						/>
-						<p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
+						<p className="text-xs mt-2" style={{ color: token.colorTextSecondary }}>
 							{t(
 								"settings.skillsmpApiKeyHint",
 								"Get your API Key from skillsmp.com",

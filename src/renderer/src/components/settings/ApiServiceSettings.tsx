@@ -7,7 +7,7 @@ import {
 	PoweroffOutlined,
 	ReloadOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Form, InputNumber, Tooltip, message } from "antd";
+import { Button, Card, Form, InputNumber, Tooltip, message, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,12 +15,15 @@ import { type ApiStatus, apiService } from "../../services/apiService";
 import { appService } from "../../services/appService";
 import { SettingSection } from "./SettingSection";
 
+const { useToken } = theme;
+
 const PORT_MIN = 1024;
 const PORT_MAX = 65535;
 const DEFAULT_PORT = 3000;
 
 export const ApiServiceSettings: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [apiStatus, setApiStatus] = useState<ApiStatus>({
 		status: "stopped",
 		port: 0,
@@ -127,10 +130,12 @@ export const ApiServiceSettings: React.FC = () => {
 									}`}
 							/>
 							<span
-								className={`font-medium text-sm uppercase ${apiStatus.status === "running"
-									? "text-green-600 dark:text-green-400"
-									: "text-red-600 dark:text-red-400"
-									}`}
+								className="font-medium text-sm uppercase"
+								style={{
+									color: apiStatus.status === "running"
+										? token.colorSuccess
+										: token.colorError,
+								}}
 							>
 								{apiStatus.status === "running"
 									? t("running", "Running", { ns: "settings" })
@@ -203,7 +208,13 @@ export const ApiServiceSettings: React.FC = () => {
 								<LinkOutlined />
 								<span>
 									{t("listeningOn", "Listening on", { ns: "settings" })}:{" "}
-									<code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400">
+									<code
+										className="px-2 py-0.5 rounded"
+										style={{
+											backgroundColor: token.colorBgContainer,
+											color: token.colorPrimary,
+										}}
+									>
 										http://localhost:{apiStatus.port}
 									</code>
 								</span>
@@ -238,7 +249,13 @@ export const ApiServiceSettings: React.FC = () => {
 											);
 										}}
 									>
-										<code className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400">
+										<code
+											className="px-2 py-0.5 rounded"
+											style={{
+												backgroundColor: token.colorBgContainer,
+												color: token.colorPrimary,
+											}}
+										>
 											http://localhost:{apiStatus.port}/api-docs
 										</code>
 									</Button>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { List, Card, Tag, Button, Empty, Input, Modal, message } from "antd";
+import { List, Card, Tag, Button, Empty, Input, Modal, message, theme } from "antd";
 import {
 	StarFilled,
 	DeleteOutlined,
@@ -14,8 +14,11 @@ import { useMessageStore, type BookmarkedMessage } from "../stores/messageStore"
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
 
+const { useToken } = theme;
+
 export default function Bookmarks() {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	// 设置标题栏
 	const pageTitle = useMemo(() => (
@@ -23,9 +26,14 @@ export default function Bookmarks() {
 			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
 				<StarOutlined className="text-white text-xs" />
 			</div>
-			<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("bookmarks.title", "收藏消息", { ns: "bookmarks" })}</span>
+			<span
+				className="text-sm font-medium"
+				style={{ color: token.colorText }}
+			>
+				{t("bookmarks.title", "收藏消息", { ns: "bookmarks" })}
+			</span>
 		</div>
-	), [t]);
+	), [t, token.colorText]);
 	useTitle(pageTitle);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [editingBookmark, setEditingBookmark] = useState<BookmarkedMessage | null>(null);
@@ -73,12 +81,24 @@ export default function Bookmarks() {
 
 	return (
 		<MainLayout>
-			<div className="h-full flex flex-col bg-slate-50/50 dark:bg-slate-950">
+			<div
+				className="h-full flex flex-col"
+				style={{ backgroundColor: token.colorBgLayout }}
+			>
 				{/* Header */}
-				<div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+				<div
+					className="px-6 py-4 border-b"
+					style={{
+						borderColor: token.colorBorder,
+						backgroundColor: token.colorBgContainer,
+					}}
+				>
 					<div className="flex items-center justify-between">
 						<div>
-							<h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+							<h1
+								className="text-2xl font-bold"
+								style={{ color: token.colorTextHeading }}
+							>
 								{t("bookmarks.title", "收藏的消息", { ns: "bookmarks" })}
 							</h1>
 							<p className="text-sm text-slate-500 mt-1">
@@ -160,12 +180,18 @@ export default function Bookmarks() {
 												</span>
 											</div>
 
-											<div className="text-slate-700 dark:text-slate-300 line-clamp-4">
+											<div
+												className="line-clamp-4"
+												style={{ color: token.colorText }}
+											>
 												{bookmark.content}
 											</div>
 
 											{bookmark.note && (
-												<div className="bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded text-sm">
+												<div
+													className="p-2 rounded text-sm"
+													style={{ backgroundColor: token.colorWarningBg }}
+												>
 													<span className="font-medium">
 														{t("bookmarks.note", "备注", { ns: "bookmarks" })}:{" "}
 													</span>

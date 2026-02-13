@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
-import { Input, Modal, List, Tag, Button, Empty } from "antd";
+import { Input, Modal, List, Tag, Button, Empty, theme } from "antd";
 import { SearchOutlined, ClockCircleOutlined, CloseOutlined } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { useMessageStore } from "../../stores/messageStore";
 import type { Message } from "../../stores/chatStore";
+
+const { useToken } = theme;
 
 interface MessageSearchProps {
   messages: Message[];
@@ -23,6 +25,7 @@ export function MessageSearch({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Message[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const { token } = useToken();
 
   const { searchMessages, searchHistory, addSearchHistory, clearSearchHistory } =
     useMessageStore();
@@ -71,7 +74,14 @@ export function MessageSearch({
 
     return parts.map((part, i) =>
       regex.test(part) ? (
-        <mark key={i} className="bg-yellow-200 dark:bg-yellow-700 px-0.5 rounded">
+        <mark
+          key={i}
+          className="px-0.5 rounded"
+          style={{
+            backgroundColor: token.colorWarningBg,
+            color: token.colorWarningText,
+          }}
+        >
           {part}
         </mark>
       ) : (
@@ -153,7 +163,10 @@ export function MessageSearch({
                 dataSource={results}
                 renderItem={(msg) => (
                   <List.Item
-                    className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg px-3 transition-colors"
+                    className="cursor-pointer rounded-lg px-3 transition-colors"
+                    style={{ backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorBgTextHover; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                     onClick={() => handleSelectResult(msg)}
                   >
                     <div className="w-full">
@@ -169,7 +182,7 @@ export function MessageSearch({
                           {new Date(msg.timestamp).toLocaleString()}
                         </span>
                       </div>
-                      <div className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">
+                      <div className="text-sm line-clamp-2" style={{ color: token.colorText }}>
                         {highlightText(msg.content, query)}
                       </div>
                     </div>

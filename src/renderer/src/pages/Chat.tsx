@@ -14,7 +14,8 @@ import {
 import {
 	Button,
 	Tooltip,
-	message
+	message,
+	theme,
 } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -62,8 +63,11 @@ const TOOLBAR_ITEMS: ToolbarItem[] = [
 	{ id: "tools", icon: <ToolOutlined />, label: "toolbar.tools", type: "tool" },
 ];
 
+const { useToken } = theme;
+
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const {
 		messages,
@@ -90,7 +94,7 @@ const Chat: React.FC = () => {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
 					<RobotOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{t("title", "AI 聊天", { ns: "chat" })}</span>
+				<span style={{ color: token.colorText }} className="text-sm font-medium">{t("title", "AI 聊天", { ns: "chat" })}</span>
 			</div>
 			<div
 				className="flex items-center gap-2"
@@ -100,7 +104,7 @@ const Chat: React.FC = () => {
 				<Tooltip title={t("chat.toolbar.searchMessages", "搜索消息", { ns: "chat" })}>
 					<Button
 						type="text"
-						icon={<span className="text-slate-700 dark:text-slate-200"><SearchOutlined /></span>}
+						icon={<SearchOutlined />}
 						onClick={() => setIsSearchOpen(true)}
 						disabled={messages.length === 0}
 						className="rounded-lg"
@@ -109,7 +113,7 @@ const Chat: React.FC = () => {
 				<Tooltip title={t("chat.toolbar.export", "导出", { ns: "chat" })}>
 					<Button
 						type="text"
-						icon={<span className="text-slate-700 dark:text-slate-200"><ExportOutlined /></span>}
+						icon={<ExportOutlined />}
 						onClick={() => setIsExportOpen(true)}
 						disabled={messages.length === 0 || isStreaming}
 						className="rounded-lg"
@@ -118,7 +122,7 @@ const Chat: React.FC = () => {
 				<Tooltip title={t("chat.toolbar.clear", "清空", { ns: "chat" })}>
 					<Button
 						type="text"
-						icon={<span className="text-slate-700 dark:text-slate-200"><ClearOutlined /></span>}
+						icon={<ClearOutlined />}
 						onClick={clearMessages}
 						disabled={messages.length === 0 || isStreaming}
 						className="rounded-lg"
@@ -126,7 +130,7 @@ const Chat: React.FC = () => {
 				</Tooltip>
 			</div>
 		</>
-	), [messages, t, clearMessages, isStreaming]);
+	), [messages, t, clearMessages, isStreaming, token.colorText]);
 	useTitle(pageTitle)
 
 	const chatEndRef = useRef<HTMLDivElement>(null);
@@ -200,7 +204,7 @@ const Chat: React.FC = () => {
 
 	return (
 		<MainLayout>
-			<div className="flex flex-col h-full bg-slate-50/50 dark:bg-slate-950">
+			<div className="flex flex-col h-full" style={{ backgroundColor: token.colorBgLayout }}>
 				{/* Chat Area */}
 				<div className="flex-1 overflow-auto w-full">
 					{messages.length === 0 ? (
@@ -211,7 +215,7 @@ const Chat: React.FC = () => {
 									<div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl mb-4 sm:mb-6">
 										<StarOutlined className="text-2xl sm:text-3xl text-white" />
 									</div>
-									<h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-3 whitespace-normal">
+									<h2 className="text-2xl sm:text-3xl font-bold mb-3 whitespace-normal" style={{ color: token.colorTextHeading }}>
 										{t("welcomeTitle", { ns: "chat" })}
 									</h2>
 									<p className="text-slate-500 text-base sm:text-lg whitespace-normal">
@@ -226,9 +230,10 @@ const Chat: React.FC = () => {
 											onClick={() => {
 												setInput(t(key, { ns: 'chat' }));
 											}}
-											className="p-4 text-left rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 hover:shadow-md transition-all group block w-full min-w-0"
+											className="p-4 text-left rounded-xl border hover:border-blue-500 hover:shadow-md transition-all group block w-full min-w-0"
+											style={{ backgroundColor: token.colorBgContainer, borderColor: token.colorBorder }}
 										>
-											<p className="text-slate-700 dark:text-slate-300 text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 break-words">
+											<p className="text-sm group-hover:text-blue-600 break-words" style={{ color: token.colorText }}>
 												{t(key, { ns: 'chat' })}
 											</p>
 										</button>
@@ -273,11 +278,15 @@ const Chat: React.FC = () => {
 						{/* Input box with toolbar */}
 						<div
 							className={cn(
-								"relative rounded-2xl border bg-slate-50 dark:bg-slate-800 transition-all duration-200",
+								"relative rounded-2xl border transition-all duration-200",
 								isInputFocused
 									? "border-blue-500 shadow-lg shadow-blue-500/10"
-									: "border-slate-200 dark:border-slate-700",
+									: ""
 							)}
+							style={{
+								backgroundColor: token.colorBgContainer,
+								borderColor: isInputFocused ? undefined : token.colorBorder,
+							}}
 						>
 							{/* Attached files */}
 							{attachedFiles.length > 0 && (
@@ -307,14 +316,17 @@ const Chat: React.FC = () => {
 									"chat.placeholder",
 									"在这里输入消息，按 Enter 发送",
 								)}
-								className="w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none text-slate-800 dark:text-slate-200"
+								className="w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none"
+								style={{ height: "auto", color: token.colorText }}
 								rows={1}
-								style={{ height: "auto" }}
 								disabled={isStreaming}
 							/>
 
 							{/* Bottom toolbar */}
-							<div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 dark:border-slate-700">
+							<div
+								className="flex items-center justify-between px-3 py-2 border-t"
+								style={{ borderColor: token.colorBorderSecondary }}
+							>
 								{/* Left toolbar items */}
 								<div className="flex items-center gap-1">
 									{/* File Upload Button */}
@@ -326,23 +338,29 @@ const Chat: React.FC = () => {
 									/>
 
 									{/* Divider */}
-									<div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+									<div
+										className="w-px h-5 mx-1"
+										style={{ backgroundColor: token.colorBorder }}
+									/>
 
 									{TOOLBAR_ITEMS.map((item) => (
 										<Tooltip key={item.id} title={t(item.label, { ns: "chat" })}>
 											<button
 												onClick={() => handleToolbarClick(item.id)}
 												className={cn(
-													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600",
+													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
 													item.color && "hover:text-[var(--hover-color)]",
 												)}
-												style={
-													item.color
-														? ({
-															"--hover-color": item.color,
-														} as React.CSSProperties)
-														: undefined
-												}
+												style={{
+													color: token.colorTextSecondary,
+													"--hover-color": item.color,
+												} as React.CSSProperties}
+												onMouseEnter={(e) => {
+													e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+												}}
+												onMouseLeave={(e) => {
+													e.currentTarget.style.backgroundColor = "transparent";
+												}}
 											>
 												{item.icon}
 											</button>
@@ -354,20 +372,45 @@ const Chat: React.FC = () => {
 										<button
 											onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
 											className={cn(
-												"w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600",
-												searchPopoverOpen && "bg-slate-200 dark:bg-slate-600"
+												"w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
 											)}
+											style={{
+												color: token.colorTextSecondary,
+												backgroundColor: searchPopoverOpen ? token.colorBgTextHover : "transparent",
+											}}
+											onMouseEnter={(e) => {
+												if (!searchPopoverOpen) {
+													e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+												}
+											}}
+											onMouseLeave={(e) => {
+												if (!searchPopoverOpen) {
+													e.currentTarget.style.backgroundColor = "transparent";
+												}
+											}}
 										>
 											{currentEngine.icon}
 										</button>
 									</Tooltip>
 
-								{/* Divider */}
-									<div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+									{/* Divider */}
+									<div
+										className="w-px h-5 mx-1"
+										style={{ backgroundColor: token.colorBorder }}
+									/>
 
 									{/* More button */}
 									<Tooltip title="更多">
-										<button className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-slate-500 hover:bg-slate-300 dark:hover:bg-slate-600">
+										<button
+											className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
+											style={{ color: token.colorTextSecondary }}
+											onMouseEnter={(e) => {
+												e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.backgroundColor = "transparent";
+											}}
+										>
 											<RightOutlined className="text-sm" />
 										</button>
 									</Tooltip>

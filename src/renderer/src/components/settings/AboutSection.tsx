@@ -11,11 +11,13 @@ import {
 	TeamOutlined,
 	TrophyOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Tabs, Tag, Timeline, Typography } from "antd";
+import { Button, Card, Tabs, Tag, Timeline, Typography, theme } from "antd";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { AppInfo } from "../../services/appService";
+
+const { useToken } = theme;
 
 const { Title, Paragraph } = Typography;
 
@@ -31,6 +33,7 @@ interface AboutSectionProps {
 // 概览 Tab - 更紧凑小巧
 const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const features = [
 		{ icon: <RocketOutlined />, titleKey: "about.features.aiChat.title", descKey: "about.features.aiChat.desc", color: "from-blue-500 to-cyan-500" },
@@ -67,12 +70,19 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 			{/* Features Grid - 更紧凑 2x2 */}
 			<div className="grid grid-cols-2 gap-2">
 				{features.map((feature) => (
-					<div key={feature.titleKey} className="relative overflow-hidden rounded-lg p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-sm transition-all">
+					<div
+						key={feature.titleKey}
+						className="relative overflow-hidden rounded-lg p-2.5 border hover:shadow-sm transition-all"
+						style={{
+							backgroundColor: token.colorBgContainer,
+							borderColor: token.colorBorder,
+						}}
+					>
 						<div className={`w-7 h-7 rounded-md bg-gradient-to-br ${feature.color} flex items-center justify-center mb-1.5 shadow-sm`}>
 							<span className="text-white text-xs">{feature.icon}</span>
 						</div>
-						<h3 className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-0.5 leading-tight">{t(feature.titleKey, { ns: "settings" })}</h3>
-						<p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">{t(feature.descKey, { ns: "settings" })}</p>
+						<h3 className="text-xs font-semibold mb-0.5 leading-tight" style={{ color: token.colorText }}>{t(feature.titleKey, { ns: "settings" })}</h3>
+						<p className="text-[10px] leading-tight" style={{ color: token.colorTextSecondary }}>{t(feature.descKey, { ns: "settings" })}</p>
 					</div>
 				))}
 			</div>
@@ -83,6 +93,7 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 // 系统信息 Tab - 更紧凑
 const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const systemItems = [
 		{ label: t("platform", "Platform", { ns: "settings" }), value: appInfo?.platform === "darwin" ? "macOS" : appInfo?.platform || "N/A", icon: <InfoCircleOutlined /> },
@@ -101,20 +112,25 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 						<span>{t("about.systemInfo", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-lg !border-slate-200 dark:!border-slate-700"
+				className="!rounded-lg"
+				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="grid grid-cols-2 gap-2">
 					{systemItems.map((item) => (
 						<div
 							key={item.label}
-							className="flex items-center gap-2 p-2 rounded-md bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50"
+							className="flex items-center gap-2 p-2 rounded-md border"
+							style={{
+								backgroundColor: token.colorBgContainer,
+								borderColor: token.colorBorder,
+							}}
 						>
 							<div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs">
 								{item.icon}
 							</div>
 							<div className="min-w-0">
-								<div className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">{item.value}</div>
-								<div className="text-[10px] text-slate-500 dark:text-slate-400">{item.label}</div>
+								<div className="text-xs font-medium truncate" style={{ color: token.colorTextHeading }}>{item.value}</div>
+								<div className="text-[10px]" style={{ color: token.colorTextSecondary }}>{item.label}</div>
 							</div>
 						</div>
 					))}
@@ -129,7 +145,8 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 						<span>{t("about.achievements", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-lg !border-slate-200 dark:!border-slate-700 !mt-[10px]"
+				className="!rounded-lg !mt-[10px]"
+				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="flex flex-wrap gap-1.5">
 					<Tag color="blue" className="!text-xs">AI Chat</Tag>
@@ -147,6 +164,7 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 // 更新日志 Tab - 更紧凑
 const ChangelogTab: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	return (
 		<Card
@@ -157,7 +175,8 @@ const ChangelogTab: React.FC = () => {
 					<span>{t("about.recentUpdates", { ns: "settings" })}</span>
 				</span>
 			}
-			className="!rounded-lg !border-slate-200 dark:!border-slate-700"
+			className="!rounded-lg"
+			style={{ borderColor: token.colorBorder }}
 		>
 			<Timeline
 				mode="left"
@@ -197,6 +216,7 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 	onOpenLicense,
 }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	return (
 		<div className="space-y-3">
@@ -208,16 +228,17 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 						<span>{t("about.team", { ns: "settings" })}</span>
 					</span>
 				}
-				className="rounded-lg! border-slate-200! dark:border-slate-700!"
+				className="rounded-lg!"
+				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="text-center py-3">
 					<div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-2">
 						<HeartOutlined className="text-lg text-white" />
 					</div>
-					<div className="text-slate-800 dark:text-slate-200 font-medium text-sm">
+					<div className="font-medium text-sm" style={{ color: token.colorText }}>
 						{t("madeWith", "Made with", { ns: "settings" })} <HeartOutlined className="text-red-400 mx-1" /> {t("byTeam", "by Super Client Team", { ns: "settings" })}
 					</div>
-					<div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+					<div className="text-xs mt-1" style={{ color: token.colorTextSecondary }}>
 						{t("about.thanks", "感谢所有贡献者和用户的支持", { ns: "settings" })}
 					</div>
 				</div>
@@ -231,9 +252,10 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 						<span>{t("license", "License", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-lg !border-slate-200 dark:!border-slate-700 !mt-[10px]"
+				className="!rounded-lg !mt-[10px]"
+				style={{ borderColor: token.colorBorder }}
 			>
-				<div className="text-xs text-slate-600 dark:text-slate-400">
+				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
 					<p className="mb-1">{t("about.licenseText", "This project is licensed under the MIT License.", { ns: "settings" })}</p>
 					<p>{t("about.licenseDesc", "You are free to use, modify, and distribute this software.", { ns: "settings" })}</p>
 				</div>

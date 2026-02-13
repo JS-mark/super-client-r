@@ -24,13 +24,13 @@ const ICON_SIZE_MAP = {
 };
 
 const TYPE_COLORS: Record<AttachmentType, string> = {
-	image: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
-	document: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
-	code: "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-	audio: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400",
-	video: "bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400",
-	archive: "bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400",
-	other: "bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400",
+	image: "bg-purple-100 text-purple-600",
+	document: "bg-blue-100 text-blue-600",
+	code: "bg-emerald-100 text-emerald-600",
+	audio: "bg-amber-100 text-amber-600",
+	video: "bg-rose-100 text-rose-600",
+	archive: "bg-slate-100 text-slate-600",
+	other: "bg-gray-100 text-gray-600",
 };
 
 // SVG icons for each file type

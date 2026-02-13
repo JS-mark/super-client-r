@@ -1,10 +1,11 @@
 import { SendOutlined, PaperClipOutlined, ClearOutlined } from "@ant-design/icons";
-import { Button, Input } from "antd";
+import { Button, Input, theme } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 
 const { TextArea } = Input;
+const { useToken } = theme;
 
 interface ChatInputProps {
 	value: string;
@@ -26,6 +27,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 	className,
 }) => {
 	const { t } = useTranslation("chat");
+	const { token } = useToken();
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
@@ -39,16 +41,23 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 	return (
 		<div
 			className={cn(
-				"border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4",
+				"border-t p-4",
 				className,
 			)}
+			style={{
+				backgroundColor: token.colorBgContainer,
+				borderColor: token.colorBorder,
+			}}
 		>
 			<div className="flex gap-3 items-end max-w-4xl mx-auto">
 				{/* Attachment Button */}
 				<Button
 					type="text"
 					icon={<PaperClipOutlined />}
-					className="flex-shrink-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+					className="flex-shrink-0 h-10 w-10 rounded-full"
+					style={{ backgroundColor: 'transparent' }}
+					onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorBgTextHover; }}
+					onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
 					disabled={disabled}
 				/>
 
@@ -60,7 +69,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 					placeholder={t("placeholder", { ns: "chat" })}
 					autoSize={{ minRows: 1, maxRows: 6 }}
 					disabled={disabled}
-					className="flex-1 !rounded-2xl !border-gray-200 dark:!border-gray-700 !bg-gray-50 dark:!bg-gray-800 focus:!border-blue-500 focus:!shadow-none"
+					className="flex-1 !rounded-2xl focus:!border-blue-500 focus:!shadow-none"
+					style={{
+						backgroundColor: token.colorFillSecondary,
+						borderColor: token.colorBorder,
+					}}
 				/>
 
 				{/* Clear Button */}
@@ -69,7 +82,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 						type="text"
 						icon={<ClearOutlined />}
 						onClick={onClear}
-						className="flex-shrink-0 h-10 w-10 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+						className="flex-shrink-0 h-10 w-10 rounded-full"
+						style={{ backgroundColor: 'transparent' }}
+						onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorBgTextHover; }}
+						onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
 						disabled={disabled}
 					/>
 				)}

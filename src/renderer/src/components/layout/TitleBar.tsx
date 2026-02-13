@@ -4,11 +4,13 @@ import {
 	FullscreenOutlined,
 	MinusOutlined,
 } from "@ant-design/icons";
-import { Tooltip } from "antd";
+import { theme, Tooltip } from "antd";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useMatches } from "react-router-dom";
 import { type TitleContent, useTitleContext } from "../../hooks/useTitle";
+
+const { useToken } = theme;
 
 export const TitleBar: React.FC = () => {
 	const { t } = useTranslation();
@@ -16,6 +18,7 @@ export const TitleBar: React.FC = () => {
 	const [isMac, setIsMac] = React.useState(false);
 	const matches = useMatches();
 	const { title: dynamicTitle } = useTitleContext();
+	const { token } = useToken();
 
 	// 从路由获取标题
 	const routeTitle: TitleContent = React.useMemo(() => {
@@ -70,16 +73,16 @@ export const TitleBar: React.FC = () => {
 
 	return (
 		<div
-			className="h-auto py-3 flex items-center justify-between select-none !bg-white dark:!bg-slate-800"
+			className="h-auto py-3 flex items-center justify-between select-none"
 			// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
-			style={{ WebkitAppRegion: "drag" }}
+			style={{ WebkitAppRegion: "drag", background: token.colorBgContainer }}
 		>
 			{/* 左侧：应用标题和图标 */}
 			<div className={`flex items-center gap-2 px-4 flex-row w-full justify-between`}>
 				{isReactElement ? (
 					displayTitle
 				) : (
-					<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">{displayTitle as string}</span>
+					<span className="text-sm font-medium" style={{ color: token.colorText }}>{displayTitle as string}</span>
 				)}
 			</div>
 

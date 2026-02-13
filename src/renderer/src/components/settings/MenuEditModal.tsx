@@ -12,6 +12,7 @@ import {
 	Segmented,
 	Space,
 	Switch,
+	theme,
 } from "antd";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -19,6 +20,8 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MenuItemConfig, MenuItemIconType } from "../../types/menu";
 import { IconSelector, ICON_TYPE_OPTIONS } from "./MenuIconConfig";
+
+const { useToken } = theme;
 
 interface MenuEditModalProps {
 	open: boolean;
@@ -36,6 +39,7 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 	onDelete,
 }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const [editingItem, setEditingItem] = useState<MenuItemConfig>(
 		item || {
 			id: "",
@@ -76,8 +80,12 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 			destroyOnHidden
 			maskClosable={false}
 			classNames={{
-				header: "border-b border-slate-100 dark:border-slate-700",
-				footer: "border-t border-slate-100 dark:border-slate-700",
+				header: "border-b",
+				footer: "border-t",
+			}}
+			styles={{
+				header: { borderColor: token.colorBorder },
+				footer: { borderColor: token.colorBorder },
 			}}
 			footer={
 				<div className="flex items-center justify-end">
@@ -112,8 +120,17 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 		>
 			<div className="space-y-5 py-2">
 				{/* Menu item info card */}
-				<div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-700">
-					<div className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+				<div
+					className="rounded-2xl p-4 border"
+					style={{
+						backgroundColor: token.colorBgContainer,
+						borderColor: token.colorBorder,
+					}}
+				>
+					<div
+						className="text-xs font-medium uppercase tracking-wider mb-2"
+						style={{ color: token.colorTextSecondary }}
+					>
 						{t("menuLabel", "菜单名称", { ns: "settings" })}
 					</div>
 					<div className="flex items-center gap-3">
@@ -122,8 +139,11 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 								"w-10 h-10 rounded-xl flex items-center justify-center text-lg",
 								editingItem.enabled
 									? "bg-gradient-to-br from-blue-500 to-indigo-600"
-									: "bg-slate-300 dark:bg-slate-600",
+									: "",
 							)}
+							style={{
+								backgroundColor: editingItem.enabled ? undefined : token.colorBgContainer,
+							}}
 						>
 							{editingItem.iconType === "emoji" && (
 								<span>{editingItem.iconContent || "🎯"}</span>
@@ -142,10 +162,10 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 							)}
 						</div>
 						<div className="flex-1">
-							<div className="font-medium text-slate-800 dark:text-slate-200">
+							<div className="font-medium" style={{ color: token.colorText }}>
 								{t(editingItem.label, { ns: "menu" })}
 							</div>
-							<div className="text-xs text-slate-400 dark:text-slate-500">
+							<div className="text-xs" style={{ color: token.colorTextSecondary }}>
 								ID: {editingItem.id}
 							</div>
 						</div>
@@ -156,7 +176,10 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 				<div className="space-y-4">
 					{/* Icon type toggle */}
 					<div>
-						<div className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+						<div
+							className="text-xs font-medium uppercase tracking-wider mb-3"
+							style={{ color: token.colorTextSecondary }}
+						>
 							{t("iconType", "图标类型", { ns: "settings" })}
 						</div>
 						<Segmented
@@ -175,13 +198,16 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 							}
 							options={ICON_TYPE_OPTIONS}
 							block
-							className="bg-slate-100 dark:bg-slate-800"
+							style={{ backgroundColor: token.colorBgContainer }}
 						/>
 					</div>
 
 					{/* Icon selector */}
 					<div>
-						<div className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+						<div
+							className="text-xs font-medium uppercase tracking-wider mb-3"
+							style={{ color: token.colorTextSecondary }}
+						>
 							{t("icon", "图标", { ns: "settings" })}
 						</div>
 						<IconSelector
@@ -200,10 +226,12 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 				<div
 					className={cn(
 						"rounded-2xl p-4 border-2 transition-all cursor-pointer",
-						editingItem.enabled
-							? "border-green-500/30 bg-green-50/50 dark:bg-green-900/20"
-							: "border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 opacity-70",
 					)}
+					style={{
+						borderColor: editingItem.enabled ? token.colorSuccess : token.colorBorder,
+						backgroundColor: editingItem.enabled ? token.colorSuccessBg : token.colorBgContainer,
+						opacity: editingItem.enabled ? 1 : 0.7,
+					}}
 					onClick={() =>
 						setEditingItem({ ...editingItem, enabled: !editingItem.enabled })
 					}
@@ -213,10 +241,11 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 							<div
 								className={cn(
 									"w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
-									editingItem.enabled
-										? "bg-green-500 text-white"
-										: "bg-slate-200 dark:bg-slate-700 text-slate-400",
 								)}
+								style={{
+									backgroundColor: editingItem.enabled ? token.colorSuccess : token.colorBgContainer,
+									color: editingItem.enabled ? "#fff" : token.colorTextDisabled,
+								}}
 							>
 								{editingItem.enabled ? (
 									<EyeOutlined className="text-lg" />
@@ -225,12 +254,12 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 								)}
 							</div>
 							<div>
-								<div className="font-medium text-slate-800 dark:text-slate-200">
+								<div className="font-medium" style={{ color: token.colorText }}>
 									{editingItem.enabled
 										? t("enabled", "已启用", { ns: "settings" })
 										: t("disabled", "已禁用", { ns: "settings" })}
 								</div>
-								<div className="text-xs text-slate-400 dark:text-slate-500">
+								<div className="text-xs" style={{ color: token.colorTextSecondary }}>
 									{editingItem.enabled
 										? t("menuItemVisible", "在侧边栏中显示", {
 												ns: "settings",

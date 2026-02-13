@@ -20,7 +20,10 @@ import {
 	Spin,
 	Tabs,
 	message,
+	theme,
 } from "antd";
+
+const { useToken } = theme;
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,6 +40,7 @@ const PAGE_SIZE = 12;
 
 const McpMarket: React.FC = () => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 
 	const pageTitle = useMemo(
 		() => (
@@ -44,12 +48,15 @@ const McpMarket: React.FC = () => {
 				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
 					<ShopOutlined className="text-white text-xs" />
 				</div>
-				<span className="text-slate-700 dark:text-slate-200 text-sm font-medium">
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
 					{t("title", "MCP Market", { ns: "mcp" })}
 				</span>
 			</div>
 		),
-		[t],
+		[t, token.colorText],
 	);
 	useTitle(pageTitle);
 

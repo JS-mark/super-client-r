@@ -152,7 +152,7 @@ export function AttachmentManager({
 	return (
 		<div className={cn("flex flex-col h-full", className)}>
 			{/* Header */}
-			<div className="flex items-center gap-2 p-4 border-b border-slate-200 dark:border-slate-700">
+			<div className="flex items-center gap-2 p-4 border-b border-slate-200 ">
 				<div className="flex-1 relative">
 					<Input
 						prefix={<SearchOutlined className="text-slate-400" />}
@@ -180,7 +180,7 @@ export function AttachmentManager({
 			</div>
 
 			{/* Type tabs */}
-			<div className="flex gap-1 p-2 overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+			<div className="flex gap-1 p-2 overflow-x-auto border-b border-slate-200 ">
 				{ATTACHMENT_TYPES.map((type) => (
 					<button
 						key={type.type}
@@ -188,8 +188,8 @@ export function AttachmentManager({
 						className={cn(
 							"px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors",
 							activeType === type.type
-								? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-								: "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+								? "bg-blue-100 text-blue-700  "
+								: "text-slate-600  hover:bg-slate-100 "
 						)}
 					>
 						<span className="mr-1">{type.icon}</span>
@@ -241,8 +241,8 @@ export function AttachmentManager({
 
 			{/* Selection footer */}
 			{selectable && selectedAttachments.length > 0 && (
-				<div className="flex items-center justify-between p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-					<span className="text-sm text-slate-600 dark:text-slate-400">
+				<div className="flex items-center justify-between p-4 border-t border-slate-200  bg-slate-50 ">
+					<span className="text-sm text-slate-600 ">
 						{t("attachment.selected", "已选择 {{count}} 个", {
 							count: selectedAttachments.length,
 						})}
@@ -323,8 +323,8 @@ function AttachmentItem({
 			className={cn(
 				"flex items-center gap-3 p-3 rounded-lg border transition-colors",
 				isSelected
-					? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-					: "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600",
+					? "border-blue-500 bg-blue-50 "
+					: "border-slate-200  hover:border-slate-300 ",
 				selectable && "cursor-pointer"
 			)}
 			onClick={selectable ? onSelect : undefined}
@@ -365,7 +365,7 @@ function AttachmentItem({
 								e.stopPropagation();
 								onOpen?.();
 							}}
-							className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500"
+							className="p-2 rounded-lg hover:bg-slate-100  text-slate-500"
 							title={t("open", "打开", { ns: "common" })}
 						>
 							<EyeOutlined />
@@ -373,7 +373,7 @@ function AttachmentItem({
 						<Dropdown menu={{ items: menuItems }} trigger={["click"]}>
 							<button
 								onClick={(e) => e.stopPropagation()}
-								className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500"
+								className="p-2 rounded-lg hover:bg-slate-100  text-slate-500"
 							>
 								<MoreOutlined />
 							</button>
@@ -424,7 +424,7 @@ export function AttachmentList({
 			{displayAttachments.map((attachment) => (
 				<div
 					key={attachment.id}
-					className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm"
+					className="flex items-center gap-2 px-2 py-1 bg-slate-100  rounded-lg text-sm"
 				>
 					<FileIcon type={attachment.type} size="sm" />
 					<span className="max-w-[120px] truncate">{attachment.name}</span>
@@ -441,7 +441,7 @@ export function AttachmentList({
 			{remainingCount > 0 && (
 				<Badge
 					count={`+${remainingCount}`}
-					className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+					className="bg-slate-200  text-slate-600 "
 				/>
 			)}
 		</div>
