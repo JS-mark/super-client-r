@@ -4,7 +4,7 @@ import {
 	FullscreenOutlined,
 	MinusOutlined,
 } from "@ant-design/icons";
-import { theme, Tooltip } from "antd";
+import { Tooltip, theme } from "antd";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useMatches } from "react-router-dom";
@@ -78,11 +78,18 @@ export const TitleBar: React.FC = () => {
 			style={{ WebkitAppRegion: "drag", background: token.colorBgContainer }}
 		>
 			{/* 左侧：应用标题和图标 */}
-			<div className={`flex items-center gap-2 px-4 flex-row w-full justify-between`}>
+			<div
+				className={`flex items-center gap-2 px-4 flex-row w-full justify-between`}
+			>
 				{isReactElement ? (
 					displayTitle
 				) : (
-					<span className="text-sm font-medium" style={{ color: token.colorText }}>{displayTitle as string}</span>
+					<span
+						className="text-sm font-medium"
+						style={{ color: token.colorText }}
+					>
+						{displayTitle as string}
+					</span>
 				)}
 			</div>
 
@@ -93,7 +100,10 @@ export const TitleBar: React.FC = () => {
 					// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
 					style={{ WebkitAppRegion: "no-drag" }}
 				>
-					<Tooltip title={t("minimize", "最小化", { ns: "menu" })} placement="bottom">
+					<Tooltip
+						title={t("minimize", "最小化", { ns: "menu" })}
+						placement="bottom"
+					>
 						<button
 							type="button"
 							onClick={handleMinimize}
@@ -104,7 +114,11 @@ export const TitleBar: React.FC = () => {
 					</Tooltip>
 
 					<Tooltip
-						title={isMaximized ? t("restore", "还原") : t("maximize", "最大化", { ns: "menu" })}
+						title={
+							isMaximized
+								? t("restore", "还原")
+								: t("maximize", "最大化", { ns: "menu" })
+						}
 						placement="bottom"
 					>
 						<button
@@ -120,7 +134,10 @@ export const TitleBar: React.FC = () => {
 						</button>
 					</Tooltip>
 
-					<Tooltip title={t("close", "关闭", { ns: "window" })} placement="bottom">
+					<Tooltip
+						title={t("close", "关闭", { ns: "window" })}
+						placement="bottom"
+					>
 						<button
 							type="button"
 							onClick={handleClose}

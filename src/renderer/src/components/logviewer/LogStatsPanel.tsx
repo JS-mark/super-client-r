@@ -176,7 +176,7 @@ export const LogStatsPanel: React.FC = () => {
 									);
 									return stats.timeHistogram.map((h, i) => (
 										<Tooltip
-											key={i}
+											key={h.hour + i.toString()}
 											title={`${h.hour.slice(-5)}: ${h.count}`}
 										>
 											<div

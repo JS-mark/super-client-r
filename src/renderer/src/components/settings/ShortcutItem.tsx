@@ -63,6 +63,7 @@ function ShortcutInput({
 	onStopRecording,
 	conflict,
 }: ShortcutInputProps) {
+	const { t } = useTranslation();
 	const { token } = useToken();
 	const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 	const displayValue = formatShortcut(value, isMac);
@@ -83,7 +84,9 @@ function ShortcutInput({
 						className="text-sm font-medium"
 						style={{ color: conflict ? token.colorError : token.colorPrimary }}
 					>
-						{conflict ? "快捷键冲突!" : "按下快捷键..."}
+						{conflict
+							? t("conflictDetected", { ns: "shortcuts" })
+							: t("recording", { ns: "shortcuts" })}
 					</span>
 				</div>
 				<Button
@@ -110,7 +113,7 @@ function ShortcutInput({
 			>
 				{displayValue}
 			</div>
-			<Tooltip title="修改快捷键">
+			<Tooltip title={t("editShortcut", { ns: "shortcuts" })}>
 				<Button
 					size="small"
 					onClick={onStartRecording}
@@ -167,15 +170,15 @@ export function ShortcutItem({
 					</Tag>
 					{isModified && (
 						<Tag color="orange" className="text-xs">
-							{t("smodified", "已修改", { ns: 'shortcuts' })}
+							{t("modified", { ns: "shortcuts" })}
 						</Tag>
 					)}
 				</div>
 				<div className="font-medium" style={{ color: token.colorText }}>
-					{t(shortcut.nameKey, shortcut.name)}
+					{t(shortcut.nameKey, { ns: "shortcuts", defaultValue: shortcut.name })}
 				</div>
 				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
-					{t(shortcut.descriptionKey, shortcut.description)}
+					{t(shortcut.descriptionKey, { ns: "shortcuts", defaultValue: shortcut.description })}
 				</div>
 			</div>
 

@@ -80,7 +80,7 @@ export function registerLogHandlers(): void {
 				logDatabaseService.insert({
 					timestamp: new Date().toISOString(),
 					level: entry.level,
-					module: entry.module || "",
+					module: entry.module || "Renderer",
 					process: "renderer",
 					message: entry.message,
 					meta: entry.meta,

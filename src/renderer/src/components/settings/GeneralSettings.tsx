@@ -4,7 +4,7 @@ import {
 	SettingOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Input, Select, Space, message, theme } from "antd";
+import { Button, Card, Input, message, Select, Space, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -83,10 +83,7 @@ export const GeneralSettings: React.FC = () => {
 	};
 
 	return (
-		<Card
-			className="!border-0 !shadow-none !bg-transparent"
-			loading={loading}
-		>
+		<Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
 			<div className="space-y-6">
 				<SettingSection
 					title={t("userDataPath", "User Data Directory", {
@@ -130,7 +127,10 @@ export const GeneralSettings: React.FC = () => {
 						className="flex items-center justify-between py-2 border-t"
 						style={{ borderColor: token.colorBorder }}
 					>
-						<div className="flex items-center gap-2" style={{ color: token.colorText }}>
+						<div
+							className="flex items-center gap-2"
+							style={{ color: token.colorText }}
+						>
 							<GlobalOutlined className="text-sm" />
 							<span className="text-sm">
 								{t("language", "Language", { ns: "settings" })}
@@ -165,7 +165,9 @@ export const GeneralSettings: React.FC = () => {
 				>
 					<div className="flex items-center justify-between">
 						<p className="text-sm" style={{ color: token.colorTextSecondary }}>
-							{t("checkForUpdates", "Check for application updates", { ns: "settings" })}
+							{t("checkForUpdates", "Check for application updates", {
+								ns: "settings",
+							})}
 						</p>
 						<Button onClick={handleCheckUpdate} className="!rounded-lg">
 							{t("checkUpdate", "Check Update", { ns: "settings" })}

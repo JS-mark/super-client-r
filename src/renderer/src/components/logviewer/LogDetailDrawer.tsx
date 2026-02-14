@@ -4,7 +4,7 @@
  */
 
 import { CopyOutlined } from "@ant-design/icons";
-import { Button, Drawer, Tag, message, theme } from "antd";
+import { Button, Drawer, message, Tag, theme } from "antd";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,8 +50,7 @@ export const LogDetailDrawer: React.FC = () => {
 			`Message: ${record.message}`,
 		];
 		if (parsedMeta) parts.push(`Metadata: ${parsedMeta}`);
-		if (record.error_message)
-			parts.push(`Error: ${record.error_message}`);
+		if (record.error_message) parts.push(`Error: ${record.error_message}`);
 		if (record.error_stack) parts.push(`Stack: ${record.error_stack}`);
 		if (record.session_id) parts.push(`Session: ${record.session_id}`);
 
@@ -73,7 +72,9 @@ export const LogDetailDrawer: React.FC = () => {
 					>
 						{record.level}
 					</Tag>
-					<span style={{ color: token.colorText, fontWeight: 600, fontSize: 14 }}>
+					<span
+						style={{ color: token.colorText, fontWeight: 600, fontSize: 14 }}
+					>
 						{t("detail.title")}
 					</span>
 				</div>
@@ -100,7 +101,10 @@ export const LogDetailDrawer: React.FC = () => {
 				<MetaField
 					label={t("detail.timestamp")}
 					value={
-						<span className="font-mono text-xs" style={{ color: token.colorText }}>
+						<span
+							className="font-mono text-xs"
+							style={{ color: token.colorText }}
+						>
 							{record.timestamp}
 						</span>
 					}
@@ -142,7 +146,10 @@ export const LogDetailDrawer: React.FC = () => {
 					<MetaField
 						label={t("detail.sessionId")}
 						value={
-							<span className="font-mono text-xs" style={{ color: token.colorTextSecondary }}>
+							<span
+								className="font-mono text-xs"
+								style={{ color: token.colorTextSecondary }}
+							>
 								{record.session_id.slice(0, 12)}...
 							</span>
 						}

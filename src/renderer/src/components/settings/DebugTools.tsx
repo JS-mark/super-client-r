@@ -13,13 +13,13 @@ import {
 	Button,
 	Card,
 	Col,
+	message,
 	Popconfirm,
 	Progress,
 	Row,
 	Skeleton,
 	Statistic,
 	Tabs,
-	message,
 	theme,
 } from "antd";
 import type React from "react";
@@ -118,19 +118,19 @@ const QuickActionsTab: React.FC = () => {
 					<div className="flex items-center gap-4">
 						<div
 							className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.type === "primary"
-								? "bg-blue-500 text-white"
-								: action.danger
-									? "text-red-500"
-									: ""
+									? "bg-blue-500 text-white"
+									: action.danger
+										? "text-red-500"
+										: ""
 								}`}
 							style={
 								action.danger
 									? { backgroundColor: token.colorErrorBg }
 									: action.type !== "primary"
 										? {
-												backgroundColor: token.colorBgContainer,
-												color: token.colorText,
-											}
+											backgroundColor: token.colorBgContainer,
+											color: token.colorText,
+										}
 										: undefined
 							}
 						>
@@ -140,7 +140,10 @@ const QuickActionsTab: React.FC = () => {
 							<div className="font-medium" style={{ color: token.colorText }}>
 								{action.label}
 							</div>
-							<div className="text-sm" style={{ color: token.colorTextSecondary }}>
+							<div
+								className="text-sm"
+								style={{ color: token.colorTextSecondary }}
+							>
 								{action.description}
 							</div>
 						</div>
@@ -405,7 +408,10 @@ const PerformanceMonitorTab: React.FC = () => {
 			<Row gutter={[16, 16]}>
 				{statCards.map((card) => (
 					<Col span={12} key={card.value}>
-						<Card className="!rounded-xl" style={{ borderColor: token.colorBorder }}>
+						<Card
+							className="!rounded-xl"
+							style={{ borderColor: token.colorBorder }}
+						>
 							<Statistic
 								title={card.title}
 								value={card.value}
@@ -429,7 +435,8 @@ const PerformanceMonitorTab: React.FC = () => {
 							{t("memoryUsage", "内存使用", { ns: "settings" })}
 						</span>
 					}
-					className="rounded-xl!" style={{ borderColor: token.colorBorder }}
+					className="rounded-xl!"
+					style={{ borderColor: token.colorBorder }}
 				>
 					<div className="space-y-4">
 						<Progress
@@ -443,7 +450,10 @@ const PerformanceMonitorTab: React.FC = () => {
 										: "#22c55e"
 							}
 						/>
-						<div className="flex justify-between text-sm" style={{ color: token.colorTextSecondary }}>
+						<div
+							className="flex justify-between text-sm"
+							style={{ color: token.colorTextSecondary }}
+						>
 							<span>
 								{t("used", "已使用", { ns: "settings" })}: {metrics.memoryUsed}{" "}
 								MB

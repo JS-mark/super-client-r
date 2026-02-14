@@ -31,6 +31,11 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { useChat } from "../hooks/useChat";
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
+import {
+	getShortcutFromEvent,
+	normalizeShortcut,
+	useShortcutStore,
+} from "../stores/shortcutStore";
 
 // Empty state suggestions - use i18n keys
 const SUGGESTION_KEYS = [
@@ -305,7 +310,25 @@ const Chat: React.FC = () => {
 								value={input}
 								onChange={(e) => setInput(e.target.value)}
 								onKeyDown={(e) => {
-									if (e.key === "Enter" && !e.shiftKey) {
+									const { getShortcut } = useShortcutStore.getState();
+									const sendShortcut = getShortcut("send-message");
+									const newLineShortcut = getShortcut("new-line");
+									const pressed = normalizeShortcut(getShortcutFromEvent(e.nativeEvent));
+
+									// Check new-line first (more specific, e.g. shift+enter)
+									if (
+										newLineShortcut?.enabled &&
+										normalizeShortcut(newLineShortcut.currentKey) === pressed
+									) {
+										// Allow default behavior (insert newline)
+										return;
+									}
+
+									// Check send-message
+									if (
+										sendShortcut?.enabled &&
+										normalizeShortcut(sendShortcut.currentKey) === pressed
+									) {
 										e.preventDefault();
 										handleSend();
 									}
@@ -316,7 +339,7 @@ const Chat: React.FC = () => {
 									"chat.placeholder",
 									"在这里输入消息，按 Enter 发送",
 								)}
-								className="w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none"
+								className="chat-textarea w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none"
 								style={{ height: "auto", color: token.colorText }}
 								rows={1}
 								disabled={isStreaming}

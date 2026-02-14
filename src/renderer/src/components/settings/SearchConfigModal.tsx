@@ -6,15 +6,23 @@ import {
 	SaveOutlined,
 	SearchOutlined,
 } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Select, Switch, message, theme } from "antd";
+import {
+	Button,
+	Form,
+	Input,
+	Modal,
+	message,
+	Select,
+	Switch,
+	theme,
+} from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { searchService } from "../../services/search/searchService";
 import type { SearchConfig, SearchProviderType } from "../../types/search";
 import {
-	type SearchProvider,
-	SEARCH_PROVIDERS,
 	getProviderInfo,
+	SEARCH_PROVIDERS,
 } from "./SearchProviders";
 
 const { useToken } = theme;
@@ -89,14 +97,12 @@ export function SearchConfigModal({
 			} else {
 				message.error(
 					result.data?.error ||
-						result.error ||
-						t("search.validateError", "验证失败"),
+					result.error ||
+					t("search.validateError", "验证失败"),
 				);
 			}
 		} catch (error) {
-			message.error(
-				t("search.validateError", "验证失败", { ns: "settings" }),
-			);
+			message.error(t("search.validateError", "验证失败", { ns: "settings" }));
 		} finally {
 			setValidating(false);
 		}
@@ -127,14 +133,10 @@ export function SearchConfigModal({
 					onClose();
 					onSaved();
 				} else {
-					message.error(
-						result.error || t("search.saveError", "保存失败"),
-					);
+					message.error(result.error || t("search.saveError", "保存失败"));
 				}
 			} catch (error) {
-				message.error(
-					t("search.saveError", "保存失败", { ns: "settings" }),
-				);
+				message.error(t("search.saveError", "保存失败", { ns: "settings" }));
 			} finally {
 				setSaving(false);
 			}
@@ -186,10 +188,7 @@ export function SearchConfigModal({
 					rules={[
 						{
 							required: true,
-							message: t(
-								"search.providerRequired",
-								"请选择搜索服务商",
-							),
+							message: t("search.providerRequired", "请选择搜索服务商"),
 						},
 					]}
 				>
@@ -215,18 +214,14 @@ export function SearchConfigModal({
 								})),
 							},
 							{
-								label: t(
-									"search.traditionalSearch",
-									"传统搜索",
-									{ ns: "settings" },
-								),
+								label: t("search.traditionalSearch", "传统搜索", {
+									ns: "settings",
+								}),
 								options: localSearchProviders.map((p) => ({
 									value: p.id,
 									label: (
 										<div className="flex items-center gap-2">
-											<span className="font-bold text-blue-500">
-												{p.icon}
-											</span>
+											<span className="font-bold text-blue-500">{p.icon}</span>
 											<span>{p.name}</span>
 										</div>
 									),
@@ -271,19 +266,14 @@ export function SearchConfigModal({
 					rules={[
 						{
 							required: true,
-							message: t(
-								"search.nameRequired",
-								"请输入配置名称",
-							),
+							message: t("search.nameRequired", "请输入配置名称"),
 						},
 					]}
 				>
 					<Input
-						placeholder={t(
-							"search.namePlaceholder",
-							"例如：我的 Tavily 搜索",
-							{ ns: "settings" },
-						)}
+						placeholder={t("search.namePlaceholder", "例如：我的 Tavily 搜索", {
+							ns: "settings",
+						})}
 					/>
 				</Form.Item>
 
@@ -300,15 +290,13 @@ export function SearchConfigModal({
 						rules={
 							currentProvider?.requiresApiKey
 								? [
-										{
-											required: true,
-											message: t(
-												"search.apiKeyRequired",
-												"请输入 API Key",
-												{ ns: "settings" },
-											),
-										},
-									]
+									{
+										required: true,
+										message: t("search.apiKeyRequired", "请输入 API Key", {
+											ns: "settings",
+										}),
+									},
+								]
 								: []
 						}
 					>
@@ -344,17 +332,13 @@ export function SearchConfigModal({
 						rules={[
 							{
 								required: true,
-								message: t(
-									"search.apiUrlRequired",
-									"请输入 API URL",
-									{ ns: "settings" },
-								),
+								message: t("search.apiUrlRequired", "请输入 API URL", {
+									ns: "settings",
+								}),
 							},
 						]}
 					>
-						<Input
-							placeholder={currentProvider?.apiUrlPlaceholder}
-						/>
+						<Input placeholder={currentProvider?.apiUrlPlaceholder} />
 					</Form.Item>
 				)}
 

@@ -10,6 +10,9 @@
   "resetAllSuccess": "All shortcuts have been reset",
   "recordingHint": "Press the key combination you want to set...",
   "conflictWarning": "Conflicts with {{name}} shortcut",
+  "conflictDetected": "Shortcut conflict!",
+  "recording": "Press keys...",
+  "editShortcut": "Edit shortcut",
   "stats": {
     "enabled": "Enabled",
     "modified": "Modified"

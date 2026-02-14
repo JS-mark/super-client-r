@@ -1,13 +1,12 @@
 import {
 	BookOutlined,
 	CopyOutlined,
-	GlobalOutlined,
 	LinkOutlined,
 	PlayCircleOutlined,
 	PoweroffOutlined,
 	ReloadOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Form, InputNumber, Tooltip, message, theme } from "antd";
+import { Button, Card, Form, InputNumber, message, Tooltip, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -113,10 +112,7 @@ export const ApiServiceSettings: React.FC = () => {
 	};
 
 	return (
-		<Card
-			className="!border-0 !shadow-none !bg-transparent"
-			loading={loading}
-		>
+		<Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
 			<SettingSection
 				title={t("apiService", "API Service", { ns: "settings" })}
 			>
@@ -132,9 +128,10 @@ export const ApiServiceSettings: React.FC = () => {
 							<span
 								className="font-medium text-sm uppercase"
 								style={{
-									color: apiStatus.status === "running"
-										? token.colorSuccess
-										: token.colorError,
+									color:
+										apiStatus.status === "running"
+											? token.colorSuccess
+											: token.colorError,
 								}}
 							>
 								{apiStatus.status === "running"

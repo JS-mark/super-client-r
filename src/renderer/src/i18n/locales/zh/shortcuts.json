@@ -10,6 +10,9 @@
 	"resetAllSuccess": "所有快捷键已重置",
 	"recordingHint": "按下要设置的快捷键组合...",
 	"conflictWarning": "与 {{name}} 快捷键冲突",
+	"conflictDetected": "快捷键冲突!",
+	"recording": "按下快捷键...",
+	"editShortcut": "修改快捷键",
 	"stats": {
 		"enabled": "已启用",
 		"modified": "已修改"

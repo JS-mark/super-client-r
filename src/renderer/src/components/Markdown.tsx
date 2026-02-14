@@ -1,8 +1,8 @@
+import type * as React from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
-import type * as React from "react";
+import remarkGfm from "remark-gfm";
 import { cn } from "../lib/utils";
 
 interface MarkdownProps {
@@ -18,18 +18,18 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 				rehypePlugins={[rehypeHighlight, rehypeRaw]}
 				components={{
 					// Custom code block styling
-					pre: ({ node, ...props }) => (
+					pre: ({ ...props }) => (
 						<pre
-							className="!bg-gray-100  !p-4 !rounded-lg !overflow-x-auto"
+							className="bg-gray-100!  p-4! rounded-lg! overflow-x-auto!"
 							{...props}
 						/>
 					),
-					code: ({ node, className, children, ...props }) => {
+					code: ({ className, children, ...props }) => {
 						const isInline = !className?.includes("language-");
 						if (isInline) {
 							return (
 								<code
-									className="!bg-gray-100  !px-1.5 !py-0.5 !rounded !text-sm !font-mono"
+									className="bg-gray-100! px-1.5! py-0.5! rounded! text-sm! font-mono!"
 									{...props}
 								>
 									{children}
@@ -68,19 +68,13 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 						</div>
 					),
 					thead: ({ node, ...props }) => (
-						<thead
-							className="!bg-gray-50 "
-							{...props}
-						/>
+						<thead className="!bg-gray-50 " {...props} />
 					),
 					tbody: ({ node, ...props }) => (
 						<tbody className="!divide-y !divide-gray-200 " {...props} />
 					),
 					tr: ({ node, ...props }) => (
-						<tr
-							className="!hover:bg-gray-50  !transition-colors"
-							{...props}
-						/>
+						<tr className="!hover:bg-gray-50  !transition-colors" {...props} />
 					),
 					th: ({ node, ...props }) => (
 						<th
@@ -89,10 +83,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 						/>
 					),
 					td: ({ node, ...props }) => (
-						<td
-							className="!px-4 !py-2 !border !border-gray-200 "
-							{...props}
-						/>
+						<td className="!px-4 !py-2 !border !border-gray-200 " {...props} />
 					),
 					// Custom list styling
 					ul: ({ node, ...props }) => (
@@ -101,9 +92,7 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 					ol: ({ node, ...props }) => (
 						<ol className="!list-decimal !pl-6 !my-2" {...props} />
 					),
-					li: ({ node, ...props }) => (
-						<li className="!my-1" {...props} />
-					),
+					li: ({ node, ...props }) => <li className="!my-1" {...props} />,
 					// Custom heading styling
 					h1: ({ node, ...props }) => (
 						<h1 className="!text-2xl !font-bold !mt-6 !mb-4" {...props} />
@@ -118,19 +107,14 @@ export const Markdown: React.FC<MarkdownProps> = ({ content, className }) => {
 						<h4 className="!text-base !font-semibold !mt-3 !mb-2" {...props} />
 					),
 					// Custom paragraph styling
-					p: ({ node, ...props }) => (
-						<p className="!my-2" {...props} />
-					),
+					p: ({ node, ...props }) => <p className="!my-2" {...props} />,
 					// Custom hr styling
 					hr: ({ node, ...props }) => (
 						<hr className="!my-6 !border-gray-200 " {...props} />
 					),
 					// Custom image styling
 					img: ({ node, ...props }) => (
-						<img
-							className="!rounded-lg !max-w-full !h-auto !my-4"
-							{...props}
-						/>
+						<img className="rounded-lg! max-w-full! h-auto! my-4!" {...props} alt={props.alt || ""} />
 					),
 				}}
 			>

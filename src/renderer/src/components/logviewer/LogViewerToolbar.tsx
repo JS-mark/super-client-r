@@ -119,128 +119,130 @@ export const LogViewerToolbar: React.FC = () => {
 
 	return (
 		<div
-			className="flex items-center gap-2 px-3 py-2 rounded-xl shrink-0"
+			className="flex flex-col gap-2 px-3 py-2.5 rounded-xl shrink-0"
 			style={{
 				background: token.colorBgContainer,
 				border: `1px solid ${token.colorBorderSecondary}`,
 			}}
 		>
-			{/* Search */}
-			<Input
-				prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
-				placeholder={t("keywordPlaceholder")}
-				allowClear
-				onChange={handleKeywordChange}
-				defaultValue={filters.keyword}
-				className="!w-48"
-				size="small"
-				variant="filled"
-			/>
+			{/* Row 1: Search + Filters */}
+			<div className="flex items-center gap-2">
+				<Input
+					prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+					placeholder={t("keywordPlaceholder")}
+					allowClear
+					onChange={handleKeywordChange}
+					defaultValue={filters.keyword}
+					className="!w-52"
+					size="small"
+					variant="filled"
+				/>
 
-			{/* Filter group */}
-			<Select
-				mode="multiple"
-				placeholder={t("allLevels")}
-				value={filters.level}
-				onChange={handleLevelChange}
-				options={LEVEL_OPTIONS}
-				maxTagCount={1}
-				allowClear
-				className="!min-w-[110px]"
-				size="small"
-				variant="filled"
-			/>
+				<Select
+					mode="multiple"
+					placeholder={t("allLevels")}
+					value={filters.level}
+					onChange={handleLevelChange}
+					options={LEVEL_OPTIONS}
+					maxTagCount={1}
+					allowClear
+					className="!min-w-[120px]"
+					size="small"
+					variant="filled"
+				/>
 
-			<Select
-				mode="multiple"
-				placeholder={t("allModules")}
-				value={filters.module}
-				onChange={handleModuleChange}
-				options={modules.map((m) => ({ value: m, label: m }))}
-				maxTagCount={1}
-				allowClear
-				className="!min-w-[110px]"
-				size="small"
-				variant="filled"
-			/>
+				<Select
+					mode="multiple"
+					placeholder={t("allModules")}
+					value={filters.module}
+					onChange={handleModuleChange}
+					options={modules.map((m) => ({ value: m, label: m }))}
+					maxTagCount={1}
+					allowClear
+					className="!min-w-[120px]"
+					size="small"
+					variant="filled"
+				/>
 
-			<Select
-				mode="multiple"
-				placeholder={t("allProcesses")}
-				value={filters.process}
-				onChange={handleProcessChange}
-				options={[
-					{ value: "main", label: t("processMain") },
-					{ value: "renderer", label: t("processRenderer") },
-				]}
-				maxTagCount={1}
-				allowClear
-				className="!min-w-[100px]"
-				size="small"
-				variant="filled"
-			/>
+				<Select
+					mode="multiple"
+					placeholder={t("allProcesses")}
+					value={filters.process}
+					onChange={handleProcessChange}
+					options={[
+						{ value: "main", label: t("processMain") },
+						{ value: "renderer", label: t("processRenderer") },
+					]}
+					maxTagCount={1}
+					allowClear
+					className="!min-w-[110px]"
+					size="small"
+					variant="filled"
+				/>
+			</div>
 
-			<RangePicker
-				showTime
-				onChange={handleTimeRangeChange}
-				size="small"
-				variant="filled"
-			/>
+			{/* Row 2: Time range + Actions */}
+			<div className="flex items-center gap-2">
+				<RangePicker
+					showTime
+					onChange={handleTimeRangeChange}
+					size="small"
+					variant="filled"
+				/>
 
-			{/* Spacer */}
-			<div className="flex-1" />
+				<div className="flex-1" />
 
-			{/* Actions */}
-			<div className="flex items-center gap-1">
-				<Tooltip title={sortOrder === "desc" ? t("sortDesc") : t("sortAsc")}>
-					<Button
-						icon={
-							sortOrder === "desc" ? (
-								<SortDescendingOutlined />
-							) : (
-								<SortAscendingOutlined />
-							)
-						}
-						onClick={handleToggleSort}
-						size="small"
-						type="text"
-					/>
-				</Tooltip>
-
-				<Tooltip title={t("refresh")}>
-					<Button
-						icon={<ReloadOutlined />}
-						onClick={refresh}
-						loading={isLoading}
-						size="small"
-						type="text"
-					/>
-				</Tooltip>
-
-				<Tooltip title={t("export")}>
-					<Button
-						icon={<ExportOutlined />}
-						onClick={handleExport}
-						size="small"
-						type="text"
-					/>
-				</Tooltip>
-
-				<Popconfirm
-					title={t("clearConfirm")}
-					onConfirm={handleClear}
-					okText={t("clear")}
-					cancelText={t("cancel", { ns: "common", defaultValue: "Cancel" })}
-				>
-					<Tooltip title={t("clear")}>
+				<div className="flex items-center gap-1">
+					<Tooltip title={sortOrder === "desc" ? t("sortDesc") : t("sortAsc")}>
 						<Button
-							icon={<ClearOutlined />}
-							danger
+							icon={
+								sortOrder === "desc" ? (
+									<SortDescendingOutlined />
+								) : (
+									<SortAscendingOutlined />
+								)
+							}
+							onClick={handleToggleSort}
 							size="small"
 							type="text"
 						/>
 					</Tooltip>
-				</Popconfirm>
+
+					<Tooltip title={t("refresh")}>
+						<Button
+							icon={<ReloadOutlined />}
+							onClick={refresh}
+							loading={isLoading}
+							size="small"
+							type="text"
+						/>
+					</Tooltip>
+
+					<Tooltip title={t("export")}>
+						<Button
+							icon={<ExportOutlined />}
+							onClick={handleExport}
+							size="small"
+							type="text"
+						/>
+					</Tooltip>
+
+					<Popconfirm
+						title={t("clearConfirm")}
+						onConfirm={handleClear}
+						okText={t("clear")}
+						cancelText={t("cancel", { ns: "common", defaultValue: "Cancel" })}
+					>
+						<Tooltip title={t("clear")}>
+							<Button
+								icon={<ClearOutlined />}
+								danger
+								size="small"
+								type="text"
+							/>
+						</Tooltip>
+					</Popconfirm>
+				</div>
 			</div>
 		</div>
 	);

@@ -1,5 +1,11 @@
-import { ApiOutlined, DeleteOutlined, EyeOutlined, ReloadOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Card, Modal, Tag, Tooltip, message } from "antd";
+import {
+	ApiOutlined,
+	DeleteOutlined,
+	EyeOutlined,
+	ReloadOutlined,
+	SyncOutlined,
+} from "@ant-design/icons";
+import { Button, Card, Modal, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -84,7 +90,13 @@ export const InstalledMcpCard: React.FC<{
 								loading={testing}
 							/>
 						</Tooltip>
-						<Tooltip title={server.enabled ? t("actions.disable", { ns: "mcp" }) : t("actions.enable", { ns: "mcp" })}>
+						<Tooltip
+							title={
+								server.enabled
+									? t("actions.disable", { ns: "mcp" })
+									: t("actions.enable", { ns: "mcp" })
+							}
+						>
 							<Button
 								size="small"
 								type="text"

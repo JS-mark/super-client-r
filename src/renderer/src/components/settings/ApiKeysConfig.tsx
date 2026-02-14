@@ -74,7 +74,7 @@ export const ApiKeysConfig: React.FC = () => {
 								"settings.skillsmpApiKeyPlaceholder",
 								"Enter your SkillsMP API Key",
 							)}
-							className="!rounded-xl"
+							className="rounded-xl!"
 							size="large"
 							prefix={<KeyOutlined className="text-slate-400" />}
 						/>

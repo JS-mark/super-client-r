@@ -3,9 +3,8 @@
  * Catches JavaScript errors in child component trees
  */
 
-import type * as React from "react";
-import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button, Result } from "antd";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
 	children: ReactNode;
@@ -72,17 +71,13 @@ export class ErrorBoundary extends Component<Props, State> {
 						status="error"
 						title="Something went wrong"
 						subTitle={
-							this.state.error?.message ||
-							"An unexpected error occurred"
+							this.state.error?.message || "An unexpected error occurred"
 						}
 						extra={[
 							<Button type="primary" key="retry" onClick={this.handleReset}>
 								Try Again
 							</Button>,
-							<Button
-								key="reload"
-								onClick={() => window.location.reload()}
-							>
+							<Button key="reload" onClick={() => window.location.reload()}>
 								Reload Page
 							</Button>,
 						]}

@@ -6,8 +6,8 @@ import {
 	SyncOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
-import { Button, Card, Dropdown, Tag, Tooltip, message } from "antd";
-import * as React from "react";
+import { Button, Card, Dropdown, message, Tag, Tooltip } from "antd";
+import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useSkillStore } from "../../stores/skillStore";
 import type { Skill } from "../../types/skills";

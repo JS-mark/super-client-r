@@ -3,17 +3,12 @@
  * SQLite-backed structured log storage using better-sqlite3
  */
 
+import type BetterSqlite3 from "better-sqlite3";
+import Database from "better-sqlite3";
 import { app } from "electron";
 import { EventEmitter } from "events";
-import {
-	existsSync,
-	mkdirSync,
-	readdirSync,
-	readFileSync,
-} from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import Database from "better-sqlite3";
-import type BetterSqlite3 from "better-sqlite3";
 
 export interface LogRecord {
 	id: number;
@@ -289,9 +284,7 @@ export class LogDatabaseService extends EventEmitter {
 		).c;
 
 		const byLevel = this.db
-			.prepare(
-				"SELECT level, COUNT(*) as c FROM logs GROUP BY level",
-			)
+			.prepare("SELECT level, COUNT(*) as c FROM logs GROUP BY level")
 			.all() as { level: string; c: number }[];
 		const countByLevel: Record<string, number> = {};
 		for (const row of byLevel) countByLevel[row.level] = row.c;
@@ -305,9 +298,7 @@ export class LogDatabaseService extends EventEmitter {
 		for (const row of byModule) countByModule[row.module] = row.c;
 
 		const byProcess = this.db
-			.prepare(
-				"SELECT process, COUNT(*) as c FROM logs GROUP BY process",
-			)
+			.prepare("SELECT process, COUNT(*) as c FROM logs GROUP BY process")
 			.all() as { process: string; c: number }[];
 		const countByProcess: Record<string, number> = {};
 		for (const row of byProcess) countByProcess[row.process] = row.c;
@@ -361,10 +352,7 @@ export class LogDatabaseService extends EventEmitter {
 		this.emit("cleared");
 	}
 
-	exportToFile(
-		params: LogQueryParams,
-		filePath: string,
-	): { count: number } {
+	exportToFile(params: LogQueryParams, filePath: string): { count: number } {
 		const allParams = { ...params, page: 1, pageSize: MAX_ROWS };
 		const result = this.query(allParams);
 
@@ -421,13 +409,11 @@ export class LogDatabaseService extends EventEmitter {
 		// Parse log files in background batches
 		setImmediate(() => {
 			try {
-				const insertMany = this.db!.transaction(
-					(entries: LogInsertEntry[]) => {
-						for (const entry of entries) {
-							this.insert(entry);
-						}
-					},
-				);
+				const insertMany = this.db!.transaction((entries: LogInsertEntry[]) => {
+					for (const entry of entries) {
+						this.insert(entry);
+					}
+				});
 
 				for (const file of logFiles) {
 					const content = readFileSync(join(logDir, file), "utf8");
@@ -449,8 +435,7 @@ export class LogDatabaseService extends EventEmitter {
 		const entries: LogInsertEntry[] = [];
 		const lines = content.split("\n");
 		// Pattern: [2025-01-01T00:00:00.000Z] [LEVEL] [Module] message
-		const lineRegex =
-			/^\[([^\]]+)\]\s+\[(\w+)\](?:\s+\[([^\]]*)\])?\s+(.*)$/;
+		const lineRegex = /^\[([^\]]+)\]\s+\[(\w+)\](?:\s+\[([^\]]*)\])?\s+(.*)$/;
 
 		let currentEntry: LogInsertEntry | null = null;
 		let errorLines: string[] = [];

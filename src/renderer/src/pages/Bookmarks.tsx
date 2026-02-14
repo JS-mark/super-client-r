@@ -1,18 +1,31 @@
-import { useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { List, Card, Tag, Button, Empty, Input, Modal, message, theme } from "antd";
 import {
-	StarFilled,
 	DeleteOutlined,
 	EditOutlined,
 	ExportOutlined,
 	SearchOutlined,
+	StarFilled,
 	StarOutlined,
 } from "@ant-design/icons";
+import {
+	Button,
+	Card,
+	Empty,
+	Input,
+	List,
+	Modal,
+	message,
+	Tag,
+	theme,
+} from "antd";
+import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
-import { useMessageStore, type BookmarkedMessage } from "../stores/messageStore";
 import { useTitle } from "../hooks/useTitle";
 import { cn } from "../lib/utils";
+import {
+	type BookmarkedMessage,
+	useMessageStore,
+} from "../stores/messageStore";
 
 const { useToken } = theme;
 
@@ -21,22 +34,26 @@ export default function Bookmarks() {
 	const { token } = useToken();
 
 	// 设置标题栏
-	const pageTitle = useMemo(() => (
-		<div className="flex items-center gap-2">
-			<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
-				<StarOutlined className="text-white text-xs" />
+	const pageTitle = useMemo(
+		() => (
+			<div className="flex items-center gap-2">
+				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center">
+					<StarOutlined className="text-white text-xs" />
+				</div>
+				<span
+					className="text-sm font-medium"
+					style={{ color: token.colorText }}
+				>
+					{t("bookmarks.title", "收藏消息", { ns: "bookmarks" })}
+				</span>
 			</div>
-			<span
-				className="text-sm font-medium"
-				style={{ color: token.colorText }}
-			>
-				{t("bookmarks.title", "收藏消息", { ns: "bookmarks" })}
-			</span>
-		</div>
-	), [t, token.colorText]);
+		),
+		[t, token.colorText],
+	);
 	useTitle(pageTitle);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [editingBookmark, setEditingBookmark] = useState<BookmarkedMessage | null>(null);
+	const [editingBookmark, setEditingBookmark] =
+		useState<BookmarkedMessage | null>(null);
 	const [editNote, setEditNote] = useState("");
 
 	const { bookmarks, removeBookmark, updateBookmark, tags } = useMessageStore();
@@ -44,7 +61,7 @@ export default function Bookmarks() {
 	const filteredBookmarks = bookmarks.filter(
 		(b) =>
 			b.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			b.note?.toLowerCase().includes(searchQuery.toLowerCase())
+			b.note?.toLowerCase().includes(searchQuery.toLowerCase()),
 	);
 
 	const handleDelete = (id: string) => {
@@ -60,7 +77,9 @@ export default function Bookmarks() {
 	const handleSaveNote = () => {
 		if (editingBookmark) {
 			updateBookmark(editingBookmark.id, { note: editNote });
-			message.success(t("bookmarks.noteSaved", "备注已保存", { ns: "bookmarks" }));
+			message.success(
+				t("bookmarks.noteSaved", "备注已保存", { ns: "bookmarks" }),
+			);
 			setEditingBookmark(null);
 		}
 	};
@@ -102,7 +121,9 @@ export default function Bookmarks() {
 								{t("bookmarks.title", "收藏的消息", { ns: "bookmarks" })}
 							</h1>
 							<p className="text-sm text-slate-500 mt-1">
-								{t("bookmarks.subtitle", "管理您收藏的重要消息", { ns: "bookmarks" })}
+								{t("bookmarks.subtitle", "管理您收藏的重要消息", {
+									ns: "bookmarks",
+								})}
 							</p>
 						</div>
 						<div className="flex gap-2">
@@ -120,7 +141,9 @@ export default function Bookmarks() {
 					<div className="mt-4">
 						<Input
 							prefix={<SearchOutlined />}
-							placeholder={t("bookmarks.search", "搜索收藏...", { ns: "bookmarks" })}
+							placeholder={t("bookmarks.search", "搜索收藏...", {
+								ns: "bookmarks",
+							})}
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
 							allowClear
@@ -132,12 +155,16 @@ export default function Bookmarks() {
 				<div className="flex-1 overflow-auto p-6">
 					{bookmarks.length === 0 ? (
 						<Empty
-							description={t("bookmarks.empty", "暂无收藏的消息", { ns: "bookmarks" })}
+							description={t("bookmarks.empty", "暂无收藏的消息", {
+								ns: "bookmarks",
+							})}
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
 						/>
 					) : filteredBookmarks.length === 0 ? (
 						<Empty
-							description={t("bookmarks.noResults", "未找到匹配的书签", { ns: "bookmarks" })}
+							description={t("bookmarks.noResults", "未找到匹配的书签", {
+								ns: "bookmarks",
+							})}
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
 						/>
 					) : (
@@ -170,7 +197,9 @@ export default function Bookmarks() {
 									>
 										<div className="space-y-3">
 											<div className="flex items-center gap-2">
-												<Tag color={bookmark.role === "user" ? "blue" : "green"}>
+												<Tag
+													color={bookmark.role === "user" ? "blue" : "green"}
+												>
 													{bookmark.role === "user"
 														? t("chat.user", "用户")
 														: t("assistant", "助手", { ns: "chat" })}
@@ -200,12 +229,12 @@ export default function Bookmarks() {
 											)}
 										</div>
 									</Card>
-									</List.Item>
-								)}
+								</List.Item>
+							)}
 						/>
-						)}
-					</div>
+					)}
 				</div>
+			</div>
 
 			{/* Edit Note Modal */}
 			<Modal
@@ -218,7 +247,9 @@ export default function Bookmarks() {
 					value={editNote}
 					onChange={(e) => setEditNote(e.target.value)}
 					rows={4}
-					placeholder={t("bookmarks.notePlaceholder", "输入备注...", { ns: "bookmarks" })}
+					placeholder={t("bookmarks.notePlaceholder", "输入备注...", {
+						ns: "bookmarks",
+					})}
 				/>
 			</Modal>
 		</MainLayout>

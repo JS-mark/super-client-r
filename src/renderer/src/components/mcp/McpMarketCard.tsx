@@ -1,5 +1,10 @@
-import { CloudDownloadOutlined, DeleteOutlined, DownloadOutlined, StarFilled } from "@ant-design/icons";
-import { Badge, Button, Card, Tag, Tooltip, message } from "antd";
+import {
+	CloudDownloadOutlined,
+	DeleteOutlined,
+	DownloadOutlined,
+	StarFilled,
+} from "@ant-design/icons";
+import { Badge, Button, Card, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
@@ -71,9 +76,7 @@ export const McpMarketCard: React.FC<{
 					<span className="truncate" title={item.name}>
 						{item.name}
 					</span>
-					{isInstalled && (
-						<Badge status="success" className="ml-auto" />
-					)}
+					{isInstalled && <Badge status="success" className="ml-auto" />}
 				</div>
 			}
 			extra={<Tag>{item.version}</Tag>}

@@ -1,5 +1,10 @@
-import { DeleteOutlined, DownloadOutlined, ReloadOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Modal, Tag, message } from "antd";
+import {
+	DeleteOutlined,
+	DownloadOutlined,
+	ReloadOutlined,
+	SyncOutlined,
+} from "@ant-design/icons";
+import { Button, Modal, message, Tag } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useSkillStore } from "../../stores/skillStore";

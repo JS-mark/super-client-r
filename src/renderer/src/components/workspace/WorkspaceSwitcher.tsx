@@ -1,27 +1,24 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import {
-	Dropdown,
-	Button,
-	Modal,
-	Form,
-	Input,
-	ColorPicker,
-	Radio,
-	message,
-	Tooltip,
-	Tag,
-} from "antd";
-import {
+	CheckOutlined,
+	CopyOutlined,
+	DeleteOutlined,
 	DownOutlined,
+	ExportOutlined,
 	PlusOutlined,
 	SettingOutlined,
-	CopyOutlined,
-	ExportOutlined,
-	ImportOutlined,
-	DeleteOutlined,
-	CheckOutlined,
 } from "@ant-design/icons";
+import {
+	Button,
+	Dropdown,
+	Form,
+	Input,
+	Modal,
+	message,
+	Radio,
+	Tooltip,
+} from "antd";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import {
 	useWorkspaceStore,
@@ -30,12 +27,16 @@ import {
 	type WorkspaceType,
 } from "../../stores/workspaceStore";
 
-const WORKSPACE_TYPE_OPTIONS: { value: WorkspaceType; label: string; icon: string }[] = [
-	{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
-	{ value: "work", label: "workspaces.type.work", icon: "💼" },
-	{ value: "project", label: "workspaces.type.project", icon: "📁" },
-	{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
-];
+const WORKSPACE_TYPE_OPTIONS: {
+	value: WorkspaceType;
+	label: string;
+	icon: string;
+}[] = [
+		{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
+		{ value: "work", label: "workspaces.type.work", icon: "💼" },
+		{ value: "project", label: "workspaces.type.project", icon: "📁" },
+		{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
+	];
 
 interface WorkspaceFormData {
 	name: string;
@@ -62,7 +63,7 @@ function WorkspaceBadge({
 			<div
 				className={cn(
 					"rounded-lg flex items-center justify-center font-medium text-white",
-					isSmall ? "w-6 h-6 text-xs" : "w-8 h-8 text-sm"
+					isSmall ? "w-6 h-6 text-xs" : "w-8 h-8 text-sm",
 				)}
 				style={{ backgroundColor: workspace.color }}
 			>
@@ -73,7 +74,7 @@ function WorkspaceBadge({
 					<span
 						className={cn(
 							"font-medium text-slate-800  truncate max-w-[120px]",
-							isSmall && "text-xs"
+							isSmall && "text-xs",
 						)}
 					>
 						{workspace.name}
@@ -127,7 +128,11 @@ function CreateWorkspaceModal({
 					label={t("workspaces.name", "名称", { ns: "workspaces" })}
 					rules={[{ required: true, message: "请输入工作区名称" }]}
 				>
-					<Input placeholder={t("workspaces.namePlaceholder", "我的工作区", { ns: "workspaces" })} />
+					<Input
+						placeholder={t("workspaces.namePlaceholder", "我的工作区", {
+							ns: "workspaces",
+						})}
+					/>
 				</Form.Item>
 
 				<Form.Item
@@ -136,7 +141,11 @@ function CreateWorkspaceModal({
 				>
 					<Input.TextArea
 						rows={2}
-						placeholder={t("workspaces.descriptionPlaceholder", "工作区描述...", { ns: "workspaces" })}
+						placeholder={t(
+							"workspaces.descriptionPlaceholder",
+							"工作区描述...",
+							{ ns: "workspaces" },
+						)}
 					/>
 				</Form.Item>
 
@@ -148,7 +157,11 @@ function CreateWorkspaceModal({
 					<Radio.Group>
 						<div className="grid grid-cols-2 gap-2">
 							{WORKSPACE_TYPE_OPTIONS.map((type) => (
-								<Radio.Button key={type.value} value={type.value} className="!h-auto">
+								<Radio.Button
+									key={type.value}
+									value={type.value}
+									className="!h-auto"
+								>
 									<div className="flex items-center gap-2 py-1">
 										<span>{type.icon}</span>
 										<span>{t(type.label)}</span>
@@ -168,7 +181,9 @@ function CreateWorkspaceModal({
 								onClick={() => setColor(c)}
 								className={cn(
 									"w-8 h-8 rounded-lg transition-all",
-									color === c ? "ring-2 ring-offset-2 ring-slate-400 scale-110" : "hover:scale-105"
+									color === c
+										? "ring-2 ring-offset-2 ring-slate-400 scale-110"
+										: "hover:scale-105",
 								)}
 								style={{ backgroundColor: c }}
 							/>
@@ -205,32 +220,44 @@ export function WorkspaceSwitcher() {
 
 	const handleCreate = (data: WorkspaceFormData) => {
 		const id = createWorkspace(data);
-		message.success(t("workspaces.create.success", "工作区创建成功", { ns: "workspaces" }));
+		message.success(
+			t("workspaces.create.success", "工作区创建成功", { ns: "workspaces" }),
+		);
 		setDropdownOpen(false);
 	};
 
 	const handleDuplicate = (workspace: Workspace) => {
 		duplicateWorkspace(workspace.id);
-		message.success(t("workspaces.duplicate.success", "工作区已复制", { ns: "workspaces" }));
+		message.success(
+			t("workspaces.duplicate.success", "工作区已复制", { ns: "workspaces" }),
+		);
 	};
 
 	const handleDelete = (workspace: Workspace) => {
 		if (workspace.id === defaultWorkspaceId) {
-			message.error(t("workspaces.delete.cannotDeleteDefault", "不能删除默认工作区"));
+			message.error(
+				t("workspaces.delete.cannotDeleteDefault", "不能删除默认工作区"),
+			);
 			return;
 		}
 
 		Modal.confirm({
-			title: t("workspaces.delete.confirmTitle", "删除工作区", { ns: "workspaces" }),
+			title: t("workspaces.delete.confirmTitle", "删除工作区", {
+				ns: "workspaces",
+			}),
 			content: t(
 				"workspaces.delete.confirmContent",
-				"确定要删除工作区 \"{{name}}\" 吗？此操作不可撤销。",
-				{ name: workspace.name }
+				'确定要删除工作区 "{{name}}" 吗？此操作不可撤销。',
+				{ name: workspace.name },
 			),
 			onOk: () => {
 				const success = deleteWorkspace(workspace.id);
 				if (success) {
-					message.success(t("workspaces.delete.success", "工作区已删除", { ns: "workspaces" }));
+					message.success(
+						t("workspaces.delete.success", "工作区已删除", {
+							ns: "workspaces",
+						}),
+					);
 				}
 			},
 		});
@@ -251,7 +278,9 @@ export function WorkspaceSwitcher() {
 			URL.revokeObjectURL(url);
 			message.success(t("workspaces.export.success", "工作区已导出"));
 		} catch (error) {
-			message.error(t("workspaces.export.error", "导出失败", { ns: "workspaces" }));
+			message.error(
+				t("workspaces.export.error", "导出失败", { ns: "workspaces" }),
+			);
 		}
 	};
 
@@ -276,10 +305,12 @@ export function WorkspaceSwitcher() {
 						}}
 						className="flex items-center gap-2 flex-1 text-left"
 					>
-						<WorkspaceBadge workspace={workspace} size="small" showName={false} />
-						<span className="text-sm text-slate-700 ">
-							{workspace.name}
-						</span>
+						<WorkspaceBadge
+							workspace={workspace}
+							size="small"
+							showName={false}
+						/>
+						<span className="text-sm text-slate-700 ">{workspace.name}</span>
 						{workspace.id === currentWorkspaceId && (
 							<CheckOutlined className="text-blue-500 text-xs ml-2" />
 						)}
@@ -287,7 +318,9 @@ export function WorkspaceSwitcher() {
 
 					{/* 操作按钮 */}
 					<div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-						<Tooltip title={t("workspaces.duplicate", "复制", { ns: "workspaces" })}>
+						<Tooltip
+							title={t("workspaces.duplicate", "复制", { ns: "workspaces" })}
+						>
 							<button
 								onClick={(e) => {
 									e.stopPropagation();
@@ -298,7 +331,9 @@ export function WorkspaceSwitcher() {
 								<CopyOutlined className="text-xs" />
 							</button>
 						</Tooltip>
-						<Tooltip title={t("workspaces.export", "导出", { ns: "workspaces" })}>
+						<Tooltip
+							title={t("workspaces.export", "导出", { ns: "workspaces" })}
+						>
 							<button
 								onClick={(e) => {
 									e.stopPropagation();
@@ -341,7 +376,9 @@ export function WorkspaceSwitcher() {
 					className="flex items-center gap-2 text-blue-600  w-full text-left"
 				>
 					<PlusOutlined />
-					<span>{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}</span>
+					<span>
+						{t("workspaces.create.title", "创建工作区", { ns: "workspaces" })}
+					</span>
 				</button>
 			),
 		},
@@ -357,7 +394,9 @@ export function WorkspaceSwitcher() {
 					className="flex items-center gap-2 text-slate-600  w-full text-left"
 				>
 					<SettingOutlined />
-					<span>{t("workspaces.manage", "管理工作区", { ns: "workspaces" })}</span>
+					<span>
+						{t("workspaces.manage", "管理工作区", { ns: "workspaces" })}
+					</span>
 				</button>
 			),
 		},

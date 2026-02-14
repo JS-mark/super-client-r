@@ -7,12 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import { skillClient } from "../services/skill/skillService";
 import { skillService } from "../services/skillService";
 import { useSkillStore } from "../stores/skillStore";
-import type { Skill } from "../types/skills";
 import type {
 	SkillExecutionResult,
 	SkillManifest,
 	SkillTool,
 } from "../types/electron";
+import type { Skill } from "../types/skills";
 
 export function useSkill() {
 	const [skills, setSkills] = useState<SkillManifest[]>([]);
@@ -149,7 +149,7 @@ export function useSkill() {
 				console.error("Failed to load market skills:", error);
 			}
 		},
-		[fetchMarketSkills]
+		[fetchMarketSkills],
 	);
 
 	// Get skill details from market
@@ -162,7 +162,7 @@ export function useSkill() {
 				return undefined;
 			}
 		},
-		[]
+		[],
 	);
 
 	// Install skill from market
@@ -173,7 +173,7 @@ export function useSkill() {
 				// Install via skill client
 				if (skill.repository || skill.homepage) {
 					const manifest = await skillClient.installSkill(
-						skill.repository || skill.homepage || ""
+						skill.repository || skill.homepage || "",
 					);
 					setSkills((prev) => [...prev, manifest]);
 				}
@@ -185,7 +185,7 @@ export function useSkill() {
 				setLoading(false);
 			}
 		},
-		[installToStore]
+		[installToStore],
 	);
 
 	// Check if skill has update
@@ -196,7 +196,7 @@ export function useSkill() {
 			if (!installed || !market) return false;
 			return market.version !== installed.version;
 		},
-		[installedSkills, marketSkills]
+		[installedSkills, marketSkills],
 	);
 
 	// Update skill
@@ -214,7 +214,7 @@ export function useSkill() {
 				setLoading(false);
 			}
 		},
-		[loadSkills, updateInStore]
+		[loadSkills, updateInStore],
 	);
 
 	// 初始化时加载

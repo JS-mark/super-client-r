@@ -1,5 +1,13 @@
-import { DeleteOutlined, EditOutlined, EyeOutlined, GlobalOutlined, LinkOutlined, ReloadOutlined, SyncOutlined } from "@ant-design/icons";
-import { Button, Card, Modal, Tag, Tooltip, message } from "antd";
+import {
+	DeleteOutlined,
+	EditOutlined,
+	EyeOutlined,
+	GlobalOutlined,
+	LinkOutlined,
+	ReloadOutlined,
+	SyncOutlined,
+} from "@ant-design/icons";
+import { Button, Card, Modal, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -76,7 +84,14 @@ export const ThirdPartyMcpCard: React.FC<{
 						loading={testing}
 					/>
 				</Tooltip>,
-				<Tooltip title={server.enabled ? t("actions.disable", { ns: "mcp" }) : t("actions.enable", { ns: "mcp" })} key="toggle">
+				<Tooltip
+					title={
+						server.enabled
+							? t("actions.disable", { ns: "mcp" })
+							: t("actions.enable", { ns: "mcp" })
+					}
+					key="toggle"
+				>
 					<Button
 						size="small"
 						type="text"

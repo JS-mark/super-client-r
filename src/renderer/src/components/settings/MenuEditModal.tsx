@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MenuItemConfig, MenuItemIconType } from "../../types/menu";
-import { IconSelector, ICON_TYPE_OPTIONS } from "./MenuIconConfig";
+import { ICON_TYPE_OPTIONS, IconSelector } from "./MenuIconConfig";
 
 const { useToken } = theme;
 
@@ -142,7 +142,9 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 									: "",
 							)}
 							style={{
-								backgroundColor: editingItem.enabled ? undefined : token.colorBgContainer,
+								backgroundColor: editingItem.enabled
+									? undefined
+									: token.colorBgContainer,
 							}}
 						>
 							{editingItem.iconType === "emoji" && (
@@ -165,7 +167,10 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 							<div className="font-medium" style={{ color: token.colorText }}>
 								{t(editingItem.label, { ns: "menu" })}
 							</div>
-							<div className="text-xs" style={{ color: token.colorTextSecondary }}>
+							<div
+								className="text-xs"
+								style={{ color: token.colorTextSecondary }}
+							>
 								ID: {editingItem.id}
 							</div>
 						</div>
@@ -228,8 +233,12 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 						"rounded-2xl p-4 border-2 transition-all cursor-pointer",
 					)}
 					style={{
-						borderColor: editingItem.enabled ? token.colorSuccess : token.colorBorder,
-						backgroundColor: editingItem.enabled ? token.colorSuccessBg : token.colorBgContainer,
+						borderColor: editingItem.enabled
+							? token.colorSuccess
+							: token.colorBorder,
+						backgroundColor: editingItem.enabled
+							? token.colorSuccessBg
+							: token.colorBgContainer,
 						opacity: editingItem.enabled ? 1 : 0.7,
 					}}
 					onClick={() =>
@@ -243,7 +252,9 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 									"w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
 								)}
 								style={{
-									backgroundColor: editingItem.enabled ? token.colorSuccess : token.colorBgContainer,
+									backgroundColor: editingItem.enabled
+										? token.colorSuccess
+										: token.colorBgContainer,
 									color: editingItem.enabled ? "#fff" : token.colorTextDisabled,
 								}}
 							>
@@ -259,14 +270,17 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 										? t("enabled", "已启用", { ns: "settings" })
 										: t("disabled", "已禁用", { ns: "settings" })}
 								</div>
-								<div className="text-xs" style={{ color: token.colorTextSecondary }}>
+								<div
+									className="text-xs"
+									style={{ color: token.colorTextSecondary }}
+								>
 									{editingItem.enabled
 										? t("menuItemVisible", "在侧边栏中显示", {
-												ns: "settings",
-											})
+											ns: "settings",
+										})
 										: t("menuItemHidden", "已从侧边栏中隐藏", {
-												ns: "settings",
-											})}
+											ns: "settings",
+										})}
 								</div>
 							</div>
 						</div>

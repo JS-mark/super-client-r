@@ -13,11 +13,11 @@ import {
 	Button,
 	Card,
 	List,
+	message,
 	Popconfirm,
 	Tag,
-	theme,
 	Tooltip,
-	message,
+	theme,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,9 +37,7 @@ export function SearchSettings() {
 	>();
 	const [loading, setLoading] = useState(false);
 	const [modalOpen, setModalOpen] = useState(false);
-	const [editingConfig, setEditingConfig] = useState<SearchConfig | null>(
-		null,
-	);
+	const [editingConfig, setEditingConfig] = useState<SearchConfig | null>(null);
 
 	// Load configs
 	const loadConfigs = useCallback(async () => {
@@ -51,8 +49,7 @@ export function SearchSettings() {
 				setDefaultProvider(result.data.defaultProvider);
 			} else {
 				message.error(
-					result.error ||
-						t("search.loadError", "加载搜索配置失败"),
+					result.error || t("search.loadError", "加载搜索配置失败"),
 				);
 			}
 		} catch (error) {
@@ -90,15 +87,10 @@ export function SearchSettings() {
 					);
 					loadConfigs();
 				} else {
-					message.error(
-						result.error ||
-							t("search.deleteError", "删除失败"),
-					);
+					message.error(result.error || t("search.deleteError", "删除失败"));
 				}
 			} catch (error) {
-				message.error(
-					t("search.deleteError", "删除失败", { ns: "settings" }),
-				);
+				message.error(t("search.deleteError", "删除失败", { ns: "settings" }));
 			}
 		},
 		[loadConfigs, t],
@@ -113,14 +105,13 @@ export function SearchSettings() {
 						provider
 							? t("search.setDefaultSuccess", "设置默认成功")
 							: t("search.clearDefaultSuccess", "已取消默认", {
-									ns: "settings",
-								}),
+								ns: "settings",
+							}),
 					);
 					loadConfigs();
 				} else {
 					message.error(
-						result.error ||
-							t("search.setDefaultError", "设置失败"),
+						result.error || t("search.setDefaultError", "设置失败"),
 					);
 				}
 			} catch (error) {
@@ -155,27 +146,24 @@ export function SearchSettings() {
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-3">
 							<div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg font-bold">
-								{getProviderInfo(defaultProvider)?.icon ||
-									"🔍"}
+								{getProviderInfo(defaultProvider)?.icon || "🔍"}
 							</div>
 							<div>
 								<div className="text-sm text-slate-500">
-									{t(
-										"search.currentDefault",
-										"当前默认搜索引擎",
-										{ ns: "settings" },
-									)}
+									{t("search.currentDefault", "当前默认搜索引擎", {
+										ns: "settings",
+									})}
 								</div>
-								<div className="font-semibold text-slate-800" style={{ color: token.colorTextHeading }}>
-									{getProviderInfo(defaultProvider)?.name ||
-										defaultProvider}
+								<div
+									className="font-semibold text-slate-800"
+									style={{ color: token.colorTextHeading }}
+								>
+									{getProviderInfo(defaultProvider)?.name || defaultProvider}
 								</div>
 							</div>
 						</div>
 						<Button
-							icon={
-								<StarFilled className="text-yellow-500" />
-							}
+							icon={<StarFilled className="text-yellow-500" />}
 							onClick={() => handleSetDefault(null)}
 							size="small"
 						>
@@ -216,8 +204,7 @@ export function SearchSettings() {
 					dataSource={configs}
 					renderItem={(config) => {
 						const providerInfo = getProviderInfo(config.provider);
-						const isDefault =
-							config.provider === defaultProvider;
+						const isDefault = config.provider === defaultProvider;
 
 						return (
 							<List.Item
@@ -226,15 +213,10 @@ export function SearchSettings() {
 										key="default"
 										title={
 											isDefault
-												? t(
-														"search.isDefault",
-														"默认",
-													)
-												: t(
-														"search.setAsDefault",
-														"设为默认",
-														{ ns: "settings" },
-													)
+												? t("search.isDefault", "默认")
+												: t("search.setAsDefault", "设为默认", {
+													ns: "settings",
+												})
 										}
 									>
 										<Button
@@ -246,18 +228,10 @@ export function SearchSettings() {
 												)
 											}
 											onClick={() =>
-												handleSetDefault(
-													isDefault
-														? null
-														: config.provider,
-												)
+												handleSetDefault(isDefault ? null : config.provider)
 											}
 											size="small"
-											type={
-												isDefault
-													? "primary"
-													: "default"
-											}
+											type={isDefault ? "primary" : "default"}
 											disabled={isDefault}
 										/>
 									</Tooltip>,
@@ -269,77 +243,51 @@ export function SearchSettings() {
 									>
 										<Button
 											icon={<EditOutlined />}
-											onClick={() =>
-												handleEditConfig(config)
-											}
+											onClick={() => handleEditConfig(config)}
 											size="small"
 										/>
 									</Tooltip>,
 									<Popconfirm
 										key="delete"
-										title={t(
-											"search.confirmDelete",
-											"确定要删除此配置吗？",
-											{ ns: "settings" },
-										)}
-										onConfirm={() =>
-											handleDeleteConfig(config.id)
-										}
+										title={t("search.confirmDelete", "确定要删除此配置吗？", {
+											ns: "settings",
+										})}
+										onConfirm={() => handleDeleteConfig(config.id)}
 										okText={t("confirm", "确定", {
 											ns: "common",
 										})}
-										cancelText={t(
-											"common.cancel",
-											"取消",
-										)}
+										cancelText={t("common.cancel", "取消")}
 									>
 										<Tooltip
 											title={t("delete", "删除", {
 												ns: "common",
 											})}
 										>
-											<Button
-												icon={<DeleteOutlined />}
-												danger
-												size="small"
-											/>
+											<Button icon={<DeleteOutlined />} danger size="small" />
 										</Tooltip>
 									</Popconfirm>,
 								]}
 							>
 								<List.Item.Meta
 									avatar={
-										<div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg" style={{ backgroundColor: token.colorBgContainer }}>
+										<div
+											className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg"
+											style={{ backgroundColor: token.colorBgContainer }}
+										>
 											{providerInfo?.icon || "🔍"}
 										</div>
 									}
 									title={
 										<div className="flex items-center gap-2">
-											<span className="font-medium">
-												{config.name}
-											</span>
+											<span className="font-medium">{config.name}</span>
 											{isDefault && (
-												<Tag
-													color="blue"
-													className="!text-xs"
-												>
-													{t(
-														"search.default",
-														"默认",
-														{ ns: "settings" },
-													)}
+												<Tag color="blue" className="!text-xs">
+													{t("search.default", "默认", { ns: "settings" })}
 												</Tag>
 											)}
 											{!config.enabled && (
-												<Tag
-													color="default"
-													className="!text-xs"
-												>
-													{t(
-														"search.disabled",
-														"已禁用",
-														{ ns: "settings" },
-													)}
+												<Tag color="default" className="!text-xs">
+													{t("search.disabled", "已禁用", { ns: "settings" })}
 												</Tag>
 											)}
 										</div>
@@ -349,8 +297,7 @@ export function SearchSettings() {
 											{providerInfo?.description}
 											{config.apiKey && (
 												<span className="ml-2">
-													<KeyOutlined className="text-xs" />{" "}
-													••••••••
+													<KeyOutlined className="text-xs" /> ••••••••
 												</span>
 											)}
 										</div>

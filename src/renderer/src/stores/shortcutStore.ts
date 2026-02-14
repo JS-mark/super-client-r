@@ -54,9 +54,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "new-chat",
 		name: "新建对话",
-		nameKey: "shortcuts.newChat",
+		nameKey: "newChat",
 		description: "创建一个新的对话",
-		descriptionKey: "shortcuts.newChatDesc",
+		descriptionKey: "newChatDesc",
 		scope: "global",
 		defaultKey: "mod+n",
 		enabled: true,
@@ -64,9 +64,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "quick-search",
 		name: "快速搜索",
-		nameKey: "shortcuts.quickSearch",
+		nameKey: "quickSearch",
 		description: "打开快速搜索面板",
-		descriptionKey: "shortcuts.quickSearchDesc",
+		descriptionKey: "quickSearchDesc",
 		scope: "global",
 		defaultKey: "mod+k",
 		enabled: true,
@@ -74,9 +74,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "toggle-sidebar",
 		name: "切换侧边栏",
-		nameKey: "shortcuts.toggleSidebar",
+		nameKey: "toggleSidebar",
 		description: "显示/隐藏侧边栏",
-		descriptionKey: "shortcuts.toggleSidebarDesc",
+		descriptionKey: "toggleSidebarDesc",
 		scope: "global",
 		defaultKey: "mod+b",
 		enabled: true,
@@ -84,9 +84,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "open-settings",
 		name: "打开设置",
-		nameKey: "shortcuts.openSettings",
+		nameKey: "openSettings",
 		description: "打开设置页面",
-		descriptionKey: "shortcuts.openSettingsDesc",
+		descriptionKey: "openSettingsDesc",
 		scope: "global",
 		defaultKey: "mod+,",
 		enabled: true,
@@ -94,9 +94,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "open-bookmarks",
 		name: "打开收藏",
-		nameKey: "shortcuts.openBookmarks",
+		nameKey: "openBookmarks",
 		description: "打开收藏页面",
-		descriptionKey: "shortcuts.openBookmarksDesc",
+		descriptionKey: "openBookmarksDesc",
 		scope: "global",
 		defaultKey: "mod+shift+b",
 		enabled: true,
@@ -105,9 +105,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "send-message",
 		name: "发送消息",
-		nameKey: "shortcuts.sendMessage",
+		nameKey: "sendMessage",
 		description: "发送当前输入的消息",
-		descriptionKey: "shortcuts.sendMessageDesc",
+		descriptionKey: "sendMessageDesc",
 		scope: "chat",
 		defaultKey: "enter",
 		enabled: true,
@@ -115,9 +115,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "new-line",
 		name: "换行",
-		nameKey: "shortcuts.newLine",
+		nameKey: "newLine",
 		description: "在输入框中换行",
-		descriptionKey: "shortcuts.newLineDesc",
+		descriptionKey: "newLineDesc",
 		scope: "input",
 		defaultKey: "shift+enter",
 		enabled: true,
@@ -125,9 +125,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "clear-chat",
 		name: "清空对话",
-		nameKey: "shortcuts.clearChat",
+		nameKey: "clearChat",
 		description: "清空当前对话内容",
-		descriptionKey: "shortcuts.clearChatDesc",
+		descriptionKey: "clearChatDesc",
 		scope: "chat",
 		defaultKey: "mod+shift+k",
 		enabled: true,
@@ -135,9 +135,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "focus-input",
 		name: "聚焦输入框",
-		nameKey: "shortcuts.focusInput",
+		nameKey: "focusInput",
 		description: "将焦点移动到输入框",
-		descriptionKey: "shortcuts.focusInputDesc",
+		descriptionKey: "focusInputDesc",
 		scope: "chat",
 		defaultKey: "mod+i",
 		enabled: true,
@@ -146,9 +146,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "go-to-chat",
 		name: "前往对话",
-		nameKey: "shortcuts.goToChat",
+		nameKey: "goToChat",
 		description: "导航到对话页面",
-		descriptionKey: "shortcuts.goToChatDesc",
+		descriptionKey: "goToChatDesc",
 		scope: "navigation",
 		defaultKey: "mod+1",
 		enabled: true,
@@ -156,9 +156,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "go-to-models",
 		name: "前往模型",
-		nameKey: "shortcuts.goToModels",
+		nameKey: "goToModels",
 		description: "导航到模型页面",
-		descriptionKey: "shortcuts.goToModelsDesc",
+		descriptionKey: "goToModelsDesc",
 		scope: "navigation",
 		defaultKey: "mod+2",
 		enabled: true,
@@ -166,9 +166,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "go-to-skills",
 		name: "前往技能",
-		nameKey: "shortcuts.goToSkills",
+		nameKey: "goToSkills",
 		description: "导航到技能页面",
-		descriptionKey: "shortcuts.goToSkillsDesc",
+		descriptionKey: "goToSkillsDesc",
 		scope: "navigation",
 		defaultKey: "mod+3",
 		enabled: true,
@@ -176,9 +176,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "go-to-plugins",
 		name: "前往插件",
-		nameKey: "shortcuts.goToPlugins",
+		nameKey: "goToPlugins",
 		description: "导航到插件页面",
-		descriptionKey: "shortcuts.goToPluginsDesc",
+		descriptionKey: "goToPluginsDesc",
 		scope: "navigation",
 		defaultKey: "mod+4",
 		enabled: true,
@@ -186,9 +186,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	{
 		id: "go-to-bookmarks",
 		name: "前往收藏",
-		nameKey: "shortcuts.goToBookmarks",
+		nameKey: "goToBookmarks",
 		description: "导航到收藏页面",
-		descriptionKey: "shortcuts.goToBookmarksDesc",
+		descriptionKey: "goToBookmarksDesc",
 		scope: "navigation",
 		defaultKey: "mod+5",
 		enabled: true,
@@ -360,9 +360,45 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			name: "shortcut-storage",
 			partialize: (state) => ({ shortcuts: state.shortcuts }),
 			onRehydrateStorage: () => (state) => {
-				// 确保有默认快捷键
-				if (state && state.shortcuts.length === 0) {
+				if (!state) return;
+
+				if (state.shortcuts.length === 0) {
+					// No persisted shortcuts — initialize all defaults
 					state.initDefaultShortcuts();
+				} else {
+					// Build a map of defaults keyed by id for quick lookup
+					const defaultsById = new Map(
+						DEFAULT_SHORTCUTS.map((d) => [d.id, d]),
+					);
+
+					// Migrate persisted shortcuts: sync nameKey/descriptionKey
+					// from defaults and strip legacy "shortcuts." prefix
+					const migrated = state.shortcuts.map((s) => {
+						const def = defaultsById.get(s.id);
+						if (def) {
+							return {
+								...s,
+								nameKey: def.nameKey,
+								descriptionKey: def.descriptionKey,
+							};
+						}
+						// Legacy shortcut with "shortcuts." prefix
+						return {
+							...s,
+							nameKey: s.nameKey.replace(/^shortcuts\./, ""),
+							descriptionKey: s.descriptionKey.replace(/^shortcuts\./, ""),
+						};
+					});
+
+					// Merge any new defaults that were added since last persist
+					const existingIds = new Set(migrated.map((s) => s.id));
+					const missing = DEFAULT_SHORTCUTS.filter(
+						(d) => !existingIds.has(d.id),
+					).map((d) => ({ ...d, currentKey: d.defaultKey }));
+
+					useShortcutStore.setState({
+						shortcuts: [...migrated, ...missing],
+					});
 				}
 			},
 		}

@@ -7,11 +7,9 @@ import { useCallback, useEffect, useState } from "react";
 import { mcpClient } from "../services/mcp/mcpService";
 import { useMcpStore } from "../stores/mcpStore";
 import type {
-	McpServerConfig,
-	McpServerStatus,
-	McpTool,
-	BuiltinMcpDefinition,
 	McpMarketItem,
+	McpServerConfig,
+	McpTool,
 } from "../types/electron";
 
 export function useMcp() {
@@ -192,7 +190,11 @@ export function useMcp() {
 
 	// 调用工具
 	const callTool = useCallback(
-		async (serverId: string, toolName: string, args: Record<string, unknown>) => {
+		async (
+			serverId: string,
+			toolName: string,
+			args: Record<string, unknown>,
+		) => {
 			try {
 				return await mcpClient.callTool(serverId, toolName, args);
 			} catch (error: any) {
@@ -234,7 +236,10 @@ export function useMcp() {
 		async (definitionId: string, config?: Record<string, unknown>) => {
 			setLoading(true);
 			try {
-				const serverConfig = await mcpClient.createBuiltinConfig(definitionId, config);
+				const serverConfig = await mcpClient.createBuiltinConfig(
+					definitionId,
+					config,
+				);
 				await mcpClient.addServer(serverConfig);
 				addToStore({
 					...serverConfig,
@@ -383,11 +388,18 @@ export function useMcp() {
 	const installFromMarket = useCallback(
 		async (
 			marketItem: McpMarketItem,
-			customConfig?: { name?: string; env?: Record<string, string>; url?: string },
+			customConfig?: {
+				name?: string;
+				env?: Record<string, string>;
+				url?: string;
+			},
 		) => {
 			setLoading(true);
 			try {
-				const config = await mcpClient.installFromMarket(marketItem, customConfig);
+				const config = await mcpClient.installFromMarket(
+					marketItem,
+					customConfig,
+				);
 				addToStore({
 					...config,
 					status: "disconnected",

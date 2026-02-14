@@ -37,8 +37,6 @@ import { logger } from "./utils/logger";
 // 生产环境启用沙箱以提高安全性
 if (!app.isPackaged) {
 	app.commandLine.appendSwitch("no-sandbox");
-	// 启用远程调试端口，允许通过 Chrome 浏览器连接使用 React DevTools
-	app.commandLine.appendSwitch("remote-debugging-port", "9223");
 }
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-software-rasterizer");
@@ -448,13 +446,6 @@ app.whenReady().then(async () => {
 	createFloatingWindow();
 	createTray();
 	createMenu();
-
-	// 开发环境启动 React DevTools 独立应用
-	if (!app.isPackaged) {
-		logger.info("[Dev] React DevTools can be accessed via:");
-		logger.info("[Dev] 1. Chrome remote debugging: http://localhost:9223");
-		logger.info("[Dev] 2. Standalone React DevTools: npx react-devtools");
-	}
 
 	// 根据设置决定是否显示悬浮窗
 	const floatWidgetEnabled = storeManager.getConfig("floatWidgetEnabled");

@@ -7,11 +7,12 @@ import {
 	SettingOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Dropdown, Layout, type MenuProps, theme, Tooltip } from "antd";
+import { Dropdown, Layout, type MenuProps, Tooltip, theme } from "antd";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAppShortcuts } from "../../hooks/useAppShortcuts";
 import { cn } from "../../lib/utils";
 import { type AppInfo, appService } from "../../services/appService";
 import { useMenuStore } from "../../stores/menuStore";
@@ -78,6 +79,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const navigate = useNavigate();
 	const location = useLocation();
 	const { token } = useToken();
+
+	// Wire up global keyboard shortcuts
+	useAppShortcuts();
 
 	// 从 store 获取菜单配置
 	const menuItems = useMenuStore((state) => state.items);
@@ -219,8 +223,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 									>
 										<span
 											className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSelected
-												? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-												: "hover:bg-slate-700/50"
+													? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
+													: "hover:bg-slate-700/50"
 												}`}
 										>
 											{renderMenuItemIcon(item)}
@@ -245,8 +249,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 							>
 								<span
 									className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSettingsSelected
-										? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-										: "hover:bg-slate-700/50"
+											? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
+											: "hover:bg-slate-700/50"
 										}`}
 								>
 									<SettingOutlined className="text-xl" />
@@ -264,10 +268,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 				{/* 内容区域 */}
 				<Content className="flex-1 overflow-auto">
 					<div
-						className={cn(
-							"h-full",
-							"animate-fade-in",
-						)}
+						className={cn("h-full", "animate-fade-in")}
 						style={{ background: token.colorBgContainer }}
 					>
 						{children}

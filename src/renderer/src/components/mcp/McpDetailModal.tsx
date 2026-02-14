@@ -1,5 +1,10 @@
-import { CloudDownloadOutlined, DeleteOutlined, DownloadOutlined, StarFilled } from "@ant-design/icons";
-import { Button, Modal, Tag, message } from "antd";
+import {
+	CloudDownloadOutlined,
+	DeleteOutlined,
+	DownloadOutlined,
+	StarFilled,
+} from "@ant-design/icons";
+import { Button, Modal, message, Tag } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";

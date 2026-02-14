@@ -1,3 +1,4 @@
+import { inspectorServer } from "@react-dev-inspector/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
@@ -33,7 +34,7 @@ export default defineConfig({
 				"@": resolve("src/renderer/src"),
 			},
 		},
-		plugins: [react(), tailwindcss()],
+		plugins: [react(), tailwindcss(), inspectorServer()],
 		build: {
 			minify: false,
 		},

@@ -9,7 +9,7 @@ import {
 	MoreOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Dropdown, Tag, Tooltip } from "antd";
+import { Button, Card, Dropdown, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import {
@@ -23,11 +23,11 @@ const WORKSPACE_TYPE_OPTIONS: {
 	label: string;
 	icon: string;
 }[] = [
-	{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
-	{ value: "work", label: "workspaces.type.work", icon: "💼" },
-	{ value: "project", label: "workspaces.type.project", icon: "📁" },
-	{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
-];
+		{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
+		{ value: "work", label: "workspaces.type.work", icon: "💼" },
+		{ value: "project", label: "workspaces.type.project", icon: "📁" },
+		{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
+	];
 
 export { WORKSPACE_TYPE_OPTIONS };
 

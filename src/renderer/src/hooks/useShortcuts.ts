@@ -1,6 +1,10 @@
-import { useEffect, useCallback, useRef } from "react";
-import { useShortcutStore, getShortcutFromEvent, normalizeShortcut } from "../stores/shortcutStore";
+import { useCallback, useEffect, useRef } from "react";
 import type { ShortcutScope } from "../stores/shortcutStore";
+import {
+	getShortcutFromEvent,
+	normalizeShortcut,
+	useShortcutStore,
+} from "../stores/shortcutStore";
 
 // 快捷键处理器类型
 type ShortcutHandler = (event: KeyboardEvent) => void | boolean;
@@ -11,7 +15,12 @@ interface ShortcutHandlers {
 }
 
 // 作用域优先级（高优先级可以覆盖低优先级）
-const SCOPE_PRIORITY: ShortcutScope[] = ["input", "chat", "navigation", "global"];
+const SCOPE_PRIORITY: ShortcutScope[] = [
+	"input",
+	"chat",
+	"navigation",
+	"global",
+];
 
 // 检查元素是否可输入
 function isInputElement(element: HTMLElement): boolean {
@@ -40,9 +49,10 @@ function getElementScope(element: HTMLElement): ShortcutScope {
  */
 export function useGlobalShortcuts(
 	handlers: ShortcutHandlers,
-	activeScope: ShortcutScope = "global"
+	activeScope: ShortcutScope = "global",
 ) {
-	const { shortcuts, isRecording, recordingShortcutId, stopRecording } = useShortcutStore();
+	const { shortcuts, isRecording, recordingShortcutId, stopRecording } =
+		useShortcutStore();
 	const handlersRef = useRef(handlers);
 
 	// 保持处理器引用最新
@@ -62,12 +72,17 @@ export function useGlobalShortcuts(
 					// 检查冲突
 					const conflict = checkConflict(shortcutKey, recordingShortcutId);
 					if (conflict) {
-						// 触发冲突事件，让 UI 处理
+						// 触发冲突事件，让 UI 显示警告
 						window.dispatchEvent(
 							new CustomEvent("shortcut-conflict", {
-								detail: { shortcutId: recordingShortcutId, conflictWith: conflict },
-							})
+								detail: {
+									shortcutId: recordingShortcutId,
+									conflictWith: conflict,
+								},
+							}),
 						);
+						// 不保存冲突的快捷键，保持录制状态让用户重试
+						return;
 					}
 
 					updateShortcut(recordingShortcutId, shortcutKey);
@@ -94,36 +109,29 @@ export function useGlobalShortcuts(
 			const elementScope = getElementScope(target);
 			const shortcutScope = matchedShortcut.scope;
 
-			// 全局快捷键总是生效
-			if (shortcutScope === "global") {
-				const handler = handlersRef.current[matchedShortcut.id];
-				if (handler) {
-					const result = handler(event);
-					if (result !== false) {
-						event.preventDefault();
-					}
-				}
-				return;
+			// global 和 navigation 快捷键总是生效（不受 activeScope 限制）
+			const alwaysActive = shortcutScope === "global" || shortcutScope === "navigation";
+
+			// 其他作用域（chat、input）需要与 activeScope 匹配
+			const scopeMatches = alwaysActive || shortcutScope === activeScope;
+
+			if (!scopeMatches) return;
+
+			// 输入框中的快捷键需要特殊处理
+			if (elementScope === "input" && !alwaysActive) {
+				// 只允许 input 作用域的快捷键在输入框中触发
+				if (shortcutScope !== "input") return;
 			}
 
-			// 检查当前作用域是否匹配
-			if (shortcutScope === activeScope) {
-				// 输入框中的快捷键需要特殊处理
-				if (elementScope === "input") {
-					// 只允许 input 作用域的快捷键在输入框中触发
-					if (shortcutScope !== "input") return;
-				}
-
-				const handler = handlersRef.current[matchedShortcut.id];
-				if (handler) {
-					const result = handler(event);
-					if (result !== false) {
-						event.preventDefault();
-					}
+			const handler = handlersRef.current[matchedShortcut.id];
+			if (handler) {
+				const result = handler(event);
+				if (result !== false) {
+					event.preventDefault();
 				}
 			}
 		},
-		[shortcuts, isRecording, recordingShortcutId, stopRecording, activeScope]
+		[shortcuts, isRecording, recordingShortcutId, stopRecording, activeScope],
 	);
 
 	useEffect(() => {
@@ -139,7 +147,8 @@ export function useGlobalShortcuts(
  * @param onRecord 录制完成回调
  */
 export function useShortcutRecorder(onRecord?: (key: string) => void) {
-	const { isRecording, recordingShortcutId, startRecording, stopRecording } = useShortcutStore();
+	const { isRecording, recordingShortcutId, startRecording, stopRecording } =
+		useShortcutStore();
 	const onRecordRef = useRef(onRecord);
 
 	useEffect(() => {
@@ -150,7 +159,7 @@ export function useShortcutRecorder(onRecord?: (key: string) => void) {
 		(shortcutId: string) => {
 			startRecording(shortcutId);
 		},
-		[startRecording]
+		[startRecording],
 	);
 
 	const stop = useCallback(() => {
