@@ -65,9 +65,6 @@ importers:
       koa-proxies:
         specifier: ^0.12.4
         version: 0.12.4(koa@3.1.1)
-      koa-router:
-        specifier: ^14.0.0
-        version: 14.0.0
       koa-swagger-decorator:
         specifier: ^1.8.7
         version: 1.8.7(@types/koa@3.0.1)
@@ -3554,11 +3551,12 @@ packages:
 
   glob@10.5.0:
     resolution: {integrity: sha512-DfXN8DfhJ7NH3Oe7cFmu3NCu1wKbkReJ8TorzSAFbSKrlNaQSKfIzqYqVY8zlbs2NLBbWpRiU52GX2PbaBVNkg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   global-agent@3.0.0:
     resolution: {integrity: sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q==}
@@ -3974,11 +3972,6 @@ packages:
     resolution: {integrity: sha512-xxrEtN0e7s7/gNRoOMUltCbuIaCWqTQUTZNWQqet/8MoxSW0hG422lx2Al9FfYO3nCeA+b5c5/YmILRzavivDA==}
     peerDependencies:
       koa: '>=2'
-
-  koa-router@14.0.0:
-    resolution: {integrity: sha512-Ue8f/PRsLLNm6b7y+eS6xkqvsG2xH11d2VB1HPcfdfW6p5736kCHf2pXaq8q9XPQ01x0Dk7V/P5Il9pe+tGTxA==}
-    engines: {node: '>= 20'}
-    deprecated: 'Please use @koa/router instead, starting from v9! '
 
   koa-swagger-decorator@1.8.7:
     resolution: {integrity: sha512-Oy5ikdMcpEVOvNs+8WRyhq0FjetPMtAcb1gsLAWJfsJ4bMoJk8qhIYkV4zzyTuLaJ5IlM28pkqqFO8lMtRcplw==}
@@ -5198,11 +5191,12 @@ packages:
   tar@6.2.1:
     resolution: {integrity: sha512-DZ4yORTwrbTj/7MZYq2w+/ZFdI6OZ/f9SFHR+71gIVUZhOQPHzVCLpvRnPgyaMpfWxxk/4ONva3GQSyNIKRv6A==}
     engines: {node: '>=10'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exhorbitant rates) by contacting i@izs.me
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   tar@7.5.6:
     resolution: {integrity: sha512-xqUeu2JAIJpXyvskvU3uvQW8PAmHrtXp2KDuMJwQqW8Sqq0CaZBAQ+dKS3RBXVhU4wC5NjAdKrmh84241gO9cA==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   temp-file@3.4.0:
     resolution: {integrity: sha512-C5tjlC/HCtVUOi3KWVokd4vHVViOmGjtLwIh4MuzPo/nMYTV/p1urt3RnMz2IWXDdKEGJH3k5+KPxtqRsUYGtg==}
@@ -9821,15 +9815,6 @@ snapshots:
       uuid: 8.3.2
     transitivePeerDependencies:
       - debug
-
-  koa-router@14.0.0:
-    dependencies:
-      debug: 4.4.3
-      http-errors: 2.0.1
-      koa-compose: 4.1.0
-      path-to-regexp: 8.3.0
-    transitivePeerDependencies:
-      - supports-color
 
   koa-swagger-decorator@1.8.7(@types/koa@3.0.1):
     dependencies:
