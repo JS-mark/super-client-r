@@ -1,33 +1,45 @@
 import {
 	ApiOutlined,
 	BugOutlined,
+	CloudOutlined,
 	GlobalOutlined,
 	InfoCircleOutlined,
 	KeyOutlined,
 	MenuOutlined,
 	SearchOutlined,
 	SettingOutlined,
+	ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Card, Tabs, theme } from "antd";
+import { Card, theme } from "antd";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const { useToken } = theme;
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { AboutModal } from "../components/AboutModal";
 import { MainLayout } from "../components/layout/MainLayout";
+import { cn } from "../lib/utils";
 import { McpConfig } from "../components/models/McpConfig";
+import { ModelList } from "../components/models/ModelList";
 import { AboutSection } from "../components/settings/AboutSection";
 import { ApiKeysConfig } from "../components/settings/ApiKeysConfig";
 import { ApiServiceSettings } from "../components/settings/ApiServiceSettings";
 import { DebugTools } from "../components/settings/DebugTools";
+import { DefaultModelSettings } from "../components/settings/DefaultModelSettings";
 import { GeneralSettings } from "../components/settings/GeneralSettings";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
 import { useTitle } from "../hooks/useTitle";
 import { type AppInfo, appService } from "../services/appService";
+
+interface SettingsTab {
+	key: string;
+	icon: React.ReactNode;
+	label: string;
+	content: React.ReactNode;
+}
 
 const Settings: React.FC = () => {
 	const { t } = useTranslation();
@@ -80,75 +92,178 @@ const Settings: React.FC = () => {
 		};
 	}, []);
 
-	const items = [
-		{
-			key: "general",
-			label: <TabLabel icon={<SettingOutlined />} text={t("general", "General", { ns: "settings" })} />,
-			children: <GeneralSettings />,
-		},
-		{
-			key: "menu",
-			label: <TabLabel icon={<MenuOutlined />} text={t("menuConfig", "Menu", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><MenuSettingsWithModal /></Card>,
-		},
-		{
-			key: "mcp",
-			label: <TabLabel icon={<ApiOutlined />} text="MCP Services" />,
-			children: <McpConfig />,
-		},
-		{
-			key: "api",
-			label: <TabLabel icon={<GlobalOutlined />} text={t("apiService", "API Service", { ns: "settings" })} />,
-			children: <ApiServiceSettings />,
-		},
-		{
-			key: "search",
-			label: <TabLabel icon={<SearchOutlined />} text={t("search.title", "Search", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><SearchSettings /></Card>,
-		},
-		{
-			key: "apikeys",
-			label: <TabLabel icon={<KeyOutlined />} text={t("apiKeys", "API Keys", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><ApiKeysConfig /></Card>,
-		},
-		{
-			key: "shortcuts",
-			label: <TabLabel icon={<KeyOutlined />} text={t("shortcuts", "Shortcuts", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><ShortcutSettings /></Card>,
-		},
-		{
-			key: "debug",
-			label: <TabLabel icon={<BugOutlined />} text={t("debug", "Debug", { ns: "settings" })} />,
-			children: <Card className="!border-0 !shadow-none !bg-transparent"><DebugTools /></Card>,
-		},
-		{
-			key: "about",
-			label: <TabLabel icon={<InfoCircleOutlined />} text={t("aboutTitle", "About", { ns: "settings" })} />,
-			children: (
-				<AboutSection
-					appInfo={appInfo}
-					onCheckUpdate={async () => {
-						const result = await appService.checkUpdate();
-						return result;
-					}}
-					onOpenGitHub={() => window.open("https://github.com/example/super-client", "_blank")}
-					onReportBug={() => window.open("https://github.com/example/super-client/issues", "_blank")}
-					onOpenLicense={() => window.open("https://github.com/example/super-client/blob/main/LICENSE", "_blank")}
-					onOpenModal={() => setAboutModalOpen(true)}
-				/>
-			),
-		},
-	];
+	const handleTabClick = useCallback((key: string) => {
+		setActiveTab(key);
+	}, []);
+
+	const tabs: SettingsTab[] = useMemo(
+		() => [
+			{
+				key: "general",
+				icon: <SettingOutlined />,
+				label: t("general", "General", { ns: "settings" }),
+				content: <GeneralSettings />,
+			},
+			{
+				key: "menu",
+				icon: <MenuOutlined />,
+				label: t("menuConfig", "Menu", { ns: "settings" }),
+				content: (
+					<Card className="!border-0 !shadow-none !bg-transparent">
+						<MenuSettingsWithModal />
+					</Card>
+				),
+			},
+			{
+				key: "providers",
+				icon: <CloudOutlined />,
+				label: t("providers", "Providers", { ns: "settings" }),
+				content: <ModelList />,
+			},
+			{
+				key: "defaultModel",
+				icon: <ThunderboltOutlined />,
+				label: t("defaultModel", "Default Model", { ns: "settings" }),
+				content: <DefaultModelSettings />,
+			},
+			{
+				key: "mcp",
+				icon: <ApiOutlined />,
+				label: t("mcpServices", "MCP Services", { ns: "settings" }),
+				content: <McpConfig />,
+			},
+			{
+				key: "api",
+				icon: <GlobalOutlined />,
+				label: t("apiService", "API Service", { ns: "settings" }),
+				content: <ApiServiceSettings />,
+			},
+			{
+				key: "search",
+				icon: <SearchOutlined />,
+				label: t("search.title", "Search", { ns: "settings" }),
+				content: <SearchSettings />,
+			},
+			{
+				key: "apikeys",
+				icon: <KeyOutlined />,
+				label: t("apiKeys", "API Keys", { ns: "settings" }),
+				content: (
+					<Card className="!border-0 !shadow-none !bg-transparent">
+						<ApiKeysConfig />
+					</Card>
+				),
+			},
+			{
+				key: "shortcuts",
+				icon: <KeyOutlined />,
+				label: t("shortcuts", "Shortcuts", { ns: "settings" }),
+				content: (
+					<Card className="!border-0 !shadow-none !bg-transparent">
+						<ShortcutSettings />
+					</Card>
+				),
+			},
+			{
+				key: "debug",
+				icon: <BugOutlined />,
+				label: t("debug", "Debug", { ns: "settings" }),
+				content: (
+					<Card className="!border-0 !shadow-none !bg-transparent">
+						<DebugTools />
+					</Card>
+				),
+			},
+			{
+				key: "about",
+				icon: <InfoCircleOutlined />,
+				label: t("aboutTitle", "About", { ns: "settings" }),
+				content: (
+					<AboutSection
+						appInfo={appInfo}
+						onCheckUpdate={async () => {
+							const result = await appService.checkUpdate();
+							return result;
+						}}
+						onOpenGitHub={() =>
+							window.open(
+								"https://github.com/example/super-client",
+								"_blank",
+							)
+						}
+						onReportBug={() =>
+							window.open(
+								"https://github.com/example/super-client/issues",
+								"_blank",
+							)
+						}
+						onOpenLicense={() =>
+							window.open(
+								"https://github.com/example/super-client/blob/main/LICENSE",
+								"_blank",
+							)
+						}
+						onOpenModal={() => setAboutModalOpen(true)}
+					/>
+				),
+			},
+		],
+		[t, appInfo],
+	);
+
+	const activeContent = tabs.find((tab) => tab.key === activeTab)?.content;
 
 	return (
 		<MainLayout>
-			<Tabs
-				activeKey={activeTab}
-				onChange={setActiveTab}
-				items={items}
-				tabPlacement="start"
-				className="h-full !p-6 settings-tabs"
-			/>
+			<div className="h-full flex overflow-hidden">
+				{/* 左侧标签栏 - 固定不滚动 */}
+				<nav
+					className="w-[200px] flex-none border-r p-4 overflow-y-auto"
+					style={{ borderColor: token.colorBorderSecondary }}
+				>
+					<div className="flex flex-col gap-1">
+						{tabs.map((tab) => (
+							<button
+								key={tab.key}
+								type="button"
+								onClick={() => handleTabClick(tab.key)}
+								className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 text-left w-full"
+								style={
+									activeTab === tab.key
+										? {
+												backgroundColor: token.colorPrimaryBg,
+												color: token.colorPrimary,
+											}
+										: {
+												color: token.colorTextSecondary,
+											}
+								}
+								onMouseEnter={(e) => {
+									if (activeTab !== tab.key) {
+										e.currentTarget.style.background = token.colorFillTertiary;
+										e.currentTarget.style.color = token.colorText;
+									}
+								}}
+								onMouseLeave={(e) => {
+									if (activeTab !== tab.key) {
+										e.currentTarget.style.background = "";
+										e.currentTarget.style.color = token.colorTextSecondary;
+									}
+								}}
+							>
+								<span className="text-base">{tab.icon}</span>
+								{tab.label}
+							</button>
+						))}
+					</div>
+				</nav>
+
+				{/* 右侧内容区 - 独立滚动 */}
+				<div className="flex-1 overflow-y-auto p-6">
+					{activeContent}
+				</div>
+			</div>
+
 			<AboutModal
 				open={aboutModalOpen}
 				onClose={() => setAboutModalOpen(false)}
@@ -157,14 +272,5 @@ const Settings: React.FC = () => {
 		</MainLayout>
 	);
 };
-
-function TabLabel({ icon, text }: { icon: React.ReactNode; text: string }) {
-	return (
-		<span className="flex items-center gap-2 font-medium">
-			{icon}
-			{text}
-		</span>
-	);
-}
 
 export default Settings;
