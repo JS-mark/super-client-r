@@ -6,7 +6,6 @@ import ErrorPage from "./pages/Error";
 import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
 import McpMarket from "./pages/McpMarket";
-import Models from "./pages/Models";
 import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
@@ -32,12 +31,6 @@ export const router = createHashRouter([
 		element: <Chat />,
 		errorElement: <ErrorPage />,
 		handle: { title: "AI 聊天" },
-	},
-	{
-		path: "/models",
-		element: <Models />,
-		errorElement: <ErrorPage />,
-		handle: { title: "模型管理" },
 	},
 	{
 		path: "/skills",

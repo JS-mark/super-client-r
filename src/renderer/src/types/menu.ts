@@ -51,15 +51,6 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			action: "navigate",
 		},
 		{
-			id: "models",
-			label: "models",
-			path: "/models",
-			iconType: "default",
-			iconContent: "AppstoreOutlined",
-			enabled: true,
-			action: "navigate",
-		},
-		{
 			id: "skills",
 			label: "skills",
 			path: "/skills",

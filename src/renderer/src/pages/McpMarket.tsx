@@ -1,5 +1,6 @@
 import {
 	ApiOutlined,
+	ExportOutlined,
 	FilterOutlined,
 	GlobalOutlined,
 	LinkOutlined,
@@ -7,9 +8,11 @@ import {
 	SaveOutlined,
 	SearchOutlined,
 	ShopOutlined,
+	StarFilled,
 } from "@ant-design/icons";
 import {
 	Button,
+	Card,
 	Dropdown,
 	Empty,
 	Form,
@@ -18,7 +21,9 @@ import {
 	Pagination,
 	Select,
 	Spin,
+	Tag,
 	Tabs,
+	Tooltip,
 	message,
 	theme,
 } from "antd";
@@ -31,6 +36,11 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { InstalledMcpCard } from "../components/mcp/InstalledMcpCard";
 import { McpDetailModal } from "../components/mcp/McpDetailModal";
 import { McpMarketCard } from "../components/mcp/McpMarketCard";
+import {
+	MCP_LOGO_PATHS,
+	MCP_MARKET_SOURCES,
+	type McpMarketSource,
+} from "../components/mcp/McpMarketSources";
 import { ThirdPartyMcpCard } from "../components/mcp/ThirdPartyMcpCard";
 import { useTitle } from "../hooks/useTitle";
 import { useMcpStore } from "../stores/mcpStore";
@@ -210,6 +220,11 @@ const McpMarket: React.FC = () => {
 					}}
 				/>
 			),
+		},
+		{
+			key: "sources",
+			label: t("tabs.sources", { ns: "mcp" }),
+			children: <MarketSourcesTab />,
 		},
 		{
 			key: "third-party",
@@ -419,6 +434,91 @@ function InstalledTab({
 					))}
 				</div>
 			)}
+		</div>
+	);
+}
+
+function McpLogoIcon({ size = 24, className }: { size?: number; className?: string }) {
+	return (
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 180 180"
+			fill="none"
+			className={className}
+			style={{ flexShrink: 0 }}
+		>
+			{MCP_LOGO_PATHS.map((d, i) => (
+				<path
+					key={i}
+					d={d}
+					stroke="currentColor"
+					strokeWidth="11.07"
+					strokeLinecap="round"
+					fill="none"
+				/>
+			))}
+		</svg>
+	);
+}
+
+function MarketSourcesTab() {
+	const { t, i18n } = useTranslation();
+	const { token } = useToken();
+	const isZh = i18n.language?.startsWith("zh");
+
+	const handleOpenSource = useCallback((source: McpMarketSource) => {
+		window.open(source.url, "_blank");
+	}, []);
+
+	return (
+		<div className="h-full overflow-y-auto pr-2">
+			<div className="mb-4">
+				<p style={{ color: token.colorTextSecondary }}>
+					{t("sourcesDescription", { ns: "mcp" })}
+				</p>
+			</div>
+			<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pb-4">
+				{MCP_MARKET_SOURCES.map((source) => (
+					<Card
+						key={source.id}
+						hoverable
+						className="cursor-pointer"
+						onClick={() => handleOpenSource(source)}
+					>
+						<div className="flex items-start gap-3">
+							<div
+								className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+								style={{
+									backgroundColor: source.official ? token.colorPrimary : token.colorFillSecondary,
+									color: source.official ? "#fff" : token.colorText,
+								}}
+							>
+								<McpLogoIcon size={22} />
+							</div>
+							<div className="flex-1 min-w-0">
+								<div className="flex items-center gap-2 mb-1">
+									<span className="font-semibold text-sm truncate" style={{ color: token.colorText }}>
+										{isZh ? source.nameZh : source.name}
+									</span>
+									{source.official && (
+										<Tag color="blue" className="!text-xs !px-1 !py-0 !m-0">
+											<StarFilled className="mr-0.5" />
+											{t("sourcesOfficial", { ns: "mcp" })}
+										</Tag>
+									)}
+								</div>
+								<p className="text-xs m-0 line-clamp-2" style={{ color: token.colorTextSecondary }}>
+									{isZh ? source.descriptionZh : source.description}
+								</p>
+							</div>
+							<Tooltip title={t("sourcesBrowse", { ns: "mcp" })}>
+								<ExportOutlined style={{ color: token.colorTextTertiary }} />
+							</Tooltip>
+						</div>
+					</Card>
+				))}
+			</div>
 		</div>
 	);
 }

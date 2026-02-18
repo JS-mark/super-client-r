@@ -2,7 +2,6 @@ import { App as AntdApp, ConfigProvider, theme } from "antd";
 import en_US from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
 import { useEffect, useMemo } from "react";
-import { Inspector } from "react-dev-inspector";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -21,7 +20,10 @@ function App() {
 	// 从 store 获取实际主题
 	const actualTheme = useThemeStore((state) => state.actualTheme);
 	const { i18n } = useTranslation();
-	const antdLocale = useMemo(() => ANTD_LOCALES[i18n.language] || zhCN, [i18n.language]);
+	const antdLocale = useMemo(
+		() => ANTD_LOCALES[i18n.language] || zhCN,
+		[i18n.language],
+	);
 	// 初始化主题
 	useEffect(() => {
 		initSystemThemeDetection();
@@ -146,7 +148,6 @@ function App() {
 			<TitleProvider>
 				<AntdApp className="h-full w-full">
 					<ErrorBoundary>
-						<Inspector />
 						<RouterProvider router={router} />
 					</ErrorBoundary>
 				</AntdApp>

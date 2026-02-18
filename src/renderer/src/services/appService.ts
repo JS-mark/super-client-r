@@ -25,6 +25,7 @@ export interface AppInfo {
 
 export interface UpdateCheckResult {
   updateAvailable: boolean
+  version?: string
   message: string
 }
 
@@ -40,7 +41,7 @@ export const appService = {
   getInfo: () => window.electron.ipc.invoke(APP_CHANNELS.GET_INFO) as Promise<AppInfo>,
   getUserDataPath: () => window.electron.ipc.invoke(APP_CHANNELS.GET_USER_DATA_PATH) as Promise<string>,
   openPath: (path: string) => window.electron.ipc.invoke(APP_CHANNELS.OPEN_PATH, path) as Promise<boolean>,
-  checkUpdate: () => window.electron.ipc.invoke(APP_CHANNELS.CHECK_UPDATE) as Promise<UpdateCheckResult>,
+  checkUpdate: () => window.electron.update.check() as Promise<UpdateCheckResult>,
   quit: () => window.electron.ipc.invoke(APP_CHANNELS.QUIT) as Promise<void>,
   relaunch: () => window.electron.ipc.invoke(APP_CHANNELS.RELAUNCH) as Promise<void>,
   openDevTools: () => window.electron.ipc.invoke(APP_CHANNELS.OPEN_DEV_TOOLS) as Promise<void>,
@@ -49,4 +50,13 @@ export const appService = {
   listLogFiles: () => window.electron.ipc.invoke(APP_CHANNELS.LIST_LOG_FILES) as Promise<LogFileInfo[]>,
   clearLogs: () => window.electron.ipc.invoke(APP_CHANNELS.CLEAR_LOGS) as Promise<boolean>,
   openExternal: (url: string) => window.electron.ipc.invoke(APP_CHANNELS.OPEN_EXTERNAL, url) as Promise<boolean>,
+  // Update methods using typed preload API
+  downloadUpdate: () => window.electron.update.download(),
+  installUpdate: () => window.electron.update.install(),
+  onUpdateChecking: (cb: () => void) => window.electron.update.onChecking(cb),
+  onUpdateAvailable: (cb: (info: unknown) => void) => window.electron.update.onAvailable(cb),
+  onUpdateNotAvailable: (cb: (info: unknown) => void) => window.electron.update.onNotAvailable(cb),
+  onUpdateProgress: (cb: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => window.electron.update.onProgress(cb),
+  onUpdateDownloaded: (cb: (info: unknown) => void) => window.electron.update.onDownloaded(cb),
+  onUpdateError: (cb: (error: string) => void) => window.electron.update.onError(cb),
 }

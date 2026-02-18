@@ -55,7 +55,7 @@ const Home = () => {
   const messages = useChatStore((state) => state.messages);
   const servers = useMcpStore((state) => state.servers);
   const installedSkills = useSkillStore((state) => state.installedSkills);
-  const models = useModelStore((state) => state.models);
+  const getAllEnabledModels = useModelStore((state) => state.getAllEnabledModels);
   const [apiStatus, setApiStatus] = useState<ApiStatus>({
     status: "stopped",
     port: 0,
@@ -76,7 +76,7 @@ const Home = () => {
   const connectedMcpServers = servers.filter(
     (s) => s.status === "connected",
   ).length;
-  const enabledModels = models.filter((m) => m.enabled).length;
+  const enabledModels = getAllEnabledModels().length;
 
   const quickActions: QuickAction[] = [
     {
