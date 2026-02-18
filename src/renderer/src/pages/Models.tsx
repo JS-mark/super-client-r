@@ -4,6 +4,7 @@ import type * as React from "react";
 import { useMemo, useState } from "react";
 
 const { useToken } = theme;
+
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
@@ -76,15 +77,16 @@ const Models: React.FC = () => {
 				tabBarExtraContent={
 					<Button
 						type="primary"
-						size="small"
+						size="medium"
 						icon={<PlusOutlined />}
 						onClick={handleAdd}
-						className="!h-9 !rounded-lg !font-medium"
 					>
-						{activeKey === "1" ? t("add", { ns: "models" }) : t("add", { ns: "mcp" })}
+						{activeKey === "1"
+							? t("addProvider", { ns: "models" })
+							: t("add", { ns: "mcp" })}
 					</Button>
 				}
-				className="!p-6"
+				className="p-6!"
 			/>
 		</MainLayout>
 	);

@@ -1,288 +1,659 @@
 import {
-	ApiOutlined,
+	AppstoreOutlined,
+	CheckCircleOutlined,
+	CloseCircleOutlined,
 	DeleteOutlined,
-	EditOutlined,
+	LinkOutlined,
+	LoadingOutlined,
 	PlusOutlined,
+	SearchOutlined,
+	ThunderboltOutlined,
 } from "@ant-design/icons";
 import {
+	App,
 	Button,
-	Drawer,
+	Divider,
 	Empty,
 	Form,
 	Input,
-	List,
+	Popconfirm,
 	Select,
 	Space,
 	Switch,
 	Tag,
+	Typography,
+	theme,
 } from "antd";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/utils";
+import { modelService } from "../../services/modelService";
 import { useModelStore } from "../../stores/modelStore";
-import type { ModelInfo } from "../../types/models";
+import type {
+	ModelProvider,
+	ModelProviderPreset,
+	ProviderModel,
+} from "../../types/models";
+import { ModelManageModal } from "./ModelManageModal";
+import {
+	getPresetProvider,
+	PRESET_PROVIDERS,
+	type PresetProviderInfo,
+} from "./ModelProviders";
+import { ProviderIcon } from "./ProviderIcon";
+
+const { Text } = Typography;
+const { useToken } = theme;
 
 interface ModelListProps {
 	addTrigger?: number;
 }
 
 export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
-	const { t } = useTranslation();
-	const models = useModelStore((state) => state.models);
-	const addModel = useModelStore((state) => state.addModel);
-	const updateModel = useModelStore((state) => state.updateModel);
-	const removeModel = useModelStore((state) => state.removeModel);
-	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-	const [editingModel, setEditingModel] = useState<ModelInfo | null>(null);
+	const { t, i18n } = useTranslation();
+	const { message } = App.useApp();
+	const { token } = useToken();
+	const providers = useModelStore((s) => s.providers);
+	const loadProviders = useModelStore((s) => s.loadProviders);
+	const saveProvider = useModelStore((s) => s.saveProvider);
+	const deleteProvider = useModelStore((s) => s.deleteProvider);
+
+	const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+		null,
+	);
+	const [isAdding, setIsAdding] = useState(false);
+	const [searchText, setSearchText] = useState("");
 	const [form] = Form.useForm();
+	const [isTesting, setIsTesting] = useState(false);
+	const [testResult, setTestResult] = useState<{
+		success: boolean;
+		latencyMs: number;
+		error?: string;
+	} | null>(null);
+	const [isFetchingModels, setIsFetchingModels] = useState(false);
+	const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
+	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+	const [manageModalOpen, setManageModalOpen] = useState(false);
 
-	const handleAdd = () => {
-		setEditingModel(null);
+	const isZh = i18n.language?.startsWith("zh");
+
+	useEffect(() => {
+		loadProviders();
+	}, [loadProviders]);
+
+	// Auto-select first provider when list loads
+	useEffect(() => {
+		if (providers.length > 0 && !selectedProviderId && !isAdding) {
+			setSelectedProviderId(providers[0].id);
+		}
+	}, [providers, selectedProviderId, isAdding]);
+
+	// Sync form when selecting existing provider
+	const selectedProvider = useMemo(
+		() => providers.find((p) => p.id === selectedProviderId) ?? null,
+		[providers, selectedProviderId],
+	);
+
+	useEffect(() => {
+		if (selectedProvider && !isAdding) {
+			setTestResult(
+				selectedProvider.tested ? { success: true, latencyMs: 0 } : null,
+			);
+			setFetchedModels([]);
+			setSelectedModelIds(
+				selectedProvider.models.filter((m) => m.enabled).map((m) => m.id),
+			);
+			form.setFieldsValue({
+				preset: selectedProvider.preset,
+				name: selectedProvider.name,
+				baseUrl: selectedProvider.baseUrl,
+				apiKey: selectedProvider.apiKey,
+			});
+		}
+	}, [selectedProvider, isAdding, form]);
+
+	const handleAdd = useCallback(() => {
+		setIsAdding(true);
+		setSelectedProviderId(null);
+		setTestResult(null);
+		setFetchedModels([]);
+		setSelectedModelIds([]);
 		form.resetFields();
-		setIsDrawerOpen(true);
-	};
+	}, [form]);
 
-	// Listen for addTrigger changes to open drawer
 	useEffect(() => {
 		if (addTrigger && addTrigger > 0) {
 			handleAdd();
 		}
-	});
+	}, [addTrigger, handleAdd]);
 
-	const handleEdit = (model: ModelInfo) => {
-		setEditingModel(model);
-		form.setFieldsValue({
-			...model,
-			apiKey: model.config.apiKey,
-			baseUrl: model.config.baseUrl,
-		});
-		setIsDrawerOpen(true);
-	};
+	const handleSelectProvider = useCallback(
+		(id: string) => {
+			if (isAdding) {
+				setIsAdding(false);
+			}
+			setSelectedProviderId(id);
+			setTestResult(null);
+			setFetchedModels([]);
+		},
+		[isAdding],
+	);
 
-	const handleSave = (values: any) => {
-		const modelData: ModelInfo = {
-			id: editingModel ? editingModel.id : Date.now().toString(),
-			name: values.name,
-			provider: values.provider,
-			capabilities: [],
-			enabled: true,
-			config: {
-				apiKey: values.apiKey,
+	const handlePresetChange = useCallback(
+		(preset: ModelProviderPreset) => {
+			const info = getPresetProvider(preset);
+			if (info) {
+				form.setFieldsValue({
+					name: isZh ? info.nameZh : info.name,
+					baseUrl: info.defaultBaseUrl,
+				});
+				setTestResult(null);
+				setFetchedModels([]);
+				setSelectedModelIds([]);
+			}
+		},
+		[form, isZh],
+	);
+
+	const handleTestConnection = useCallback(async () => {
+		const baseUrl = form.getFieldValue("baseUrl");
+		const apiKey = form.getFieldValue("apiKey");
+		if (!baseUrl) {
+			message.warning(t("form.baseUrlRequired", { ns: "models" }));
+			return;
+		}
+		setIsTesting(true);
+		setTestResult(null);
+		try {
+			const result = await modelService.testConnection(baseUrl, apiKey || "");
+			if (result.success && result.data) {
+				setTestResult(result.data);
+				if (result.data.success) {
+					message.success(
+						t("messages.testSuccess", { ns: "models" }) +
+						` (${result.data.latencyMs}ms)`,
+					);
+				} else {
+					message.error(
+						result.data.error || t("messages.testError", { ns: "models" }),
+					);
+				}
+			} else {
+				message.error(
+					result.error || t("messages.testError", { ns: "models" }),
+				);
+			}
+		} catch {
+			message.error(t("messages.testError", { ns: "models" }));
+		} finally {
+			setIsTesting(false);
+		}
+	}, [form, message, t]);
+
+	const handleFetchModels = useCallback(async () => {
+		const baseUrl = form.getFieldValue("baseUrl");
+		const apiKey = form.getFieldValue("apiKey");
+		const preset = form.getFieldValue("preset") as ModelProviderPreset | undefined;
+		if (!baseUrl) return;
+		setIsFetchingModels(true);
+		try {
+			const result = await modelService.fetchModels(baseUrl, apiKey || "", preset);
+			if (result.success && result.data) {
+				setFetchedModels(result.data.models);
+				if (selectedModelIds.length === 0) {
+					setSelectedModelIds(result.data.models.map((m) => m.id));
+				}
+			} else {
+				message.error(
+					result.error || t("messages.fetchModelsError", { ns: "models" }),
+				);
+			}
+		} catch {
+			message.error(t("messages.fetchModelsError", { ns: "models" }));
+		} finally {
+			setIsFetchingModels(false);
+		}
+	}, [form, message, t, selectedModelIds.length]);
+
+	const handleSave = useCallback(
+		async (values: {
+			preset: ModelProviderPreset;
+			name: string;
+			baseUrl: string;
+			apiKey: string;
+		}) => {
+			const now = Date.now();
+			const models: ProviderModel[] =
+				fetchedModels.length > 0
+					? fetchedModels.map((m) => ({
+						...m,
+						enabled: selectedModelIds.includes(m.id),
+					}))
+					: (selectedProvider?.models ?? []).map((m) => ({
+						...m,
+						enabled: selectedModelIds.includes(m.id),
+					}));
+
+			const provider: ModelProvider = {
+				id: selectedProvider?.id ?? `provider_${now}`,
+				name: values.name,
+				preset: values.preset,
 				baseUrl: values.baseUrl,
-			},
-		};
+				apiKey: values.apiKey || "",
+				enabled: selectedProvider?.enabled ?? testResult?.success === true,
+				tested: testResult?.success === true,
+				models,
+				createdAt: selectedProvider?.createdAt ?? now,
+				updatedAt: now,
+			};
 
-		if (editingModel) {
-			updateModel(editingModel.id, modelData);
-		} else {
-			addModel(modelData);
-		}
-		setIsDrawerOpen(false);
+			try {
+				await saveProvider(provider);
+				message.success(t("messages.saveSuccess", { ns: "models" }));
+				if (isAdding) {
+					setIsAdding(false);
+					setSelectedProviderId(provider.id);
+				}
+			} catch {
+				message.error(t("messages.saveError", { ns: "models" }));
+			}
+		},
+		[
+			selectedProvider,
+			fetchedModels,
+			selectedModelIds,
+			testResult,
+			saveProvider,
+			message,
+			t,
+			isAdding,
+		],
+	);
+
+	const handleDelete = useCallback(
+		async (id: string) => {
+			try {
+				await deleteProvider(id);
+				message.success(t("messages.deleteSuccess", { ns: "models" }));
+				if (selectedProviderId === id) {
+					setSelectedProviderId(null);
+				}
+			} catch {
+				message.error(t("messages.deleteError", { ns: "models" }));
+			}
+		},
+		[deleteProvider, message, t, selectedProviderId],
+	);
+
+	const handleToggleEnabled = useCallback(
+		async (provider: ModelProvider, checked: boolean) => {
+			if (checked && !provider.tested) {
+				message.warning(t("messages.testFirst", { ns: "models" }));
+				return;
+			}
+			const updated = { ...provider, enabled: checked, updatedAt: Date.now() };
+			await saveProvider(updated);
+		},
+		[saveProvider, message, t],
+	);
+
+	const getPresetName = (preset: ModelProviderPreset) => {
+		const info = getPresetProvider(preset);
+		if (!info) return preset;
+		return isZh ? info.nameZh : info.name;
 	};
 
-	const getProviderColor = (provider: string) => {
-		switch (provider) {
-			case "openai":
-				return "bg-green-100 text-green-700 ";
-			case "anthropic":
-				return "bg-orange-100 text-orange-700 ";
-			case "gemini":
-				return "bg-blue-100 text-blue-700 ";
-			default:
-				return "bg-gray-100 text-gray-700  ";
-		}
-	};
+	// Filter providers by search
+	const filteredProviders = useMemo(() => {
+		if (!searchText.trim()) return providers;
+		const lower = searchText.toLowerCase();
+		return providers.filter(
+			(p) =>
+				p.name.toLowerCase().includes(lower) ||
+				getPresetName(p.preset).toLowerCase().includes(lower),
+		);
+	}, [providers, searchText, getPresetName]);
 
-	const getProviderIcon = () => {
-		return <ApiOutlined className="text-lg" />;
-	};
+	// Current editing context: either a new provider or a selected existing provider
+	const showRightPanel = isAdding || selectedProvider !== null;
 
 	return (
 		<div className="animate-fade-in">
-			{/* Model List */}
-			{models.length === 0 ? (
-				<Empty
-					image={Empty.PRESENTED_IMAGE_SIMPLE}
-					description={
-						<span className="text-gray-500 ">
-							{t("empty", "No models configured yet", { ns: "models" })}
-						</span>
-					}
+			{/* Split Panel Layout */}
+			<div
+				className="flex rounded-xl border overflow-hidden"
+				style={{ minHeight: 520, borderColor: token.colorBorderSecondary }}
+			>
+				{/* Left Panel - Provider List */}
+				<div
+					className="w-64 shrink-0 border-r flex flex-col"
+					style={{ borderColor: token.colorBorderSecondary, background: token.colorBgLayout }}
 				>
-					<Button
-						type="primary"
-						icon={<PlusOutlined />}
-						onClick={handleAdd}
-						className="!h-10 !rounded-lg !font-medium"
+					{/* Search */}
+					<div
+						className="p-3 border-b"
+						style={{ borderColor: token.colorBorderSecondary }}
 					>
-						{t("add", { ns: "models" })}
-					</Button>
-				</Empty>
-			) : (
-				<List
-					className="!bg-white  !rounded-xl !shadow-sm"
-					dataSource={models}
-					renderItem={(item) => (
-						<List.Item
-							key={item.id}
-							className="!px-6 !py-4 !border-b last:!border-b-0 hover:!bg-gray-50  transition-colors"
-							actions={[
-								<Switch
-									key="switch"
-									checked={item.enabled}
-									onChange={(checked) =>
-										updateModel(item.id, { enabled: checked })
-									}
-									className="!ml-2"
-								/>,
-								<Button
-									key="edit"
-									type="text"
-									icon={<EditOutlined />}
-									onClick={() => handleEdit(item)}
-									className="!text-gray-500 hover:!text-blue-500"
-								/>,
-								<Button
-									key="delete"
-									type="text"
-									danger
-									icon={<DeleteOutlined />}
-									onClick={() => removeModel(item.id)}
-									className="!text-gray-500 hover:!text-red-500"
-								/>,
-							]}
-						>
-							<List.Item.Meta
-								avatar={
-									<div
-										className={cn(
-											"w-10 h-10 rounded-lg flex items-center justify-center",
-											getProviderColor(item.provider),
-										)}
-									>
-										{getProviderIcon()}
+						<Input
+							prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+							placeholder={t("searchProvider", { ns: "models" })}
+							value={searchText}
+							onChange={(e) => setSearchText(e.target.value)}
+							allowClear
+							size="small"
+							className="rounded-lg!"
+						/>
+					</div>
+
+					{/* Provider List */}
+					<div className="flex-1 overflow-y-auto">
+						{filteredProviders.map((provider) => {
+							const isSelected = selectedProviderId === provider.id && !isAdding;
+							return (
+								<div
+									key={provider.id}
+									className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-l-2"
+									style={{
+										borderLeftColor: isSelected ? token.colorPrimary : "transparent",
+										background: isSelected ? token.colorPrimaryBg : undefined,
+									}}
+									onMouseEnter={(e) => {
+										if (!isSelected) e.currentTarget.style.background = token.colorFillTertiary;
+									}}
+									onMouseLeave={(e) => {
+										if (!isSelected) e.currentTarget.style.background = "";
+									}}
+									onClick={() => handleSelectProvider(provider.id)}
+								>
+									<ProviderIcon preset={provider.preset} size={32} />
+									<div className="flex-1 min-w-0">
+										<div className="text-sm font-medium truncate" style={{ color: token.colorText }}>
+											{provider.name}
+										</div>
+										<div className="text-xs truncate" style={{ color: token.colorTextSecondary }}>
+											{getPresetName(provider.preset)}
+										</div>
 									</div>
-								}
-								title={
-									<div className="flex items-center gap-2">
-										<span className="font-medium text-gray-900 ">
-											{item.name}
-										</span>
+									{provider.enabled && (
 										<Tag
-											className={cn(
-												"!text-xs !font-medium",
-												getProviderColor(item.provider),
-											)}
+											color="green"
+											className="!text-xs !leading-tight !px-1.5 !py-0 !m-0 !rounded"
 										>
-											{item.provider}
+											ON
 										</Tag>
-										{!item.enabled && (
-											<Tag color="default" className="!text-xs">
-												{t("disabled", "Disabled", { ns: "models" })}
-											</Tag>
-										)}
-									</div>
-								}
-								description={
-									<span className="text-gray-500 ">
-										{item.config.baseUrl || "Default endpoint"}
-									</span>
-								}
+									)}
+								</div>
+							);
+						})}
+
+						{providers.length === 0 && !isAdding && (
+							<div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+								<Empty
+									image={Empty.PRESENTED_IMAGE_SIMPLE}
+									description={
+										<span className="text-xs" style={{ color: token.colorTextSecondary }}>
+											{t("empty", { ns: "models" })}
+										</span>
+									}
+								/>
+							</div>
+						)}
+					</div>
+
+					{/* Add Button */}
+					<div
+						className="p-3 border-t"
+						style={{ borderColor: token.colorBorderSecondary }}
+					>
+						<Button
+							type="dashed"
+							icon={<PlusOutlined />}
+							onClick={handleAdd}
+							block
+							className="rounded-lg!"
+						>
+							{t("addProvider", { ns: "models" })}
+						</Button>
+					</div>
+				</div>
+
+				{/* Right Panel - Provider Detail */}
+				<div className="flex-1 overflow-y-auto" style={{ background: token.colorBgContainer }}>
+					{showRightPanel ? (
+						<div className="p-6">
+							{/* Header */}
+							<div className="flex items-center justify-between mb-6">
+								<h3 className="text-lg font-semibold m-0" style={{ color: token.colorText }}>
+									{isAdding
+										? t("addProvider", { ns: "models" })
+										: selectedProvider?.name}
+								</h3>
+								<Space>
+									{!isAdding && selectedProvider && (
+										<>
+											<Switch
+												checked={selectedProvider.enabled}
+												onChange={(checked) =>
+													handleToggleEnabled(selectedProvider, checked)
+												}
+												checkedChildren={t("providerEnabled", { ns: "models" })}
+												unCheckedChildren={t("providerDisabled", {
+													ns: "models",
+												})}
+											/>
+											<Popconfirm
+												title={t("confirmDelete", { ns: "models" })}
+												onConfirm={() => handleDelete(selectedProvider.id)}
+											>
+												<Button
+													type="text"
+													danger
+													icon={<DeleteOutlined />}
+													size="small"
+												/>
+											</Popconfirm>
+										</>
+									)}
+								</Space>
+							</div>
+
+							{/* Form */}
+							<Form form={form} layout="vertical" onFinish={handleSave}>
+								<Form.Item
+									name="preset"
+									label={t("form.preset", { ns: "models" })}
+									rules={[
+										{
+											required: true,
+											message: t("form.presetRequired", { ns: "models" }),
+										},
+									]}
+								>
+									<Select
+										placeholder={t("form.presetPlaceholder", { ns: "models" })}
+										onChange={handlePresetChange}
+										showSearch
+										optionFilterProp="label"
+										disabled={!isAdding && !!selectedProvider}
+										options={PRESET_PROVIDERS.map((p: PresetProviderInfo) => ({
+											label: isZh ? `${p.nameZh} (${p.name})` : p.name,
+											value: p.id,
+										}))}
+									/>
+								</Form.Item>
+
+								<Form.Item
+									name="name"
+									label={t("form.name", { ns: "models" })}
+									rules={[
+										{
+											required: true,
+											message: t("form.nameRequired", { ns: "models" }),
+										},
+									]}
+								>
+									<Input
+										placeholder={t("form.namePlaceholder", { ns: "models" })}
+									/>
+								</Form.Item>
+
+								<Form.Item
+									name="apiKey"
+									label={t("form.apiKey", { ns: "models" })}
+									help={t("form.apiKeyHelp", { ns: "models" })}
+								>
+									<Input.Password placeholder="sk-..." />
+								</Form.Item>
+
+								<Form.Item
+									name="baseUrl"
+									label={t("form.baseUrl", { ns: "models" })}
+									rules={[
+										{
+											required: true,
+											message: t("form.baseUrlRequired", { ns: "models" }),
+										},
+									]}
+								>
+									<Input placeholder="https://api.example.com/v1" />
+								</Form.Item>
+
+								{/* Test Connection */}
+								<div className="flex items-center gap-3 mb-4">
+									<Button
+										icon={isTesting ? <LoadingOutlined /> : <LinkOutlined />}
+										onClick={handleTestConnection}
+										loading={isTesting}
+									>
+										{t("test", { ns: "models" })}
+									</Button>
+									{testResult && (
+										<span
+											className="text-sm"
+											style={{ color: testResult.success ? token.colorSuccess : token.colorError }}
+										>
+											{testResult.success ? (
+												<>
+													<CheckCircleOutlined className="mr-1" />
+													{testResult.latencyMs > 0 &&
+														`${testResult.latencyMs}ms`}
+													{testResult.latencyMs === 0 &&
+														t("messages.testSuccess", { ns: "models" })}
+												</>
+											) : (
+												<>
+													<CloseCircleOutlined className="mr-1" />
+													{testResult.error ||
+														t("messages.testError", { ns: "models" })}
+												</>
+											)}
+										</span>
+									)}
+								</div>
+
+								{/* Models Section */}
+								{testResult?.success && (
+									<>
+										<Divider className="!my-4" />
+										<div className="mb-3 flex items-center justify-between">
+											<Text strong className="text-sm">
+												{t("manageModels", { ns: "models" })}
+											</Text>
+											<Space>
+												<Button
+													icon={
+														isFetchingModels ? (
+															<LoadingOutlined />
+														) : (
+															<ThunderboltOutlined />
+														)
+													}
+													onClick={handleFetchModels}
+													loading={isFetchingModels}
+													size="small"
+												>
+													{t("fetchModels", { ns: "models" })}
+												</Button>
+												{(fetchedModels.length > 0 ||
+													(selectedProvider &&
+														selectedProvider.models.length > 0)) && (
+													<Button
+														icon={<AppstoreOutlined />}
+														onClick={() => setManageModalOpen(true)}
+														size="small"
+														type="primary"
+														ghost
+													>
+														{t("manageModels", { ns: "models" })}
+													</Button>
+												)}
+											</Space>
+										</div>
+
+									</>
+								)}
+
+								{/* Save Button */}
+								<Divider className="!my-4" />
+								<div className="flex justify-end gap-2">
+									{isAdding && (
+										<Button
+											onClick={() => {
+												setIsAdding(false);
+												if (providers.length > 0) {
+													setSelectedProviderId(providers[0].id);
+												}
+											}}
+										>
+											{t("cancel", { ns: "models" })}
+										</Button>
+									)}
+									<Button type="primary" htmlType="submit">
+										{t("save", { ns: "models" })}
+									</Button>
+								</div>
+							</Form>
+						</div>
+					) : (
+						<div className="flex flex-col items-center justify-center h-full text-center px-8">
+							<ProviderIcon
+								preset="custom"
+								size={56}
+								className="mb-4 !opacity-30"
 							/>
-						</List.Item>
+							<Text type="secondary" className="text-sm">
+								{t("noProviderSelected", { ns: "models" })}
+							</Text>
+							<Text type="secondary" className="text-xs mt-1">
+								{t("noProviderSelectedHint", { ns: "models" })}
+							</Text>
+						</div>
 					)}
+				</div>
+			</div>
+
+			{/* Model Manage Modal */}
+			{selectedProvider && (
+				<ModelManageModal
+					open={manageModalOpen}
+					onClose={() => setManageModalOpen(false)}
+					provider={selectedProvider}
+					models={
+						fetchedModels.length > 0
+							? fetchedModels
+							: selectedProvider.models
+					}
+					onModelsChange={(updatedModels) => {
+						if (fetchedModels.length > 0) {
+							setFetchedModels(updatedModels);
+						}
+						setSelectedModelIds(
+							updatedModels.filter((m) => m.enabled).map((m) => m.id),
+						);
+					}}
+					onRefresh={handleFetchModels}
+					isRefreshing={isFetchingModels}
 				/>
 			)}
-
-			{/* Drawer */}
-			<Drawer
-				title={
-					<div className="flex items-center gap-2">
-						<span className="font-semibold">
-							{editingModel ? t("edit", { ns: "models" }) : t("add", { ns: "models" })}
-						</span>
-					</div>
-				}
-				size={420}
-				styles={{
-					body: { paddingBottom: 80 },
-					// @ts-expect-error
-					header: { borderBottom: "1px solid #f0f0f0", WebkitAppRegion: "no-drag" },
-				}}
-				onClose={() => setIsDrawerOpen(false)}
-				open={isDrawerOpen}
-				destroyOnHidden={true}
-				maskClosable={true}
-				extra={
-					<Space>
-						<Button onClick={() => setIsDrawerOpen(false)}>
-							{t("cancel", { ns: "models" })}
-						</Button>
-						<Button type="primary" onClick={() => form.submit()}>
-							{t("save", { ns: "models" })}
-						</Button>
-					</Space>
-				}
-			>
-				<Form form={form} layout="vertical" onFinish={handleSave}>
-					<Form.Item
-						name="name"
-						label={t("form.name", { ns: "models" })}
-						rules={[{ required: true, message: t("form.nameRequired", { ns: "models" }) }]}
-					>
-						<Input
-							placeholder={t("form.namePlaceholder", "e.g., GPT-4", { ns: "models" })}
-							className="!rounded-lg"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="provider"
-						label={t("form.provider", { ns: "models" })}
-						rules={[
-							{ required: true, message: t("form.providerRequired", { ns: "models" }) },
-						]}
-					>
-						<Select
-							placeholder={t(
-								"models.form.providerPlaceholder",
-								"Select provider",
-							)}
-							className="!rounded-lg"
-						>
-							<Select.Option value="openai">OpenAI</Select.Option>
-							<Select.Option value="anthropic">Anthropic</Select.Option>
-							<Select.Option value="gemini">Gemini</Select.Option>
-							<Select.Option value="custom">Custom</Select.Option>
-						</Select>
-					</Form.Item>
-					<Form.Item
-						name="apiKey"
-						label={t("form.apiKey", { ns: "models" })}
-						help={t(
-							"models.form.apiKeyHelp",
-							"Your API key for authentication",
-						)}
-					>
-						<Input.Password
-							placeholder={t("form.apiKeyPlaceholder", "sk-...", { ns: "models" })}
-							className="!rounded-lg"
-						/>
-					</Form.Item>
-					<Form.Item
-						name="baseUrl"
-						label={t("form.baseUrl", { ns: "models" })}
-						help={t("form.baseUrlHelp", "Custom API endpoint URL", { ns: "models" })}
-					>
-						<Input
-							placeholder={t(
-								"models.form.baseUrlPlaceholder",
-								"https://api.example.com",
-							)}
-							className="!rounded-lg"
-						/>
-					</Form.Item>
-				</Form>
-			</Drawer>
 		</div>
 	);
 };

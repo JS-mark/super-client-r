@@ -1,15 +1,109 @@
-export interface ModelConfig {
-	apiKey?: string;
-	baseUrl?: string;
-	parameters?: Record<string, any>;
-	maxTokens?: number;
+export type ModelProviderPreset =
+	| "dashscope"
+	| "deepseek"
+	| "openai"
+	| "anthropic"
+	| "gemini"
+	| "cherryin"
+	| "siliconflow"
+	| "aihubmix"
+	| "ocoolai"
+	| "zhipu-ai"
+	| "302ai"
+	| "moonshot"
+	| "baichuan"
+	| "volcengine"
+	| "minimax"
+	| "hunyuan"
+	| "grok"
+	| "github-models"
+	| "huggingface"
+	| "openrouter"
+	| "ollama"
+	| "lmstudio"
+	| "newapi"
+	| "custom";
+
+export type ModelCapability =
+	| "vision"
+	| "web_search"
+	| "reasoning"
+	| "tool_use"
+	| "embedding"
+	| "reranking";
+
+export type ModelCategory =
+	| "chat"
+	| "embedding"
+	| "reranking"
+	| "vision"
+	| "code"
+	| "image_generation"
+	| "audio"
+	| "custom";
+
+export type PricingCurrency = "USD" | "CNY" | "EUR";
+
+export interface ModelPricing {
+	currency: PricingCurrency;
+	inputPricePerMillion: number;
+	outputPricePerMillion: number;
 }
 
-export interface ModelInfo {
+export interface ProviderModel {
 	id: string;
 	name: string;
-	provider: "openai" | "anthropic" | "gemini" | "custom";
-	capabilities: string[];
+	group?: string;
 	enabled: boolean;
-	config: ModelConfig;
+	capabilities: ModelCapability[];
+	category: ModelCategory;
+	supportsStreaming: boolean;
+	pricing?: ModelPricing;
+	systemPrompt?: string;
+	maxTokens?: number;
+	contextWindow?: number;
+}
+
+export interface ModelProvider {
+	id: string;
+	name: string;
+	preset: ModelProviderPreset;
+	baseUrl: string;
+	apiKey: string;
+	enabled: boolean;
+	tested: boolean;
+	models: ProviderModel[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface ActiveModelSelection {
+	providerId: string;
+	modelId: string;
+}
+
+export interface TestConnectionResponse {
+	success: boolean;
+	latencyMs: number;
+	error?: string;
+}
+
+export interface FetchModelsResponse {
+	models: ProviderModel[];
+}
+
+export interface ChatStreamEvent {
+	requestId: string;
+	type: "chunk" | "done" | "error";
+	content?: string;
+	error?: string;
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	};
+	timing?: {
+		firstTokenMs?: number;
+		totalMs?: number;
+	};
 }
