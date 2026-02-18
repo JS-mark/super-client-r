@@ -1,10 +1,14 @@
-import { useState, useCallback, useEffect } from "react";
-import { Input, Modal, List, Tag, Button, Empty, theme } from "antd";
-import { SearchOutlined, ClockCircleOutlined, CloseOutlined } from "@ant-design/icons";
+import {
+  ClockCircleOutlined,
+  CloseOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
+import { Button, Empty, Input, List, Modal, Tag, theme } from "antd";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
-import { useMessageStore } from "../../stores/messageStore";
 import type { Message } from "../../stores/chatStore";
+import { useMessageStore } from "../../stores/messageStore";
 
 const { useToken } = theme;
 
@@ -27,8 +31,12 @@ export function MessageSearch({
   const [isSearching, setIsSearching] = useState(false);
   const { token } = useToken();
 
-  const { searchMessages, searchHistory, addSearchHistory, clearSearchHistory } =
-    useMessageStore();
+  const {
+    searchMessages,
+    searchHistory,
+    addSearchHistory,
+    clearSearchHistory,
+  } = useMessageStore();
 
   const handleSearch = useCallback(
     (searchQuery: string) => {
@@ -50,7 +58,7 @@ export function MessageSearch({
         addSearchHistory(searchQuery);
       }
     },
-    [messages, searchMessages, addSearchHistory]
+    [messages, searchMessages, addSearchHistory],
   );
 
   useEffect(() => {
@@ -75,7 +83,7 @@ export function MessageSearch({
     return parts.map((part, i) =>
       regex.test(part) ? (
         <mark
-          key={i}
+          key={part}
           className="px-0.5 rounded"
           style={{
             backgroundColor: token.colorWarningBg,
@@ -85,8 +93,8 @@ export function MessageSearch({
           {part}
         </mark>
       ) : (
-        <span key={i}>{part}</span>
-      )
+        <span key={part}>{part}</span>
+      ),
     );
   };
 
@@ -103,7 +111,9 @@ export function MessageSearch({
         {/* 搜索输入 */}
         <Input
           prefix={<SearchOutlined className="text-slate-400" />}
-          placeholder={t("chat.searchPlaceholder", "搜索聊天记录...", { ns: "chat" })}
+          placeholder={t("chat.searchPlaceholder", "搜索聊天记录...", {
+            ns: "chat",
+          })}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           allowClear
@@ -118,11 +128,7 @@ export function MessageSearch({
               <span className="text-sm text-slate-500">
                 {t("chat.searchHistory", "搜索历史", { ns: "chat" })}
               </span>
-              <Button
-                type="link"
-                size="small"
-                onClick={clearSearchHistory}
-              >
+              <Button type="link" size="small" onClick={clearSearchHistory}>
                 {t("clear", "清空", { ns: "common" })}
               </Button>
             </div>
@@ -148,13 +154,15 @@ export function MessageSearch({
               {isSearching
                 ? t("chat.searching", "搜索中...", { ns: "chat" })
                 : t("chat.searchResults", "找到 {{count}} 条结果", {
-                    count: results.length,
-                  })}
+                  count: results.length,
+                })}
             </div>
 
             {results.length === 0 && !isSearching ? (
               <Empty
-                description={t("chat.noSearchResults", "未找到相关消息", { ns: "chat" })}
+                description={t("chat.noSearchResults", "未找到相关消息", {
+                  ns: "chat",
+                })}
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             ) : (
@@ -164,16 +172,19 @@ export function MessageSearch({
                 renderItem={(msg) => (
                   <List.Item
                     className="cursor-pointer rounded-lg px-3 transition-colors"
-                    style={{ backgroundColor: 'transparent' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = token.colorBgTextHover; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    style={{ backgroundColor: "transparent" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor =
+                        token.colorBgTextHover;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                     onClick={() => handleSelectResult(msg)}
                   >
                     <div className="w-full">
                       <div className="flex items-center gap-2 mb-1">
-                        <Tag
-                          color={msg.role === "user" ? "blue" : "green"}
-                        >
+                        <Tag color={msg.role === "user" ? "blue" : "green"}>
                           {msg.role === "user"
                             ? t("chat.user", "用户")
                             : t("chat.assistant", "助手", { ns: "chat" })}
@@ -182,7 +193,10 @@ export function MessageSearch({
                           {new Date(msg.timestamp).toLocaleString()}
                         </span>
                       </div>
-                      <div className="text-sm line-clamp-2" style={{ color: token.colorText }}>
+                      <div
+                        className="text-sm line-clamp-2"
+                        style={{ color: token.colorText }}
+                      >
                         {highlightText(msg.content, query)}
                       </div>
                     </div>

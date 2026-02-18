@@ -1,137 +1,85 @@
-import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from "@ant-design/icons";
-import { theme } from "antd";
+import {
+	CheckCircleOutlined,
+	CloseCircleOutlined,
+	LoadingOutlined,
+	ToolOutlined,
+} from "@ant-design/icons";
+import { ThoughtChain } from "@ant-design/x";
 import type * as React from "react";
-import { useState } from "react";
-import { cn } from "../../lib/utils";
+import { useMemo } from "react";
 import type { Message } from "../../stores/chatStore";
 
-const { useToken } = theme;
+const STATUS_MAP = {
+	pending: "loading",
+	success: "success",
+	error: "error",
+} as const;
+
+const STATUS_ICON: Record<string, React.ReactNode> = {
+	pending: <LoadingOutlined spin />,
+	success: <CheckCircleOutlined />,
+	error: <CloseCircleOutlined />,
+};
 
 export const ToolCallCard: React.FC<{
 	toolCall: NonNullable<Message["toolCall"]>;
 }> = ({ toolCall }) => {
-	const [isExpanded, setIsExpanded] = useState(true);
-	const { token } = useToken();
-
-	const getStatusStyles = () => {
-		switch (toolCall.status) {
-			case "pending":
-				return {
-					icon: <LoadingOutlined className="animate-spin" />,
-					iconColor: token.colorInfo,
-					bg: token.colorInfoBg,
-					border: token.colorInfoBorder,
-				};
-			case "success":
-				return {
-					icon: <CheckCircleOutlined />,
-					iconColor: token.colorSuccess,
-					bg: token.colorSuccessBg,
-					border: token.colorSuccessBorder,
-				};
-			case "error":
-				return {
-					icon: <CloseCircleOutlined />,
-					iconColor: token.colorError,
-					bg: token.colorErrorBg,
-					border: token.colorErrorBorder,
-				};
-			default:
-				return {
-					icon: null,
-					iconColor: token.colorText,
-					bg: token.colorBgContainer,
-					border: token.colorBorder,
-				};
-		}
-	};
-
-	const statusStyles = getStatusStyles();
-
-	return (
-		<div
-			className={cn(
-				"my-3 rounded-xl border overflow-hidden transition-all",
-			)}
-			style={{
-				backgroundColor: statusStyles.bg,
-				borderColor: statusStyles.border,
-			}}
-		>
-			<button
-				onClick={() => setIsExpanded(!isExpanded)}
-				className="w-full px-4 py-3 flex items-center gap-3 transition-colors"
-				style={{ backgroundColor: 'transparent' }}
-				onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${token.colorText}0D`; }}
-				onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-			>
-				<span className="text-lg" style={{ color: statusStyles.iconColor }}>
-					{statusStyles.icon}
-				</span>
-				<div className="flex-1 text-left">
-					<div className="font-medium text-sm" style={{ color: token.colorText }}>
-						{toolCall.name}
-					</div>
-					<div className="text-xs capitalize" style={{ color: token.colorTextSecondary }}>
-						{toolCall.status}
-					</div>
-				</div>
-				<span className="text-xs" style={{ color: token.colorTextTertiary }}>{isExpanded ? "▼" : "▶"}</span>
-			</button>
-
-			{isExpanded && (
-				<div className="px-4 pb-4 space-y-3">
-					<div
-						className="rounded-lg p-3"
-						style={{ backgroundColor: `${token.colorBgContainer}80` }}
-					>
-						<div className="text-xs font-medium mb-1" style={{ color: token.colorTextSecondary }}>Input</div>
-						<pre
-							className="text-xs overflow-auto max-h-24"
-							style={{ color: token.colorText }}
-						>
-							{JSON.stringify(toolCall.input, null, 2)}
-						</pre>
-					</div>
-
-					{toolCall.result !== undefined && (
-						<div
-							className="rounded-lg p-3"
-							style={{ backgroundColor: `${token.colorBgContainer}80` }}
-						>
-							<div className="text-xs font-medium mb-1" style={{ color: token.colorTextSecondary }}>
-								Result
+	const items = useMemo(
+		() => [
+			{
+				key: toolCall.id,
+				title: toolCall.name,
+				icon: STATUS_ICON[toolCall.status] || <ToolOutlined />,
+				status: STATUS_MAP[toolCall.status] as
+					| "loading"
+					| "success"
+					| "error",
+				description:
+					toolCall.duration !== undefined
+						? `${toolCall.duration}ms`
+						: undefined,
+				content: (
+					<div className="space-y-2 text-xs">
+						<div>
+							<div className="font-medium text-slate-500 mb-1">
+								Input
 							</div>
-							<pre
-								className="text-xs overflow-auto max-h-32"
-								style={{ color: token.colorText }}
-							>
-								{typeof toolCall.result === "string"
-									? toolCall.result
-									: JSON.stringify(toolCall.result, null, 2)}
+							<pre className="bg-slate-50 rounded-lg p-2 overflow-auto max-h-24 text-slate-700">
+								{JSON.stringify(toolCall.input, null, 2)}
 							</pre>
 						</div>
-					)}
+						{toolCall.result !== undefined && (
+							<div>
+								<div className="font-medium text-slate-500 mb-1">
+									Result
+								</div>
+								<pre className="bg-slate-50 rounded-lg p-2 overflow-auto max-h-32 text-slate-700">
+									{typeof toolCall.result === "string"
+										? toolCall.result
+										: JSON.stringify(
+												toolCall.result,
+												null,
+												2,
+											)}
+								</pre>
+							</div>
+						)}
+						{toolCall.error && (
+							<div className="bg-red-50 text-red-600 rounded-lg p-2">
+								{toolCall.error}
+							</div>
+						)}
+					</div>
+				),
+				collapsible: true,
+			},
+		],
+		[toolCall],
+	);
 
-					{toolCall.error && (
-						<div
-							className="rounded-lg p-3 text-sm"
-							style={{
-								backgroundColor: token.colorErrorBg,
-								color: token.colorError,
-							}}
-						>
-							{toolCall.error}
-						</div>
-					)}
-
-					{toolCall.duration !== undefined && (
-						<div className="text-right text-xs" style={{ color: token.colorTextTertiary }}>
-							Duration: {toolCall.duration}ms
-						</div>
-					)}
-				</div>
-			)}
+	return (
+		<div className="my-3">
+			<ThoughtChain items={items} line="dashed" />
 		</div>
 	);
 };

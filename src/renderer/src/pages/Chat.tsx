@@ -1,71 +1,76 @@
 import {
 	BulbOutlined,
 	ClearOutlined,
+	CodeOutlined,
+	CopyOutlined,
+	DeleteOutlined,
+	DownloadOutlined,
+	EditOutlined,
 	ExportOutlined,
 	FileTextOutlined,
+	LeftOutlined,
+	MoreOutlined,
 	PlusOutlined,
+	ReloadOutlined,
 	RightOutlined,
 	RobotOutlined,
 	SearchOutlined,
-	SendOutlined,
+	SettingOutlined,
+	StarFilled,
 	StarOutlined,
+	TagsOutlined,
 	ToolOutlined,
+	TranslationOutlined,
+	UserOutlined,
 } from "@ant-design/icons";
-import {
-	Button,
-	Tooltip,
-	message,
-	theme,
-} from "antd";
+import { Bubble, Prompts, Sender, Welcome } from "@ant-design/x";
+import type { BubbleListRef } from "@ant-design/x/es/bubble";
+import { Avatar, Button, Dropdown, Flex, message, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AttachmentList } from "../components/attachment";
 import { FileUploadButton } from "../components/attachment/FileUpload";
-import type { Attachment } from "../stores/attachmentStore";
 import { ChatExportDialog } from "../components/chat/ChatExportDialog";
-import { MessageBubble } from "../components/chat/MessageBubble";
 import { MessageSearch } from "../components/chat/MessageSearch";
-import { SearchEnginePanel, useSearchEngine } from "../components/chat/SearchEnginePanel";
+import {
+	SearchEnginePanel,
+	useSearchEngine,
+} from "../components/chat/SearchEnginePanel";
+import { MessageContextMenu } from "../components/chat/MessageContextMenu";
+import { ToolCallCard } from "../components/chat/ToolCallCard";
+import { Markdown } from "../components/Markdown";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useChat } from "../hooks/useChat";
 import { useTitle } from "../hooks/useTitle";
-import { cn } from "../lib/utils";
+import type { Attachment } from "../stores/attachmentStore";
+import { useMessageStore } from "../stores/messageStore";
 import {
 	getShortcutFromEvent,
 	normalizeShortcut,
 	useShortcutStore,
 } from "../stores/shortcutStore";
 
-// Empty state suggestions - use i18n keys
-const SUGGESTION_KEYS = [
-	"suggestions.quantum",
-	"suggestions.fibonacci",
-	"suggestions.debug",
-	"suggestions.marketing",
-];
-
-// Skill/tool icons for the input toolbar
+// Toolbar item definition
 interface ToolbarItem {
 	id: string;
 	icon: React.ReactNode;
 	label: string;
-	type: "skill" | "tool" | "action";
-	color?: string;
 }
 
-// Quick action items for the toolbar - labels use i18n keys
-const TOOLBAR_ITEMS: ToolbarItem[] = [
-	{ id: "quote", icon: <PlusOutlined />, label: "toolbar.quote", type: "action" },
-	{
-		id: "prompt",
-		icon: <BulbOutlined />,
-		label: "toolbar.prompt",
-		type: "tool",
-		color: "#52c41a",
-	},
-	{ id: "doc", icon: <FileTextOutlined />, label: "toolbar.doc", type: "tool" },
-	{ id: "tools", icon: <ToolOutlined />, label: "toolbar.tools", type: "tool" },
+// Primary toolbar items - always visible
+const PRIMARY_TOOLBAR_ITEMS: ToolbarItem[] = [
+	{ id: "quote", icon: <PlusOutlined />, label: "toolbar.quote" },
+	{ id: "prompt", icon: <BulbOutlined />, label: "toolbar.prompt" },
+	{ id: "doc", icon: <FileTextOutlined />, label: "toolbar.doc" },
+	{ id: "tools", icon: <ToolOutlined />, label: "toolbar.tools" },
+];
+
+// Extra toolbar items - shown when "More" is expanded
+const EXTRA_TOOLBAR_ITEMS: ToolbarItem[] = [
+	{ id: "tags", icon: <TagsOutlined />, label: "toolbar.tags" },
+	{ id: "translate", icon: <TranslationOutlined />, label: "toolbar.translate" },
+	{ id: "settings", icon: <SettingOutlined />, label: "toolbar.settings" },
 ];
 
 const { useToken } = theme;
@@ -82,374 +87,883 @@ const Chat: React.FC = () => {
 		isStreaming,
 		streamingContent,
 		clearMessages,
-		setChatMode,
+		stopCurrentStream,
+		retryMessage,
+		editMessage,
+		deleteMessage,
 	} = useChat();
 
 	// Search engine state
-	const { selectedEngine, setSelectedEngine, currentEngine } = useSearchEngine();
+	const { selectedEngine, setSelectedEngine, currentEngine } =
+		useSearchEngine();
 
 	// Message search and export dialogs
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [isExportOpen, setIsExportOpen] = useState(false);
 
-	// 设置标题栏和页面标题
-	const pageTitle = useMemo(() => (
-		<>
-			<div className="flex items-center gap-2">
-				<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-					<RobotOutlined className="text-white text-xs" />
+	// Title bar and page title
+	const pageTitle = useMemo(
+		() => (
+			<>
+				<div className="flex items-center gap-2">
+					<div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+						<RobotOutlined className="text-white text-xs" />
+					</div>
+					<span
+						style={{ color: token.colorText }}
+						className="text-sm font-medium"
+					>
+						{t("title", "AI 聊天", { ns: "chat" })}
+					</span>
 				</div>
-				<span style={{ color: token.colorText }} className="text-sm font-medium">{t("title", "AI 聊天", { ns: "chat" })}</span>
-			</div>
-			<div
-				className="flex items-center gap-2"
-				// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
-				style={{ WebkitAppRegion: "no-drag" }}
-			>
-				<Tooltip title={t("chat.toolbar.searchMessages", "搜索消息", { ns: "chat" })}>
-					<Button
-						type="text"
-						icon={<SearchOutlined />}
-						onClick={() => setIsSearchOpen(true)}
-						disabled={messages.length === 0}
-						className="rounded-lg"
-					/>
-				</Tooltip>
-				<Tooltip title={t("chat.toolbar.export", "导出", { ns: "chat" })}>
-					<Button
-						type="text"
-						icon={<ExportOutlined />}
-						onClick={() => setIsExportOpen(true)}
-						disabled={messages.length === 0 || isStreaming}
-						className="rounded-lg"
-					/>
-				</Tooltip>
-				<Tooltip title={t("chat.toolbar.clear", "清空", { ns: "chat" })}>
-					<Button
-						type="text"
-						icon={<ClearOutlined />}
-						onClick={clearMessages}
-						disabled={messages.length === 0 || isStreaming}
-						className="rounded-lg"
-					/>
-				</Tooltip>
-			</div>
-		</>
-	), [messages, t, clearMessages, isStreaming, token.colorText]);
-	useTitle(pageTitle)
+				<div
+					className="flex items-center gap-2"
+					// @ts-expect-error - WebkitAppRegion is a valid CSS property for Electron
+					style={{ WebkitAppRegion: "no-drag" }}
+				>
+					<Tooltip
+						title={t("chat.toolbar.searchMessages", "搜索消息", {
+							ns: "chat",
+						})}
+					>
+						<Button
+							type="text"
+							icon={<SearchOutlined />}
+							onClick={() => setIsSearchOpen(true)}
+							disabled={messages.length === 0}
+							className="rounded-lg"
+						/>
+					</Tooltip>
+					<Tooltip
+						title={t("chat.toolbar.export", "导出", { ns: "chat" })}
+					>
+						<Button
+							type="text"
+							icon={<ExportOutlined />}
+							onClick={() => setIsExportOpen(true)}
+							disabled={messages.length === 0 || isStreaming}
+							className="rounded-lg"
+						/>
+					</Tooltip>
+					<Tooltip
+						title={t("chat.toolbar.clear", "清空", { ns: "chat" })}
+					>
+						<Button
+							type="text"
+							icon={<ClearOutlined />}
+							onClick={clearMessages}
+							disabled={messages.length === 0 || isStreaming}
+							className="rounded-lg"
+						/>
+					</Tooltip>
+				</div>
+			</>
+		),
+		[messages, t, clearMessages, isStreaming, token.colorText],
+	);
+	useTitle(pageTitle);
 
-	const chatEndRef = useRef<HTMLDivElement>(null);
-	const [isInputFocused, setIsInputFocused] = useState(false);
+	const bubbleListRef = useRef<BubbleListRef>(null);
 	const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+	const [toolbarExpanded, setToolbarExpanded] = useState(false);
+	const { isBookmarked } = useMessageStore();
 
 	// Attachment state
 	const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
 
-	// Toolbar feature states
-	const [isPromptSelectorOpen, setIsPromptSelectorOpen] = useState(false);
-	const [isToolSelectorOpen, setIsToolSelectorOpen] = useState(false);
-	const [isQuoteSelectorOpen, setIsQuoteSelectorOpen] = useState(false);
-
-	// Active tools state
-	const [activeTools, setActiveTools] = useState<string[]>([]);
-
 	// Conversation ID for message operations
 	const conversationId = "default"; // TODO: Use actual conversation ID
 
-	const handleSend = () => {
-		if ((input.trim() || attachedFiles.length > 0) && !isStreaming) {
-			sendMessage();
-			setAttachedFiles([]);
-		}
-	};
+	const handleSend = useCallback(
+		(value: string) => {
+			if ((value.trim() || attachedFiles.length > 0) && !isStreaming) {
+				sendMessage();
+				setAttachedFiles([]);
+			}
+		},
+		[attachedFiles.length, isStreaming, sendMessage],
+	);
+
+	// Suggestion prompts for the welcome screen
+	const suggestionItems = useMemo(
+		() => [
+			{
+				key: "quantum",
+				icon: <BulbOutlined style={{ color: "#7c3aed" }} />,
+				label: t("suggestions.quantum", {
+					ns: "chat",
+					defaultValue: "Explain quantum computing in simple terms",
+				}),
+			},
+			{
+				key: "fibonacci",
+				icon: <CodeOutlined style={{ color: "#2563eb" }} />,
+				label: t("suggestions.fibonacci", {
+					ns: "chat",
+					defaultValue:
+						"Write a Python function to calculate fibonacci",
+				}),
+			},
+			{
+				key: "debug",
+				icon: <ToolOutlined style={{ color: "#dc2626" }} />,
+				label: t("suggestions.debug", {
+					ns: "chat",
+					defaultValue: "Help me debug this error in my code",
+				}),
+			},
+			{
+				key: "marketing",
+				icon: <FileTextOutlined style={{ color: "#16a34a" }} />,
+				label: t("suggestions.marketing", {
+					ns: "chat",
+					defaultValue: "Create a marketing plan for a new product",
+				}),
+			},
+		],
+		[t],
+	);
+
+	const handlePromptClick = useCallback(
+		(info: { data: { key: string; label?: React.ReactNode } }) => {
+			const label =
+				typeof info.data.label === "string" ? info.data.label : "";
+			if (label) {
+				setInput(label);
+			}
+		},
+		[setInput],
+	);
 
 	// Handle toolbar item click
-	const handleToolbarClick = useCallback((itemId: string) => {
-		switch (itemId) {
-			case "prompt":
-				setIsPromptSelectorOpen(true);
-				break;
-			case "tools":
-				setIsToolSelectorOpen(true);
-				break;
-			case "quote":
-				setIsQuoteSelectorOpen(true);
-				break;
-			case "doc":
-				message.info(t("toolbar.docComingSoon", "文档功能即将推出", { ns: "chat" }));
-				break;
-			default:
-				break;
-		}
-	}, [t]);
+	const handleToolbarClick = useCallback(
+		(itemId: string) => {
+			switch (itemId) {
+				case "doc":
+					message.info(
+						t("toolbar.docComingSoon", "文档功能即将推出", { ns: "chat" }),
+					);
+					break;
+				default:
+					message.info(t(`toolbar.${itemId}`, { ns: "chat" }));
+					break;
+			}
+		},
+		[t, message],
+	);
 
-	// Handle prompt selection
-	const handlePromptSelect = useCallback((prompt: string) => {
-		setInput((prev) => prev + (prev ? " " : "") + prompt);
-		setIsPromptSelectorOpen(false);
-	}, [setInput]);
+	// Bookmark handlers (reused from MessageContextMenu)
+	const {
+		addBookmark,
+		removeBookmark,
+		getBookmarkByMessageId,
+	} = useMessageStore();
 
-	// Handle tool toggle
-	const handleToolToggle = useCallback((toolId: string) => {
-		setActiveTools((prev) =>
-			prev.includes(toolId)
-				? prev.filter((id) => id !== toolId)
-				: [...prev, toolId]
-		);
-	}, []);
+	const handleCopyMessage = useCallback(
+		(content: string) => {
+			navigator.clipboard.writeText(content);
+			message.success(t("actions.copied", "已复制", { ns: "chat" }));
+		},
+		[message, t],
+	);
 
-	// Handle quote selection
-	const handleQuoteSelect = useCallback((messageId: string) => {
-		const msg = messages.find((m) => m.id === messageId);
-		if (msg) {
-			setInput((prev) => prev + (prev ? "\n\n" : "") + "> " + msg.content.slice(0, 200) + (msg.content.length > 200 ? "..." : ""));
-		}
-		setIsQuoteSelectorOpen(false);
-	}, [messages, setInput]);
+	const handleDeleteMessage = useCallback(
+		(messageId: string) => {
+			deleteMessage(messageId);
+			message.success(t("actions.deleted", "已删除", { ns: "chat" }));
+		},
+		[deleteMessage, message, t],
+	);
+
+	const handleExportMessage = useCallback(
+		(msg: { id: string; content: string }) => {
+			const blob = new Blob([msg.content], { type: "text/plain" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `message-${msg.id}.txt`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+			message.success(t("chat.messageExported", "消息已导出", { ns: "chat" }));
+		},
+		[message, t],
+	);
+
+	const handleToggleBookmark = useCallback(
+		(msg: { id: string; role: string; content: string; timestamp: number }) => {
+			const bm = getBookmarkByMessageId(msg.id);
+			if (bm) {
+				removeBookmark(bm.id);
+				message.success(t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }));
+			} else if (msg.role === "user" || msg.role === "assistant") {
+				addBookmark({
+					messageId: msg.id,
+					conversationId,
+					content: msg.content,
+					role: msg.role as "user" | "assistant",
+					timestamp: msg.timestamp,
+				});
+				message.success(t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }));
+			}
+		},
+		[addBookmark, removeBookmark, getBookmarkByMessageId, conversationId, message, t],
+	);
+
+	// Bubble.List role config
+	const roles = useMemo(
+		() => ({
+			user: {
+				placement: "end" as const,
+				variant: "filled" as const,
+				shape: "round" as const,
+				rootClassName: "group",
+				avatar: (
+					<Avatar
+						icon={<UserOutlined />}
+						style={{
+							background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+							color: "#fff",
+						}}
+					/>
+				),
+				styles: {
+					content: {
+						background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+						color: "#fff",
+					},
+				},
+			},
+			ai: {
+				placement: "start" as const,
+				variant: "borderless" as const,
+				shape: "round" as const,
+				rootClassName: "group",
+				avatar: (
+					<Avatar
+						icon={<RobotOutlined />}
+						style={{
+							background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+							color: "#fff",
+						}}
+					/>
+				),
+			},
+		}),
+		[],
+	);
+
+	// Convert messages to Bubble.List items
+	const bubbleItems = useMemo(() => {
+		return messages.map((msg, idx) => {
+			const isLast = idx === messages.length - 1;
+			const isAssistant = msg.role === "assistant";
+			const isTool = msg.role === "tool";
+			const isCurrentlyStreaming = isAssistant && isStreaming && isLast;
+			const displayContent =
+				isAssistant && isStreaming && isLast
+					? streamingContent
+					: msg.content;
+
+			// Tool call messages
+			if (isTool && msg.toolCall) {
+				return {
+					key: msg.id || `msg-${idx}`,
+					role: "ai" as const,
+					content: "",
+					contentRender: () => <ToolCallCard toolCall={msg.toolCall!} />,
+					variant: "borderless" as const,
+					avatar: undefined as React.ReactNode,
+				};
+			}
+
+			return {
+				key: msg.id || `msg-${idx}`,
+				role: msg.role === "user" ? ("user" as const) : ("ai" as const),
+				content: displayContent || "",
+				loading: isCurrentlyStreaming && !displayContent,
+				typing: isCurrentlyStreaming
+					? { effect: "fade-in" as const, step: 5, interval: 50 }
+					: undefined,
+				contentRender: () => {
+					if (!displayContent) return null;
+					return (
+						<MessageContextMenu
+							message={msg}
+							conversationId={conversationId}
+							onDelete={() => {
+								message.info(
+									t(
+										"chat.messageDeleteNotImplemented",
+										"消息删除功能待实现",
+										{ ns: "chat" },
+									),
+								);
+							}}
+						>
+							<div>
+								<Markdown
+									content={displayContent}
+									streaming={isCurrentlyStreaming}
+								/>
+							</div>
+						</MessageContextMenu>
+					);
+				},
+				footer: (() => {
+					const meta = msg.metadata;
+					const isAssistantMsg = msg.role === "assistant";
+					const isUserMsg = msg.role === "user";
+
+					// Build tooltip content for hover
+					const tooltipLines: string[] = [];
+					if (isAssistantMsg) {
+						if (meta?.firstTokenMs != null) {
+							tooltipLines.push(
+								`${t("chat.metrics.firstToken", "首字时延", { ns: "chat" })} ${meta.firstTokenMs} ms`,
+							);
+						}
+						if (meta?.tokensPerSecond != null) {
+							tooltipLines.push(
+								`${t("chat.metrics.speed", "每秒", { ns: "chat" })} ${meta.tokensPerSecond} tokens`,
+							);
+						}
+						if (meta?.tokens != null) {
+							const parts = [`Tokens: ${meta.tokens}`];
+							if (meta.inputTokens != null) parts.push(`↑${meta.inputTokens}`);
+							if (meta.outputTokens != null) parts.push(`↓${meta.outputTokens}`);
+							tooltipLines.push(parts.join(" "));
+						}
+					} else if (meta?.inputTokens != null) {
+						tooltipLines.push(`Tokens: ↑${meta.inputTokens}`);
+					}
+
+					// Token display text
+					let tokenText = "";
+					if (isAssistantMsg && meta?.inputTokens != null && meta?.outputTokens != null) {
+						tokenText = `↑${meta.inputTokens} ↓${meta.outputTokens}`;
+					} else if (meta?.inputTokens != null) {
+						tokenText = `↑${meta.inputTokens}`;
+					} else if (meta?.tokens != null) {
+						tokenText = `${meta.tokens} tokens`;
+					}
+
+					const timeText = new Date(msg.timestamp).toLocaleTimeString([], {
+						hour: "2-digit",
+						minute: "2-digit",
+					});
+
+					// Token info element
+					const tokenInfo = (
+						<div className="flex items-center gap-1.5">
+							{isBookmarked(msg.id) && (
+								<StarFilled className="text-yellow-500 text-xs" />
+							)}
+							{tokenText && (
+								<span
+									className="text-xs"
+									style={{ color: token.colorTextQuaternary }}
+								>
+									{tokenText}
+								</span>
+							)}
+							<span
+								className="text-xs"
+								style={{ color: token.colorTextQuaternary }}
+							>
+								{timeText}
+							</span>
+						</div>
+					);
+
+					const tokenInfoWithTooltip = tooltipLines.length > 0 ? (
+						<Tooltip
+							title={tooltipLines.map((line, i) => (
+								<div key={i}>{line}</div>
+							))}
+						>
+							{tokenInfo}
+						</Tooltip>
+					) : tokenInfo;
+
+					// Action buttons (appear on hover)
+					const actionBtnStyle = { color: token.colorTextTertiary };
+
+					// More dropdown items for assistant messages
+					const moreMenuItems = isAssistantMsg ? [
+						{
+							key: "bookmark",
+							icon: isBookmarked(msg.id) ? <StarFilled className="text-yellow-500" /> : <StarOutlined />,
+							label: isBookmarked(msg.id)
+								? t("chat.removeBookmark", "取消收藏", { ns: "chat" })
+								: t("actions.bookmark", "收藏", { ns: "chat" }),
+							onClick: () => handleToggleBookmark(msg),
+						},
+						{
+							key: "export",
+							icon: <DownloadOutlined />,
+							label: t("actions.export", "导出", { ns: "chat" }),
+							onClick: () => handleExportMessage(msg),
+						},
+					] : [];
+
+					const actionButtons = (
+						<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+							{isUserMsg && (
+								<>
+									<Tooltip title={t("actions.retry", "重试", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<ReloadOutlined />}
+											style={actionBtnStyle}
+											onClick={() => retryMessage(msg.id)}
+										/>
+									</Tooltip>
+									<Tooltip title={t("actions.edit", "编辑", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<EditOutlined />}
+											style={actionBtnStyle}
+											onClick={() => editMessage(msg.id)}
+										/>
+									</Tooltip>
+									<Tooltip title={t("actions.copy", "复制", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<CopyOutlined />}
+											style={actionBtnStyle}
+											onClick={() => handleCopyMessage(msg.content)}
+										/>
+									</Tooltip>
+									<Tooltip title={t("actions.delete", "删除", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<DeleteOutlined />}
+											style={actionBtnStyle}
+											onClick={() => handleDeleteMessage(msg.id)}
+										/>
+									</Tooltip>
+								</>
+							)}
+							{isAssistantMsg && (
+								<>
+									<Tooltip title={t("actions.copy", "复制", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<CopyOutlined />}
+											style={actionBtnStyle}
+											onClick={() => handleCopyMessage(msg.content)}
+										/>
+									</Tooltip>
+									<Tooltip title={t("actions.regenerate", "重新生成", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<ReloadOutlined />}
+											style={actionBtnStyle}
+											onClick={() => retryMessage(msg.id)}
+										/>
+									</Tooltip>
+									<Tooltip title={t("actions.delete", "删除", { ns: "chat" })}>
+										<Button
+											type="text"
+											size="small"
+											icon={<DeleteOutlined />}
+											style={actionBtnStyle}
+											onClick={() => handleDeleteMessage(msg.id)}
+										/>
+									</Tooltip>
+									<Dropdown menu={{ items: moreMenuItems }} trigger={["click"]}>
+										<Button
+											type="text"
+											size="small"
+											icon={<MoreOutlined />}
+											style={actionBtnStyle}
+										/>
+									</Dropdown>
+								</>
+							)}
+						</div>
+					);
+
+					// Layout: user messages have actions on left, info on right
+					// Assistant messages have info on left, actions on right
+					if (isUserMsg) {
+						return (
+							<div className="flex items-center justify-end gap-2">
+								{actionButtons}
+								{tokenInfoWithTooltip}
+							</div>
+						);
+					}
+
+					return (
+						<div className="flex items-center gap-2">
+							{tokenInfoWithTooltip}
+							{actionButtons}
+						</div>
+					);
+				})(),
+			};
+		});
+	}, [
+		messages,
+		isStreaming,
+		streamingContent,
+		conversationId,
+		isBookmarked,
+		message,
+		t,
+		token.colorTextQuaternary,
+		token.colorTextTertiary,
+		retryMessage,
+		editMessage,
+		handleCopyMessage,
+		handleDeleteMessage,
+		handleToggleBookmark,
+		handleExportMessage,
+	]);
 
 	return (
 		<MainLayout>
-			<div className="flex flex-col h-full" style={{ backgroundColor: token.colorBgLayout }}>
+			<div
+				className="flex flex-col h-full"
+				style={{ backgroundColor: token.colorBgLayout }}
+			>
 				{/* Chat Area */}
-				<div className="flex-1 overflow-auto w-full">
+				<div className="flex-1 overflow-hidden w-full">
 					{messages.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full w-full px-4 sm:px-6">
-							{/* Welcome Card */}
-							<div className="w-full mx-auto">
-								<div className="text-center mb-6 sm:mb-8">
-									<div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl mb-4 sm:mb-6">
+							<Welcome
+								icon={
+									<div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl">
 										<StarOutlined className="text-2xl sm:text-3xl text-white" />
 									</div>
-									<h2 className="text-2xl sm:text-3xl font-bold mb-3 whitespace-normal" style={{ color: token.colorTextHeading }}>
-										{t("welcomeTitle", { ns: "chat" })}
-									</h2>
-									<p className="text-slate-500 text-base sm:text-lg whitespace-normal">
-										{t("welcomeSubtitle", { ns: "chat" })}
-									</p>
-								</div>
-								{/* Suggestions */}
-								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-									{SUGGESTION_KEYS.map((key) => (
-										<button
-											key={key}
-											onClick={() => {
-												setInput(t(key, { ns: 'chat' }));
-											}}
-											className="p-4 text-left rounded-xl border hover:border-blue-500 hover:shadow-md transition-all group block w-full min-w-0"
-											style={{ backgroundColor: token.colorBgContainer, borderColor: token.colorBorder }}
-										>
-											<p className="text-sm group-hover:text-blue-600 break-words" style={{ color: token.colorText }}>
-												{t(key, { ns: 'chat' })}
-											</p>
-										</button>
-									))}
-								</div>
+								}
+								title={t("welcomeTitle", { ns: "chat" })}
+								description={t("welcomeSubtitle", {
+									ns: "chat",
+								})}
+								variant="borderless"
+								styles={{
+									title: {
+										fontSize: "1.75rem",
+										fontWeight: 700,
+									},
+									description: {
+										color: token.colorTextSecondary,
+										fontSize: "1rem",
+									},
+								}}
+							/>
+							<div className="mt-6">
+								<Prompts
+									items={suggestionItems}
+									onItemClick={handlePromptClick}
+									wrap
+									styles={{
+										item: {
+											flex: "1 1 calc(50% - 8px)",
+											minWidth: 200,
+										},
+									}}
+								/>
 							</div>
 						</div>
 					) : (
-						<div className="max-w-4xl mx-auto px-6 py-8">
-							{messages.map((msg, idx) => (
-								<MessageBubble
-									key={msg.id || idx}
-									msg={msg}
-									isStreaming={isStreaming}
-									isLast={idx === messages.length - 1}
-									streamingContent={streamingContent}
-									conversationId={conversationId}
-									onDelete={(msgId) => {
-										message.info(t("chat.messageDeleteNotImplemented", "消息删除功能待实现", { ns: "chat" }));
-									}}
-								/>
-							))}
-							<div ref={chatEndRef} />
-						</div>
+						<Bubble.List
+							ref={bubbleListRef}
+							items={bubbleItems}
+							role={roles}
+							autoScroll
+							className="h-full"
+							styles={{
+								content: {
+									maxWidth: "56rem",
+									margin: "0 auto",
+									padding: "2rem 1.5rem",
+								},
+							}}
+						/>
 					)}
 				</div>
 
 				{/* Input Area */}
 				<div className="px-6 py-4">
-					<div className="w-full mx-auto max-w-4xl">
-						{/* Search Engine Panel - Full width at top */}
+					<div className="relative w-full mx-auto max-w-4xl">
+						{/* Search Engine Panel */}
 						{searchPopoverOpen && (
-							<div className="mb-2 shadow-lg rounded-lg overflow-hidden">
+							<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
 								<SearchEnginePanel
 									selectedEngine={selectedEngine}
 									onSelectEngine={setSelectedEngine}
-									onClose={() => setSearchPopoverOpen(false)}
+									onClose={() =>
+										setSearchPopoverOpen(false)
+									}
 								/>
 							</div>
 						)}
 
-						{/* Input box with toolbar */}
-						<div
-							className={cn(
-								"relative rounded-2xl border transition-all duration-200",
-								isInputFocused
-									? "border-blue-500 shadow-lg shadow-blue-500/10"
-									: ""
-							)}
-							style={{
-								backgroundColor: token.colorBgContainer,
-								borderColor: isInputFocused ? undefined : token.colorBorder,
-							}}
-						>
-							{/* Attached files */}
-							{attachedFiles.length > 0 && (
-								<div className="px-4 pt-3">
-									<AttachmentList
-										attachments={attachedFiles}
-										onRemove={(id) =>
-											setAttachedFiles((prev) => prev.filter((f) => f.id !== id))
-										}
-									/>
-								</div>
-							)}
-
-							{/* Textarea */}
-							<textarea
-								value={input}
-								onChange={(e) => setInput(e.target.value)}
-								onKeyDown={(e) => {
-									const { getShortcut } = useShortcutStore.getState();
-									const sendShortcut = getShortcut("send-message");
-									const newLineShortcut = getShortcut("new-line");
-									const pressed = normalizeShortcut(getShortcutFromEvent(e.nativeEvent));
-
-									// Check new-line first (more specific, e.g. shift+enter)
-									if (
-										newLineShortcut?.enabled &&
-										normalizeShortcut(newLineShortcut.currentKey) === pressed
-									) {
-										// Allow default behavior (insert newline)
-										return;
+						{/* Attached files preview */}
+						{attachedFiles.length > 0 && (
+							<div className="mb-2">
+								<AttachmentList
+									attachments={attachedFiles}
+									onRemove={(id) =>
+										setAttachedFiles((prev) =>
+											prev.filter((f) => f.id !== id),
+										)
 									}
-
-									// Check send-message
-									if (
-										sendShortcut?.enabled &&
-										normalizeShortcut(sendShortcut.currentKey) === pressed
-									) {
-										e.preventDefault();
-										handleSend();
-									}
-								}}
-								onFocus={() => setIsInputFocused(true)}
-								onBlur={() => setIsInputFocused(false)}
-								placeholder={t(
-									"chat.placeholder",
-									"在这里输入消息，按 Enter 发送",
-								)}
-								className="chat-textarea w-full bg-transparent border-0 resize-none py-4 px-5 max-h-40 min-h-[80px] focus:outline-none"
-								style={{ height: "auto", color: token.colorText }}
-								rows={1}
-								disabled={isStreaming}
-							/>
-
-							{/* Bottom toolbar */}
-							<div
-								className="flex items-center justify-between px-3 py-2 border-t"
-								style={{ borderColor: token.colorBorderSecondary }}
-							>
-								{/* Left toolbar items */}
-								<div className="flex items-center gap-1">
-									{/* File Upload Button */}
-									<FileUploadButton
-										onUploadComplete={(attachments) => {
-											setAttachedFiles((prev) => [...prev, ...attachments]);
-										}}
-										conversationId={conversationId}
-									/>
-
-									{/* Divider */}
-									<div
-										className="w-px h-5 mx-1"
-										style={{ backgroundColor: token.colorBorder }}
-									/>
-
-									{TOOLBAR_ITEMS.map((item) => (
-										<Tooltip key={item.id} title={t(item.label, { ns: "chat" })}>
-											<button
-												onClick={() => handleToolbarClick(item.id)}
-												className={cn(
-													"w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-													item.color && "hover:text-[var(--hover-color)]",
-												)}
-												style={{
-													color: token.colorTextSecondary,
-													"--hover-color": item.color,
-												} as React.CSSProperties}
-												onMouseEnter={(e) => {
-													e.currentTarget.style.backgroundColor = token.colorBgTextHover;
-												}}
-												onMouseLeave={(e) => {
-													e.currentTarget.style.backgroundColor = "transparent";
-												}}
-											>
-												{item.icon}
-											</button>
-										</Tooltip>
-									))}
-
-									{/* Search engine toggle button */}
-									<Tooltip title={t("chat.toolbar.search", "搜索", { ns: "chat" })}>
-										<button
-											onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
-											className={cn(
-												"w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-											)}
-											style={{
-												color: token.colorTextSecondary,
-												backgroundColor: searchPopoverOpen ? token.colorBgTextHover : "transparent",
-											}}
-											onMouseEnter={(e) => {
-												if (!searchPopoverOpen) {
-													e.currentTarget.style.backgroundColor = token.colorBgTextHover;
-												}
-											}}
-											onMouseLeave={(e) => {
-												if (!searchPopoverOpen) {
-													e.currentTarget.style.backgroundColor = "transparent";
-												}
-											}}
-										>
-											{currentEngine.icon}
-										</button>
-									</Tooltip>
-
-									{/* Divider */}
-									<div
-										className="w-px h-5 mx-1"
-										style={{ backgroundColor: token.colorBorder }}
-									/>
-
-									{/* More button */}
-									<Tooltip title="更多">
-										<button
-											className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
-											style={{ color: token.colorTextSecondary }}
-											onMouseEnter={(e) => {
-												e.currentTarget.style.backgroundColor = token.colorBgTextHover;
-											}}
-											onMouseLeave={(e) => {
-												e.currentTarget.style.backgroundColor = "transparent";
-											}}
-										>
-											<RightOutlined className="text-sm" />
-										</button>
-									</Tooltip>
-								</div>
-
-								{/* Right send button */}
-								<Button
-									type="primary"
-									onClick={handleSend}
-									loading={isStreaming}
-									disabled={!input.trim() && attachedFiles.length === 0}
-									className="rounded-full h-9 w-9 flex items-center justify-center !bg-slate-400 hover:!bg-slate-500 !border-0"
-									icon={<SendOutlined className="text-sm" />}
 								/>
 							</div>
-						</div>
+						)}
+
+						{/* Sender component */}
+						<Sender
+							value={input}
+							onChange={(val) => setInput(val)}
+							onSubmit={handleSend}
+							onCancel={
+								isStreaming ? stopCurrentStream : undefined
+							}
+							loading={isStreaming}
+							placeholder={t(
+								"chat.placeholder",
+								"在这里输入消息，按 Enter 发送",
+							)}
+							onKeyDown={(e) => {
+								const { getShortcut } =
+									useShortcutStore.getState();
+								const sendShortcut =
+									getShortcut("send-message");
+								const newLineShortcut =
+									getShortcut("new-line");
+								const pressed = normalizeShortcut(
+									getShortcutFromEvent(e.nativeEvent),
+								);
+
+								if (
+									newLineShortcut?.enabled &&
+									normalizeShortcut(
+										newLineShortcut.currentKey,
+									) === pressed
+								) {
+									return;
+								}
+
+								if (
+									sendShortcut?.enabled &&
+									normalizeShortcut(
+										sendShortcut.currentKey,
+									) === pressed
+								) {
+									e.preventDefault();
+									handleSend(input);
+									return false;
+								}
+							}}
+							autoSize={{ minRows: 2, maxRows: 6 }}
+							// Hide the default send button from the right side of textarea
+							suffix={() => null}
+							// Toolbar below textarea: render function to access built-in SendButton
+							footer={(_footerNode, { components }) => {
+								const { SendButton } = components;
+								return (
+									<Flex
+										justify="space-between"
+										align="center"
+									>
+										<Flex align="center" gap={4}>
+											{/* File upload */}
+											<FileUploadButton
+												onUploadComplete={(
+													attachments,
+												) => {
+													setAttachedFiles(
+														(prev) => [
+															...prev,
+															...attachments,
+														],
+													);
+												}}
+												conversationId={
+													conversationId
+												}
+											/>
+
+											<div
+												className="w-px h-5 mx-1"
+												style={{
+													backgroundColor:
+														token.colorBorder,
+												}}
+											/>
+
+											{/* Primary toolbar items */}
+											{PRIMARY_TOOLBAR_ITEMS.map(
+												(item) => (
+													<Tooltip
+														key={item.id}
+														title={t(
+															item.label,
+															{
+																ns: "chat",
+															},
+														)}
+													>
+														<Button
+															type="text"
+															size="small"
+															icon={
+																item.icon
+															}
+															onClick={() =>
+																handleToolbarClick(
+																	item.id,
+																)
+															}
+														/>
+													</Tooltip>
+												),
+											)}
+
+											{/* Search engine */}
+											<Tooltip
+												title={t(
+													"chat.toolbar.search",
+													"搜索",
+													{ ns: "chat" },
+												)}
+											>
+												<Button
+													type="text"
+													size="small"
+													icon={
+														currentEngine.icon
+													}
+													onClick={() =>
+														setSearchPopoverOpen(
+															!searchPopoverOpen,
+														)
+													}
+													style={
+														searchPopoverOpen
+															? {
+																	backgroundColor:
+																		token.colorBgTextHover,
+																}
+															: undefined
+													}
+												/>
+											</Tooltip>
+
+											{/* Extra items - visible when expanded */}
+											{toolbarExpanded && (
+												<>
+													<div
+														className="w-px h-5 mx-1"
+														style={{
+															backgroundColor:
+																token.colorBorder,
+														}}
+													/>
+													{EXTRA_TOOLBAR_ITEMS.map(
+														(item) => (
+															<Tooltip
+																key={
+																	item.id
+																}
+																title={t(
+																	item.label,
+																	{
+																		ns: "chat",
+																	},
+																)}
+															>
+																<Button
+																	type="text"
+																	size="small"
+																	icon={
+																		item.icon
+																	}
+																	onClick={() =>
+																		handleToolbarClick(
+																			item.id,
+																		)
+																	}
+																/>
+															</Tooltip>
+														),
+													)}
+												</>
+											)}
+
+											<div
+												className="w-px h-5 mx-1"
+												style={{
+													backgroundColor:
+														token.colorBorder,
+												}}
+											/>
+
+											{/* More / Collapse toggle - always at the end */}
+											<Tooltip
+												title={
+													toolbarExpanded
+														? t(
+																"toolbar.collapse",
+																"收起",
+																{
+																	ns: "chat",
+																},
+															)
+														: t(
+																"toolbar.more",
+																"更多",
+																{
+																	ns: "chat",
+																},
+															)
+												}
+											>
+												<Button
+													type="text"
+													size="small"
+													icon={
+														toolbarExpanded ? (
+															<LeftOutlined />
+														) : (
+															<RightOutlined />
+														)
+													}
+													onClick={() =>
+														setToolbarExpanded(
+															(prev) =>
+																!prev,
+														)
+													}
+												/>
+											</Tooltip>
+										</Flex>
+
+										{/* Built-in SendButton */}
+										<SendButton
+											type="primary"
+											shape="circle"
+										/>
+									</Flex>
+								);
+							}}
+							styles={{
+								input: { fontSize: 14 },
+							}}
+						/>
 					</div>
 				</div>
 			</div>
@@ -460,7 +974,9 @@ const Chat: React.FC = () => {
 				isOpen={isSearchOpen}
 				onClose={() => setIsSearchOpen(false)}
 				onJumpToMessage={(messageId) => {
-					message.info(`${t("chat.jumpToMessage", "跳转到消息", { ns: "chat" })}: ${messageId}`);
+					message.info(
+						`${t("chat.jumpToMessage", "跳转到消息", { ns: "chat" })}: ${messageId}`,
+					);
 				}}
 			/>
 

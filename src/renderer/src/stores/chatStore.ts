@@ -24,7 +24,11 @@ export interface Message {
 	metadata?: {
 		model?: string;
 		tokens?: number;
+		inputTokens?: number;
+		outputTokens?: number;
 		duration?: number;
+		firstTokenMs?: number;
+		tokensPerSecond?: number;
 	};
 }
 
@@ -50,10 +54,14 @@ interface ChatState {
 	addMessage: (message: Message) => void;
 	updateLastMessage: (content: string) => void;
 	updateMessageToolCall: (messageId: string, toolCall: Partial<ToolCall>) => void;
+	updateMessageMetadata: (messageId: string, metadata: Partial<NonNullable<Message["metadata"]>>) => void;
 	setStreaming: (streaming: boolean) => void;
 	setStreamingContent: (content: string) => void;
 	appendStreamingContent: (content: string) => void;
 	clearMessages: () => void;
+	deleteMessage: (messageId: string) => void;
+	updateMessageContent: (messageId: string, content: string) => void;
+	deleteMessagesFrom: (messageId: string) => void;
 
 	// Session actions
 	createSession: (name?: string) => string;
@@ -109,6 +117,20 @@ export const useChatStore = create<ChatState>()(
 					return { messages: newMessages };
 				}),
 
+			updateMessageMetadata: (messageId, metadataUpdate) =>
+				set((state) => {
+					const messageIndex = state.messages.findIndex((m) => m.id === messageId);
+					if (messageIndex === -1) return state;
+
+					const newMessages = [...state.messages];
+					const message = newMessages[messageIndex];
+					newMessages[messageIndex] = {
+						...message,
+						metadata: { ...message.metadata, ...metadataUpdate },
+					};
+					return { messages: newMessages };
+				}),
+
 			setStreaming: (streaming) => set({ isStreaming: streaming }),
 
 			setStreamingContent: (content) => set({ streamingContent: content }),
@@ -130,6 +152,45 @@ export const useChatStore = create<ChatState>()(
 						return { messages: [], sessions: updatedSessions };
 					}
 					return { messages: [] };
+				}),
+
+			deleteMessage: (messageId) =>
+				set((state) => {
+					const newMessages = state.messages.filter((m) => m.id !== messageId);
+					if (state.currentSessionId) {
+						const updatedSessions = state.sessions.map((s) =>
+							s.id === state.currentSessionId
+								? { ...s, messageCount: newMessages.length, updatedAt: Date.now() }
+								: s,
+						);
+						return { messages: newMessages, sessions: updatedSessions };
+					}
+					return { messages: newMessages };
+				}),
+
+			updateMessageContent: (messageId, content) =>
+				set((state) => {
+					const idx = state.messages.findIndex((m) => m.id === messageId);
+					if (idx === -1) return state;
+					const newMessages = [...state.messages];
+					newMessages[idx] = { ...newMessages[idx], content };
+					return { messages: newMessages };
+				}),
+
+			deleteMessagesFrom: (messageId) =>
+				set((state) => {
+					const idx = state.messages.findIndex((m) => m.id === messageId);
+					if (idx === -1) return state;
+					const newMessages = state.messages.slice(0, idx);
+					if (state.currentSessionId) {
+						const updatedSessions = state.sessions.map((s) =>
+							s.id === state.currentSessionId
+								? { ...s, messageCount: newMessages.length, updatedAt: Date.now() }
+								: s,
+						);
+						return { messages: newMessages, sessions: updatedSessions };
+					}
+					return { messages: newMessages };
 				}),
 
 			createSession: (name) => {
