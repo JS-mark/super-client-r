@@ -1,22 +1,21 @@
 import {
+	CheckCircleOutlined,
 	DeleteOutlined,
 	EditOutlined,
-	KeyOutlined,
+	ExportOutlined,
 	PlusOutlined,
 	SearchOutlined,
-	SettingOutlined,
 	StarFilled,
 	StarOutlined,
 } from "@ant-design/icons";
 import {
-	Alert,
+	App,
 	Button,
-	Card,
-	List,
-	message,
+	Empty,
 	Popconfirm,
-	Tag,
+	Switch,
 	Tooltip,
+	Typography,
 	theme,
 } from "antd";
 import { useCallback, useEffect, useState } from "react";
@@ -27,9 +26,11 @@ import { SearchConfigModal } from "./SearchConfigModal";
 import { getProviderInfo } from "./SearchProviders";
 
 const { useToken } = theme;
+const { Text } = Typography;
 
 export function SearchSettings() {
 	const { t } = useTranslation();
+	const { message } = App.useApp();
 	const { token } = useToken();
 	const [configs, setConfigs] = useState<SearchConfig[]>([]);
 	const [defaultProvider, setDefaultProvider] = useState<
@@ -39,7 +40,6 @@ export function SearchSettings() {
 	const [modalOpen, setModalOpen] = useState(false);
 	const [editingConfig, setEditingConfig] = useState<SearchConfig | null>(null);
 
-	// Load configs
 	const loadConfigs = useCallback(async () => {
 		setLoading(true);
 		try {
@@ -49,17 +49,16 @@ export function SearchSettings() {
 				setDefaultProvider(result.data.defaultProvider);
 			} else {
 				message.error(
-					result.error || t("search.loadError", "加载搜索配置失败"),
+					result.error ||
+						t("search.loadError", { ns: "settings" }),
 				);
 			}
-		} catch (error) {
-			message.error(
-				t("search.loadError", "加载搜索配置失败", { ns: "settings" }),
-			);
+		} catch {
+			message.error(t("search.loadError", { ns: "settings" }));
 		} finally {
 			setLoading(false);
 		}
-	}, [t]);
+	}, [t, message]);
 
 	useEffect(() => {
 		loadConfigs();
@@ -80,20 +79,18 @@ export function SearchSettings() {
 			try {
 				const result = await searchService.deleteConfig(id);
 				if (result.success) {
-					message.success(
-						t("search.deleteSuccess", "删除成功", {
-							ns: "settings",
-						}),
-					);
+					message.success(t("search.deleteSuccess", { ns: "settings" }));
 					loadConfigs();
 				} else {
-					message.error(result.error || t("search.deleteError", "删除失败"));
+					message.error(
+						result.error || t("search.deleteError", { ns: "settings" }),
+					);
 				}
-			} catch (error) {
-				message.error(t("search.deleteError", "删除失败", { ns: "settings" }));
+			} catch {
+				message.error(t("search.deleteError", { ns: "settings" }));
 			}
 		},
-		[loadConfigs, t],
+		[loadConfigs, t, message],
 	);
 
 	const handleSetDefault = useCallback(
@@ -103,233 +100,289 @@ export function SearchSettings() {
 				if (result.success) {
 					message.success(
 						provider
-							? t("search.setDefaultSuccess", "设置默认成功")
-							: t("search.clearDefaultSuccess", "已取消默认", {
-								ns: "settings",
-							}),
+							? t("search.setDefaultSuccess", { ns: "settings" })
+							: t("search.clearDefaultSuccess", { ns: "settings" }),
 					);
 					loadConfigs();
 				} else {
 					message.error(
-						result.error || t("search.setDefaultError", "设置失败"),
+						result.error || t("search.setDefaultError", { ns: "settings" }),
 					);
 				}
-			} catch (error) {
-				message.error(
-					t("search.setDefaultError", "设置失败", {
-						ns: "settings",
-					}),
-				);
+			} catch {
+				message.error(t("search.setDefaultError", { ns: "settings" }));
 			}
 		},
-		[loadConfigs, t],
+		[loadConfigs, t, message],
 	);
 
-	return (
-		<div className="space-y-6">
-			{/* Info alert */}
-			<Alert
-				message={t("search.title", "网络搜索配置")}
-				description={t(
-					"search.description",
-					"配置第三方搜索服务，让 AI 能够获取最新的网络信息。支持 API 搜索和传统搜索引擎。",
-					{ ns: "settings" },
-				)}
-				type="info"
-				showIcon
-				className="mb-4"
-			/>
+	const handleToggleEnabled = useCallback(
+		async (config: SearchConfig, enabled: boolean) => {
+			try {
+				const result = await searchService.saveConfig({
+					...config,
+					enabled,
+				});
+				if (result.success) {
+					loadConfigs();
+				} else {
+					message.error(result.error || t("search.saveError", { ns: "settings" }));
+				}
+			} catch {
+				message.error(t("search.saveError", { ns: "settings" }));
+			}
+		},
+		[loadConfigs, t, message],
+	);
 
-			{/* Default provider display */}
-			{defaultProvider && (
-				<Card className="!rounded-xl !border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-					<div className="flex items-center justify-between">
-						<div className="flex items-center gap-3">
-							<div className="w-10 h-10 rounded-lg bg-blue-500 text-white flex items-center justify-center text-lg font-bold">
-								{getProviderInfo(defaultProvider)?.icon || "🔍"}
-							</div>
-							<div>
-								<div className="text-sm text-slate-500">
-									{t("search.currentDefault", "当前默认搜索引擎", {
-										ns: "settings",
-									})}
-								</div>
-								<div
-									className="font-semibold text-slate-800"
-									style={{ color: token.colorTextHeading }}
-								>
-									{getProviderInfo(defaultProvider)?.name || defaultProvider}
-								</div>
-							</div>
-						</div>
-						<Button
-							icon={<StarFilled className="text-yellow-500" />}
-							onClick={() => handleSetDefault(null)}
-							size="small"
-						>
-							{t("search.clearDefault", "取消默认", {
-								ns: "settings",
-							})}
-						</Button>
+	if (loading && configs.length === 0) {
+		return (
+			<div className="flex items-center justify-center py-16">
+				<div
+					className="text-sm"
+					style={{ color: token.colorTextSecondary }}
+				>
+					Loading...
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<div className="animate-fade-in">
+			{/* Header */}
+			<div className="flex items-center justify-between mb-6">
+				<div>
+					<Text
+						strong
+						className="text-base"
+						style={{ color: token.colorText }}
+					>
+						{t("search.title", { ns: "settings" })}
+					</Text>
+					<div
+						className="text-xs mt-1"
+						style={{ color: token.colorTextTertiary }}
+					>
+						{t("search.description", { ns: "settings" })}
 					</div>
-				</Card>
-			)}
+				</div>
+				<Button
+					type="primary"
+					icon={<PlusOutlined />}
+					onClick={handleAddConfig}
+				>
+					{t("search.addConfig", { ns: "settings" })}
+				</Button>
+			</div>
 
 			{/* Config list */}
-			<Card
-				title={
-					<div className="flex items-center justify-between">
-						<span className="flex items-center gap-2">
-							<SettingOutlined />
-							{t("search.configList", "搜索配置", {
-								ns: "settings",
-							})}
-						</span>
+			{configs.length === 0 ? (
+				<div className="flex flex-col items-center justify-center py-16">
+					<Empty
+						image={Empty.PRESENTED_IMAGE_SIMPLE}
+						description={
+							<span style={{ color: token.colorTextSecondary }}>
+								{t("search.noConfigs", { ns: "settings" })}
+							</span>
+						}
+					>
 						<Button
 							type="primary"
 							icon={<PlusOutlined />}
 							onClick={handleAddConfig}
-							size="small"
 						>
-							{t("search.addConfig", "添加配置", {
-								ns: "settings",
-							})}
+							{t("search.addConfig", { ns: "settings" })}
 						</Button>
-					</div>
-				}
-				className="!rounded-xl !border-slate-200"
-				loading={loading}
-			>
-				<List
-					dataSource={configs}
-					renderItem={(config) => {
+					</Empty>
+				</div>
+			) : (
+				<div className="flex flex-col gap-3">
+					{configs.map((config) => {
 						const providerInfo = getProviderInfo(config.provider);
 						const isDefault = config.provider === defaultProvider;
 
 						return (
-							<List.Item
-								actions={[
-									<Tooltip
-										key="default"
-										title={
-											isDefault
-												? t("search.isDefault", "默认")
-												: t("search.setAsDefault", "设为默认", {
-													ns: "settings",
-												})
-										}
-									>
-										<Button
-											icon={
-												isDefault ? (
-													<StarFilled className="text-yellow-500" />
-												) : (
-													<StarOutlined />
-												)
-											}
-											onClick={() =>
-												handleSetDefault(isDefault ? null : config.provider)
-											}
-											size="small"
-											type={isDefault ? "primary" : "default"}
-											disabled={isDefault}
-										/>
-									</Tooltip>,
-									<Tooltip
-										key="edit"
-										title={t("edit", "编辑", {
-											ns: "common",
-										})}
-									>
-										<Button
-											icon={<EditOutlined />}
-											onClick={() => handleEditConfig(config)}
-											size="small"
-										/>
-									</Tooltip>,
-									<Popconfirm
-										key="delete"
-										title={t("search.confirmDelete", "确定要删除此配置吗？", {
-											ns: "settings",
-										})}
-										onConfirm={() => handleDeleteConfig(config.id)}
-										okText={t("confirm", "确定", {
-											ns: "common",
-										})}
-										cancelText={t("common.cancel", "取消")}
-									>
-										<Tooltip
-											title={t("delete", "删除", {
-												ns: "common",
-											})}
-										>
-											<Button icon={<DeleteOutlined />} danger size="small" />
-										</Tooltip>
-									</Popconfirm>,
-								]}
-							>
-								<List.Item.Meta
-									avatar={
-										<div
-											className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-lg"
-											style={{ backgroundColor: token.colorBgContainer }}
-										>
-											{providerInfo?.icon || "🔍"}
-										</div>
+							<div
+								key={config.id}
+								className="group rounded-xl border p-4 transition-colors duration-150"
+								style={{
+									borderColor: isDefault
+										? token.colorPrimaryBorder
+										: token.colorBorderSecondary,
+									background: isDefault
+										? token.colorPrimaryBg
+										: token.colorBgContainer,
+								}}
+								onMouseEnter={(e) => {
+									if (!isDefault) {
+										e.currentTarget.style.borderColor =
+											token.colorBorder;
 									}
-									title={
+								}}
+								onMouseLeave={(e) => {
+									if (!isDefault) {
+										e.currentTarget.style.borderColor =
+											token.colorBorderSecondary;
+									}
+								}}
+							>
+								<div className="flex items-center gap-4">
+									{/* Provider icon */}
+									<div
+										className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-none"
+										style={{
+											background: token.colorFillTertiary,
+										}}
+									>
+										{providerInfo?.icon || "🔍"}
+									</div>
+
+									{/* Info */}
+									<div className="flex-1 min-w-0">
 										<div className="flex items-center gap-2">
-											<span className="font-medium">{config.name}</span>
+											<Text
+												strong
+												className="text-sm"
+												style={{ color: token.colorText }}
+											>
+												{config.name}
+											</Text>
 											{isDefault && (
-												<Tag color="blue" className="!text-xs">
-													{t("search.default", "默认", { ns: "settings" })}
-												</Tag>
+												<span
+													className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+													style={{
+														color: token.colorPrimary,
+														background: token.colorPrimaryBg,
+														border: `1px solid ${token.colorPrimaryBorder}`,
+													}}
+												>
+													<StarFilled className="text-[10px]" />
+													{t("search.default", { ns: "settings" })}
+												</span>
 											)}
 											{!config.enabled && (
-												<Tag color="default" className="!text-xs">
-													{t("search.disabled", "已禁用", { ns: "settings" })}
-												</Tag>
-											)}
-										</div>
-									}
-									description={
-										<div className="text-sm text-slate-500">
-											{providerInfo?.description}
-											{config.apiKey && (
-												<span className="ml-2">
-													<KeyOutlined className="text-xs" /> ••••••••
+												<span
+													className="inline-flex items-center px-2 py-0.5 rounded-full text-xs"
+													style={{
+														color: token.colorTextQuaternary,
+														background: token.colorFillQuaternary,
+													}}
+												>
+													{t("search.disabled", { ns: "settings" })}
 												</span>
 											)}
 										</div>
-									}
-								/>
-							</List.Item>
-						);
-					}}
-					locale={{
-						emptyText: (
-							<div className="text-center py-8 text-slate-400">
-								<SearchOutlined className="text-4xl mb-2" />
-								<p>
-									{t("search.noConfigs", "暂无搜索配置", {
-										ns: "settings",
-									})}
-								</p>
-								<Button
-									type="primary"
-									icon={<PlusOutlined />}
-									onClick={handleAddConfig}
-									className="mt-4"
-								>
-									{t("search.addConfig", "添加配置", {
-										ns: "settings",
-									})}
-								</Button>
+										<div
+											className="text-xs mt-1 flex items-center gap-2"
+											style={{ color: token.colorTextTertiary }}
+										>
+											<span>{providerInfo?.description}</span>
+											{config.apiKey && (
+												<span className="flex items-center gap-1">
+													<CheckCircleOutlined />
+													API Key
+												</span>
+											)}
+											{providerInfo?.helpUrl && (
+												<a
+													href={providerInfo.helpUrl}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="flex items-center gap-0.5 hover:opacity-80"
+													style={{ color: token.colorTextTertiary }}
+													onClick={(e) => e.stopPropagation()}
+												>
+													<ExportOutlined className="text-[10px]" />
+												</a>
+											)}
+										</div>
+									</div>
+
+									{/* Actions */}
+									<div className="flex items-center gap-2 flex-none">
+										{/* Default toggle */}
+										<Tooltip
+											title={
+												isDefault
+													? t("search.clearDefault", { ns: "settings" })
+													: t("search.setAsDefault", { ns: "settings" })
+											}
+										>
+											<Button
+												type="text"
+												size="small"
+												icon={
+													isDefault ? (
+														<StarFilled
+															style={{ color: "#faad14" }}
+														/>
+													) : (
+														<StarOutlined
+															style={{
+																color: token.colorTextQuaternary,
+															}}
+														/>
+													)
+												}
+												onClick={() =>
+													handleSetDefault(
+														isDefault ? null : config.provider,
+													)
+												}
+											/>
+										</Tooltip>
+
+										{/* Enable/Disable */}
+										<Switch
+											size="small"
+											checked={config.enabled}
+											onChange={(checked) =>
+												handleToggleEnabled(config, checked)
+											}
+										/>
+
+										{/* Edit */}
+										<Tooltip title={t("edit", { ns: "settings" })}>
+											<Button
+												type="text"
+												size="small"
+												icon={
+													<EditOutlined
+														style={{
+															color: token.colorTextSecondary,
+														}}
+													/>
+												}
+												onClick={() => handleEditConfig(config)}
+											/>
+										</Tooltip>
+
+										{/* Delete */}
+										<Popconfirm
+											title={t("search.confirmDelete", "确定要删除此配置吗？", {
+												ns: "settings",
+											})}
+											onConfirm={() => handleDeleteConfig(config.id)}
+											okText={t("confirm", "确定", { ns: "common" })}
+											cancelText={t("common.cancel", "取消")}
+										>
+											<Tooltip title={t("delete", { ns: "settings" })}>
+												<Button
+													type="text"
+													size="small"
+													danger
+													icon={<DeleteOutlined />}
+												/>
+											</Tooltip>
+										</Popconfirm>
+									</div>
+								</div>
 							</div>
-						),
-					}}
-				/>
-			</Card>
+						);
+					})}
+				</div>
+			)}
 
 			{/* Add/Edit config modal */}
 			<SearchConfigModal

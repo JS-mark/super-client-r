@@ -7,11 +7,11 @@ import {
 	SearchOutlined,
 } from "@ant-design/icons";
 import {
+	App,
 	Button,
 	Form,
 	Input,
 	Modal,
-	message,
 	Select,
 	Switch,
 	theme,
@@ -20,10 +20,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { searchService } from "../../services/search/searchService";
 import type { SearchConfig, SearchProviderType } from "../../types/search";
-import {
-	getProviderInfo,
-	SEARCH_PROVIDERS,
-} from "./SearchProviders";
+import { getProviderInfo, SEARCH_PROVIDERS } from "./SearchProviders";
 
 const { useToken } = theme;
 
@@ -41,6 +38,7 @@ export function SearchConfigModal({
 	onSaved,
 }: SearchConfigModalProps) {
 	const { t } = useTranslation();
+	const { message } = App.useApp();
 	const { token } = useToken();
 	const [form] = Form.useForm();
 	const [selectedProvider, setSelectedProvider] =
@@ -70,9 +68,7 @@ export function SearchConfigModal({
 		const values = form.getFieldsValue();
 		if (!values.provider) {
 			message.warning(
-				t("search.selectProviderFirst", "请先选择服务商", {
-					ns: "settings",
-				}),
+				t("search.selectProviderFirst", { ns: "settings" }),
 			);
 			return;
 		}
@@ -92,21 +88,21 @@ export function SearchConfigModal({
 			const result = await searchService.validateConfig(config);
 			if (result.success && result.data?.valid) {
 				message.success(
-					t("search.validateSuccess", "API Key 有效", { ns: "settings" }),
+					t("search.validateSuccess", { ns: "settings" }),
 				);
 			} else {
 				message.error(
 					result.data?.error ||
-					result.error ||
-					t("search.validateError", "验证失败"),
+						result.error ||
+						t("search.validateError", { ns: "settings" }),
 				);
 			}
-		} catch (error) {
-			message.error(t("search.validateError", "验证失败", { ns: "settings" }));
+		} catch {
+			message.error(t("search.validateError", { ns: "settings" }));
 		} finally {
 			setValidating(false);
 		}
-	}, [form, t]);
+	}, [form, t, message]);
 
 	const handleSaveConfig = useCallback(
 		async (values: any) => {
@@ -128,20 +124,22 @@ export function SearchConfigModal({
 				const result = await searchService.saveConfig(config);
 				if (result.success) {
 					message.success(
-						t("search.saveSuccess", "保存成功", { ns: "settings" }),
+						t("search.saveSuccess", { ns: "settings" }),
 					);
 					onClose();
 					onSaved();
 				} else {
-					message.error(result.error || t("search.saveError", "保存失败"));
+					message.error(
+						result.error || t("search.saveError", { ns: "settings" }),
+					);
 				}
-			} catch (error) {
-				message.error(t("search.saveError", "保存失败", { ns: "settings" }));
+			} catch {
+				message.error(t("search.saveError", { ns: "settings" }));
 			} finally {
 				setSaving(false);
 			}
 		},
-		[editingConfig, onClose, onSaved, t],
+		[editingConfig, onClose, onSaved, t, message],
 	);
 
 	return (
@@ -150,8 +148,8 @@ export function SearchConfigModal({
 				<div className="flex items-center gap-2">
 					<SearchOutlined />
 					{editingConfig
-						? t("search.editConfig", "编辑搜索配置")
-						: t("search.addConfig", "添加搜索配置", { ns: "settings" })}
+						? t("search.editConfig", { ns: "settings" })
+						: t("search.addConfig", { ns: "settings" })}
 				</div>
 			}
 			open={open}
@@ -159,8 +157,8 @@ export function SearchConfigModal({
 			footer={null}
 			width={560}
 			destroyOnClose
-			afterOpenChange={(open) => {
-				if (open && editingConfig) {
+			afterOpenChange={(visible) => {
+				if (visible && editingConfig) {
 					form.setFieldsValue({
 						provider: editingConfig.provider,
 						name: editingConfig.name,
@@ -169,7 +167,7 @@ export function SearchConfigModal({
 						enabled: editingConfig.enabled,
 					});
 					setSelectedProvider(editingConfig.provider);
-				} else if (open) {
+				} else if (visible) {
 					form.resetFields();
 					setSelectedProvider(null);
 				}
@@ -184,25 +182,21 @@ export function SearchConfigModal({
 				{/* Provider select */}
 				<Form.Item
 					name="provider"
-					label={t("search.provider", "搜索服务商", { ns: "settings" })}
+					label={t("search.provider", { ns: "settings" })}
 					rules={[
 						{
 							required: true,
-							message: t("search.providerRequired", "请选择搜索服务商"),
+							message: t("search.providerRequired", { ns: "settings" }),
 						},
 					]}
 				>
 					<Select
-						placeholder={t("search.selectProvider", "请选择服务商", {
-							ns: "settings",
-						})}
+						placeholder={t("search.selectProvider", { ns: "settings" })}
 						onChange={handleProviderChange}
 						disabled={!!editingConfig}
 						options={[
 							{
-								label: t("search.apiSearch", "API 搜索", {
-									ns: "settings",
-								}),
+								label: t("search.apiSearch", { ns: "settings" }),
 								options: apiSearchProviders.map((p) => ({
 									value: p.id,
 									label: (
@@ -214,14 +208,14 @@ export function SearchConfigModal({
 								})),
 							},
 							{
-								label: t("search.traditionalSearch", "传统搜索", {
-									ns: "settings",
-								}),
+								label: t("search.traditionalSearch", { ns: "settings" }),
 								options: localSearchProviders.map((p) => ({
 									value: p.id,
 									label: (
 										<div className="flex items-center gap-2">
-											<span className="font-bold text-blue-500">{p.icon}</span>
+											<span style={{ color: token.colorPrimary }} className="font-bold">
+												{p.icon}
+											</span>
 											<span>{p.name}</span>
 										</div>
 									),
@@ -236,7 +230,7 @@ export function SearchConfigModal({
 					<div
 						className="mb-4 p-3 rounded-lg text-sm"
 						style={{
-							backgroundColor: token.colorBgContainer,
+							backgroundColor: token.colorFillQuaternary,
 							color: token.colorTextSecondary,
 						}}
 					>
@@ -247,12 +241,11 @@ export function SearchConfigModal({
 									href={currentProvider.helpUrl}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="text-blue-500 hover:text-blue-600 flex items-center gap-1"
+									className="flex items-center gap-1 hover:opacity-80"
+									style={{ color: token.colorPrimary }}
 								>
 									<QuestionCircleOutlined />
-									{t("search.getApiKey", "获取 API Key", {
-										ns: "settings",
-									})}
+									{t("search.getApiKey", { ns: "settings" })}
 								</a>
 							)}
 						</div>
@@ -262,18 +255,16 @@ export function SearchConfigModal({
 				{/* Config name */}
 				<Form.Item
 					name="name"
-					label={t("search.configName", "配置名称", { ns: "settings" })}
+					label={t("search.configName", { ns: "settings" })}
 					rules={[
 						{
 							required: true,
-							message: t("search.nameRequired", "请输入配置名称"),
+							message: t("search.nameRequired", { ns: "settings" }),
 						},
 					]}
 				>
 					<Input
-						placeholder={t("search.namePlaceholder", "例如：我的 Tavily 搜索", {
-							ns: "settings",
-						})}
+						placeholder={t("search.namePlaceholder", { ns: "settings" })}
 					/>
 				</Form.Item>
 
@@ -290,13 +281,13 @@ export function SearchConfigModal({
 						rules={
 							currentProvider?.requiresApiKey
 								? [
-									{
-										required: true,
-										message: t("search.apiKeyRequired", "请输入 API Key", {
-											ns: "settings",
-										}),
-									},
-								]
+										{
+											required: true,
+											message: t("search.apiKeyRequired", {
+												ns: "settings",
+											}),
+										},
+									]
 								: []
 						}
 					>
@@ -310,9 +301,7 @@ export function SearchConfigModal({
 									disabled={!form.getFieldValue("apiKey")}
 								>
 									<CheckCircleOutlined />
-									{t("search.validate", "检测", {
-										ns: "settings",
-									})}
+									{t("search.validate", { ns: "settings" })}
 								</Button>
 							}
 						/>
@@ -332,9 +321,7 @@ export function SearchConfigModal({
 						rules={[
 							{
 								required: true,
-								message: t("search.apiUrlRequired", "请输入 API URL", {
-									ns: "settings",
-								}),
+								message: t("search.apiUrlRequired", { ns: "settings" }),
 							},
 						]}
 					>
@@ -345,10 +332,8 @@ export function SearchConfigModal({
 				{/* Enable toggle */}
 				<Form.Item name="enabled" valuePropName="checked">
 					<Switch
-						checkedChildren={t("search.enabled", "已启用")}
-						unCheckedChildren={t("search.disabled", "已禁用", {
-							ns: "settings",
-						})}
+						checkedChildren={t("search.enabled", { ns: "settings" })}
+						unCheckedChildren={t("search.disabled", { ns: "settings" })}
 						defaultChecked
 					/>
 				</Form.Item>
