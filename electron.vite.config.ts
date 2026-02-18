@@ -1,6 +1,6 @@
-import { inspectorServer } from "@react-dev-inspector/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { codeInspectorPlugin } from "code-inspector-plugin";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { resolve } from "path";
 
@@ -15,7 +15,6 @@ export default defineConfig({
 			},
 		},
 		plugins: [externalizeDepsPlugin()],
-
 	},
 	preload: {
 		build: {
@@ -34,7 +33,13 @@ export default defineConfig({
 				"@": resolve("src/renderer/src"),
 			},
 		},
-		plugins: [react(), tailwindcss(), inspectorServer()],
+		plugins: [
+			react(),
+			tailwindcss(),
+			codeInspectorPlugin({
+				bundler: 'vite',
+			})
+		],
 		build: {
 			minify: false,
 		},

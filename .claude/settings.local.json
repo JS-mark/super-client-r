@@ -84,7 +84,24 @@
       "Bash(npm run build:*)",
       "Bash(pnpm remove:*)",
       "Bash(npx chrome-ext-downloader:*)",
-      "Bash(npx electron-rebuild:*)"
+      "Bash(npx electron-rebuild:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:x.ant.design)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "WebFetch(domain:sdk.vercel.ai)",
+      "WebFetch(domain:unpkg.com)",
+      "WebFetch(domain:ai-sdk.dev)",
+      "WebFetch(domain:app.unpkg.com)",
+      "WebFetch(domain:elements.ai-sdk.dev)",
+      "Bash(pnpm exec electron-vite build:*)",
+      "WebFetch(domain:bundlephobia.com)",
+      "WebFetch(domain:milkdown.dev)",
+      "WebFetch(domain:mdxeditor.dev)",
+      "WebFetch(domain:www.blocknotejs.org)",
+      "WebFetch(domain:tiptap.dev)",
+      "Bash(# Check if tiptap has a markdown extension curl -s \"\"https://registry.npmjs.org/@tiptap/extension-markdown/latest\"\")",
+      "Bash(xargs cat:*)"
     ]
   }
 }
