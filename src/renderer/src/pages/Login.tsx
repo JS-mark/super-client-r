@@ -1,5 +1,6 @@
 import { GithubOutlined, GoogleOutlined } from "@ant-design/icons";
-import { Button, Card, Space, Typography, theme } from "antd";
+import { Alert, Button, Card, Space, Typography, theme } from "antd";
+import { useCallback, useState } from "react";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
@@ -12,25 +13,36 @@ const { Title, Text } = Typography;
 const Login: React.FC = () => {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
-	const { login } = useUserStore();
+	const { login, loginWithOAuth, isLoading, error } = useUserStore();
 	const { token } = useToken();
+	const [loginProvider, setLoginProvider] = useState<string | null>(null);
 
-	const handleLogin = (provider: "google" | "github" | "mock") => {
-		console.log(`Login with ${provider}`);
+	const handleOAuthLogin = useCallback(
+		async (provider: "google" | "github") => {
+			setLoginProvider(provider);
+			try {
+				await loginWithOAuth(provider);
+				// Check if login succeeded (store is updated)
+				const state = useUserStore.getState();
+				if (state.isLoggedIn) {
+					navigate("/chat");
+				}
+			} finally {
+				setLoginProvider(null);
+			}
+		},
+		[loginWithOAuth, navigate],
+	);
 
-		// Mock user data - 实际项目中应该从 OAuth 回调获取
+	const handleMockLogin = useCallback(() => {
 		const mockUser = {
 			id: `user_${Date.now()}`,
-			name: provider === "google" ? "Google User" : provider === "github" ? "GitHub User" : "Test User",
-			email: `${provider}_user@example.com`,
+			name: "Test User",
+			email: "test@example.com",
 		};
-
-		// 保存用户信息
 		login(mockUser);
-
-		// 跳转到聊天页面
 		navigate("/chat");
-	};
+	}, [login, navigate]);
 
 	return (
 		<div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
@@ -59,13 +71,26 @@ const Login: React.FC = () => {
 					</Text>
 				</div>
 
+				{/* Error Message */}
+				{error && (
+					<Alert
+						message={error}
+						type="error"
+						showIcon
+						closable
+						className="mb-4"
+					/>
+				)}
+
 				{/* Login Buttons */}
 				<Space orientation="vertical" className="w-full" size="middle">
 					<Button
 						block
 						size="large"
 						icon={<GoogleOutlined className="text-lg" />}
-						onClick={() => handleLogin("google")}
+						onClick={() => handleOAuthLogin("google")}
+						loading={isLoading && loginProvider === "google"}
+						disabled={isLoading}
 						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-blue-300 hover:!shadow-md transition-all"
 					>
 						{t("signInGoogle", { ns: "app" })}
@@ -74,7 +99,9 @@ const Login: React.FC = () => {
 						block
 						size="large"
 						icon={<GithubOutlined className="text-lg" />}
-						onClick={() => handleLogin("github")}
+						onClick={() => handleOAuthLogin("github")}
+						loading={isLoading && loginProvider === "github"}
+						disabled={isLoading}
 						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-purple-300 hover:!shadow-md transition-all"
 					>
 						{t("signInGithub", { ns: "app" })}
@@ -103,7 +130,8 @@ const Login: React.FC = () => {
 								block
 								size="large"
 								type="dashed"
-								onClick={() => handleLogin("mock")}
+								onClick={handleMockLogin}
+								disabled={isLoading}
 								className="!h-12 !rounded-xl !font-medium"
 							>
 								{t("mockLogin", { ns: "app" })}

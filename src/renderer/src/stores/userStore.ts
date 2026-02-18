@@ -1,18 +1,24 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { authService } from "../services/authService";
 
 export interface User {
 	id: string;
 	name: string;
 	email?: string;
 	avatar?: string;
+	provider?: "google" | "github";
 }
 
 interface UserState {
 	user: User | null;
 	isLoggedIn: boolean;
+	isLoading: boolean;
+	error: string | null;
 	login: (user: User) => void;
-	logout: () => void;
+	loginWithOAuth: (provider: "google" | "github") => Promise<void>;
+	logout: () => Promise<void>;
+	restoreSession: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>()(
@@ -20,19 +26,67 @@ export const useUserStore = create<UserState>()(
 		(set) => ({
 			user: null,
 			isLoggedIn: false,
+			isLoading: false,
+			error: null,
 			login: (user) =>
 				set({
 					user,
 					isLoggedIn: true,
+					error: null,
 				}),
-			logout: () =>
+			loginWithOAuth: async (provider) => {
+				set({ isLoading: true, error: null });
+				try {
+					const response = await authService.login(provider);
+					if (response.success && response.data) {
+						set({
+							user: response.data,
+							isLoggedIn: true,
+							isLoading: false,
+							error: null,
+						});
+					} else {
+						set({
+							isLoading: false,
+							error: response.error || "Login failed",
+						});
+					}
+				} catch (error) {
+					set({
+						isLoading: false,
+						error: (error as Error).message,
+					});
+				}
+			},
+			logout: async () => {
+				try {
+					await authService.logout();
+				} catch {
+					// Continue with local logout even if IPC fails
+				}
 				set({
 					user: null,
 					isLoggedIn: false,
-				}),
+					error: null,
+				});
+			},
+			restoreSession: async () => {
+				try {
+					const response = await authService.getUser();
+					if (response.success && response.data) {
+						set({
+							user: response.data,
+							isLoggedIn: true,
+						});
+					}
+				} catch {
+					// Ignore restore errors
+				}
+			},
 		}),
 		{
 			name: "user-storage",
+			partialize: (state) => ({ user: state.user, isLoggedIn: state.isLoggedIn }),
 		},
 	),
 );
