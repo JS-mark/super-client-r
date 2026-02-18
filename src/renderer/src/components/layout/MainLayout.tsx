@@ -7,9 +7,10 @@ import {
 	SettingOutlined,
 	StarOutlined,
 } from "@ant-design/icons";
-import { Dropdown, Layout, type MenuProps, Tooltip, theme } from "antd";
+import { Dropdown, type MenuProps, Tooltip, theme } from "antd";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppShortcuts } from "../../hooks/useAppShortcuts";
@@ -25,11 +26,10 @@ import type { MenuItemConfig } from "../../types/menu";
 import { AboutModal } from "../AboutModal";
 import { TitleBar } from "./TitleBar";
 
-const { Sider, Content } = Layout;
 const { useToken } = theme;
 
 /**
- * 图标映射：图标名称到 Ant Design 图标组件
+ * Icon map: icon name → Ant Design icon component
  */
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	MessageOutlined,
@@ -42,35 +42,119 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 };
 
 /**
- * 渲染菜单图标
+ * Render menu item icon
  */
 function renderMenuItemIcon(item: MenuItemConfig): React.ReactNode {
 	if (!item.enabled) return null;
 
-	// 渲染图标
-	let iconNode: React.ReactNode;
-
 	if (item.iconType === "emoji") {
-		// Emoji 图标
-		iconNode = <span className="text-xl">{item.iconContent}</span>;
-	} else if (item.iconType === "image") {
-		// 图片图标
-		iconNode = (
+		return <span className="text-xl">{item.iconContent}</span>;
+	}
+	if (item.iconType === "image") {
+		return (
 			<img
 				src={item.iconContent}
 				alt={item.label}
 				className="w-6 h-6 object-contain"
 			/>
 		);
-	} else {
-		// 默认 Ant Design 图标
-		const iconKey = item.iconContent || "MessageOutlined";
-		const IconComponent = ICON_MAP[iconKey] || MessageOutlined;
-		iconNode = <IconComponent className="text-xl" />;
 	}
-
-	return iconNode;
+	const iconKey = item.iconContent || "MessageOutlined";
+	const IconComponent = ICON_MAP[iconKey] || MessageOutlined;
+	return <IconComponent className="text-xl" />;
 }
+
+// --- Sub-components ---
+
+const springTransition = { type: "spring" as const, stiffness: 400, damping: 17 };
+
+interface UserAvatarProps {
+	user: { name: string } | null;
+	isLoggedIn: boolean;
+}
+
+const UserAvatar: React.FC<UserAvatarProps> = ({ user, isLoggedIn }) => {
+	if (isLoggedIn && user) {
+		const initials = getUserInitials(user.name);
+		const bgColor = getAvatarColor(user.name);
+		return (
+			<motion.div
+				whileHover={{ scale: 1.05, rotate: 2 }}
+				transition={springTransition}
+				className={cn(
+					"w-9 h-9 rounded-xl flex items-center justify-center shadow-lg cursor-pointer",
+					bgColor,
+				)}
+			>
+				<span className="text-white font-bold text-sm">{initials}</span>
+			</motion.div>
+		);
+	}
+	return (
+		<motion.div
+			whileHover={{ scale: 1.05, rotate: 2 }}
+			transition={springTransition}
+			className="w-9 h-9 rounded-xl bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/30 cursor-pointer"
+		>
+			<span className="text-white font-bold text-sm">S</span>
+		</motion.div>
+	);
+};
+
+interface SidebarMenuItemProps {
+	item: MenuItemConfig;
+	isSelected: boolean;
+	onClick: () => void;
+	label: string;
+}
+
+const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
+	item,
+	isSelected,
+	onClick,
+	label,
+}) => {
+	return (
+		<Tooltip title={label} placement="right" mouseEnterDelay={0.5}>
+			<motion.button
+				type="button"
+				onClick={onClick}
+				whileHover={{ scale: 1.08 }}
+				whileTap={{ scale: 0.92 }}
+				transition={springTransition}
+				className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
+			>
+				<span
+					className={cn(
+						"w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200",
+						isSelected ? "text-white" : "hover:bg-slate-700/50",
+					)}
+				>
+					{renderMenuItemIcon(item)}
+				</span>
+				{isSelected && (
+					<motion.div
+						layoutId="sidebar-active"
+						className="absolute inset-x-2.5 top-1.5 bottom-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/30"
+						transition={{
+							type: "spring",
+							stiffness: 350,
+							damping: 30,
+						}}
+					/>
+				)}
+			</motion.button>
+		</Tooltip>
+	);
+};
+
+// Page transition config
+const pageTransition = {
+	duration: 0.2,
+	ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+};
+
+// --- Main Layout ---
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	children,
@@ -80,74 +164,59 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	const location = useLocation();
 	const { token } = useToken();
 
-	// Wire up global keyboard shortcuts
 	useAppShortcuts();
 
-	// 从 store 获取菜单配置
 	const menuItems = useMenuStore((state) => state.items);
-
-	// 用户状态
 	const { user, isLoggedIn, logout } = useUserStore();
 
-	// 关于弹窗状态
 	const [aboutModalOpen, setAboutModalOpen] = useState(false);
 	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
-	// 获取应用信息
 	useEffect(() => {
 		appService.getInfo().then((info) => {
 			setAppInfo(info);
 		});
 	}, []);
 
-	// 监听显示关于弹窗事件（从系统托盘菜单触发）
 	useEffect(() => {
 		const handleShowAboutModal = () => {
 			setAboutModalOpen(true);
 		};
-
 		window.electron.ipc.on("show-about-modal", handleShowAboutModal);
-
 		return () => {
 			window.electron.ipc.off("show-about-modal", handleShowAboutModal);
 		};
 	}, []);
 
-	// 过滤出已启用的菜单项（排除设置项，设置项固定显示在底部）
 	const enabledItems = menuItems.filter(
 		(item) => item.enabled && item.id !== "settings",
 	);
 
-	// 检查设置是否被选中
 	const isSettingsSelected = location.pathname.startsWith("/settings");
 
-	// 当前选中的菜单项 ID
 	const selectedKey =
 		enabledItems.find((item) => location.pathname.startsWith(item.path))?.id ||
 		"";
 
-	// 处理菜单点击
-	const handleMenuClick = (item: MenuItemConfig) => {
-		navigate(item.path);
-	};
+	const handleMenuClick = useCallback(
+		(item: MenuItemConfig) => {
+			navigate(item.path);
+		},
+		[navigate],
+	);
 
-	// 处理退出登录
-	const handleLogout = () => {
+	const handleLogout = useCallback(() => {
 		logout();
-		// 导航到登录页
 		navigate("/");
-	};
+	}, [logout, navigate]);
 
-	// 右键菜单项
 	const contextMenuItems: MenuProps["items"] = [
 		{
 			key: "username",
 			label: user?.name || t("guest", "访客", { ns: "user" }),
 			disabled: true,
 		},
-		{
-			type: "divider",
-		},
+		{ type: "divider" },
 		{
 			key: "logout",
 			label: t("logout", "退出登录", { ns: "user" }),
@@ -155,38 +224,12 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 		},
 	];
 
-	// 用户头像组件
-	const UserAvatar = () => {
-		if (isLoggedIn && user) {
-			const initials = getUserInitials(user.name);
-			const bgColor = getAvatarColor(user.name);
-
-			return (
-				<div
-					className={`w-9 h-9 rounded-xl ${bgColor} flex items-center justify-center shadow-lg cursor-pointer hover:opacity-90 transition-opacity`}
-				>
-					<span className="text-white font-bold text-sm">{initials}</span>
-				</div>
-			);
-		}
-
-		// 未登录状态显示默认 Logo
-		return (
-			<div className="w-9 h-9 rounded-xl bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/30">
-				<span className="text-white font-bold text-sm">S</span>
-			</div>
-		);
-	};
-
 	return (
-		<Layout className="h-screen bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10">
-			{/* 左侧边栏 - 全高 */}
-			<Sider
-				width={80}
-				className="!bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 !border-r !border-slate-700/50 shadow-2xl h-full"
-			>
+		<div className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10">
+			{/* Sidebar */}
+			<div className="w-20 h-full flex-none bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-slate-700/50 shadow-2xl">
 				<div className="flex flex-col h-full pt-[30px]">
-					{/* Logo Area - 用户头像 */}
+					{/* Avatar */}
 					<div className="h-16 flex items-center justify-center border-b border-slate-700/50">
 						<Dropdown
 							menu={{ items: contextMenuItems }}
@@ -195,93 +238,108 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 						>
 							<div>
 								<Tooltip
-									title={user?.name || t("name", "Super Client", { ns: "app" })}
+									title={
+										user?.name || t("name", "Super Client", { ns: "app" })
+									}
 									placement="right"
 									mouseEnterDelay={0.5}
 								>
-									<UserAvatar />
+									<UserAvatar user={user} isLoggedIn={isLoggedIn} />
 								</Tooltip>
 							</div>
 						</Dropdown>
 					</div>
 
-					{/* Menu - 仅图标 */}
+					{/* Menu items */}
 					<div className="mt-4 px-2 flex flex-col gap-1">
-						{enabledItems.map((item) => {
-							const isSelected = selectedKey === item.id;
-							return (
-								<Tooltip
+						<LayoutGroup>
+							{enabledItems.map((item) => (
+								<SidebarMenuItem
 									key={item.id}
-									title={t(item.label, { ns: "menu" })}
-									placement="right"
-									mouseEnterDelay={0.5}
-								>
-									<button
-										type="button"
-										onClick={() => handleMenuClick(item)}
-										className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
-									>
-										<span
-											className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSelected
-													? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-													: "hover:bg-slate-700/50"
-												}`}
-										>
-											{renderMenuItemIcon(item)}
-										</span>
-									</button>
-								</Tooltip>
-							);
-						})}
+									item={item}
+									isSelected={selectedKey === item.id}
+									onClick={() => handleMenuClick(item)}
+									label={t(item.label, { ns: "menu" })}
+								/>
+							))}
+						</LayoutGroup>
 					</div>
 
-					{/* Settings Button - 固定在底部 */}
+					{/* Settings - fixed at bottom */}
 					<div className="mt-auto px-2 pb-4 pt-4 border-t border-slate-700/50">
-						<Tooltip
-							title={t("settings", { ns: "menu" })}
-							placement="right"
-							mouseEnterDelay={0.5}
-						>
-							<button
-								type="button"
-								onClick={() => navigate("/settings")}
-								className="w-full h-12 flex items-center justify-center transition-all text-slate-400 hover:text-white"
+						<LayoutGroup>
+							<Tooltip
+								title={t("settings", { ns: "menu" })}
+								placement="right"
+								mouseEnterDelay={0.5}
 							>
-								<span
-									className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isSettingsSelected
-											? "bg-gradient-to-br from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/30"
-											: "hover:bg-slate-700/50"
-										}`}
+								<motion.button
+									type="button"
+									onClick={() => navigate("/settings")}
+									whileHover={{ scale: 1.08 }}
+									whileTap={{ scale: 0.92 }}
+									transition={springTransition}
+									className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
 								>
-									<SettingOutlined className="text-xl" />
-								</span>
-							</button>
-						</Tooltip>
+									<span
+										className={cn(
+											"w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200",
+											isSettingsSelected
+												? "text-white"
+												: "hover:bg-slate-700/50",
+										)}
+									>
+										<SettingOutlined className="text-xl" />
+									</span>
+									{isSettingsSelected && (
+										<motion.div
+											layoutId="sidebar-settings-active"
+											className="absolute inset-x-2.5 top-1.5 bottom-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/30"
+											transition={{
+												type: "spring",
+												stiffness: 350,
+												damping: 30,
+											}}
+										/>
+									)}
+								</motion.button>
+							</Tooltip>
+						</LayoutGroup>
 					</div>
 				</div>
-			</Sider>
-			{/* 右侧内容区域 */}
-			<Layout className="h-full flex flex-col">
-				{/* 自定义标题栏 - 只在右侧顶部 */}
+			</div>
+
+			{/* Right column */}
+			<div className="flex-1 h-full flex flex-col overflow-hidden">
+				{/* Title bar */}
 				<TitleBar />
 
-				{/* 内容区域 */}
-				<Content className="flex-1 overflow-auto">
-					<div
-						className={cn("h-full", "animate-fade-in")}
-						style={{ background: token.colorBgContainer }}
-					>
-						{children}
-					</div>
-				</Content>
-			</Layout>
+				{/* Scrollable content area */}
+				<div
+					className="flex-1 overflow-y-auto"
+					style={{ background: token.colorBgContainer }}
+				>
+					<AnimatePresence mode="wait">
+						<motion.div
+							key={location.pathname}
+							initial={{ opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: -4 }}
+							transition={pageTransition}
+							className="h-full"
+						>
+							{children}
+						</motion.div>
+					</AnimatePresence>
+				</div>
+			</div>
 
-			{/* 关于弹窗 */}
+			{/* About modal */}
 			<AboutModal
 				open={aboutModalOpen}
 				onClose={() => setAboutModalOpen(false)}
 				appInfo={appInfo}
 			/>
-		</Layout>
+		</div>
 	);
 };
