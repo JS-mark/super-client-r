@@ -7,9 +7,8 @@ import {
 	MessageOutlined,
 	ReloadOutlined,
 } from "@ant-design/icons";
-import { Button, Switch, Tag, Tooltip, theme } from "antd";
+import { Button, Switch, Tooltip, theme } from "antd";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/utils";
 import {
 	formatShortcut,
 	type Shortcut,
@@ -45,86 +44,6 @@ export const SCOPE_CONFIG: Record<
 	},
 };
 
-// Shortcut input component
-interface ShortcutInputProps {
-	value: string;
-	onChange: (value: string) => void;
-	isRecording: boolean;
-	onStartRecording: () => void;
-	onStopRecording: () => void;
-	conflict?: Shortcut | null;
-}
-
-function ShortcutInput({
-	value,
-	onChange,
-	isRecording,
-	onStartRecording,
-	onStopRecording,
-	conflict,
-}: ShortcutInputProps) {
-	const { t } = useTranslation();
-	const { token } = useToken();
-	const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-	const displayValue = formatShortcut(value, isMac);
-
-	if (isRecording) {
-		return (
-			<div className="flex items-center gap-2">
-				<div
-					className={cn(
-						"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border-2 border-blue-500 animate-pulse",
-					)}
-					style={{
-						backgroundColor: conflict ? token.colorErrorBg : token.colorInfoBg,
-						borderColor: conflict ? token.colorError : token.colorPrimary,
-					}}
-				>
-					<span
-						className="text-sm font-medium"
-						style={{ color: conflict ? token.colorError : token.colorPrimary }}
-					>
-						{conflict
-							? t("conflictDetected", { ns: "shortcuts" })
-							: t("recording", { ns: "shortcuts" })}
-					</span>
-				</div>
-				<Button
-					size="small"
-					onClick={onStopRecording}
-					icon={<CheckOutlined />}
-					type="primary"
-				/>
-			</div>
-		);
-	}
-
-	return (
-		<div className="flex items-center gap-2">
-			<div
-				className={cn(
-					"flex-1 h-10 px-3 flex items-center justify-center rounded-lg border font-mono text-sm",
-				)}
-				style={{
-					backgroundColor: token.colorBgContainer,
-					borderColor: conflict ? token.colorError : token.colorBorder,
-					color: conflict ? token.colorError : token.colorText,
-				}}
-			>
-				{displayValue}
-			</div>
-			<Tooltip title={t("editShortcut", { ns: "shortcuts" })}>
-				<Button
-					size="small"
-					onClick={onStartRecording}
-					icon={<EditOutlined />}
-				/>
-			</Tooltip>
-		</div>
-	);
-}
-
-// Single shortcut setting item
 interface ShortcutItemProps {
 	shortcut: Shortcut;
 	isRecording: boolean;
@@ -134,6 +53,7 @@ interface ShortcutItemProps {
 	onToggle: (id: string) => void;
 	onReset: (id: string) => void;
 	conflict: Shortcut | null;
+	disabled?: boolean;
 }
 
 export function ShortcutItem({
@@ -145,72 +65,108 @@ export function ShortcutItem({
 	onToggle,
 	onReset,
 	conflict,
+	disabled = false,
 }: ShortcutItemProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
-	const scopeConfig = SCOPE_CONFIG[shortcut.scope];
+	const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 	const isModified = shortcut.currentKey !== shortcut.defaultKey;
+	const isThisRecording = isRecording && recordingId === shortcut.id;
+	const hasConflict = conflict?.id === shortcut.id;
+	const dimmed = disabled || !shortcut.enabled;
+
+	const displayKey = formatShortcut(shortcut.currentKey, isMac);
 
 	return (
 		<div
-			className={cn(
-				"flex items-center justify-between p-4 rounded-xl border transition-all",
-			)}
+			className="flex items-center justify-between py-3 px-4 rounded-lg transition-colors"
 			style={{
-				backgroundColor: shortcut.enabled ? token.colorBgContainer : token.colorBgContainer,
-				borderColor: shortcut.enabled ? token.colorBorder : token.colorBorder,
-				opacity: shortcut.enabled ? 1 : 0.6,
+				backgroundColor: isThisRecording
+					? token.colorPrimaryBg
+					: "transparent",
+				opacity: dimmed ? 0.5 : 1,
 			}}
 		>
-			<div className="flex-1 min-w-0">
-				<div className="flex items-center gap-2 mb-1">
-					<Tag color={scopeConfig.color} className="text-xs">
-						{scopeConfig.icon}
-						<span className="ml-1">{t(scopeConfig.labelKey, { ns: "shortcuts" })}</span>
-					</Tag>
-					{isModified && (
-						<Tag color="orange" className="text-xs">
-							{t("modified", { ns: "shortcuts" })}
-						</Tag>
-					)}
-				</div>
-				<div className="font-medium" style={{ color: token.colorText }}>
+			{/* Left: name + description */}
+			<div className="flex-1 min-w-0 mr-4">
+				<div
+					className="text-sm font-medium leading-snug"
+					style={{ color: token.colorText }}
+				>
 					{t(shortcut.nameKey, { ns: "shortcuts", defaultValue: shortcut.name })}
 				</div>
-				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
+				<div
+					className="text-xs leading-snug mt-0.5"
+					style={{ color: token.colorTextDescription }}
+				>
 					{t(shortcut.descriptionKey, { ns: "shortcuts", defaultValue: shortcut.description })}
 				</div>
 			</div>
 
-			<div className="flex items-center gap-4 ml-4">
-				<div className="w-[180px]">
-					<ShortcutInput
-						value={shortcut.currentKey}
-						onChange={() => { }}
-						isRecording={isRecording && recordingId === shortcut.id}
-						onStartRecording={() => onStartRecording(shortcut.id)}
-						onStopRecording={onStopRecording}
-						conflict={conflict?.id === shortcut.id ? conflict : null}
-					/>
-				</div>
+			{/* Right: key badge + actions */}
+			<div className="flex items-center gap-3 shrink-0">
+				{/* Shortcut key badge / recording state */}
+				{isThisRecording ? (
+					<div className="flex items-center gap-2">
+						<div
+							className="h-7 px-3 flex items-center rounded-md text-xs font-medium animate-pulse"
+							style={{
+								backgroundColor: hasConflict ? token.colorErrorBg : token.colorPrimaryBg,
+								color: hasConflict ? token.colorError : token.colorPrimary,
+								border: `1px solid ${hasConflict ? token.colorError : token.colorPrimary}`,
+							}}
+						>
+							{hasConflict
+								? t("conflictDetected", { ns: "shortcuts" })
+								: t("recording", { ns: "shortcuts" })}
+						</div>
+						<Button
+							size="small"
+							type="primary"
+							icon={<CheckOutlined />}
+							onClick={onStopRecording}
+							className="!h-7 !w-7 !min-w-0"
+						/>
+					</div>
+				) : (
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							className="h-7 px-2.5 flex items-center rounded-md font-mono text-xs cursor-pointer border transition-colors hover:border-blue-400"
+							style={{
+								backgroundColor: token.colorFillQuaternary,
+								borderColor: token.colorBorderSecondary,
+								color: token.colorText,
+							}}
+							onClick={() => !disabled && onStartRecording(shortcut.id)}
+							disabled={disabled}
+						>
+							{displayKey}
+						</button>
 
-				<div className="flex items-center gap-2">
-					<Switch
-						checked={shortcut.enabled}
-						onChange={() => onToggle(shortcut.id)}
-						size="small"
-					/>
+						{isModified && (
+							<Tooltip title={t("reset", "重置", { ns: "common" })}>
+								<Button
+									type="text"
+									size="small"
+									icon={<ReloadOutlined />}
+									onClick={() => onReset(shortcut.id)}
+									className="!h-7 !w-7 !min-w-0"
+									style={{ color: token.colorTextTertiary }}
+									disabled={disabled}
+								/>
+							</Tooltip>
+						)}
+					</div>
+				)}
 
-					{isModified && (
-						<Tooltip title={t("reset", "重置", { ns: "common" })}>
-							<Button
-								size="small"
-								onClick={() => onReset(shortcut.id)}
-								icon={<ReloadOutlined />}
-							/>
-						</Tooltip>
-					)}
-				</div>
+				{/* Toggle switch */}
+				<Switch
+					checked={shortcut.enabled}
+					onChange={() => onToggle(shortcut.id)}
+					size="small"
+					disabled={disabled}
+				/>
 			</div>
 		</div>
 	);

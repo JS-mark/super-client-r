@@ -1,18 +1,19 @@
 import {
-	KeyOutlined,
 	ReloadOutlined,
+	SearchOutlined,
 	WarningOutlined,
 } from "@ant-design/icons";
 import {
-	Alert,
 	Button,
 	Empty,
 	Input,
 	Modal,
+	Segmented,
+	Switch,
 	message,
 	theme,
 } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type Shortcut,
@@ -23,34 +24,33 @@ import { SCOPE_CONFIG, ShortcutItem } from "./ShortcutItem";
 
 const { useToken } = theme;
 
+const SCOPES: ShortcutScope[] = ["global", "chat", "navigation", "input"];
+
 export function ShortcutSettings() {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const {
 		shortcuts,
+		globalEnabled,
 		isRecording,
 		recordingShortcutId,
 		initDefaultShortcuts,
 		startRecording,
 		stopRecording,
+		toggleGlobalEnabled,
 		toggleShortcut,
 		resetShortcut,
 		resetAllShortcuts,
-		checkConflict,
 	} = useShortcutStore();
 
 	const [searchQuery, setSearchQuery] = useState("");
-	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">(
-		"all",
-	);
+	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">("all");
 	const [conflict, setConflict] = useState<Shortcut | null>(null);
 
-	// 初始化默认快捷键
 	useEffect(() => {
 		initDefaultShortcuts();
 	}, [initDefaultShortcuts]);
 
-	// 监听冲突事件
 	useEffect(() => {
 		const handleConflict = (e: CustomEvent) => {
 			const { conflictWith } = e.detail;
@@ -62,14 +62,12 @@ export function ShortcutSettings() {
 				}),
 			);
 		};
-
 		window.addEventListener("shortcut-conflict" as any, handleConflict);
 		return () => {
 			window.removeEventListener("shortcut-conflict" as any, handleConflict);
 		};
 	}, [t]);
 
-	// 处理开始录制
 	const handleStartRecording = useCallback(
 		(id: string) => {
 			setConflict(null);
@@ -78,12 +76,10 @@ export function ShortcutSettings() {
 		[startRecording],
 	);
 
-	// 处理停止录制
 	const handleStopRecording = useCallback(() => {
 		stopRecording();
 	}, [stopRecording]);
 
-	// 处理重置所有
 	const handleResetAll = useCallback(() => {
 		Modal.confirm({
 			title: t("resetAllTitle", { ns: "shortcuts" }),
@@ -97,109 +93,101 @@ export function ShortcutSettings() {
 		});
 	}, [resetAllShortcuts, t]);
 
-	// 过滤快捷键
-	const filteredShortcuts = shortcuts.filter((s) => {
-		const matchesSearch =
-			!searchQuery ||
-			t(s.nameKey, { ns: "shortcuts", defaultValue: s.name }).toLowerCase().includes(searchQuery.toLowerCase()) ||
-			t(s.descriptionKey, { ns: "shortcuts", defaultValue: s.description })
-				.toLowerCase()
-				.includes(searchQuery.toLowerCase());
-		const matchesScope = selectedScope === "all" || s.scope === selectedScope;
-		return matchesSearch && matchesScope;
-	});
+	// Filter shortcuts
+	const filteredShortcuts = useMemo(() => {
+		return shortcuts.filter((s) => {
+			const matchesSearch =
+				!searchQuery ||
+				t(s.nameKey, { ns: "shortcuts", defaultValue: s.name })
+					.toLowerCase()
+					.includes(searchQuery.toLowerCase()) ||
+				t(s.descriptionKey, { ns: "shortcuts", defaultValue: s.description })
+					.toLowerCase()
+					.includes(searchQuery.toLowerCase());
+			const matchesScope = selectedScope === "all" || s.scope === selectedScope;
+			return matchesSearch && matchesScope;
+		});
+	}, [shortcuts, searchQuery, selectedScope, t]);
 
-	// 按作用域分组
-	const groupedShortcuts = filteredShortcuts.reduce(
-		(acc, shortcut) => {
-			if (!acc[shortcut.scope]) {
-				acc[shortcut.scope] = [];
-			}
-			acc[shortcut.scope].push(shortcut);
-			return acc;
-		},
-		{} as Record<ShortcutScope, Shortcut[]>,
-	);
+	// Group by scope
+	const groupedShortcuts = useMemo(() => {
+		return filteredShortcuts.reduce(
+			(acc, shortcut) => {
+				if (!acc[shortcut.scope]) {
+					acc[shortcut.scope] = [];
+				}
+				acc[shortcut.scope].push(shortcut);
+				return acc;
+			},
+			{} as Record<ShortcutScope, Shortcut[]>,
+		);
+	}, [filteredShortcuts]);
 
-	// 统计信息
-	const stats = {
+	// Stats
+	const stats = useMemo(() => ({
 		total: shortcuts.length,
 		enabled: shortcuts.filter((s) => s.enabled).length,
 		modified: shortcuts.filter((s) => s.currentKey !== s.defaultKey).length,
-	};
+	}), [shortcuts]);
+
+	// Scope segmented options
+	const scopeOptions = useMemo(() => [
+		{ label: t("allScopes", { ns: "shortcuts" }), value: "all" },
+		...SCOPES.map((scope) => ({
+			label: (
+				<span className="flex items-center gap-1.5">
+					{SCOPE_CONFIG[scope].icon}
+					{t(SCOPE_CONFIG[scope].labelKey, { ns: "shortcuts" })}
+				</span>
+			),
+			value: scope,
+		})),
+	], [t]);
 
 	return (
-		<div className="space-y-6">
-			{/* 标题和统计 */}
-			<div className="flex items-center justify-between">
-				<div>
-					<h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: token.colorTextHeading }}>
-						<KeyOutlined />
-						{t("title", { ns: "shortcuts" })}
-					</h3>
-					<p className="text-sm mt-1" style={{ color: token.colorTextSecondary }}>
-						{t("subtitle", { ns: "shortcuts" })}
-					</p>
+		<div className="space-y-5">
+			{/* Header: global toggle */}
+			<div
+				className="flex items-center justify-between p-4 rounded-xl"
+				style={{
+					backgroundColor: token.colorFillQuaternary,
+				}}
+			>
+				<div className="flex-1">
+					<div className="text-sm font-medium" style={{ color: token.colorText }}>
+						{t("globalEnabled", { ns: "shortcuts" })}
+					</div>
+					<div className="text-xs mt-0.5" style={{ color: token.colorTextDescription }}>
+						{t("globalEnabledDesc", { ns: "shortcuts" })}
+					</div>
 				</div>
-				<div className="flex items-center gap-4 text-sm text-slate-500">
-					<span>
-						{t("stats.enabled", { ns: "shortcuts" })}: {stats.enabled}/
-						{stats.total}
-					</span>
-					{stats.modified > 0 && (
-						<span className="text-orange-500">
-							{t("stats.modified", { ns: "shortcuts" })}: {stats.modified}
-						</span>
-					)}
-				</div>
+				<Switch
+					checked={globalEnabled}
+					onChange={toggleGlobalEnabled}
+				/>
 			</div>
 
-			{/* 提示信息 */}
-			<Alert
-				message={t("tips.title", { ns: "shortcuts" })}
-				description={
-					<div className="text-sm space-y-1">
-						<p>{t("tips.line1", { ns: "shortcuts" })}</p>
-						<p>{t("tips.line2", { ns: "shortcuts" })}</p>
-						<p>{t("tips.line3", { ns: "shortcuts" })}</p>
-					</div>
-				}
-				type="info"
-				showIcon
-				style={{
-					backgroundColor: token.colorInfoBg,
-					borderColor: token.colorInfoBorder,
-				}}
-			/>
-
-			{/* 过滤器和搜索 */}
-			<div className="flex items-center gap-4">
+			{/* Search + scope filter */}
+			<div className="flex items-center gap-3">
 				<Input
 					placeholder={t("search", { ns: "shortcuts" })}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					className="flex-1"
-					prefix={<KeyOutlined className="text-slate-400" />}
+					prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
 					allowClear
+					className="flex-1"
+					disabled={!globalEnabled}
 				/>
-				<div className="flex gap-2">
-					{(Object.keys(SCOPE_CONFIG) as ShortcutScope[]).map((scope) => (
-						<Button
-							key={scope}
-							size="small"
-							type={selectedScope === scope ? "primary" : "default"}
-							onClick={() =>
-								setSelectedScope(selectedScope === scope ? "all" : scope)
-							}
-						>
-							{SCOPE_CONFIG[scope].icon}
-							<span className="ml-1">{t(SCOPE_CONFIG[scope].labelKey, { ns: "shortcuts" })}</span>
-						</Button>
-					))}
-				</div>
+				<Segmented
+					options={scopeOptions}
+					value={selectedScope}
+					onChange={(val) => setSelectedScope(val as ShortcutScope | "all")}
+					size="middle"
+					disabled={!globalEnabled}
+				/>
 			</div>
 
-			{/* 快捷键列表 */}
+			{/* Shortcut list grouped by scope */}
 			<div className="space-y-4">
 				{filteredShortcuts.length === 0 ? (
 					<Empty
@@ -209,28 +197,53 @@ export function ShortcutSettings() {
 				) : (
 					(Object.keys(groupedShortcuts) as ShortcutScope[]).map((scope) => (
 						<div key={scope}>
-							<div className="flex items-center gap-2 mb-3">
-								{SCOPE_CONFIG[scope].icon}
-								<span className="font-medium" style={{ color: token.colorText }}>
+							{/* Scope header */}
+							<div className="flex items-center gap-2 mb-1 px-4">
+								<span
+									className="text-xs font-medium uppercase tracking-wide"
+									style={{ color: token.colorTextTertiary }}
+								>
 									{t(SCOPE_CONFIG[scope].labelKey, { ns: "shortcuts" })}
 								</span>
-								<span className="text-xs text-slate-400">
-									({groupedShortcuts[scope].length})
+								<div
+									className="flex-1 h-px"
+									style={{ backgroundColor: token.colorBorderSecondary }}
+								/>
+								<span
+									className="text-xs"
+									style={{ color: token.colorTextQuaternary }}
+								>
+									{groupedShortcuts[scope].length}
 								</span>
 							</div>
-							<div className="space-y-2">
-								{groupedShortcuts[scope].map((shortcut) => (
-									<ShortcutItem
-										key={shortcut.id}
-										shortcut={shortcut}
-										isRecording={isRecording}
-										recordingId={recordingShortcutId}
-										onStartRecording={handleStartRecording}
-										onStopRecording={handleStopRecording}
-										onToggle={toggleShortcut}
-										onReset={resetShortcut}
-										conflict={conflict}
-									/>
+
+							{/* Items */}
+							<div
+								className="rounded-xl border overflow-hidden"
+								style={{
+									borderColor: token.colorBorderSecondary,
+								}}
+							>
+								{groupedShortcuts[scope].map((shortcut, idx) => (
+									<div key={shortcut.id}>
+										{idx > 0 && (
+											<div
+												className="h-px mx-4"
+												style={{ backgroundColor: token.colorBorderSecondary }}
+											/>
+										)}
+										<ShortcutItem
+											shortcut={shortcut}
+											isRecording={isRecording}
+											recordingId={recordingShortcutId}
+											onStartRecording={handleStartRecording}
+											onStopRecording={handleStopRecording}
+											onToggle={toggleShortcut}
+											onReset={resetShortcut}
+											conflict={conflict}
+											disabled={!globalEnabled}
+										/>
+									</div>
 								))}
 							</div>
 						</div>
@@ -238,19 +251,35 @@ export function ShortcutSettings() {
 				)}
 			</div>
 
-			{/* 底部操作 */}
-			<div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: token.colorBorder }}>
-				<div className="text-sm text-slate-500">
-					{isRecording && (
-						<span className="flex items-center gap-2 text-blue-500">
+			{/* Footer: recording hint + reset all */}
+			<div
+				className="flex items-center justify-between pt-4 border-t"
+				style={{ borderColor: token.colorBorderSecondary }}
+			>
+				<div className="text-xs" style={{ color: token.colorTextQuaternary }}>
+					{isRecording ? (
+						<span className="flex items-center gap-1.5" style={{ color: token.colorPrimary }}>
 							<WarningOutlined className="animate-pulse" />
 							{t("recordingHint", { ns: "shortcuts" })}
+						</span>
+					) : (
+						<span>
+							{t("stats.enabled", { ns: "shortcuts" })}: {stats.enabled}/{stats.total}
+							{stats.modified > 0 && (
+								<span style={{ color: token.colorWarning }}>
+									{" · "}{t("stats.modified", { ns: "shortcuts" })}: {stats.modified}
+								</span>
+							)}
 						</span>
 					)}
 				</div>
 				{stats.modified > 0 && (
-					<Button onClick={handleResetAll} danger>
-						<ReloadOutlined />
+					<Button
+						size="small"
+						onClick={handleResetAll}
+						icon={<ReloadOutlined />}
+						disabled={!globalEnabled}
+					>
 						{t("resetAll", { ns: "shortcuts" })}
 					</Button>
 				)}

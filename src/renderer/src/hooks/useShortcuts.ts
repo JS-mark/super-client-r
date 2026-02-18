@@ -51,7 +51,7 @@ export function useGlobalShortcuts(
 	handlers: ShortcutHandlers,
 	activeScope: ShortcutScope = "global",
 ) {
-	const { shortcuts, isRecording, recordingShortcutId, stopRecording } =
+	const { shortcuts, globalEnabled, isRecording, recordingShortcutId, stopRecording } =
 		useShortcutStore();
 	const handlersRef = useRef(handlers);
 
@@ -90,6 +90,9 @@ export function useGlobalShortcuts(
 				}
 				return;
 			}
+
+			// 如果全局禁用，跳过快捷键处理
+			if (!globalEnabled) return;
 
 			// 正常处理快捷键
 			const shortcutKey = normalizeShortcut(getShortcutFromEvent(event));
@@ -131,7 +134,7 @@ export function useGlobalShortcuts(
 				}
 			}
 		},
-		[shortcuts, isRecording, recordingShortcutId, stopRecording, activeScope],
+		[shortcuts, globalEnabled, isRecording, recordingShortcutId, stopRecording, activeScope],
 	);
 
 	useEffect(() => {

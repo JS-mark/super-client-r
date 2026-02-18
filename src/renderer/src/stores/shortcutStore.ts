@@ -20,6 +20,7 @@ export interface Shortcut {
 // 快捷键状态
 interface ShortcutState {
 	shortcuts: Shortcut[];
+	globalEnabled: boolean;
 	isRecording: boolean;
 	recordingShortcutId: string | null;
 }
@@ -34,6 +35,8 @@ interface ShortcutActions {
 	resetShortcut: (id: string) => void;
 	// 重置所有快捷键
 	resetAllShortcuts: () => void;
+	// 全局启用/禁用
+	toggleGlobalEnabled: () => void;
 	// 启用/禁用快捷键
 	toggleShortcut: (id: string) => void;
 	// 检查快捷键冲突
@@ -281,6 +284,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 	persist(
 		(set, get) => ({
 			shortcuts: [],
+			globalEnabled: true,
 			isRecording: false,
 			recordingShortcutId: null,
 
@@ -322,6 +326,10 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 				}));
 			},
 
+			toggleGlobalEnabled: () => {
+				set((state) => ({ globalEnabled: !state.globalEnabled }));
+			},
+
 			toggleShortcut: (id) => {
 				set((state) => ({
 					shortcuts: state.shortcuts.map((s) =>
@@ -358,7 +366,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 		}),
 		{
 			name: "shortcut-storage",
-			partialize: (state) => ({ shortcuts: state.shortcuts }),
+			partialize: (state) => ({ shortcuts: state.shortcuts, globalEnabled: state.globalEnabled }),
 			onRehydrateStorage: () => (state) => {
 				if (!state) return;
 
