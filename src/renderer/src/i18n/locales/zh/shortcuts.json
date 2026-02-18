@@ -4,15 +4,18 @@
 	"search": "搜索快捷键...",
 	"noResults": "没有找到匹配的快捷键",
 	"modified": "已修改",
-	"resetAll": "重置所有",
+	"resetAll": "重置所有快捷键",
 	"resetAllTitle": "重置所有快捷键",
 	"resetAllConfirm": "确定要重置所有快捷键为默认值吗？此操作不可撤销。",
 	"resetAllSuccess": "所有快捷键已重置",
 	"recordingHint": "按下要设置的快捷键组合...",
-	"conflictWarning": "与 {{name}} 快捷键冲突",
+	"conflictWarning": "与「{{name}}」快捷键冲突",
 	"conflictDetected": "快捷键冲突!",
 	"recording": "按下快捷键...",
 	"editShortcut": "修改快捷键",
+	"globalEnabled": "启用快捷键",
+	"globalEnabledDesc": "关闭后所有键盘快捷键将停用",
+	"allScopes": "全部",
 	"stats": {
 		"enabled": "已启用",
 		"modified": "已修改"
@@ -22,6 +25,12 @@
 		"chat": "对话",
 		"navigation": "导航",
 		"input": "输入"
+	},
+	"scopeDesc": {
+		"global": "在应用的任何位置生效",
+		"chat": "在对话页面生效",
+		"navigation": "页面导航快捷键",
+		"input": "在输入框中生效"
 	},
 	"tips": {
 		"title": "快捷键提示",

@@ -51,9 +51,13 @@
 	},
 	"tabs": {
 		"market": "Market",
+		"sources": "Sources",
 		"installed": "Installed",
 		"thirdParty": "Third Party"
 	},
+	"sourcesDescription": "Browse third-party MCP marketplaces to discover more MCP servers and tools",
+	"sourcesOfficial": "Official",
+	"sourcesBrowse": "Open in browser",
 	"searchPlaceholder": "Search MCP servers...",
 	"searchInstalled": "Search installed MCP...",
 	"searchThirdParty": "Search third party MCP...",

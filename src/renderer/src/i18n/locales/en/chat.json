@@ -19,7 +19,12 @@
 		"baidu": "Baidu",
 		"doc": "Document",
 		"tools": "Tools",
+		"tags": "Tags",
+		"translate": "Translate",
+		"settings": "Settings",
 		"more": "More",
+		"collapse": "Collapse",
+		"docComingSoon": "Document feature coming soon",
 		"search": "Search",
 		"searchMessages": "Search Messages",
 		"export": "Export",
@@ -75,5 +80,22 @@
 		"txtDesc": "Simple plain text format"
 	},
 	"user": "User",
-	"assistant": "Assistant"
+	"assistant": "Assistant",
+	"metrics": {
+		"firstToken": "First token",
+		"speed": "Speed"
+	},
+	"actions": {
+		"retry": "Retry",
+		"edit": "Edit",
+		"copy": "Copy",
+		"delete": "Delete",
+		"more": "More",
+		"regenerate": "Regenerate",
+		"copied": "Copied",
+		"deleted": "Deleted",
+		"bookmark": "Bookmark",
+		"export": "Export",
+		"addNote": "Add Note"
+	}
 }

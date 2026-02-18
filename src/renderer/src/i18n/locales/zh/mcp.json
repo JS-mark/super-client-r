@@ -51,9 +51,13 @@
 	},
 	"tabs": {
 		"market": "市场",
+		"sources": "市场源",
 		"installed": "已安装",
 		"thirdParty": "第三方"
 	},
+	"sourcesDescription": "浏览第三方 MCP 市场，发现更多 MCP 服务和工具",
+	"sourcesOfficial": "官方",
+	"sourcesBrowse": "在浏览器中打开",
 	"searchPlaceholder": "搜索 MCP 服务...",
 	"searchInstalled": "搜索已安装的 MCP...",
 	"searchThirdParty": "搜索第三方 MCP...",
