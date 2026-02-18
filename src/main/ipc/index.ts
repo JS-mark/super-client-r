@@ -7,8 +7,10 @@ import { setupAgentHandlers } from "../services/agent";
 import { registerAgentHandlers } from "./handlers/agentHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
+import { registerAuthHandlers } from "./handlers/authHandlers";
 import { registerFileHandlers } from "./handlers/fileHandlers";
 import { registerLogHandlers } from "./handlers/logHandlers";
+import { registerModelHandlers } from "./handlers/modelHandlers";
 import { registerFloatWidgetHandlers } from "./handlers/floatWidgetHandlers";
 import { registerMcpHandlers } from "./handlers/mcpHandlers";
 import { registerPluginHandlers } from "./handlers/pluginHandlers";
@@ -21,6 +23,7 @@ import { registerWindowControlHandlers } from "./handlers/windowHandlers";
  */
 export function registerIpcHandlers(): void {
 	registerAgentHandlers();
+	registerAuthHandlers();
 	registerSkillHandlers();
 	registerMcpHandlers();
 	registerAppHandlers();
@@ -31,6 +34,7 @@ export function registerIpcHandlers(): void {
 	registerPluginHandlers();
 	registerFileHandlers();
 	registerLogHandlers();
+	registerModelHandlers();
 	setupAgentHandlers();
 }
 

@@ -257,6 +257,167 @@ export interface RendererLogEntry {
 	error_stack?: string;
 }
 
+// ============ Auth 相关类型 ============
+
+export type AuthProvider = "google" | "github";
+
+export interface AuthLoginRequest {
+	provider: AuthProvider;
+}
+
+export interface AuthUser {
+	id: string;
+	name: string;
+	email?: string;
+	avatar?: string;
+	provider: AuthProvider;
+}
+
+export interface AuthTokens {
+	accessToken: string;
+	refreshToken?: string;
+	expiresAt?: number;
+}
+
+// ============ Model Provider 相关类型 ============
+
+export type ModelProviderPreset =
+	| "dashscope"
+	| "deepseek"
+	| "openai"
+	| "anthropic"
+	| "gemini"
+	| "cherryin"
+	| "siliconflow"
+	| "aihubmix"
+	| "ocoolai"
+	| "zhipu-ai"
+	| "302ai"
+	| "moonshot"
+	| "baichuan"
+	| "volcengine"
+	| "minimax"
+	| "hunyuan"
+	| "grok"
+	| "github-models"
+	| "huggingface"
+	| "openrouter"
+	| "ollama"
+	| "lmstudio"
+	| "newapi"
+	| "custom";
+
+export type ModelCapability =
+	| "vision"
+	| "web_search"
+	| "reasoning"
+	| "tool_use"
+	| "embedding"
+	| "reranking";
+
+export type ModelCategory =
+	| "chat"
+	| "embedding"
+	| "reranking"
+	| "vision"
+	| "code"
+	| "image_generation"
+	| "audio"
+	| "custom";
+
+export type PricingCurrency = "USD" | "CNY" | "EUR";
+
+export interface ModelPricing {
+	currency: PricingCurrency;
+	inputPricePerMillion: number;
+	outputPricePerMillion: number;
+}
+
+export interface ProviderModel {
+	id: string;
+	name: string;
+	group?: string;
+	enabled: boolean;
+	capabilities: ModelCapability[];
+	category: ModelCategory;
+	supportsStreaming: boolean;
+	pricing?: ModelPricing;
+	systemPrompt?: string;
+	maxTokens?: number;
+	contextWindow?: number;
+}
+
+export interface ModelProvider {
+	id: string;
+	name: string;
+	preset: ModelProviderPreset;
+	baseUrl: string;
+	apiKey: string;
+	enabled: boolean;
+	tested: boolean;
+	models: ProviderModel[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface ActiveModelSelection {
+	providerId: string;
+	modelId: string;
+}
+
+export interface TestConnectionRequest {
+	baseUrl: string;
+	apiKey: string;
+}
+
+export interface TestConnectionResponse {
+	success: boolean;
+	latencyMs: number;
+	error?: string;
+}
+
+export interface FetchModelsRequest {
+	baseUrl: string;
+	apiKey: string;
+	preset?: ModelProviderPreset;
+}
+
+export interface FetchModelsResponse {
+	models: ProviderModel[];
+}
+
+export interface UpdateModelConfigRequest {
+	providerId: string;
+	modelId: string;
+	config: Partial<Omit<ProviderModel, "id">>;
+}
+
+export interface ChatCompletionRequest {
+	requestId: string;
+	baseUrl: string;
+	apiKey: string;
+	model: string;
+	messages: { role: "user" | "assistant" | "system"; content: string }[];
+	maxTokens?: number;
+	temperature?: number;
+}
+
+export interface ChatStreamEvent {
+	requestId: string;
+	type: "chunk" | "done" | "error";
+	content?: string;
+	error?: string;
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	};
+	timing?: {
+		firstTokenMs?: number;
+		totalMs?: number;
+	};
+}
+
 // ============ IPC 请求/响应类型 ============
 
 export interface IPCRequest<T = unknown> {

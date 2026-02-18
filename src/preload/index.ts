@@ -131,6 +131,54 @@ export interface ElectronAPI {
 		openViewer: () => Promise<{ success: boolean }>;
 	};
 
+	// Auth API
+	auth: {
+		login: (provider: "google" | "github") => Promise<IPCResponse<AuthUser>>;
+		logout: () => Promise<IPCResponse>;
+		getUser: () => Promise<IPCResponse<AuthUser | null>>;
+	};
+
+	// Update API
+	update: {
+		check: () => Promise<{ updateAvailable: boolean; version?: string; message: string }>;
+		download: () => Promise<IPCResponse>;
+		install: () => Promise<void>;
+		onChecking: (callback: () => void) => () => void;
+		onAvailable: (callback: (info: unknown) => void) => () => void;
+		onNotAvailable: (callback: (info: unknown) => void) => () => void;
+		onProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => () => void;
+		onDownloaded: (callback: (info: unknown) => void) => () => void;
+		onError: (callback: (error: string) => void) => () => void;
+	};
+
+	// Model Provider API
+	model: {
+		listProviders: () => Promise<IPCResponse<ModelProvider[]>>;
+		getProvider: (id: string) => Promise<IPCResponse<ModelProvider>>;
+		saveProvider: (provider: ModelProvider) => Promise<IPCResponse>;
+		deleteProvider: (id: string) => Promise<IPCResponse>;
+		testConnection: (baseUrl: string, apiKey: string) => Promise<IPCResponse<TestConnectionResponse>>;
+		fetchModels: (baseUrl: string, apiKey: string, preset?: ModelProviderPreset) => Promise<IPCResponse<FetchModelsResponse>>;
+		updateModelConfig: (providerId: string, modelId: string, config: Partial<ProviderModel>) => Promise<IPCResponse>;
+		getActiveModel: () => Promise<IPCResponse<ActiveModelSelection | undefined>>;
+		setActiveModel: (selection: ActiveModelSelection | null) => Promise<IPCResponse>;
+	};
+
+	// LLM API
+	llm: {
+		chatCompletion: (request: {
+			requestId: string;
+			baseUrl: string;
+			apiKey: string;
+			model: string;
+			messages: { role: "user" | "assistant" | "system"; content: string }[];
+			maxTokens?: number;
+			temperature?: number;
+		}) => Promise<IPCResponse>;
+		stopStream: (requestId: string) => Promise<IPCResponse>;
+		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
+	};
+
 	// 通用 IPC
 	ipc: {
 		on: (channel: string, listener: (...args: unknown[]) => void) => void;
@@ -356,6 +404,115 @@ export interface RendererLogEntry {
 	error_stack?: string;
 }
 
+export interface AuthUser {
+	id: string;
+	name: string;
+	email?: string;
+	avatar?: string;
+	provider: "google" | "github";
+}
+
+export type ModelProviderPreset =
+	| "dashscope"
+	| "deepseek"
+	| "openai"
+	| "anthropic"
+	| "gemini"
+	| "cherryin"
+	| "siliconflow"
+	| "aihubmix"
+	| "ocoolai"
+	| "zhipu-ai"
+	| "302ai"
+	| "moonshot"
+	| "baichuan"
+	| "volcengine"
+	| "minimax"
+	| "hunyuan"
+	| "grok"
+	| "github-models"
+	| "huggingface"
+	| "openrouter"
+	| "ollama"
+	| "lmstudio"
+	| "newapi"
+	| "custom";
+
+export type ModelCapability =
+	| "vision"
+	| "web_search"
+	| "reasoning"
+	| "tool_use"
+	| "embedding"
+	| "reranking";
+
+export type ModelCategory =
+	| "chat"
+	| "embedding"
+	| "reranking"
+	| "vision"
+	| "code"
+	| "image_generation"
+	| "audio"
+	| "custom";
+
+export type PricingCurrency = "USD" | "CNY" | "EUR";
+
+export interface ModelPricing {
+	currency: PricingCurrency;
+	inputPricePerMillion: number;
+	outputPricePerMillion: number;
+}
+
+export interface ProviderModel {
+	id: string;
+	name: string;
+	group?: string;
+	enabled: boolean;
+	capabilities: ModelCapability[];
+	category: ModelCategory;
+	supportsStreaming: boolean;
+	pricing?: ModelPricing;
+	systemPrompt?: string;
+	maxTokens?: number;
+	contextWindow?: number;
+}
+
+export interface ModelProvider {
+	id: string;
+	name: string;
+	preset: ModelProviderPreset;
+	baseUrl: string;
+	apiKey: string;
+	enabled: boolean;
+	tested: boolean;
+	models: ProviderModel[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface ActiveModelSelection {
+	providerId: string;
+	modelId: string;
+}
+
+export interface TestConnectionResponse {
+	success: boolean;
+	latencyMs: number;
+	error?: string;
+}
+
+export interface FetchModelsResponse {
+	models: ProviderModel[];
+}
+
+export interface ChatStreamEvent {
+	requestId: string;
+	type: "chunk" | "done" | "error";
+	content?: string;
+	error?: string;
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
@@ -509,6 +666,79 @@ const electronAPI: ElectronAPI = {
 		clearDb: () => ipcRenderer.invoke("log:clear-db"),
 		exportLogs: (params) => ipcRenderer.invoke("log:export", params),
 		openViewer: () => ipcRenderer.invoke("log:open-viewer"),
+	},
+
+	// Auth API
+	auth: {
+		login: (provider: "google" | "github") =>
+			ipcRenderer.invoke("auth:login", provider),
+		logout: () => ipcRenderer.invoke("auth:logout"),
+		getUser: () => ipcRenderer.invoke("auth:get-user"),
+	},
+
+	// Update API
+	update: {
+		check: () => ipcRenderer.invoke("app:check-update"),
+		download: () => ipcRenderer.invoke("update:download"),
+		install: () => ipcRenderer.invoke("update:install"),
+		onChecking: (callback: () => void) => {
+			const listener = () => callback();
+			ipcRenderer.on("update:checking", listener);
+			return () => ipcRenderer.off("update:checking", listener);
+		},
+		onAvailable: (callback: (info: unknown) => void) => {
+			const listener = (_event: unknown, info: unknown) => callback(info);
+			ipcRenderer.on("update:available", listener);
+			return () => ipcRenderer.off("update:available", listener);
+		},
+		onNotAvailable: (callback: (info: unknown) => void) => {
+			const listener = (_event: unknown, info: unknown) => callback(info);
+			ipcRenderer.on("update:not-available", listener);
+			return () => ipcRenderer.off("update:not-available", listener);
+		},
+		onProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => {
+			const listener = (_event: unknown, progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => callback(progress);
+			ipcRenderer.on("update:progress", listener);
+			return () => ipcRenderer.off("update:progress", listener);
+		},
+		onDownloaded: (callback: (info: unknown) => void) => {
+			const listener = (_event: unknown, info: unknown) => callback(info);
+			ipcRenderer.on("update:downloaded", listener);
+			return () => ipcRenderer.off("update:downloaded", listener);
+		},
+		onError: (callback: (error: string) => void) => {
+			const listener = (_event: unknown, error: string) => callback(error);
+			ipcRenderer.on("update:error", listener);
+			return () => ipcRenderer.off("update:error", listener);
+		},
+	},
+
+	// Model Provider API
+	model: {
+		listProviders: () => ipcRenderer.invoke("model:list-providers"),
+		getProvider: (id: string) => ipcRenderer.invoke("model:get-provider", id),
+		saveProvider: (provider: ModelProvider) => ipcRenderer.invoke("model:save-provider", provider),
+		deleteProvider: (id: string) => ipcRenderer.invoke("model:delete-provider", id),
+		testConnection: (baseUrl: string, apiKey: string) =>
+			ipcRenderer.invoke("model:test-connection", { baseUrl, apiKey }),
+		fetchModels: (baseUrl: string, apiKey: string, preset?: ModelProviderPreset) =>
+			ipcRenderer.invoke("model:fetch-models", { baseUrl, apiKey, preset }),
+		updateModelConfig: (providerId: string, modelId: string, config: Partial<ProviderModel>) =>
+			ipcRenderer.invoke("model:update-model-config", { providerId, modelId, config }),
+		getActiveModel: () => ipcRenderer.invoke("model:get-active-model"),
+		setActiveModel: (selection: ActiveModelSelection | null) =>
+			ipcRenderer.invoke("model:set-active-model", selection),
+	},
+
+	// LLM API
+	llm: {
+		chatCompletion: (request) => ipcRenderer.invoke("llm:chat-completion", request),
+		stopStream: (requestId: string) => ipcRenderer.invoke("llm:stop-stream", requestId),
+		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => {
+			const listener = (_event: unknown, data: ChatStreamEvent) => callback(data);
+			ipcRenderer.on("llm:stream-event", listener);
+			return () => ipcRenderer.off("llm:stream-event", listener);
+		},
 	},
 
 	// 通用 IPC

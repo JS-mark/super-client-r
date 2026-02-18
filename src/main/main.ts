@@ -31,6 +31,7 @@ import {
 } from "./services/protocolService";
 import { getSkillService } from "./services/skill/SkillService";
 import { storeManager } from "./store/StoreManager";
+import { updateService } from "./services/updateService";
 import { logger } from "./utils/logger";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
@@ -317,6 +318,9 @@ function createMenu(): void {
 				],
 			},
 			{
+				role: "editMenu",
+			},
+			{
 				label: "窗口",
 				submenu: [
 					{ role: "minimize" },
@@ -446,6 +450,15 @@ app.whenReady().then(async () => {
 	createFloatingWindow();
 	createTray();
 	createMenu();
+
+	// Initialize auto-update service
+	if (mainWindow) {
+		updateService.initialize(mainWindow);
+		// Auto-check for updates in production
+		if (app.isPackaged) {
+			updateService.checkForUpdates();
+		}
+	}
 
 	// 根据设置决定是否显示悬浮窗
 	const floatWidgetEnabled = storeManager.getConfig("floatWidgetEnabled");

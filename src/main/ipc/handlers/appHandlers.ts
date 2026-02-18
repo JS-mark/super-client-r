@@ -2,7 +2,8 @@ import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { existsSync, promises as fsPromises, readdirSync } from "fs";
 import { join } from "path";
 import { storeManager } from "../../store";
-import { APP_CHANNELS } from "../channels";
+import { updateService } from "../../services/updateService";
+import { APP_CHANNELS, UPDATE_CHANNELS } from "../channels";
 
 export interface LogFileInfo {
 	name: string;
@@ -41,15 +42,20 @@ export function registerAppHandlers() {
 	});
 
 	ipcMain.handle(APP_CHANNELS.CHECK_UPDATE, async () => {
-		// 实际项目中应引入 electron-updater
-		// import { autoUpdater } from 'electron-updater'
-		// return await autoUpdater.checkForUpdatesAndNotify()
+		return updateService.checkForUpdates();
+	});
 
-		// 模拟检查
-		return {
-			updateAvailable: false,
-			message: "当前已是最新版本",
-		};
+	ipcMain.handle(UPDATE_CHANNELS.DOWNLOAD, async () => {
+		try {
+			await updateService.downloadUpdate();
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: (error as Error).message };
+		}
+	});
+
+	ipcMain.handle(UPDATE_CHANNELS.INSTALL, () => {
+		updateService.quitAndInstall();
 	});
 
 	ipcMain.handle(APP_CHANNELS.QUIT, () => {

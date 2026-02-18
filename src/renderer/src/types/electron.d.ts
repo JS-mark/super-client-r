@@ -194,6 +194,14 @@ export interface RendererLogEntry {
 	error_stack?: string;
 }
 
+export interface AuthUser {
+	id: string;
+	name: string;
+	email?: string;
+	avatar?: string;
+	provider: "google" | "github";
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
@@ -212,6 +220,116 @@ export interface AttachmentInfo {
 	conversationId?: string;
 	messageId?: string;
 	thumbnailPath?: string;
+}
+
+export type ModelProviderPreset =
+	| "dashscope"
+	| "deepseek"
+	| "openai"
+	| "anthropic"
+	| "gemini"
+	| "cherryin"
+	| "siliconflow"
+	| "aihubmix"
+	| "ocoolai"
+	| "zhipu-ai"
+	| "302ai"
+	| "moonshot"
+	| "baichuan"
+	| "volcengine"
+	| "minimax"
+	| "hunyuan"
+	| "grok"
+	| "github-models"
+	| "huggingface"
+	| "openrouter"
+	| "ollama"
+	| "lmstudio"
+	| "newapi"
+	| "custom";
+
+export type ModelCapability =
+	| "vision"
+	| "web_search"
+	| "reasoning"
+	| "tool_use"
+	| "embedding"
+	| "reranking";
+
+export type ModelCategory =
+	| "chat"
+	| "embedding"
+	| "reranking"
+	| "vision"
+	| "code"
+	| "image_generation"
+	| "audio"
+	| "custom";
+
+export type PricingCurrency = "USD" | "CNY" | "EUR";
+
+export interface ModelPricing {
+	currency: PricingCurrency;
+	inputPricePerMillion: number;
+	outputPricePerMillion: number;
+}
+
+export interface ProviderModel {
+	id: string;
+	name: string;
+	group?: string;
+	enabled: boolean;
+	capabilities: ModelCapability[];
+	category: ModelCategory;
+	supportsStreaming: boolean;
+	pricing?: ModelPricing;
+	systemPrompt?: string;
+	maxTokens?: number;
+	contextWindow?: number;
+}
+
+export interface ModelProvider {
+	id: string;
+	name: string;
+	preset: ModelProviderPreset;
+	baseUrl: string;
+	apiKey: string;
+	enabled: boolean;
+	tested: boolean;
+	models: ProviderModel[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface ActiveModelSelection {
+	providerId: string;
+	modelId: string;
+}
+
+export interface TestConnectionResponse {
+	success: boolean;
+	latencyMs: number;
+	error?: string;
+}
+
+export interface FetchModelsResponse {
+	models: ProviderModel[];
+}
+
+export interface ChatStreamEvent {
+	requestId: string;
+	type: "chunk" | "done" | "error";
+	content?: string;
+	error?: string;
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	};
+	timing?: {
+		firstTokenMs?: number;
+		totalMs?: number;
+	};
 }
 
 export interface ElectronAPI {
@@ -326,6 +444,54 @@ export interface ElectronAPI {
 		clearDb: () => Promise<{ success: boolean }>;
 		exportLogs: (params: LogQueryParams) => Promise<{ success: boolean; count?: number; filePath?: string }>;
 		openViewer: () => Promise<{ success: boolean }>;
+	};
+
+	// Auth API
+	auth: {
+		login: (provider: "google" | "github") => Promise<IPCResponse<AuthUser>>;
+		logout: () => Promise<IPCResponse>;
+		getUser: () => Promise<IPCResponse<AuthUser | null>>;
+	};
+
+	// Update API
+	update: {
+		check: () => Promise<{ updateAvailable: boolean; version?: string; message: string }>;
+		download: () => Promise<IPCResponse>;
+		install: () => Promise<void>;
+		onChecking: (callback: () => void) => () => void;
+		onAvailable: (callback: (info: unknown) => void) => () => void;
+		onNotAvailable: (callback: (info: unknown) => void) => () => void;
+		onProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => () => void;
+		onDownloaded: (callback: (info: unknown) => void) => () => void;
+		onError: (callback: (error: string) => void) => () => void;
+	};
+
+	// Model Provider API
+	model: {
+		listProviders: () => Promise<IPCResponse<ModelProvider[]>>;
+		getProvider: (id: string) => Promise<IPCResponse<ModelProvider>>;
+		saveProvider: (provider: ModelProvider) => Promise<IPCResponse>;
+		deleteProvider: (id: string) => Promise<IPCResponse>;
+		testConnection: (baseUrl: string, apiKey: string) => Promise<IPCResponse<TestConnectionResponse>>;
+		fetchModels: (baseUrl: string, apiKey: string, preset?: ModelProviderPreset) => Promise<IPCResponse<FetchModelsResponse>>;
+		updateModelConfig: (providerId: string, modelId: string, config: Partial<ProviderModel>) => Promise<IPCResponse>;
+		getActiveModel: () => Promise<IPCResponse<ActiveModelSelection | undefined>>;
+		setActiveModel: (selection: ActiveModelSelection | null) => Promise<IPCResponse>;
+	};
+
+	// LLM API
+	llm: {
+		chatCompletion: (request: {
+			requestId: string;
+			baseUrl: string;
+			apiKey: string;
+			model: string;
+			messages: { role: "user" | "assistant" | "system"; content: string }[];
+			maxTokens?: number;
+			temperature?: number;
+		}) => Promise<IPCResponse>;
+		stopStream: (requestId: string) => Promise<IPCResponse>;
+		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
 	};
 
 	// 通用 IPC

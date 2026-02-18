@@ -165,6 +165,33 @@ export const LOG_CHANNELS = {
 	OPEN_VIEWER: "log:open-viewer",
 } as const;
 
+// Auth 相关通道
+export const AUTH_CHANNELS = {
+	// OAuth 登录
+	LOGIN: "auth:login",
+	// 登出
+	LOGOUT: "auth:logout",
+	// 获取当前用户
+	GET_USER: "auth:get-user",
+} as const;
+
+// 更新相关通道
+export const UPDATE_CHANNELS = {
+	// 检查更新
+	CHECK: "update:check",
+	// 下载更新
+	DOWNLOAD: "update:download",
+	// 安装更新
+	INSTALL: "update:install",
+	// 事件 (main → renderer)
+	CHECKING: "update:checking",
+	AVAILABLE: "update:available",
+	NOT_AVAILABLE: "update:not-available",
+	PROGRESS: "update:progress",
+	DOWNLOADED: "update:downloaded",
+	ERROR: "update:error",
+} as const;
+
 // 文件附件相关通道
 export const FILE_CHANNELS = {
 	// 选择文件
@@ -185,6 +212,38 @@ export const FILE_CHANNELS = {
 	COPY_FILE: "file:copy-file",
 } as const;
 
+// Model Provider 相关通道
+export const MODEL_CHANNELS = {
+	// 获取所有 providers
+	LIST_PROVIDERS: "model:list-providers",
+	// 获取单个 provider
+	GET_PROVIDER: "model:get-provider",
+	// 保存 provider (新建或更新)
+	SAVE_PROVIDER: "model:save-provider",
+	// 删除 provider
+	DELETE_PROVIDER: "model:delete-provider",
+	// 测试连接
+	TEST_CONNECTION: "model:test-connection",
+	// 获取可用模型列表
+	FETCH_MODELS: "model:fetch-models",
+	// 更新单个模型配置
+	UPDATE_MODEL_CONFIG: "model:update-model-config",
+	// 获取当前活跃模型
+	GET_ACTIVE_MODEL: "model:get-active-model",
+	// 设置活跃模型
+	SET_ACTIVE_MODEL: "model:set-active-model",
+} as const;
+
+// LLM 调用相关通道
+export const LLM_CHANNELS = {
+	// 发起聊天补全请求
+	CHAT_COMPLETION: "llm:chat-completion",
+	// 停止流式响应
+	STOP_STREAM: "llm:stop-stream",
+	// 流式事件 (main → renderer)
+	STREAM_EVENT: "llm:stream-event",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -198,4 +257,8 @@ export type IPCChannel =
 	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS]
 	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS]
 	| (typeof LOG_CHANNELS)[keyof typeof LOG_CHANNELS]
-	| (typeof FILE_CHANNELS)[keyof typeof FILE_CHANNELS];
+	| (typeof FILE_CHANNELS)[keyof typeof FILE_CHANNELS]
+	| (typeof AUTH_CHANNELS)[keyof typeof AUTH_CHANNELS]
+	| (typeof UPDATE_CHANNELS)[keyof typeof UPDATE_CHANNELS]
+	| (typeof MODEL_CHANNELS)[keyof typeof MODEL_CHANNELS]
+	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS];

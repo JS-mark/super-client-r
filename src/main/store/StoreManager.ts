@@ -4,6 +4,12 @@
  */
 
 import Store from "electron-store";
+import type {
+	ActiveModelSelection,
+	ModelProvider,
+	ProviderModel,
+} from "../ipc/types";
+import { ensureModelDefaults } from "../services/llm/modelNormalizer";
 
 export type SearchProviderType =
 	| "zhipu"
@@ -38,11 +44,31 @@ export interface AppConfig {
 	floatWidgetEnabled?: boolean;
 	searchConfigs?: SearchConfig[];
 	defaultSearchProvider?: SearchProviderType;
+	// Model providers
+	modelProviders?: ModelProvider[];
+	activeModelSelection?: ActiveModelSelection;
 	// Plugin related
 	plugins?: unknown[];
 	pluginsData?: Record<string, unknown>;
 	// Keybindings
 	keybindings?: Record<string, string>;
+	// OAuth credentials
+	googleClientId?: string;
+	githubClientId?: string;
+	githubClientSecret?: string;
+	// Auth user data
+	authUser?: {
+		id: string;
+		name: string;
+		email?: string;
+		avatar?: string;
+		provider: "google" | "github";
+	};
+	authTokens?: {
+		accessToken: string;
+		refreshToken?: string;
+		expiresAt?: number;
+	};
 }
 
 export interface AppData {
@@ -177,6 +203,83 @@ export class StoreManager {
 
 	getDefaultSearchProvider(): SearchProviderType | undefined {
 		return this.configStore.get("defaultSearchProvider");
+	}
+
+	// ============ Model Provider 相关 ============
+
+	getModelProviders(): ModelProvider[] {
+		const raw = this.configStore.get("modelProviders") || [];
+		// Migrate old data: ensure all models have new required fields
+		return raw.map((provider: ModelProvider) => ({
+			...provider,
+			models: provider.models.map((m) =>
+				ensureModelDefaults(m as unknown as Record<string, unknown>),
+			),
+		}));
+	}
+
+	getModelProvider(id: string): ModelProvider | undefined {
+		return this.getModelProviders().find((p) => p.id === id);
+	}
+
+	saveModelProvider(provider: ModelProvider): void {
+		const providers = this.getModelProviders();
+		const existingIndex = providers.findIndex((p) => p.id === provider.id);
+
+		if (existingIndex >= 0) {
+			providers[existingIndex] = provider;
+		} else {
+			providers.push(provider);
+		}
+
+		this.configStore.set("modelProviders", providers);
+	}
+
+	deleteModelProvider(id: string): void {
+		const providers = this.getModelProviders().filter((p) => p.id !== id);
+		this.configStore.set("modelProviders", providers);
+
+		// Clear active selection if it references the deleted provider
+		const active = this.getActiveModelSelection();
+		if (active?.providerId === id) {
+			this.configStore.delete("activeModelSelection" as keyof AppConfig);
+		}
+	}
+
+	getActiveModelSelection(): ActiveModelSelection | undefined {
+		return this.configStore.get("activeModelSelection");
+	}
+
+	updateModelConfig(
+		providerId: string,
+		modelId: string,
+		config: Partial<Omit<ProviderModel, "id">>,
+	): void {
+		const providers = this.getModelProviders();
+		const providerIndex = providers.findIndex((p) => p.id === providerId);
+		if (providerIndex < 0) {
+			throw new Error(`Provider not found: ${providerId}`);
+		}
+		const provider = providers[providerIndex];
+		const modelIndex = provider.models.findIndex((m) => m.id === modelId);
+		if (modelIndex < 0) {
+			throw new Error(`Model not found: ${modelId}`);
+		}
+		provider.models[modelIndex] = {
+			...provider.models[modelIndex],
+			...config,
+		};
+		provider.updatedAt = Date.now();
+		providers[providerIndex] = provider;
+		this.configStore.set("modelProviders", providers);
+	}
+
+	setActiveModelSelection(selection: ActiveModelSelection | null): void {
+		if (selection === null) {
+			this.configStore.delete("activeModelSelection" as keyof AppConfig);
+		} else {
+			this.configStore.set("activeModelSelection", selection);
+		}
 	}
 
 	// ============ 清除所有数据 ============
