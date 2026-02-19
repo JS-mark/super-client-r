@@ -24,6 +24,8 @@ export interface Message {
 	toolCall?: ToolCall;
 	metadata?: {
 		model?: string;
+		providerPreset?: string;
+		providerName?: string;
 		tokens?: number;
 		inputTokens?: number;
 		outputTokens?: number;

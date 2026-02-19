@@ -116,7 +116,7 @@ const ModelSelectPrompt: React.FC<{
 	if (enabledModels.length === 0) {
 		return (
 			<div
-				className="mt-6 p-6 rounded-xl border text-center max-w-md"
+				className="mt-6 p-6 rounded-xl border text-center"
 				style={{
 					borderColor: token.colorWarningBorder,
 					backgroundColor: token.colorWarningBg,
@@ -364,6 +364,8 @@ const Chat: React.FC = () => {
 
 	const handleSend = useCallback(
 		(value: string) => {
+			// Safety guard: prevent send when slash command panel is open
+			if (slashStateRef.current.open) return;
 			if ((value.trim() || attachedFiles.length > 0) && !isStreaming) {
 				sendMessage({
 					mode: chatMode,
@@ -416,7 +418,7 @@ const Chat: React.FC = () => {
 		(skillId: string, _skillName: string) => {
 			setChatMode("skill");
 			setSelectedSkillId(skillId);
-			setInput(`/${skillId} `);
+			setInput("");
 			setSlashPanelOpen(false);
 			setSlashQuery("");
 		},
@@ -594,7 +596,7 @@ const Chat: React.FC = () => {
 		],
 	);
 
-	// Bubble.List role config
+	// Bubble.List role config — avatars are rendered in per-message headers, not here
 	const roles = useMemo(
 		() => ({
 			user: {
@@ -602,15 +604,7 @@ const Chat: React.FC = () => {
 				variant: "filled" as const,
 				shape: "round" as const,
 				rootClassName: "group",
-				avatar: (
-					<Avatar
-						icon={<UserOutlined />}
-						style={{
-							background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-							color: "#fff",
-						}}
-					/>
-				),
+				avatar: undefined as React.ReactNode,
 				styles: {
 					content: {
 						background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
@@ -623,19 +617,26 @@ const Chat: React.FC = () => {
 				variant: "borderless" as const,
 				shape: "round" as const,
 				rootClassName: "group",
-				avatar: (
-					<Avatar
-						icon={<RobotOutlined />}
-						style={{
-							background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
-							color: "#fff",
-						}}
-					/>
-				),
+				avatar: undefined as React.ReactNode,
+				styles: {
+					content: {
+						display: "inline-block",
+					},
+				},
 			},
 		}),
 		[],
 	);
+
+	// Format timestamp for header display: MM/DD HH:mm
+	const formatHeaderTime = useCallback((ts: number) => {
+		const d = new Date(ts);
+		const month = String(d.getMonth() + 1).padStart(2, "0");
+		const day = String(d.getDate()).padStart(2, "0");
+		const hour = String(d.getHours()).padStart(2, "0");
+		const minute = String(d.getMinutes()).padStart(2, "0");
+		return `${month}/${day} ${hour}:${minute}`;
+	}, []);
 
 	// Convert messages to Bubble.List items
 	const bubbleItems = useMemo(() => {
@@ -643,11 +644,120 @@ const Chat: React.FC = () => {
 			const isLast = idx === messages.length - 1;
 			const isAssistant = msg.role === "assistant";
 			const isTool = msg.role === "tool";
+			const isUser = msg.role === "user";
 			const isCurrentlyStreaming = isAssistant && isStreaming && isLast;
 			const displayContent =
 				isAssistant && isStreaming && isLast ? streamingContent : msg.content;
 
-			// Tool call messages
+			// Check if this AI message is a continuation after tool call(s)
+			const prevMsg = idx > 0 ? messages[idx - 1] : null;
+			const isContinuation = (isAssistant || isTool) && prevMsg != null && (prevMsg.role === "tool" || prevMsg.role === "assistant");
+
+			const timeText = formatHeaderTime(msg.timestamp);
+
+			// ── User header: label + avatar (right-aligned) + time below ──
+			const userHeader = isUser ? (
+				<div className="flex flex-col items-end gap-0.5 mb-1">
+					<div className="flex items-center gap-2">
+						<span
+							style={{
+								fontSize: 13,
+								fontWeight: 500,
+								color: token.colorText,
+							}}
+						>
+							{t("chat.user", "用户", { ns: "chat" })}
+						</span>
+						<Avatar
+							icon={<UserOutlined />}
+							size={28}
+							style={{
+								background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+								color: "#fff",
+							}}
+						/>
+					</div>
+					<span
+						style={{
+							fontSize: 11,
+							color: token.colorTextQuaternary,
+						}}
+					>
+						{timeText}
+					</span>
+				</div>
+			) : null;
+
+			// ── AI header: avatar + model name (left-aligned) + time below ──
+			const aiHeader = (() => {
+				if (isUser || isContinuation) return null;
+				const meta = msg.metadata;
+				const preset = meta?.providerPreset as ModelProviderPreset | undefined;
+				const avatarNode = preset ? (
+					<ProviderIcon preset={preset} size={28} />
+				) : (
+					<Avatar
+						icon={<RobotOutlined />}
+						size={28}
+						style={{
+							background: "linear-gradient(135deg, #8b5cf6, #ec4899)",
+							color: "#fff",
+						}}
+					/>
+				);
+				const modelName = meta?.model;
+				const providerName = meta?.providerName;
+
+				return (
+					<div className="flex flex-col gap-0.5 mb-1">
+						<div className="flex items-center gap-2">
+							{avatarNode}
+							{modelName ? (
+								<span
+									style={{
+										fontSize: 13,
+										fontWeight: 500,
+										color: token.colorText,
+									}}
+								>
+									{modelName}
+									{providerName && (
+										<span
+											style={{
+												fontWeight: 400,
+												color: token.colorTextTertiary,
+											}}
+										>
+											{" "}| {providerName}
+										</span>
+									)}
+								</span>
+							) : (
+								<span
+									style={{
+										fontSize: 13,
+										fontWeight: 500,
+										color: token.colorText,
+									}}
+								>
+									AI
+								</span>
+							)}
+						</div>
+						<span
+							style={{
+								fontSize: 11,
+								color: token.colorTextQuaternary,
+								marginLeft: 36,
+							}}
+						>
+							{timeText}
+						</span>
+					</div>
+				);
+			})();
+
+			// Tool call messages — no header (part of same turn)
 			if (isTool && msg.toolCall) {
 				return {
 					key: msg.id || `msg-${idx}`,
@@ -655,18 +765,18 @@ const Chat: React.FC = () => {
 					content: "",
 					contentRender: () => <ToolCallCard toolCall={msg.toolCall!} />,
 					variant: "borderless" as const,
-					avatar: undefined as React.ReactNode,
 				};
 			}
 
 			return {
 				key: msg.id || `msg-${idx}`,
-				role: msg.role === "user" ? ("user" as const) : ("ai" as const),
+				role: isUser ? ("user" as const) : ("ai" as const),
 				content: displayContent || "",
 				loading: isCurrentlyStreaming && !displayContent,
 				typing: isCurrentlyStreaming
 					? { effect: "fade-in" as const, step: 5, interval: 50 }
 					: undefined,
+				header: isUser ? userHeader : aiHeader,
 				contentRender: () => {
 					if (!displayContent) return null;
 					return (
@@ -733,12 +843,7 @@ const Chat: React.FC = () => {
 						tokenText = `${meta.tokens} tokens`;
 					}
 
-					const timeText = new Date(msg.timestamp).toLocaleTimeString([], {
-						hour: "2-digit",
-						minute: "2-digit",
-					});
-
-					// Token info element
+					// Token info element (no time — already in header)
 					const tokenInfo = (
 						<div className="flex items-center gap-1.5">
 							{isBookmarked(msg.id) && (
@@ -752,12 +857,6 @@ const Chat: React.FC = () => {
 									{tokenText}
 								</span>
 							)}
-							<span
-								className="text-xs"
-								style={{ color: token.colorTextQuaternary }}
-							>
-								{timeText}
-							</span>
 						</div>
 					);
 
@@ -913,8 +1012,10 @@ const Chat: React.FC = () => {
 		isBookmarked,
 		message,
 		t,
-		token.colorTextQuaternary,
+		token.colorText,
 		token.colorTextTertiary,
+		token.colorTextQuaternary,
+		formatHeaderTime,
 		retryMessage,
 		editMessage,
 		handleCopyMessage,
@@ -939,7 +1040,7 @@ const Chat: React.FC = () => {
 					style={{ backgroundColor: token.colorBgLayout }}
 				>
 					{/* Chat Area */}
-					<div className="flex-1 overflow-hidden w-full">
+					<div className="flex-1 overflow-hidden w-full px-4 sm:px-6">
 					{messages.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full w-full px-4 sm:px-6">
 							<Welcome
@@ -1068,8 +1169,7 @@ const Chat: React.FC = () => {
 							value={input}
 							onChange={(val) => {
 								setInput(val);
-								// Show slash panel only for "/command" with no space (still selecting)
-								if (val.startsWith("/") && !val.slice(1).includes(" ")) {
+								if (val.startsWith("/")) {
 									setSlashPanelOpen(true);
 									setSlashQuery(val.slice(1));
 								} else if (slashPanelOpen) {

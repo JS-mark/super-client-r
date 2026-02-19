@@ -1,7 +1,6 @@
 import { App } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildSystemPrompt } from "../prompt";
-import { agentClient } from "../services/agent/agentService";
+import { type EnvInfo, buildSystemPrompt } from "../prompt";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
 import { searchService } from "../services/search/searchService";
@@ -18,6 +17,75 @@ export interface ChatOptions {
 	skillId?: string;
 	searchEngine?: string;
 	searchConfigs?: SearchConfig[];
+}
+
+/**
+ * Fetch MCP tools from all connected servers and build tool awareness prompt.
+ * Returns tools array, toolMapping, and a tool hint string for the system prompt.
+ */
+/**
+ * 将 serverId 转换为合法的 OpenAI 函数名前缀
+ * OpenAI 要求: ^[a-zA-Z0-9_-]+$
+ * 例如: "@scp/fetch" → "scp-fetch", "@mcp/browser" → "mcp-browser"
+ */
+function sanitizeServerId(serverId: string): string {
+	return serverId.replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+
+async function fetchMcpTools(): Promise<{
+	tools?: Array<{
+		type: "function";
+		function: { name: string; description: string; parameters: Record<string, unknown> };
+	}>;
+	toolMapping?: Record<string, { serverId: string; toolName: string }>;
+	toolHint: string;
+}> {
+	try {
+		const mcpTools = await mcpClient.getAllTools();
+		if (mcpTools.length > 0) {
+			const tools: Array<{
+				type: "function";
+				function: { name: string; description: string; parameters: Record<string, unknown> };
+			}> = [];
+			const toolMapping: Record<string, { serverId: string; toolName: string }> = {};
+			for (const { serverId, tool } of mcpTools) {
+				const safePrefix = sanitizeServerId(serverId);
+				const prefixedName = `${safePrefix}__${tool.name}`;
+				tools.push({
+					type: "function",
+					function: {
+						name: prefixedName,
+						description: tool.description || "",
+						parameters: tool.inputSchema || { type: "object", properties: {} },
+					},
+				});
+				toolMapping[prefixedName] = { serverId, toolName: tool.name };
+			}
+			const toolNames = tools.map((t) => t.function.name.split("__").pop()).join(", ");
+			const toolHint = `\n\nYou have access to the following tools and SHOULD actively use them when the user's request can benefit from them: ${toolNames}. Do not say you cannot access files, databases, or the web if a relevant tool is available — use the tool instead.`;
+			return { tools, toolMapping, toolHint };
+		}
+	} catch (err) {
+		console.warn("[useChat] Failed to fetch MCP tools:", err);
+	}
+	return { toolHint: "" };
+}
+
+// 缓存环境信息（静态数据，应用生命周期内不变）
+let cachedEnvInfo: EnvInfo | null = null;
+
+async function getEnvInfo(): Promise<EnvInfo | undefined> {
+	if (cachedEnvInfo) return cachedEnvInfo;
+	try {
+		const res = await window.electron.system.getEnvInfo();
+		if (res.success && res.data) {
+			cachedEnvInfo = res.data;
+			return cachedEnvInfo;
+		}
+	} catch (err) {
+		console.warn("[useChat] Failed to fetch env info:", err);
+	}
+	return undefined;
 }
 
 export function useChat() {
@@ -45,6 +113,11 @@ export function useChat() {
 
 	const currentRequestIdRef = useRef<string | null>(null);
 	const streamContentRef = useRef("");
+	const currentModelInfoRef = useRef<{
+		model: string;
+		providerPreset: string;
+		providerName: string;
+	} | null>(null);
 
 	// Subscribe to LLM stream events
 	useEffect(() => {
@@ -120,7 +193,11 @@ export function useChat() {
 					const tps = outputTokens && totalMs && totalMs > 0
 						? Math.round((outputTokens / totalMs) * 1000)
 						: undefined;
+					const modelInfo = currentModelInfoRef.current;
 					updateMessageMetadata(lastAssistant.id, {
+						model: modelInfo?.model,
+						providerPreset: modelInfo?.providerPreset,
+						providerName: modelInfo?.providerName,
 						tokens: event.usage?.totalTokens,
 						inputTokens: event.usage?.inputTokens,
 						outputTokens: event.usage?.outputTokens,
@@ -168,6 +245,11 @@ export function useChat() {
 			}
 
 			const { provider, model } = active;
+			currentModelInfoRef.current = {
+				model: model.id,
+				providerPreset: provider.preset,
+				providerName: provider.name,
+			};
 
 			setStreaming(true);
 			setStreamingContent("");
@@ -186,8 +268,9 @@ export function useChat() {
 						content: m.content,
 					}));
 
-				// Inject system prompt: global default + model custom system prompt
-				const systemPrompt = buildSystemPrompt(model.systemPrompt);
+				// Inject system prompt: global default + env context + model custom system prompt
+				const envInfo = await getEnvInfo();
+				const systemPrompt = buildSystemPrompt(model.systemPrompt, envInfo);
 				history.unshift({
 					role: "system",
 					content: systemPrompt,
@@ -225,32 +308,9 @@ export function useChat() {
 				}
 
 				// Auto-fetch MCP tools from all connected servers
-				let tools: Array<{
-					type: "function";
-					function: { name: string; description: string; parameters: Record<string, unknown> };
-				}> | undefined;
-				let toolMapping: Record<string, { serverId: string; toolName: string }> | undefined;
-
-				try {
-					const mcpTools = await mcpClient.getAllTools();
-					if (mcpTools.length > 0) {
-						tools = [];
-						toolMapping = {};
-						for (const { serverId, tool } of mcpTools) {
-							const prefixedName = `${serverId}__${tool.name}`;
-							tools.push({
-								type: "function",
-								function: {
-									name: prefixedName,
-									description: tool.description || "",
-									parameters: tool.inputSchema || { type: "object", properties: {} },
-								},
-							});
-							toolMapping[prefixedName] = { serverId, toolName: tool.name };
-						}
-					}
-				} catch (err) {
-					console.warn("[useChat] Failed to fetch MCP tools, continuing without tools:", err);
+				const { tools, toolMapping, toolHint } = await fetchMcpTools();
+				if (toolHint) {
+					history[0].content += toolHint;
 				}
 
 				await modelService.chatCompletion({
@@ -276,90 +336,77 @@ export function useChat() {
 	);
 
 	/**
-	 * Send message using Agent
+	 * Send message using Agent mode
+	 * Uses the active model with MCP tools and an agentic system prompt.
+	 * The LLM service handles multi-round tool execution automatically.
 	 */
 	const sendAgentMessage = useCallback(
-		async (content: string, agentId?: string) => {
-			if (!agentId) {
-				message.error("No agent selected");
+		async (content: string, _agentId?: string) => {
+			const active = useModelStore.getState().getActiveProviderModel();
+			if (!active) {
+				message.error("No active model selected. Please configure a model in Settings → Models.");
 				return;
 			}
 
+			const { provider, model } = active;
+			currentModelInfoRef.current = {
+				model: model.id,
+				providerPreset: provider.preset,
+				providerName: provider.name,
+			};
+
 			setStreaming(true);
 			setStreamingContent("");
+			streamContentRef.current = "";
+
+			const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+			currentRequestIdRef.current = requestId;
 
 			try {
-				const session = await agentClient.createSession({
-					apiKey: "",
-					model: "claude-3-5-sonnet-20241022",
+				const currentMessages = useChatStore.getState().messages;
+				const history: { role: "user" | "assistant" | "system"; content: string }[] = currentMessages
+					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
+					.map((m) => ({
+						role: m.role as "user" | "assistant",
+						content: m.content,
+					}));
+
+				// Build agentic system prompt
+				const envInfo = await getEnvInfo();
+				const basePrompt = buildSystemPrompt(model.systemPrompt, envInfo);
+				const agentPrompt = `${basePrompt}\n\n--- Agent Mode ---\nYou are operating in Agent mode. You have access to tools and should proactively use them to accomplish the user's task. Break down complex tasks into steps, use available tools as needed, and provide comprehensive results. Think step by step and take action autonomously.`;
+
+				history.unshift({
+					role: "system",
+					content: agentPrompt,
 				});
 
-				await agentClient.sendMessage(session.id, content);
+				// Auto-fetch MCP tools for agent mode
+				const { tools, toolMapping, toolHint } = await fetchMcpTools();
+				if (toolHint) {
+					history[0].content += toolHint;
+				}
 
-				const unsubscribe = agentClient.onStreamEvent((event) => {
-					if (event.type === "text") {
-						appendStreamingContent(String(event.data));
-					} else if (event.type === "tool_use") {
-						const toolData = event.data as {
-							id: string;
-							name: string;
-							input: Record<string, unknown>;
-						};
-						const toolMessage: Message = {
-							id: `tool_${Date.now()}`,
-							role: "tool",
-							content: `Using tool: ${toolData.name}`,
-							timestamp: Date.now(),
-							type: "tool_use",
-							toolCall: {
-								id: toolData.id,
-								name: toolData.name,
-								input: toolData.input,
-								status: "pending",
-							},
-						};
-						addMessage(toolMessage);
-					} else if (event.type === "tool_result") {
-						const resultData = event.data as {
-							tool_use_id: string;
-							content: unknown;
-							is_error?: boolean;
-						};
-						const toolMsg = messages.find(
-							(m) => m.toolCall?.id === resultData.tool_use_id,
-						);
-						if (toolMsg) {
-							updateMessageToolCall(toolMsg.id, {
-								status: resultData.is_error ? "error" : "success",
-								result: resultData.content,
-							});
-						}
-					} else if (event.type === "done") {
-						unsubscribe();
-						setStreaming(false);
-					}
+				await modelService.chatCompletion({
+					requestId,
+					baseUrl: provider.baseUrl,
+					apiKey: provider.apiKey,
+					model: model.id,
+					messages: history,
+					tools,
+					toolMapping,
 				});
-
-				setTimeout(() => {
-					unsubscribe();
-					setStreaming(false);
-				}, 60000);
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send agent message:", error);
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				message.error(`Error: ${errorMsg}`);
 				setStreaming(false);
+				setStreamingContent("");
+				streamContentRef.current = "";
+				currentRequestIdRef.current = null;
 			}
 		},
-		[
-			message,
-			messages,
-			addMessage,
-			updateMessageToolCall,
-			appendStreamingContent,
-			setStreaming,
-			setStreamingContent,
-		],
+		[message, setStreaming, setStreamingContent],
 	);
 
 	/**
@@ -379,6 +426,11 @@ export function useChat() {
 			}
 
 			const { provider, model } = active;
+			currentModelInfoRef.current = {
+				model: model.id,
+				providerPreset: provider.preset,
+				providerName: provider.name,
+			};
 
 			// 获取 skill 的系统提示词
 			let skillSystemPrompt: string | null = null;
@@ -404,8 +456,9 @@ export function useChat() {
 						content: m.content,
 					}));
 
-				// 构建系统提示词: 全局默认 + Skill 上下文 + 模型自定义
-				const basePrompt = buildSystemPrompt(model.systemPrompt);
+				// 构建系统提示词: 全局默认 + 环境上下文 + Skill 上下文 + 模型自定义
+				const envInfo = await getEnvInfo();
+				const basePrompt = buildSystemPrompt(model.systemPrompt, envInfo);
 				const systemPrompt = skillSystemPrompt
 					? `${basePrompt}\n\n--- Skill Context ---\n${skillSystemPrompt}`
 					: basePrompt;
@@ -415,12 +468,20 @@ export function useChat() {
 					content: systemPrompt,
 				});
 
+				// Auto-fetch MCP tools so the model can autonomously invoke them in skill mode
+				const { tools, toolMapping, toolHint } = await fetchMcpTools();
+				if (toolHint) {
+					history[0].content += toolHint;
+				}
+
 				await modelService.chatCompletion({
 					requestId,
 					baseUrl: provider.baseUrl,
 					apiKey: provider.apiKey,
 					model: model.id,
 					messages: history,
+					tools,
+					toolMapping,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send skill message:", error);
@@ -473,11 +534,17 @@ export function useChat() {
 			};
 			addMessage(userMessage);
 
+			const retryActive = useModelStore.getState().getActiveProviderModel();
 			const assistantMessage: Message = {
 				id: `assistant_${Date.now()}`,
 				role: "assistant",
 				content: "",
 				timestamp: Date.now(),
+				metadata: retryActive ? {
+					model: retryActive.model.id,
+					providerPreset: retryActive.provider.preset,
+					providerName: retryActive.provider.name,
+				} : undefined,
 			};
 			addMessage(assistantMessage);
 
@@ -527,11 +594,17 @@ export function useChat() {
 			addMessage(userMessage);
 			setInput("");
 
+			const activeForMeta = useModelStore.getState().getActiveProviderModel();
 			const assistantMessage: Message = {
 				id: `assistant_${Date.now()}`,
 				role: "assistant",
 				content: "",
 				timestamp: Date.now(),
+				metadata: activeForMeta ? {
+					model: activeForMeta.model.id,
+					providerPreset: activeForMeta.provider.preset,
+					providerName: activeForMeta.provider.name,
+				} : undefined,
 			};
 			addMessage(assistantMessage);
 

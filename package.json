@@ -92,13 +92,16 @@
     "motion": "^12.34.0",
     "nanoid": "^5.1.6",
     "openai": "^6.22.0",
+    "pyodide": "^0.29.3",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-i18next": "^16.5.4",
     "react-router-dom": "^7.13.0",
     "react-window": "^2.2.7",
+    "react18-json-view": "^0.2.9",
     "swagger-ui-dist": "^5.31.0",
     "tailwind-merge": "^3.4.0",
+    "tinyglobby": "^0.2.15",
     "zustand": "^5.0.10"
   },
   "devDependencies": {
