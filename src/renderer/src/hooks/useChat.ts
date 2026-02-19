@@ -7,6 +7,7 @@ import { searchService } from "../services/search/searchService";
 import { skillClient } from "../services/skill/skillService";
 import { type Message, useChatStore } from "../stores/chatStore";
 import { useModelStore } from "../stores/modelStore";
+import type { ActiveModelSelection } from "../types/models";
 import type { SearchConfig } from "../types/search";
 
 export type ChatMode = "direct" | "agent" | "skill";
@@ -92,13 +93,14 @@ export function useChat() {
 	const { message } = App.useApp();
 	const {
 		messages,
+		sessionStatus,
 		isStreaming,
 		streamingContent,
 		addMessage,
 		updateLastMessage,
 		updateMessageToolCall,
 		updateMessageMetadata,
-		setStreaming,
+		setSessionStatus,
 		setStreamingContent,
 		appendStreamingContent,
 		clearMessages,
@@ -111,6 +113,9 @@ export function useChat() {
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
+	// Session-scoped model override (does not affect global setting)
+	const [sessionModelOverride, setSessionModelOverride] = useState<ActiveModelSelection | null>(null);
+
 	const currentRequestIdRef = useRef<string | null>(null);
 	const streamContentRef = useRef("");
 	const currentModelInfoRef = useRef<{
@@ -119,15 +124,34 @@ export function useChat() {
 		providerName: string;
 	} | null>(null);
 
+	/**
+	 * Get the effective model for the current session.
+	 * Uses sessionModelOverride if set, otherwise falls back to global active model.
+	 */
+	const getEffectiveModel = useCallback(() => {
+		if (sessionModelOverride) {
+			const { providers } = useModelStore.getState();
+			const provider = providers.find((p) => p.id === sessionModelOverride.providerId);
+			const model = provider?.models.find((m) => m.id === sessionModelOverride.modelId);
+			if (provider && model) return { provider, model };
+		}
+		return useModelStore.getState().getActiveProviderModel();
+	}, [sessionModelOverride]);
+
 	// Subscribe to LLM stream events
 	useEffect(() => {
 		const unsubscribe = modelService.onStreamEvent((event) => {
 			if (event.requestId !== currentRequestIdRef.current) return;
 
 			if (event.type === "chunk" && event.content) {
+				// Transition preparing → streaming on first chunk
+				if (useChatStore.getState().sessionStatus === "preparing") {
+					setSessionStatus("streaming");
+				}
 				streamContentRef.current += event.content;
 				appendStreamingContent(event.content);
 			} else if (event.type === "tool_call" && event.toolCall) {
+				setSessionStatus("tool_calling");
 				// Model is calling a tool — show a tool message in the chat
 				const toolMessage: Message = {
 					id: `tool_${event.toolCall.id}`,
@@ -157,6 +181,7 @@ export function useChat() {
 					setStreamingContent("");
 				}
 			} else if (event.type === "tool_result" && event.toolResult) {
+				setSessionStatus("streaming");
 				// Tool execution completed — update the tool message
 				const toolMsgId = `tool_${event.toolResult.toolCallId}`;
 				updateMessageToolCall(toolMsgId, {
@@ -217,20 +242,20 @@ export function useChat() {
 						}
 					}
 				}
-				setStreaming(false);
+				setSessionStatus("idle");
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
 			} else if (event.type === "error") {
 				message.error(`Stream error: ${event.error}`);
-				setStreaming(false);
+				setSessionStatus("idle");
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
 			}
 		});
 		return unsubscribe;
-	}, [addMessage, appendStreamingContent, setStreaming, setStreamingContent, updateLastMessage, updateMessageToolCall, updateMessageMetadata, message]);
+	}, [addMessage, appendStreamingContent, setSessionStatus, setStreamingContent, updateLastMessage, updateMessageToolCall, updateMessageMetadata, message]);
 
 	/**
 	 * Send message in direct chat mode (via IPC to main process)
@@ -238,7 +263,7 @@ export function useChat() {
 	 */
 	const sendDirectMessage = useCallback(
 		async (content: string, options?: { searchEngine?: string; searchConfigs?: SearchConfig[] }) => {
-			const active = useModelStore.getState().getActiveProviderModel();
+			const active = getEffectiveModel();
 			if (!active) {
 				message.error("No active model selected. Please configure a model in Settings → Models.");
 				return;
@@ -251,7 +276,7 @@ export function useChat() {
 				providerName: provider.name,
 			};
 
-			setStreaming(true);
+			setSessionStatus("preparing");
 			setStreamingContent("");
 			streamContentRef.current = "";
 
@@ -326,13 +351,13 @@ export function useChat() {
 				console.error("[useChat] Failed to send direct message:", error);
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				message.error(`Error: ${errorMsg}`);
-				setStreaming(false);
+				setSessionStatus("idle");
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setStreaming, setStreamingContent],
+		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
 	);
 
 	/**
@@ -342,7 +367,7 @@ export function useChat() {
 	 */
 	const sendAgentMessage = useCallback(
 		async (content: string, _agentId?: string) => {
-			const active = useModelStore.getState().getActiveProviderModel();
+			const active = getEffectiveModel();
 			if (!active) {
 				message.error("No active model selected. Please configure a model in Settings → Models.");
 				return;
@@ -355,7 +380,7 @@ export function useChat() {
 				providerName: provider.name,
 			};
 
-			setStreaming(true);
+			setSessionStatus("preparing");
 			setStreamingContent("");
 			streamContentRef.current = "";
 
@@ -400,13 +425,13 @@ export function useChat() {
 				console.error("[useChat] Failed to send agent message:", error);
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				message.error(`Error: ${errorMsg}`);
-				setStreaming(false);
+				setSessionStatus("idle");
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setStreaming, setStreamingContent],
+		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
 	);
 
 	/**
@@ -419,7 +444,7 @@ export function useChat() {
 				return;
 			}
 
-			const active = useModelStore.getState().getActiveProviderModel();
+			const active = getEffectiveModel();
 			if (!active) {
 				message.error("No active model selected. Please configure a model in Settings → Models.");
 				return;
@@ -440,7 +465,7 @@ export function useChat() {
 				console.warn("[useChat] Failed to load skill system prompt");
 			}
 
-			setStreaming(true);
+			setSessionStatus("preparing");
 			setStreamingContent("");
 			streamContentRef.current = "";
 
@@ -487,13 +512,13 @@ export function useChat() {
 				console.error("[useChat] Failed to send skill message:", error);
 				const errorMsg = error instanceof Error ? error.message : String(error);
 				message.error(`Error: ${errorMsg}`);
-				setStreaming(false);
+				setSessionStatus("idle");
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setStreaming, setStreamingContent],
+		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
 	);
 
 	/**
@@ -534,7 +559,7 @@ export function useChat() {
 			};
 			addMessage(userMessage);
 
-			const retryActive = useModelStore.getState().getActiveProviderModel();
+			const retryActive = getEffectiveModel();
 			const assistantMessage: Message = {
 				id: `assistant_${Date.now()}`,
 				role: "assistant",
@@ -550,7 +575,7 @@ export function useChat() {
 
 			await sendDirectMessage(userContent);
 		},
-		[addMessage, deleteMessagesFrom, sendDirectMessage],
+		[addMessage, deleteMessagesFrom, sendDirectMessage, getEffectiveModel],
 	);
 
 	/**
@@ -594,7 +619,7 @@ export function useChat() {
 			addMessage(userMessage);
 			setInput("");
 
-			const activeForMeta = useModelStore.getState().getActiveProviderModel();
+			const activeForMeta = getEffectiveModel();
 			const assistantMessage: Message = {
 				id: `assistant_${Date.now()}`,
 				role: "assistant",
@@ -639,6 +664,7 @@ export function useChat() {
 			sendDirectMessage,
 			sendAgentMessage,
 			sendSkillMessage,
+			getEffectiveModel,
 		],
 	);
 
@@ -647,23 +673,40 @@ export function useChat() {
 			modelService.stopStream(currentRequestIdRef.current);
 			currentRequestIdRef.current = null;
 		}
-	}, []);
+		// Save any accumulated streaming content to the last message
+		if (streamContentRef.current) {
+			updateLastMessage(streamContentRef.current);
+		}
+		// Reset all streaming state — critical: the main process abort is silent
+		// (no "done" event broadcast), so we must clean up here
+		setSessionStatus("idle");
+		setStreamingContent("");
+		streamContentRef.current = "";
+		// Persist messages to disk
+		const { currentConversationId, persistMessages } = useChatStore.getState();
+		if (currentConversationId) {
+			persistMessages();
+		}
+	}, [setSessionStatus, setStreamingContent, updateLastMessage]);
 
 	return {
 		// State
 		messages,
 		input,
+		sessionStatus,
 		isStreaming,
 		streamingContent,
 		chatMode,
 		selectedAgentId,
 		selectedSkillId,
+		sessionModelOverride,
 
 		// Setters
 		setInput,
 		setChatMode,
 		setSelectedAgentId,
 		setSelectedSkillId,
+		setSessionModelOverride,
 
 		// Actions
 		sendMessage,
@@ -672,5 +715,6 @@ export function useChat() {
 		retryMessage,
 		editMessage,
 		deleteMessage,
+		getEffectiveModel,
 	};
 }

@@ -91,6 +91,15 @@
 	"selectModelToStart": "选择一个模型开始对话",
 	"selectModel": "选择模型...",
 	"modelSelected": "模型已选择",
+	"sessionModel": "会话模型",
+	"sessionModelOverride": "临时切换",
+	"usingGlobalModel": "使用全局模型",
+	"usingSessionModel": "当前会话临时使用",
+	"sessionStatus": {
+		"preparing": "准备中...",
+		"streaming": "回复中...",
+		"tool_calling": "工具调用中..."
+	},
 	"sidebar": {
 		"newChat": "新对话",
 		"searchConversations": "搜索...",
@@ -137,6 +146,7 @@
 		"deleted": "已删除",
 		"bookmark": "收藏",
 		"export": "导出",
-		"addNote": "添加备注"
+		"addNote": "添加备注",
+		"stop": "终止"
 	}
 }

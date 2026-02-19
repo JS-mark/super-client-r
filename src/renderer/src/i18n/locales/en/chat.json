@@ -91,6 +91,15 @@
 	"selectModelToStart": "Select a model to start chatting",
 	"selectModel": "Select a model...",
 	"modelSelected": "Model selected",
+	"sessionModel": "Session Model",
+	"sessionModelOverride": "Temporary switch",
+	"usingGlobalModel": "Using global model",
+	"usingSessionModel": "Using session override",
+	"sessionStatus": {
+		"preparing": "Preparing...",
+		"streaming": "Responding...",
+		"tool_calling": "Calling tools..."
+	},
 	"sidebar": {
 		"newChat": "New Chat",
 		"searchConversations": "Search...",
@@ -137,6 +146,7 @@
 		"deleted": "Deleted",
 		"bookmark": "Bookmark",
 		"export": "Export",
-		"addNote": "Add Note"
+		"addNote": "Add Note",
+		"stop": "Stop"
 	}
 }

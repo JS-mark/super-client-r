@@ -24,6 +24,7 @@ import {
 	ToolOutlined,
 	TranslationOutlined,
 	UserOutlined,
+	PauseCircleOutlined,
 } from "@ant-design/icons";
 import { Bubble, Prompts, Sender, Welcome } from "@ant-design/x";
 import type { BubbleListRef } from "@ant-design/x/es/bubble";
@@ -216,6 +217,7 @@ const Chat: React.FC = () => {
 		input,
 		setInput,
 		sendMessage,
+		sessionStatus,
 		isStreaming,
 		streamingContent,
 		clearMessages,
@@ -227,6 +229,8 @@ const Chat: React.FC = () => {
 		setChatMode,
 		selectedSkillId,
 		setSelectedSkillId,
+		sessionModelOverride,
+		setSessionModelOverride,
 	} = useChat();
 
 	// Search engine state
@@ -340,6 +344,45 @@ const Chat: React.FC = () => {
 			setPendingInput(null);
 		}
 	}, [pendingInput, setInput, setPendingInput]);
+
+	// Reset session model override when switching conversations
+	useEffect(() => {
+		setSessionModelOverride(null);
+	}, [currentConversationId, setSessionModelOverride]);
+
+	// Build grouped model options for the session model selector
+	const activeSelection = useModelStore((s) => s.activeSelection);
+	const providers = useModelStore((s) => s.providers);
+	const groupedModelOptions = useMemo(() => {
+		const enabledModels = getAllEnabledModels();
+		const groups: Record<
+			string,
+			{ providerName: string; preset: ModelProviderPreset; models: { label: React.ReactNode; value: string }[] }
+		> = {};
+		for (const { provider, model } of enabledModels) {
+			if (!groups[provider.id]) {
+				groups[provider.id] = { providerName: provider.name, preset: provider.preset, models: [] };
+			}
+			groups[provider.id].models.push({
+				label: (
+					<span className="flex items-center gap-1.5">
+						<ProviderIcon preset={provider.preset} size={14} />
+						<span>{model.name}</span>
+					</span>
+				),
+				value: `${provider.id}||${model.id}`,
+			});
+		}
+		return Object.entries(groups).map(([, group]) => ({
+			label: (
+				<span className="flex items-center gap-1.5">
+					<ProviderIcon preset={group.preset} size={14} />
+					{group.providerName}
+				</span>
+			),
+			options: group.models,
+		}));
+	}, [providers, getAllEnabledModels]);
 
 	const handleNewChat = useCallback(() => {
 		createConversation();
@@ -1357,8 +1400,58 @@ const Chat: React.FC = () => {
 											</Tooltip>
 										</Flex>
 
-										{/* Built-in SendButton */}
-										<SendButton type="primary" shape="circle" />
+										{/* Session model selector + status + send */}
+									<Flex align="center" gap={8}>
+										<Select
+											size="small"
+											variant="borderless"
+											value={
+												sessionModelOverride
+													? `${sessionModelOverride.providerId}||${sessionModelOverride.modelId}`
+													: activeSelection
+														? `${activeSelection.providerId}||${activeSelection.modelId}`
+														: undefined
+											}
+											onChange={(val) => {
+												if (!val) {
+													setSessionModelOverride(null);
+													return;
+												}
+												const [providerId, modelId] = val.split("||");
+												setSessionModelOverride({ providerId, modelId });
+											}}
+											options={groupedModelOptions}
+											popupMatchSelectWidth={false}
+											disabled={isStreaming}
+											style={{
+												maxWidth: 200,
+												...(sessionModelOverride ? { background: token.colorPrimaryBg, borderRadius: 6 } : {}),
+											}}
+											placeholder={t("selectModel", "选择模型", { ns: "chat" })}
+										/>
+										{sessionStatus !== "idle" && (
+											<span
+												className="text-xs whitespace-nowrap"
+												style={{ color: token.colorTextSecondary }}
+											>
+												{t(`sessionStatus.${sessionStatus}`, { ns: "chat" })}
+											</span>
+										)}
+										{/* Send or Stop button */}
+										{isStreaming ? (
+											<Tooltip title={t("actions.stop", "终止", { ns: "chat" })}>
+												<Button
+													type="primary"
+													danger
+													shape="circle"
+													icon={<PauseCircleOutlined />}
+													onClick={stopCurrentStream}
+												/>
+											</Tooltip>
+										) : (
+											<SendButton type="primary" shape="circle" />
+										)}
+									</Flex>
 									</Flex>
 								);
 							}}
