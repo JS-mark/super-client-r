@@ -101,7 +101,18 @@
       "WebFetch(domain:www.blocknotejs.org)",
       "WebFetch(domain:tiptap.dev)",
       "Bash(# Check if tiptap has a markdown extension curl -s \"\"https://registry.npmjs.org/@tiptap/extension-markdown/latest\"\")",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "WebFetch(domain:anthropic.github.io)",
+      "WebFetch(domain:glama.ai)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:registry.modelcontextprotocol.io)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(gh api:*)",
+      "Bash(gh search code:*)",
+      "Bash(/opt/homebrew/bin/gh version)",
+      "Bash(/usr/local/bin/gh version)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "Bash(npm info:*)"
     ]
   }
 }
