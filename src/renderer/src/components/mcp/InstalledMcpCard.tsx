@@ -5,7 +5,7 @@ import {
 	PlayCircleOutlined,
 	SettingOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Modal, message, Tag, Tooltip } from "antd";
+import { Button, Modal, Tag, Tooltip, message, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,12 +13,15 @@ import { useMcpStore } from "../../stores/mcpStore";
 import type { McpServer } from "../../types/mcp";
 import { McpStatusBadge } from "./McpStatusBadge";
 
+const { useToken } = theme;
+
 export const InstalledMcpCard: React.FC<{
 	server: McpServer;
 	onView: () => void;
 	onConfigure?: (server: McpServer) => void;
 }> = ({ server, onView, onConfigure }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const { removeServer, testConnection, disconnectServer } = useMcpStore();
 	const [connecting, setConnecting] = useState(false);
 
@@ -68,40 +71,78 @@ export const InstalledMcpCard: React.FC<{
 	const isConnected = server.status === "connected";
 	const isConnecting = server.status === "connecting" || connecting;
 
+	const iconBg = isConnected
+		? `linear-gradient(135deg, ${token.colorPrimary}, ${token.colorPrimaryActive})`
+		: token.colorFillSecondary;
+
 	return (
-		<Card
-			hoverable
-			className="h-full flex flex-col cursor-pointer"
+		<div
 			onClick={onView}
-			title={
-				<div className="flex items-center gap-2">
-					<div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-						<ApiOutlined className="text-white text-sm" />
-					</div>
-					<span className="truncate" title={server.name}>
-						{server.name}
-					</span>
-				</div>
-			}
-			extra={
-				<div className="flex items-center gap-2">
-					<McpStatusBadge status={server.status} />
-				</div>
-			}
+			className="group relative flex flex-col rounded-xl border cursor-pointer transition-all duration-200"
+			style={{
+				borderColor: token.colorBorderSecondary,
+				backgroundColor: token.colorBgContainer,
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.borderColor = token.colorPrimaryBorder;
+				e.currentTarget.style.boxShadow = token.boxShadowTertiary;
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.borderColor = token.colorBorderSecondary;
+				e.currentTarget.style.boxShadow = "none";
+			}}
 		>
-			<div className="flex flex-col h-24 justify-between">
-				<div className="text-sm text-gray-500">
-					<p className="line-clamp-2">{server.description || "-"}</p>
+			{/* Header */}
+			<div className="flex items-start gap-3 p-4 pb-2">
+				<div
+					className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+					style={{ background: iconBg }}
+				>
+					<ApiOutlined style={{ color: isConnected ? "#fff" : token.colorTextTertiary, fontSize: 16 }} />
 				</div>
-				<div className="flex justify-between items-center mt-2">
-					<div className="flex gap-1">
-						<Tag>{server.transport}</Tag>
-						{isInternal && (
-							<Tag color="blue">{t("internal.label", { ns: "mcp" })}</Tag>
-						)}
+				<div className="flex-1 min-w-0">
+					<div className="flex items-center gap-2">
+						<span
+							className="font-semibold text-sm truncate"
+							style={{ color: token.colorText }}
+							title={server.name}
+						>
+							{server.name}
+						</span>
 					</div>
-					<div className="flex gap-1">
-						{isInternal ? null : isConnected ? (
+					<div className="flex items-center gap-1.5 mt-1">
+						<McpStatusBadge status={server.status} />
+					</div>
+				</div>
+			</div>
+
+			{/* Description */}
+			<div className="px-4 flex-1">
+				<p
+					className="text-xs line-clamp-2 leading-relaxed m-0"
+					style={{ color: token.colorTextSecondary }}
+				>
+					{server.description || "-"}
+				</p>
+			</div>
+
+			{/* Footer */}
+			<div className="px-4 py-3 flex items-center justify-between">
+				<div className="flex items-center gap-1.5">
+					<Tag bordered={false} className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+						{server.transport}
+					</Tag>
+					{isInternal && (
+						<Tag bordered={false} color="blue" className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+							{t("internal.label", { ns: "mcp" })}
+						</Tag>
+					)}
+				</div>
+
+				{/* Actions */}
+				{!isInternal && (
+					<div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+						{isConnected ? (
 							<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
 								<Button
 									size="small"
@@ -121,36 +162,32 @@ export const InstalledMcpCard: React.FC<{
 								<Button
 									size="small"
 									type="text"
-									icon={<PlayCircleOutlined style={server.status === "error" ? { color: "#ff4d4f" } : undefined} />}
+									icon={<PlayCircleOutlined style={server.status === "error" ? { color: token.colorError } : undefined} />}
 									onClick={handleConnect}
 									loading={isConnecting}
 								/>
 							</Tooltip>
 						)}
-						{!isInternal && (
-							<Tooltip title={t("actions.settings", { ns: "mcp" })}>
-								<Button
-									size="small"
-									type="text"
-									icon={<SettingOutlined />}
-									onClick={handleConfigure}
-								/>
-							</Tooltip>
-						)}
-						{!isInternal && (
-							<Tooltip title={t("actions.delete", { ns: "mcp" })}>
-								<Button
-									size="small"
-									type="text"
-									danger
-									icon={<DeleteOutlined />}
-									onClick={handleDelete}
-								/>
-							</Tooltip>
-						)}
+						<Tooltip title={t("actions.settings", { ns: "mcp" })}>
+							<Button
+								size="small"
+								type="text"
+								icon={<SettingOutlined />}
+								onClick={handleConfigure}
+							/>
+						</Tooltip>
+						<Tooltip title={t("actions.delete", { ns: "mcp" })}>
+							<Button
+								size="small"
+								type="text"
+								danger
+								icon={<DeleteOutlined />}
+								onClick={handleDelete}
+							/>
+						</Tooltip>
 					</div>
-				</div>
+				)}
 			</div>
-		</Card>
+		</div>
 	);
 };

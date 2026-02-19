@@ -1,15 +1,19 @@
 import {
+	CheckCircleFilled,
 	CloudDownloadOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
 	SettingOutlined,
 	StarFilled,
 } from "@ant-design/icons";
-import { Badge, Button, Card, message, Tag, Tooltip } from "antd";
+import { Button, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
 import type { McpMarketItem, McpServer } from "../../types/mcp";
+
+const { useToken } = theme;
 
 export const McpMarketCard: React.FC<{
 	item: McpMarketItem;
@@ -19,118 +23,152 @@ export const McpMarketCard: React.FC<{
 	onConfigure?: (server: McpServer) => void;
 }> = ({ item, onClick, onInstall, isInstalled, onConfigure }) => {
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const { removeServer, servers } = useMcpStore();
 
 	const installedServer = servers.find((s) => s.name === item.name);
 
-	const handleUninstall = (e: React.MouseEvent) => {
+	const handleUninstall = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (installedServer) {
 			removeServer(installedServer.id);
-			message.success(
-				t("messages.uninstalled", { ns: "mcp", name: item.name }),
-			);
 		}
-	};
+	}, [installedServer, removeServer]);
 
-	const handleInstall = (e: React.MouseEvent) => {
+	const handleInstall = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
 		onInstall();
-	};
+	}, [onInstall]);
 
-	const handleConfigure = (e: React.MouseEvent) => {
+	const handleConfigure = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
 		if (installedServer && onConfigure) {
 			onConfigure(installedServer);
 		}
-	};
-
-	const actions: React.ReactNode[] = [];
-
-	if (isInstalled) {
-		actions.push(
-			<Tooltip title={t("actions.settings", { ns: "mcp" })} key="settings">
-				<Button
-					size="small"
-					icon={<SettingOutlined />}
-					onClick={handleConfigure}
-				>
-					{t("actions.configure", { ns: "mcp" })}
-				</Button>
-			</Tooltip>,
-			<Button
-				key="uninstall"
-				size="small"
-				danger
-				icon={<DeleteOutlined />}
-				onClick={handleUninstall}
-			>
-				{t("actions.uninstall", { ns: "common" })}
-			</Button>,
-		);
-	} else {
-		actions.push(
-			<Button
-				key="install"
-				type="primary"
-				size="small"
-				icon={<DownloadOutlined />}
-				onClick={handleInstall}
-			>
-				{t("actions.install", { ns: "common" })}
-			</Button>,
-		);
-	}
+	}, [installedServer, onConfigure]);
 
 	return (
-		<Card
-			hoverable
-			className="h-full flex flex-col cursor-pointer"
-			actions={actions}
+		<div
 			onClick={onClick}
-			title={
-				<div className="flex items-center gap-2">
-					<span className="text-xl">{item.icon || "🔌"}</span>
-					<span className="truncate" title={item.name}>
-						{item.name}
-					</span>
-					{isInstalled && <Badge status="success" className="ml-auto" />}
-				</div>
-			}
-			extra={<Tag>{item.version}</Tag>}
+			className="group relative flex flex-col rounded-xl border cursor-pointer transition-all duration-200"
+			style={{
+				borderColor: token.colorBorderSecondary,
+				backgroundColor: token.colorBgContainer,
+			}}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.borderColor = token.colorPrimaryBorder;
+				e.currentTarget.style.boxShadow = token.boxShadowTertiary;
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.borderColor = token.colorBorderSecondary;
+				e.currentTarget.style.boxShadow = "none";
+			}}
 		>
-			<div className="flex flex-col h-32 justify-between">
-				<Tooltip
-					title={item.description}
-					placement="topLeft"
-					styles={{
-						root: { maxWidth: 400 },
-						container: {
-							maxHeight: 200,
-							overflow: "auto",
-						},
-					}}
+			{/* Header */}
+			<div className="flex items-start gap-3 p-4 pb-2">
+				<div
+					className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+					style={{ backgroundColor: token.colorFillQuaternary }}
 				>
-					<p className="text-gray-500 line-clamp-3 mb-2 grow cursor-help">
-						{item.description}
-					</p>
-				</Tooltip>
-				<div className="flex justify-between items-center text-xs text-gray-400 mt-2">
-					<span>
-						{t("by", { ns: "common" })} {item.author}
-					</span>
+					{item.icon || "🔌"}
+				</div>
+				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2">
-						<span className="flex items-center gap-1">
-							<StarFilled className="text-yellow-500 text-xs" />
-							{item.rating}
+						<span
+							className="font-semibold text-sm truncate"
+							style={{ color: token.colorText }}
+							title={item.name}
+						>
+							{item.name}
 						</span>
-						<span className="flex items-center gap-1">
-							<CloudDownloadOutlined className="text-xs" />
-							{item.downloads.toLocaleString()}
-						</span>
+						{isInstalled && (
+							<CheckCircleFilled style={{ color: token.colorSuccess, fontSize: 14 }} />
+						)}
+					</div>
+					<div className="flex items-center gap-1.5 mt-1">
+						<Tag
+							bordered={false}
+							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						>
+							v{item.version}
+						</Tag>
 					</div>
 				</div>
 			</div>
-		</Card>
+
+			{/* Description */}
+			<div className="px-4 flex-1">
+				<p
+					className="text-xs line-clamp-3 leading-relaxed m-0"
+					style={{ color: token.colorTextSecondary }}
+					title={item.description}
+				>
+					{item.description}
+				</p>
+			</div>
+
+			{/* Footer */}
+			<div className="px-4 py-3 flex items-center justify-between">
+				<div className="flex items-center gap-3">
+					<span
+						className="text-xs truncate max-w-[80px]"
+						style={{ color: token.colorTextTertiary }}
+						title={item.author}
+					>
+						{item.author}
+					</span>
+					<span
+						className="flex items-center gap-1 text-xs"
+						style={{ color: token.colorTextQuaternary }}
+					>
+						<StarFilled style={{ color: "#faad14", fontSize: 11 }} />
+						{item.rating}
+					</span>
+					<span
+						className="flex items-center gap-1 text-xs"
+						style={{ color: token.colorTextQuaternary }}
+					>
+						<CloudDownloadOutlined style={{ fontSize: 11 }} />
+						{item.downloads >= 1000
+							? `${(item.downloads / 1000).toFixed(1)}k`
+							: item.downloads}
+					</span>
+				</div>
+
+				{/* Action buttons */}
+				<div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+					{isInstalled ? (
+						<>
+							<Tooltip title={t("actions.settings", { ns: "mcp" })}>
+								<Button
+									size="small"
+									type="text"
+									icon={<SettingOutlined />}
+									onClick={handleConfigure}
+								/>
+							</Tooltip>
+							<Tooltip title={t("actions.uninstall", { ns: "common" })}>
+								<Button
+									size="small"
+									type="text"
+									danger
+									icon={<DeleteOutlined />}
+									onClick={handleUninstall}
+								/>
+							</Tooltip>
+						</>
+					) : (
+						<Button
+							type="primary"
+							size="small"
+							icon={<DownloadOutlined />}
+							onClick={handleInstall}
+						>
+							{t("actions.install", { ns: "common" })}
+						</Button>
+					)}
+				</div>
+			</div>
+		</div>
 	);
 };
