@@ -1,7 +1,7 @@
 import { SettingOutlined } from "@ant-design/icons";
 import { Form, Input, Modal, Switch } from "antd";
 import type * as React from "react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { McpServer, BuiltinMcpDefinition } from "../../types/mcp";
 
@@ -24,8 +24,18 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 }) => {
 	const { t } = useTranslation();
 	const [form] = Form.useForm();
+	const [homedir, setHomedir] = useState<string>("");
 
 	const hasSchema = !!configSchema && Object.keys((configSchema as any)?.properties || {}).length > 0;
+
+	// 获取用户主目录用于路径字段默认值
+	useEffect(() => {
+		window.electron.system.getHomedir().then((res) => {
+			if (res.success && res.data) {
+				setHomedir(res.data);
+			}
+		}).catch(() => {});
+	}, []);
 
 	// 从 server 的 env/args 提取当前配置值
 	useEffect(() => {
@@ -50,7 +60,8 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 					if (key === "allowedPaths" && builtinDefinition) {
 						const baseArgsLen = builtinDefinition.args.length;
 						const extraArgs = server.args?.slice(baseArgsLen) || [];
-						initialValues[key] = extraArgs.join("\n");
+						// 预填用户主目录（如果没有已配置的路径）
+						initialValues[key] = extraArgs.length > 0 ? extraArgs.join("\n") : homedir;
 					}
 				} else if (prop.type === "string") {
 					if (server.env?.[key]) {
@@ -81,7 +92,7 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 
 			form.setFieldsValue(initialValues);
 		}
-	}, [open, server, configSchema, builtinDefinition, form, hasSchema]);
+	}, [open, server, configSchema, builtinDefinition, form, hasSchema, homedir]);
 
 	const handleSave = useCallback(() => {
 		form.validateFields().then((values) => {

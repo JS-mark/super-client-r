@@ -19,6 +19,7 @@ import {
 	thirdPartyMcpService,
 } from "./ThirdPartyMcpService";
 import { mcpMarketService } from "./McpMarketService";
+import { internalMcpService } from "./internal";
 
 const log = logger.withContext("MCP");
 
@@ -102,10 +103,22 @@ export class McpService extends EventEmitter {
 				thirdPartyMcpService.addServer(config);
 				thirdPartyMcpService.registerServer(config);
 				break;
+			case "internal":
+				// 内置 in-process 服务器，始终连接
+				this.serverStatus.set(config.id, {
+					id: config.id,
+					status: "connected",
+					type: "internal",
+					transport: "internal",
+					tools: internalMcpService.getTools(config.id),
+				});
+				break;
 		}
 
-		// 持久化到 electron-store
-		storeManager.saveMcpServer(config);
+		// 持久化到 electron-store（internal 类型不持久化）
+		if (config.type !== "internal") {
+			storeManager.saveMcpServer(config);
+		}
 
 		this.emit("server-added", config);
 	}
@@ -117,6 +130,12 @@ export class McpService extends EventEmitter {
 		const config = this.servers.get(id);
 		if (!config) {
 			log.warn("Remove server: not found", { id });
+			return;
+		}
+
+		// 内置服务器不可删除
+		if (config.type === "internal") {
+			log.warn("Cannot remove internal server", { id, name: config.name });
 			return;
 		}
 
@@ -208,6 +227,9 @@ export class McpService extends EventEmitter {
 					thirdPartyMcpService.addServer(config);
 					thirdPartyMcpService.registerServer(config);
 					break;
+				case "internal":
+					// Internal 服务器不从持久化加载（由 registerInternalServers 注册）
+					continue;
 			}
 
 			loaded++;
@@ -233,6 +255,7 @@ export class McpService extends EventEmitter {
 		switch (config.type) {
 			case "builtin":
 			case "market":
+			case "internal":
 				return this.serverStatus.get(id);
 			case "third-party":
 				return thirdPartyMcpService.getServerStatus(id);
@@ -276,6 +299,11 @@ export class McpService extends EventEmitter {
 				return this.connectStdio(id, config);
 			case "third-party":
 				return thirdPartyMcpService.connect(id);
+			case "internal": {
+				// Internal 服务器始终已连接
+				const status = this.serverStatus.get(id)!;
+				return status;
+			}
 			default:
 				log.error("Connect failed: unknown server type", undefined, { id, type: config.type });
 				throw new Error(`Unknown server type: ${config.type}`);
@@ -298,6 +326,9 @@ export class McpService extends EventEmitter {
 				break;
 			case "third-party":
 				await thirdPartyMcpService.disconnect(id);
+				break;
+			case "internal":
+				// Internal 服务器不可断开
 				break;
 		}
 	}
@@ -348,6 +379,22 @@ export class McpService extends EventEmitter {
 						timestamp: startTime,
 						duration: unifiedResult.metadata?.duration || Date.now() - startTime,
 					};
+				case "internal": {
+					const internalResult = await internalMcpService.callTool(
+						serverId,
+						toolName,
+						args,
+					);
+					const duration = Date.now() - startTime;
+					this.emit("tool-called", { serverId, toolName, args, duration });
+					return {
+						success: !internalResult.isError,
+						data: internalResult,
+						serverType: "internal" as McpServerType,
+						timestamp: startTime,
+						duration,
+					};
+				}
 				default:
 					throw new Error(`Unknown server type: ${config.type}`);
 			}
@@ -391,6 +438,8 @@ export class McpService extends EventEmitter {
 				return this.serverStatus.get(serverId)?.tools || [];
 			case "third-party":
 				return thirdPartyMcpService.getServerTools(serverId);
+			case "internal":
+				return internalMcpService.getTools(serverId);
 			default:
 				return [];
 		}
@@ -402,9 +451,11 @@ export class McpService extends EventEmitter {
 	getAllAvailableTools(): Array<{ serverId: string; tool: McpTool }> {
 		const tools: Array<{ serverId: string; tool: McpTool }> = [];
 
-		// stdio 服务器
+		// stdio 服务器（排除 internal，避免重复）
 		for (const [id, status] of this.serverStatus.entries()) {
 			if (status.status === "connected" && status.tools) {
+				const config = this.servers.get(id);
+				if (config?.type === "internal") continue;
 				for (const tool of status.tools) {
 					tools.push({ serverId: id, tool });
 				}
@@ -415,7 +466,21 @@ export class McpService extends EventEmitter {
 		const thirdPartyTools = thirdPartyMcpService.getAllAvailableTools();
 		tools.push(...thirdPartyTools);
 
+		// Internal 服务器
+		const internalTools = internalMcpService.getAllTools();
+		tools.push(...internalTools);
+
 		return tools;
+	}
+
+	/**
+	 * 批量注册 internal 服务器配置
+	 */
+	registerInternalServers(configs: McpServerConfig[]): void {
+		log.info("Registering internal servers", { count: configs.length });
+		for (const config of configs) {
+			this.addServer(config);
+		}
 	}
 
 	/**

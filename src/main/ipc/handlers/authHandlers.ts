@@ -6,6 +6,7 @@
 import { ipcMain } from "electron";
 import { AUTH_CHANNELS } from "../channels";
 import { authService } from "../../services/auth/AuthService";
+import { conversationStorage } from "../../services/chat/ConversationStorageService";
 import type { AuthProvider } from "../types";
 import { logger } from "../../utils/logger";
 
@@ -13,6 +14,8 @@ export function registerAuthHandlers(): void {
 	ipcMain.handle(AUTH_CHANNELS.LOGIN, async (_, provider: AuthProvider) => {
 		try {
 			const user = await authService.login(provider);
+			// Switch conversation storage to the logged-in user's directory
+			conversationStorage.setCurrentUser(user.id);
 			return { success: true, data: user };
 		} catch (error) {
 			logger.error("Auth login failed", error as Error);
@@ -23,6 +26,8 @@ export function registerAuthHandlers(): void {
 	ipcMain.handle(AUTH_CHANNELS.LOGOUT, async () => {
 		try {
 			await authService.logout();
+			// Switch back to default (anonymous) directory
+			conversationStorage.setCurrentUser(null);
 			return { success: true };
 		} catch (error) {
 			logger.error("Auth logout failed", error as Error);

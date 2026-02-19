@@ -53,7 +53,8 @@
 		"market": "市场",
 		"sources": "市场源",
 		"installed": "已安装",
-		"thirdParty": "第三方"
+		"thirdParty": "第三方",
+		"builtinInternal": "内置"
 	},
 	"sourcesDescription": "浏览第三方 MCP 市场，发现更多 MCP 服务和工具",
 	"sourcesOfficial": "官方",
@@ -92,5 +93,13 @@
 	"confirm": {
 		"delete": "确认删除",
 		"deleteContent": "确定要删除 {{name}} 吗？"
+	},
+	"internal": {
+		"label": "内置",
+		"alwaysConnected": "始终连接",
+		"cannotRemove": "内置工具不可删除",
+		"searchPlaceholder": "搜索内置 MCP...",
+		"description": "内置 MCP 服务器在应用内直接运行，无需安装配置，始终可用。",
+		"noData": "暂无内置 MCP 服务器"
 	}
 }

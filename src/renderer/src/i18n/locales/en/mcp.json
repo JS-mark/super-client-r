@@ -53,7 +53,8 @@
 		"market": "Market",
 		"sources": "Sources",
 		"installed": "Installed",
-		"thirdParty": "Third Party"
+		"thirdParty": "Third Party",
+		"builtinInternal": "Built-in"
 	},
 	"sourcesDescription": "Browse third-party MCP marketplaces to discover more MCP servers and tools",
 	"sourcesOfficial": "Official",
@@ -92,5 +93,13 @@
 	"confirm": {
 		"delete": "Confirm Delete",
 		"deleteContent": "Are you sure you want to delete {{name}}?"
+	},
+	"internal": {
+		"label": "Built-in",
+		"alwaysConnected": "Always connected",
+		"cannotRemove": "Built-in tools cannot be removed",
+		"searchPlaceholder": "Search built-in MCP...",
+		"description": "Built-in MCP servers run directly in the app, always available without installation or configuration.",
+		"noData": "No built-in MCP servers"
 	}
 }

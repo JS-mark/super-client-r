@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from "events";
+import os from "os";
 import type {
 	McpMarketItem,
 	McpMarketSearchParams,
@@ -144,6 +145,20 @@ function npmToMarketItem(obj: NpmSearchObject): McpMarketItem {
 		createdAt: pkg.date,
 		updatedAt: pkg.date,
 	};
+}
+
+/**
+ * 检测是否为文件系统类 MCP 包（需要路径参数）
+ */
+function isFilesystemPackage(name: string, keywords: string[]): boolean {
+	const text = `${name} ${keywords.join(" ")}`.toLowerCase();
+	return (
+		text.includes("filesystem") ||
+		text.includes("file-system") ||
+		/\bfs[-_]mcp\b/.test(text) ||
+		/\bmcp[-_]fs\b/.test(text) ||
+		/\bserver[-_]filesystem\b/.test(text)
+	);
 }
 
 // ---------- Service ----------
@@ -365,11 +380,15 @@ export class McpMarketService extends EventEmitter {
 
 			if (marketItem.transport === "stdio") {
 				config.command = marketItem.command;
-				config.args = marketItem.args;
+				config.args = [...(marketItem.args || [])];
 				config.env = {
 					...marketItem.env,
 					...customConfig?.env,
 				};
+				// 自动为文件系统类包注入用户主目录作为默认路径
+				if (isFilesystemPackage(marketItem.name, marketItem.tags || [])) {
+					config.args.push(os.homedir());
+				}
 			} else if (marketItem.transport === "http" || marketItem.transport === "sse") {
 				config.url = customConfig?.url || marketItem.url;
 				config.headers = marketItem.headers;

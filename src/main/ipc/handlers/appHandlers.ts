@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { existsSync, promises as fsPromises, readdirSync } from "fs";
+import os from "os";
 import { join } from "path";
 import { storeManager } from "../../store";
 import { updateService } from "../../services/updateService";
-import { APP_CHANNELS, UPDATE_CHANNELS } from "../channels";
+import { APP_CHANNELS, SYSTEM_CHANNELS, UPDATE_CHANNELS } from "../channels";
 
 export interface LogFileInfo {
 	name: string;
@@ -276,5 +277,29 @@ export function registerAppHandlers() {
 			win.webContents.send("theme:on-change", themeMode);
 		});
 		return true;
+	});
+
+	// 获取用户主目录
+	ipcMain.handle(SYSTEM_CHANNELS.GET_HOMEDIR, () => {
+		return { success: true, data: os.homedir() };
+	});
+
+	// 获取环境信息（用于系统提示词注入）
+	ipcMain.handle(SYSTEM_CHANNELS.GET_ENV_INFO, () => {
+		return {
+			success: true,
+			data: {
+				os: `${os.type()} ${os.release()}`,
+				platform: process.platform,
+				arch: process.arch,
+				nodeVersion: process.versions.node,
+				electronVersion: process.versions.electron,
+				v8Version: process.versions.v8,
+				homedir: os.homedir(),
+				cwd: process.cwd(),
+				appVersion: app.getVersion(),
+				locale: app.getLocale(),
+			},
+		};
 	});
 }

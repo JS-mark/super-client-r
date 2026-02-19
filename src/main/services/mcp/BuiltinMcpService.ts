@@ -4,6 +4,7 @@
  */
 
 import { EventEmitter } from "events";
+import os from "os";
 import type { BuiltinMcpDefinition, McpServerConfig } from "../../ipc/types";
 
 // 内置 MCP 服务器定义
@@ -237,9 +238,10 @@ export class BuiltinMcpService extends EventEmitter {
 
 		// 处理特殊参数（如 filesystem 的路径）
 		let args = [...def.args];
-		if (definitionId === "builtin-filesystem" && customConfig?.allowedPaths) {
-			const paths = customConfig.allowedPaths as string[];
-			args = [...def.args, ...paths];
+		if (definitionId === "builtin-filesystem") {
+			const paths = customConfig?.allowedPaths as string[] | undefined;
+			const resolvedPaths = paths && paths.length > 0 ? paths : [os.homedir()];
+			args = [...def.args, ...resolvedPaths];
 		}
 		if (definitionId === "builtin-sqlite" && customConfig?.dbPath) {
 			args = [...def.args, customConfig.dbPath as string];

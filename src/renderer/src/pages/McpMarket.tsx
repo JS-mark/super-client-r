@@ -104,6 +104,7 @@ const McpMarket: React.FC = () => {
 	const [marketSearchTerm, setMarketSearchTerm] = useState("");
 	const [installedSearchTerm, setInstalledSearchTerm] = useState("");
 	const [thirdPartySearchTerm, setThirdPartySearchTerm] = useState("");
+	const [builtinSearchTerm, setBuiltinSearchTerm] = useState("");
 	const [selectedItem, setSelectedItem] = useState<McpMarketItem | null>(null);
 	const [modalOpen, setModalOpen] = useState(false);
 	const [thirdPartyModalOpen, setThirdPartyModalOpen] = useState(false);
@@ -121,6 +122,35 @@ const McpMarket: React.FC = () => {
 		window.electron.mcp.builtin.getDefinitions().then((res) => {
 			if (res.success && res.data) {
 				setBuiltinDefinitions(res.data);
+			}
+		});
+		// 从主进程同步服务器列表，合并 internal 服务器到 store
+		window.electron.mcp.listServers().then((res) => {
+			if (res.success && res.data) {
+				const { servers: storeServers, setServers } = useMcpStore.getState();
+				const internalConfigs = res.data.filter((c) => c.type === "internal");
+				if (internalConfigs.length > 0) {
+					// 移除 store 中旧的 internal 服务器，用主进程最新的替换
+					const nonInternal = storeServers.filter((s) => s.type !== "internal");
+					const internalServers: McpServer[] = internalConfigs.map((c) => ({
+						...c,
+						status: "connected" as const,
+						enabled: true,
+					}));
+					setServers([...internalServers, ...nonInternal]);
+				}
+			}
+		});
+		// 同步所有服务器的状态和工具
+		window.electron.mcp.getAllStatus().then((res) => {
+			if (res.success && res.data) {
+				const { updateServerStatus, updateServerTools } = useMcpStore.getState();
+				for (const status of res.data) {
+					updateServerStatus(status.id, status.status, status.error);
+					if (status.tools) {
+						updateServerTools(status.id, status.tools);
+					}
+				}
 			}
 		});
 	}, [fetchMarketItems]);
@@ -155,6 +185,16 @@ const McpMarket: React.FC = () => {
 				(s.description || "").toLowerCase().includes(lower),
 		);
 	};
+
+	const internalServers = useMemo(
+		() => servers.filter((s) => s.type === "internal"),
+		[servers],
+	);
+
+	const nonInternalServers = useMemo(
+		() => servers.filter((s) => s.type !== "internal"),
+		[servers],
+	);
 
 	const thirdPartyServers = useMemo(
 		() => servers.filter((s) => s.type === "third-party"),
@@ -366,11 +406,22 @@ const McpMarket: React.FC = () => {
 			),
 		},
 		{
+			key: "builtin-internal",
+			label: `${t("tabs.builtinInternal", { ns: "mcp" })} (${internalServers.length})`,
+			children: (
+				<BuiltinInternalTab
+					servers={filterServers(internalServers, builtinSearchTerm)}
+					searchTerm={builtinSearchTerm}
+					onSearchChange={setBuiltinSearchTerm}
+				/>
+			),
+		},
+		{
 			key: "installed",
-			label: `${t("tabs.installed", { ns: "mcp" })} (${servers.length})`,
+			label: `${t("tabs.installed", { ns: "mcp" })} (${nonInternalServers.length})`,
 			children: (
 				<InstalledTab
-					servers={filterServers(servers, installedSearchTerm)}
+					servers={filterServers(nonInternalServers, installedSearchTerm)}
 					searchTerm={installedSearchTerm}
 					onSearchChange={setInstalledSearchTerm}
 					onConfigure={handleOpenConfig}
@@ -559,6 +610,49 @@ function ThirdPartyTab({
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 					{servers.map((server) => (
 						<ThirdPartyMcpCard key={server.id} server={server} onEdit={() => onEdit(server)} />
+					))}
+				</div>
+			)}
+		</div>
+	);
+}
+
+function BuiltinInternalTab({
+	servers, searchTerm, onSearchChange,
+}: {
+	servers: McpServer[];
+	searchTerm: string;
+	onSearchChange: (v: string) => void;
+}) {
+	const { t } = useTranslation();
+	const { token } = useToken();
+
+	return (
+		<div className="h-full overflow-y-auto pr-2">
+			<div className="mb-4 flex gap-2">
+				<Input
+					prefix={<SearchOutlined className="text-gray-400" />}
+					placeholder={t("internal.searchPlaceholder", { ns: "mcp" })}
+					allowClear
+					value={searchTerm}
+					onChange={(e) => onSearchChange(e.target.value)}
+				/>
+			</div>
+			<div className="mb-4">
+				<p className="text-xs" style={{ color: token.colorTextSecondary }}>
+					{t("internal.description", { ns: "mcp" })}
+				</p>
+			</div>
+			{servers.length === 0 ? (
+				<Empty description={t("internal.noData", { ns: "mcp" })} className="py-20" />
+			) : (
+				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+					{servers.map((server) => (
+						<InstalledMcpCard
+							key={server.id}
+							server={server}
+							onView={() => {}}
+						/>
 					))}
 				</div>
 			)}

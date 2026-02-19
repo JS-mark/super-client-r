@@ -64,9 +64,9 @@ export interface SkillExecutionResult {
 
 // ============ MCP 相关类型 ============
 
-export type McpServerType = "builtin" | "third-party" | "market";
+export type McpServerType = "builtin" | "third-party" | "market" | "internal";
 
-export type McpTransportType = "stdio" | "sse" | "http";
+export type McpTransportType = "stdio" | "sse" | "http" | "internal";
 
 export interface McpServerConfig {
 	id: string;

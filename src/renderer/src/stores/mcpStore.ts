@@ -64,6 +64,7 @@ interface McpState {
 	getMarketServers: () => McpServer[];
 	getEnabledServers: () => McpServer[];
 	getConnectedServers: () => McpServer[];
+	getInternalServers: () => McpServer[];
 }
 
 export const useMcpStore = create<McpState>()(
@@ -103,6 +104,8 @@ export const useMcpStore = create<McpState>()(
 			},
 
 			removeServer: (id) => {
+				const server = get().servers.find((s) => s.id === id);
+				if (server?.type === "internal") return; // 内置服务器不可删除
 				set((state) => ({ servers: state.servers.filter((s) => s.id !== id) }));
 				// 从主进程移除
 				window.electron.mcp.removeServer(id);
@@ -321,12 +324,16 @@ export const useMcpStore = create<McpState>()(
 			getConnectedServers: () => {
 				return get().servers.filter((s) => s.status === "connected");
 			},
+
+			getInternalServers: () => {
+				return get().servers.filter((s) => s.type === "internal");
+			},
 		}),
 		{
 			name: "mcp-storage",
 			partialize: (state) => ({
-				servers: state.servers,
-				// 不持久化市场数据和内置定义
+				// 不持久化 internal 服务器（由主进程动态注册）和市场数据
+				servers: state.servers.filter((s) => s.type !== "internal"),
 			}),
 		},
 	),

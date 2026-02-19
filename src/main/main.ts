@@ -31,9 +31,12 @@ import {
 	registerProtocol,
 } from "./services/protocolService";
 import { getSkillService } from "./services/skill/SkillService";
+import { conversationStorage } from "./services/chat/ConversationStorageService";
 import { storeManager } from "./store/StoreManager";
 import { updateService } from "./services/updateService";
 import { logger } from "./utils/logger";
+import { internalMcpService } from "./services/mcp/internal";
+import { mcpService } from "./services/mcp/McpService";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
 // 生产环境启用沙箱以提高安全性
@@ -426,6 +429,9 @@ app.whenReady().then(async () => {
 
 	logger.info("App is ready");
 
+	// Initialize per-conversation storage (runs migration from legacy chat-history.json)
+	conversationStorage.initialize();
+
 	// 启动本地服务
 	await localServer.start();
 
@@ -434,6 +440,17 @@ app.whenReady().then(async () => {
 	registerWindowHandlers();
 	setLogViewerOpener(createLogViewerWindow);
 	logger.info("IPC handlers registered");
+
+	// 初始化内置 MCP 服务器
+	internalMcpService
+		.initialize()
+		.then(() => {
+			mcpService.registerInternalServers(internalMcpService.getAllServerConfigs());
+			logger.info("Internal MCP servers registered");
+		})
+		.catch((error) => {
+			logger.error("Failed to initialize internal MCP servers", error);
+		});
 
 	// 初始化插件管理器（从存储加载已安装插件并自动激活）
 	initializePluginManager().catch((error) => {
@@ -515,6 +532,9 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
 	isQuitting = true;
 	logger.info("App is quitting");
+	internalMcpService.cleanup().catch((error) => {
+		logger.error("Failed to cleanup internal MCP servers", error);
+	});
 	logDatabaseService.close();
 });
 

@@ -64,6 +64,7 @@ export const InstalledMcpCard: React.FC<{
 		onConfigure?.(server);
 	}, [onConfigure, server]);
 
+	const isInternal = server.type === "internal";
 	const isConnected = server.status === "connected";
 	const isConnecting = server.status === "connecting" || connecting;
 
@@ -93,9 +94,14 @@ export const InstalledMcpCard: React.FC<{
 					<p className="line-clamp-2">{server.description || "-"}</p>
 				</div>
 				<div className="flex justify-between items-center mt-2">
-					<Tag>{server.transport}</Tag>
 					<div className="flex gap-1">
-						{isConnected ? (
+						<Tag>{server.transport}</Tag>
+						{isInternal && (
+							<Tag color="blue">{t("internal.label", { ns: "mcp" })}</Tag>
+						)}
+					</div>
+					<div className="flex gap-1">
+						{isInternal ? null : isConnected ? (
 							<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
 								<Button
 									size="small"
@@ -121,23 +127,27 @@ export const InstalledMcpCard: React.FC<{
 								/>
 							</Tooltip>
 						)}
-						<Tooltip title={t("actions.settings", { ns: "mcp" })}>
-							<Button
-								size="small"
-								type="text"
-								icon={<SettingOutlined />}
-								onClick={handleConfigure}
-							/>
-						</Tooltip>
-						<Tooltip title={t("actions.delete", { ns: "mcp" })}>
-							<Button
-								size="small"
-								type="text"
-								danger
-								icon={<DeleteOutlined />}
-								onClick={handleDelete}
-							/>
-						</Tooltip>
+						{!isInternal && (
+							<Tooltip title={t("actions.settings", { ns: "mcp" })}>
+								<Button
+									size="small"
+									type="text"
+									icon={<SettingOutlined />}
+									onClick={handleConfigure}
+								/>
+							</Tooltip>
+						)}
+						{!isInternal && (
+							<Tooltip title={t("actions.delete", { ns: "mcp" })}>
+								<Button
+									size="small"
+									type="text"
+									danger
+									icon={<DeleteOutlined />}
+									onClick={handleDelete}
+								/>
+							</Tooltip>
+						)}
 					</div>
 				</div>
 			</div>
