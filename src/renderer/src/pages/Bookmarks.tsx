@@ -3,7 +3,6 @@ import {
 	EditOutlined,
 	ExportOutlined,
 	SearchOutlined,
-	StarFilled,
 	StarOutlined,
 } from "@ant-design/icons";
 import {
@@ -21,7 +20,6 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
-import { cn } from "../lib/utils";
 import {
 	type BookmarkedMessage,
 	useMessageStore,
@@ -56,7 +54,7 @@ export default function Bookmarks() {
 		useState<BookmarkedMessage | null>(null);
 	const [editNote, setEditNote] = useState("");
 
-	const { bookmarks, removeBookmark, updateBookmark, tags } = useMessageStore();
+	const { bookmarks, removeBookmark, updateBookmark } = useMessageStore();
 
 	const filteredBookmarks = bookmarks.filter(
 		(b) =>

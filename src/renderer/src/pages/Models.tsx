@@ -1,4 +1,4 @@
-import { PlusOutlined, SettingOutlined } from "@ant-design/icons";
+import { PlusOutlined, SettingOutlined, ShopOutlined } from "@ant-design/icons";
 import { Button, Tabs, theme } from "antd";
 import type * as React from "react";
 import { useMemo, useState } from "react";
@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 const { useToken } = theme;
 
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { McpConfig } from "../components/models/McpConfig";
 import { ModelList } from "../components/models/ModelList";
@@ -14,9 +15,9 @@ import { useTitle } from "../hooks/useTitle";
 const Models: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
+	const navigate = useNavigate();
 	const [activeKey, setActiveKey] = useState("1");
 	const [modelListAddTrigger, setModelListAddTrigger] = useState(0);
-	const [mcpConfigAddTrigger, setMcpConfigAddTrigger] = useState(0);
 
 	// 页面标题组件 - 同时用于 TitleBar 和页面头部
 	const pageTitle = useMemo(() => {
@@ -42,7 +43,7 @@ const Models: React.FC = () => {
 		if (activeKey === "1") {
 			setModelListAddTrigger((prev) => prev + 1);
 		} else {
-			setMcpConfigAddTrigger((prev) => prev + 1);
+			navigate("/mcp");
 		}
 	};
 
@@ -63,7 +64,7 @@ const Models: React.FC = () => {
 					{t("tabMcp", { ns: "models" })}
 				</span>
 			),
-			children: <McpConfig addTrigger={mcpConfigAddTrigger} />,
+			children: <McpConfig />,
 		},
 	];
 
@@ -78,12 +79,12 @@ const Models: React.FC = () => {
 					<Button
 						type="primary"
 						size="medium"
-						icon={<PlusOutlined />}
+						icon={activeKey === "1" ? <PlusOutlined /> : <ShopOutlined />}
 						onClick={handleAdd}
 					>
 						{activeKey === "1"
 							? t("addProvider", { ns: "models" })
-							: t("add", { ns: "mcp" })}
+							: t("goToMcpMarket", { ns: "settings", defaultValue: "MCP Market" })}
 					</Button>
 				}
 				className="p-6!"

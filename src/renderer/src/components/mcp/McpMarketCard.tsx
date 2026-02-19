@@ -2,20 +2,22 @@ import {
 	CloudDownloadOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
+	SettingOutlined,
 	StarFilled,
 } from "@ant-design/icons";
 import { Badge, Button, Card, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
-import type { McpMarketItem } from "../../types/mcp";
+import type { McpMarketItem, McpServer } from "../../types/mcp";
 
 export const McpMarketCard: React.FC<{
 	item: McpMarketItem;
 	onClick: () => void;
 	onInstall: () => void;
 	isInstalled: boolean;
-}> = ({ item, onClick, onInstall, isInstalled }) => {
+	onConfigure?: (server: McpServer) => void;
+}> = ({ item, onClick, onInstall, isInstalled, onConfigure }) => {
 	const { t } = useTranslation();
 	const { removeServer, servers } = useMcpStore();
 
@@ -36,10 +38,26 @@ export const McpMarketCard: React.FC<{
 		onInstall();
 	};
 
+	const handleConfigure = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (installedServer && onConfigure) {
+			onConfigure(installedServer);
+		}
+	};
+
 	const actions: React.ReactNode[] = [];
 
 	if (isInstalled) {
 		actions.push(
+			<Tooltip title={t("actions.settings", { ns: "mcp" })} key="settings">
+				<Button
+					size="small"
+					icon={<SettingOutlined />}
+					onClick={handleConfigure}
+				>
+					{t("actions.configure", { ns: "mcp" })}
+				</Button>
+			</Tooltip>,
 			<Button
 				key="uninstall"
 				size="small"

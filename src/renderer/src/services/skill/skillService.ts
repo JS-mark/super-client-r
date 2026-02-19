@@ -102,6 +102,15 @@ export class SkillClient {
 			throw new Error(response.error || "Failed to disable skill");
 		}
 	}
+
+	/**
+	 * 获取 skill 的系统提示词
+	 */
+	async getSystemPrompt(skillId: string): Promise<string | null> {
+		const result = await window.electron.skill.getSystemPrompt(skillId);
+		if (result.success) return result.data ?? null;
+		throw new Error(result.error || "Failed to get system prompt");
+	}
 }
 
 // 单例实例

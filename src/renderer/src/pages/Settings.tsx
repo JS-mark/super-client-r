@@ -19,7 +19,6 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { AboutModal } from "../components/AboutModal";
 import { MainLayout } from "../components/layout/MainLayout";
-import { cn } from "../lib/utils";
 import { McpConfig } from "../components/models/McpConfig";
 import { ModelList } from "../components/models/ModelList";
 import { AboutSection } from "../components/settings/AboutSection";

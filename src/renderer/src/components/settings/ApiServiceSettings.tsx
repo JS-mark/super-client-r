@@ -79,7 +79,7 @@ export const ApiServiceSettings: React.FC = () => {
 					`Server ${action}ed successfully`,
 				),
 			);
-		} catch (e) {
+		} catch {
 			message.error(
 				t(
 					`settings.api${action.charAt(0).toUpperCase() + action.slice(1)}Error`,

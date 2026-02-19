@@ -10,6 +10,7 @@ import type {
 	UpdateModelConfigRequest,
 } from "../types";
 import { llmService } from "../../services/llm";
+import { mcpService } from "../../services/mcp/McpService";
 import { storeManager } from "../../store/StoreManager";
 
 export function registerModelHandlers(): void {
@@ -190,8 +191,25 @@ export function registerModelHandlers(): void {
 			request: ChatCompletionRequest,
 		): Promise<IPCResponse> => {
 			try {
+				// Build a tool executor that maps prefixed tool names back to MCP servers
+				const toolExecutor = request.toolMapping
+					? async (name: string, args: Record<string, unknown>) => {
+							const mapping = request.toolMapping![name];
+							if (!mapping) throw new Error(`Unknown tool: ${name}`);
+							const result = await mcpService.callTool(
+								mapping.serverId,
+								mapping.toolName,
+								args,
+							);
+							if (!result.success) {
+								throw new Error(result.error || "Tool call failed");
+							}
+							return result.data;
+						}
+					: undefined;
+
 				// Fire and forget — stream events are sent via BrowserWindow.send
-				llmService.chatCompletion(request);
+				llmService.chatCompletion(request, toolExecutor);
 				return { success: true, data: { requestId: request.requestId } };
 			} catch (error: unknown) {
 				const message =

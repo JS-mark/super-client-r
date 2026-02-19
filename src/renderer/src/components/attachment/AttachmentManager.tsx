@@ -3,11 +3,9 @@ import { useTranslation } from "react-i18next";
 import {
 	Button,
 	Input,
-	Tabs,
 	Empty,
 	Dropdown,
 	message,
-	Popconfirm,
 	Badge,
 } from "antd";
 import {
@@ -25,7 +23,7 @@ import {
 	type Attachment,
 	type AttachmentType,
 } from "../../stores/attachmentStore";
-import { FileIcon, formatFileSize, getFileTypeFromExtension } from "./FileIcon";
+import { FileIcon, formatFileSize } from "./FileIcon";
 import { ImageGallery } from "./ImageGallery";
 
 const ATTACHMENT_TYPES: { type: AttachmentType | "all"; label: string; icon: string }[] = [
@@ -216,7 +214,7 @@ export function AttachmentManager({
 					/>
 				) : (
 					<div className="space-y-2">
-						{filteredAttachments.map((attachment, index) => (
+						{filteredAttachments.map((attachment) => (
 							<AttachmentItem
 								key={attachment.id}
 								attachment={attachment}

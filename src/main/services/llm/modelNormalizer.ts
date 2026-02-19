@@ -536,7 +536,7 @@ function findKnownModel(modelId: string): KnownModelInfo | undefined {
  */
 function normalizeModel(
 	raw: { id: string; name?: string },
-	preset?: ModelProviderPreset,
+	_preset?: ModelProviderPreset,
 ): ProviderModel {
 	const known = findKnownModel(raw.id);
 

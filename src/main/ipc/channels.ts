@@ -31,16 +31,26 @@ export const SKILL_CHANNELS = {
 	GET_SKILL: "skill:get",
 	// 执行 skill
 	EXECUTE_SKILL: "skill:execute",
+	// 获取 skill 系统提示词
+	GET_SYSTEM_PROMPT: "skill:get-system-prompt",
 } as const;
 
 // Chat 相关通道
 export const CHAT_CHANNELS = {
-	// 发送消息
-	SEND_MESSAGE: "chat:send-message",
-	// 获取历史消息
-	GET_HISTORY: "chat:get-history",
-	// 清除历史
-	CLEAR_HISTORY: "chat:clear",
+	// 对话管理
+	LIST_CONVERSATIONS: "chat:list-conversations",
+	CREATE_CONVERSATION: "chat:create-conversation",
+	DELETE_CONVERSATION: "chat:delete-conversation",
+	RENAME_CONVERSATION: "chat:rename-conversation",
+	// 消息管理
+	GET_MESSAGES: "chat:get-messages",
+	SAVE_MESSAGES: "chat:save-messages",
+	APPEND_MESSAGE: "chat:append-message",
+	UPDATE_MESSAGE: "chat:update-message",
+	CLEAR_MESSAGES: "chat:clear-messages",
+	// 上次对话
+	GET_LAST_CONVERSATION: "chat:get-last-conversation",
+	SET_LAST_CONVERSATION: "chat:set-last-conversation",
 } as const;
 
 // MCP 相关通道
@@ -50,9 +60,17 @@ export const MCP_CHANNELS = {
 	// 断开连接
 	DISCONNECT: "mcp:disconnect",
 	// 获取服务器列表
-	LIST_SERVERS: "mcp:list",
+	LIST_SERVERS: "mcp:list-servers",
 	// 获取服务器工具
 	GET_TOOLS: "mcp:get-tools",
+	// 添加服务器
+	ADD_SERVER: "mcp:add-server",
+	// 移除服务器
+	REMOVE_SERVER: "mcp:remove-server",
+	// 更新服务器配置
+	UPDATE_SERVER: "mcp:update-server",
+	// 获取所有状态
+	GET_ALL_STATUS: "mcp:get-all-status",
 } as const;
 
 // App 相关通道
@@ -145,6 +163,8 @@ export const SEARCH_CHANNELS = {
 	GET_DEFAULT: "search:get-default",
 	// 验证搜索配置
 	VALIDATE_CONFIG: "search:validate-config",
+	// 执行搜索
+	EXECUTE: "search:execute",
 } as const;
 
 // 日志系统相关通道

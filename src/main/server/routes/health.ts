@@ -1,4 +1,4 @@
-import { request, summary, tags, body, description } from "koa-swagger-decorator";
+import { request, summary, tags, description } from "koa-swagger-decorator";
 
 export class HealthController {
 	@request("get", "/health")

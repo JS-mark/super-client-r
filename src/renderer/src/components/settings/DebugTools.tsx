@@ -41,7 +41,7 @@ const QuickActionsTab: React.FC = () => {
 			message.success(
 				t("devToolsOpened", "Developer tools opened", { ns: "settings" }),
 			);
-		} catch (e) {
+		} catch {
 			message.error(
 				t("devToolsError", "Failed to open developer tools", {
 					ns: "settings",
@@ -53,7 +53,7 @@ const QuickActionsTab: React.FC = () => {
 	const handleRelaunch = async () => {
 		try {
 			await appService.relaunch();
-		} catch (e) {
+		} catch {
 			message.error(
 				t("relaunchError", "Failed to relaunch", { ns: "settings" }),
 			);
@@ -213,7 +213,7 @@ const SystemInfoTab: React.FC = () => {
 				},
 				timestamp: new Date().toISOString(),
 			});
-		} catch (e) {
+		} catch {
 			message.error(
 				t("collectDebugInfoError", "Failed to collect debug info", {
 					ns: "settings",

@@ -102,10 +102,10 @@ const BUILTIN_MCP_DEFINITIONS: BuiltinMcpDefinition[] = [
 	{
 		id: "builtin-puppeteer",
 		name: "Puppeteer 浏览器",
-		description: "浏览器自动化和网页抓取",
+		description: "浏览器自动化和网页抓取（已归档，推荐使用 Playwright）",
 		version: "1.0.0",
 		icon: "🌐",
-		tags: ["official", "browser", "automation"],
+		tags: ["official", "browser", "automation", "archived"],
 		transport: "stdio",
 		command: "npx",
 		args: ["-y", "@modelcontextprotocol/server-puppeteer"],
@@ -120,6 +120,59 @@ const BUILTIN_MCP_DEFINITIONS: BuiltinMcpDefinition[] = [
 		transport: "stdio",
 		command: "npx",
 		args: ["-y", "@modelcontextprotocol/server-fetch"],
+	},
+	{
+		id: "builtin-playwright",
+		name: "Playwright 浏览器",
+		description: "基于 Playwright 的浏览器自动化，支持多浏览器引擎",
+		version: "1.0.0",
+		icon: "🎭",
+		tags: ["official", "browser", "automation", "playwright"],
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "@playwright/mcp", "--headless"],
+		configSchema: {
+			type: "object",
+			properties: {
+				headless: {
+					type: "boolean",
+					description: "是否以无头模式运行浏览器（默认为 true）",
+				},
+			},
+		},
+	},
+	{
+		id: "builtin-python-sandbox",
+		name: "Python 沙箱",
+		description: "在 WebAssembly 沙箱中安全执行 Python 代码，无需本地 Python 环境",
+		version: "1.0.0",
+		icon: "🐍",
+		tags: ["official", "python", "sandbox", "code-execution"],
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "@pydantic/mcp-run-python"],
+	},
+	{
+		id: "builtin-memory",
+		name: "知识图谱记忆",
+		description: "持久化知识图谱，用于跨会话记忆实体和关系",
+		version: "1.0.0",
+		icon: "🧠",
+		tags: ["official", "memory", "knowledge-graph"],
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "@modelcontextprotocol/server-memory"],
+	},
+	{
+		id: "builtin-sequential-thinking",
+		name: "顺序思考推理",
+		description: "分步骤思考和推理，适合复杂问题分解",
+		version: "1.0.0",
+		icon: "💭",
+		tags: ["official", "thinking", "reasoning"],
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
 	},
 ];
 
@@ -190,6 +243,12 @@ export class BuiltinMcpService extends EventEmitter {
 		}
 		if (definitionId === "builtin-sqlite" && customConfig?.dbPath) {
 			args = [...def.args, customConfig.dbPath as string];
+		}
+		if (
+			definitionId === "builtin-playwright" &&
+			customConfig?.headless === false
+		) {
+			args = def.args.filter((a) => a !== "--headless");
 		}
 
 		return {

@@ -12,6 +12,7 @@ import enLogviewer from "./locales/en/logviewer.json";
 import enMcp from "./locales/en/mcp.json";
 import enMenu from "./locales/en/menu.json";
 import enModels from "./locales/en/models.json";
+import enPlugins from "./locales/en/plugins.json";
 import enSettings from "./locales/en/settings.json";
 import enShortcuts from "./locales/en/shortcuts.json";
 import enSkills from "./locales/en/skills.json";
@@ -30,6 +31,7 @@ import zhLogviewer from "./locales/zh/logviewer.json";
 import zhMcp from "./locales/zh/mcp.json";
 import zhMenu from "./locales/zh/menu.json";
 import zhModels from "./locales/zh/models.json";
+import zhPlugins from "./locales/zh/plugins.json";
 import zhSettings from "./locales/zh/settings.json";
 import zhShortcuts from "./locales/zh/shortcuts.json";
 import zhSkills from "./locales/zh/skills.json";
@@ -50,6 +52,7 @@ const resources = {
 		mcp: zhMcp,
 		menu: zhMenu,
 		models: zhModels,
+		plugins: zhPlugins,
 		settings: zhSettings,
 		shortcuts: zhShortcuts,
 		skills: zhSkills,
@@ -69,6 +72,7 @@ const resources = {
 		mcp: enMcp,
 		menu: enMenu,
 		models: enModels,
+		plugins: enPlugins,
 		settings: enSettings,
 		shortcuts: enShortcuts,
 		skills: enSkills,
@@ -90,6 +94,7 @@ const allNamespaces = [
 	"mcp",
 	"menu",
 	"models",
+	"plugins",
 	"settings",
 	"shortcuts",
 	"skills",

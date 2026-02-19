@@ -1,0 +1,29 @@
+{
+  "plugins": {
+    "title": "Plugin Center",
+    "subtitle": "Manage and install plugins to extend app functionality",
+    "market": "Plugin Market",
+    "installed": "Installed",
+    "install": "Install",
+    "installLocal": "Install Local Plugin",
+    "searchPlaceholder": "Search plugins...",
+    "noMarketPlugins": "No plugins available",
+    "noInstalledPlugins": "No installed plugins",
+    "browseMarket": "Browse Plugin Market",
+    "confirmUninstall": "Are you sure you want to uninstall this plugin?",
+    "commands": "Commands",
+    "noCommands": "No commands available",
+    "run": "Run",
+    "commandResult": "Command Result",
+    "template": "Template",
+    "description": "Description",
+    "copy": "Copy",
+    "useInChat": "Use in Chat",
+    "copied": "Copied to clipboard",
+    "pluginEnabled": "Plugin enabled",
+    "pluginDisabled": "Plugin disabled",
+    "pluginInstalled": "Plugin installed successfully",
+    "pluginUninstalled": "Plugin uninstalled",
+    "downloadSuccess": "Plugin downloaded and installed successfully"
+  }
+}

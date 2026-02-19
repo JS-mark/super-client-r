@@ -34,6 +34,7 @@ interface McpState {
 	enableServer: (id: string) => void;
 	disableServer: (id: string) => void;
 	toggleServer: (id: string) => void;
+	disconnectServer: (id: string) => Promise<void>;
 	updateServerStatus: (id: string, status: McpServer["status"], error?: string) => void;
 	updateServerTools: (id: string, tools: McpServer["tools"]) => void;
 	setServers: (servers: McpServer[]) => void;
@@ -65,170 +66,6 @@ interface McpState {
 	getConnectedServers: () => McpServer[];
 }
 
-// 模拟市场数据
-const MOCK_MARKET_ITEMS: McpMarketItem[] = [
-	{
-		id: "market-filesystem",
-		name: "Filesystem Pro",
-		description: "增强版文件系统操作，支持远程文件系统和云存储",
-		version: "2.0.0",
-		author: "MCP Community",
-		icon: "📁",
-		tags: ["filesystem", "cloud", "utilities"],
-		rating: 4.9,
-		downloads: 150000,
-		installCount: 50000,
-		transport: "stdio",
-		command: "npx",
-		args: ["-y", "@mcp-community/server-filesystem-pro"],
-		readmeUrl: "https://github.com/mcp-community/filesystem-pro#readme",
-		repositoryUrl: "https://github.com/mcp-community/filesystem-pro",
-		license: "MIT",
-		createdAt: "2024-01-15T00:00:00Z",
-		updatedAt: "2024-06-01T00:00:00Z",
-	},
-	{
-		id: "market-postgres",
-		name: "PostgreSQL",
-		description: "PostgreSQL 数据库操作和查询优化",
-		version: "1.2.0",
-		author: "Database Tools Inc",
-		icon: "🐘",
-		tags: ["database", "postgresql", "sql"],
-		rating: 4.7,
-		downloads: 80000,
-		installCount: 25000,
-		transport: "stdio",
-		command: "npx",
-		args: ["-y", "@dbtools/mcp-server-postgres"],
-		readmeUrl: "https://github.com/dbtools/postgres-mcp#readme",
-		repositoryUrl: "https://github.com/dbtools/postgres-mcp",
-		license: "Apache-2.0",
-		createdAt: "2024-02-01T00:00:00Z",
-		updatedAt: "2024-05-15T00:00:00Z",
-	},
-	{
-		id: "market-redis",
-		name: "Redis",
-		description: "Redis 缓存和队列操作",
-		version: "1.0.5",
-		author: "Cache Masters",
-		icon: "🔴",
-		tags: ["database", "redis", "cache"],
-		rating: 4.5,
-		downloads: 45000,
-		installCount: 12000,
-		transport: "stdio",
-		command: "npx",
-		args: ["-y", "@cachemasters/mcp-redis"],
-		readmeUrl: "https://github.com/cachemasters/redis-mcp#readme",
-		repositoryUrl: "https://github.com/cachemasters/redis-mcp",
-		license: "MIT",
-		createdAt: "2024-03-01T00:00:00Z",
-		updatedAt: "2024-04-20T00:00:00Z",
-	},
-	{
-		id: "market-slack",
-		name: "Slack Integration",
-		description: "Slack 工作区管理和消息发送",
-		version: "1.1.0",
-		author: "Team Connect",
-		icon: "💬",
-		tags: ["slack", "messaging", "team"],
-		rating: 4.6,
-		downloads: 60000,
-		installCount: 18000,
-		transport: "http",
-		url: "https://slack-mcp.example.com",
-		headers: {
-			"X-API-Version": "v1",
-		},
-		readmeUrl: "https://github.com/teamconnect/slack-mcp#readme",
-		repositoryUrl: "https://github.com/teamconnect/slack-mcp",
-		license: "MIT",
-		createdAt: "2024-01-20T00:00:00Z",
-		updatedAt: "2024-05-01T00:00:00Z",
-	},
-	{
-		id: "market-notion",
-		name: "Notion",
-		description: "Notion 工作空间管理和页面操作",
-		version: "2.1.0",
-		author: "Notion Tools",
-		icon: "📝",
-		tags: ["notion", "documentation", "productivity"],
-		rating: 4.8,
-		downloads: 95000,
-		installCount: 35000,
-		transport: "http",
-		url: "https://notion-mcp.example.com",
-		readmeUrl: "https://github.com/notiontools/notion-mcp#readme",
-		repositoryUrl: "https://github.com/notiontools/notion-mcp",
-		license: "MIT",
-		createdAt: "2024-02-15T00:00:00Z",
-		updatedAt: "2024-06-10T00:00:00Z",
-	},
-	{
-		id: "market-aws",
-		name: "AWS Services",
-		description: "AWS 云服务操作，支持 S3、EC2、Lambda 等",
-		version: "3.0.0",
-		author: "Cloud Native Tools",
-		icon: "☁️",
-		tags: ["aws", "cloud", "devops"],
-		rating: 4.4,
-		downloads: 70000,
-		installCount: 22000,
-		transport: "stdio",
-		command: "npx",
-		args: ["-y", "@cloudnative/mcp-aws"],
-		readmeUrl: "https://github.com/cloudnative/aws-mcp#readme",
-		repositoryUrl: "https://github.com/cloudnative/aws-mcp",
-		license: "Apache-2.0",
-		createdAt: "2024-01-01T00:00:00Z",
-		updatedAt: "2024-05-20T00:00:00Z",
-	},
-	{
-		id: "market-docker",
-		name: "Docker",
-		description: "Docker 容器和镜像管理",
-		version: "1.3.0",
-		author: "Container Masters",
-		icon: "🐳",
-		tags: ["docker", "containers", "devops"],
-		rating: 4.7,
-		downloads: 55000,
-		installCount: 16000,
-		transport: "stdio",
-		command: "npx",
-		args: ["-y", "@containermasters/mcp-docker"],
-		readmeUrl: "https://github.com/containermasters/docker-mcp#readme",
-		repositoryUrl: "https://github.com/containermasters/docker-mcp",
-		license: "MIT",
-		createdAt: "2024-02-20T00:00:00Z",
-		updatedAt: "2024-04-30T00:00:00Z",
-	},
-	{
-		id: "market-jira",
-		name: "Jira",
-		description: "Jira 项目管理和问题跟踪",
-		version: "1.0.8",
-		author: "Agile Tools",
-		icon: "📋",
-		tags: ["jira", "project-management", "agile"],
-		rating: 4.3,
-		downloads: 35000,
-		installCount: 10000,
-		transport: "http",
-		url: "https://jira-mcp.example.com",
-		readmeUrl: "https://github.com/agiletools/jira-mcp#readme",
-		repositoryUrl: "https://github.com/agiletools/jira-mcp",
-		license: "MIT",
-		createdAt: "2024-03-15T00:00:00Z",
-		updatedAt: "2024-05-05T00:00:00Z",
-	},
-];
-
 export const useMcpStore = create<McpState>()(
 	persist(
 		(set, get) => ({
@@ -246,11 +83,30 @@ export const useMcpStore = create<McpState>()(
 			isLoading: false,
 
 			// 服务器管理
-			addServer: (server) =>
-				set((state) => ({ servers: [...state.servers, server] })),
+			addServer: (server) => {
+				set((state) => ({ servers: [...state.servers, server] }));
+				// 注册到主进程
+				window.electron.mcp.addServer({
+					id: server.id,
+					name: server.name,
+					type: server.type,
+					transport: server.transport,
+					command: server.command,
+					args: server.args,
+					env: server.env,
+					url: server.url,
+					headers: server.headers,
+					description: server.description,
+					version: server.version,
+					enabled: server.enabled,
+				});
+			},
 
-			removeServer: (id) =>
-				set((state) => ({ servers: state.servers.filter((s) => s.id !== id) })),
+			removeServer: (id) => {
+				set((state) => ({ servers: state.servers.filter((s) => s.id !== id) }));
+				// 从主进程移除
+				window.electron.mcp.removeServer(id);
+			},
 
 			updateServer: (id, updates) =>
 				set((state) => ({
@@ -279,6 +135,24 @@ export const useMcpStore = create<McpState>()(
 						s.id === id ? { ...s, enabled: !s.enabled } : s,
 					),
 				})),
+
+			disconnectServer: async (id: string) => {
+				try {
+					await window.electron.mcp.disconnect(id);
+					set((state) => ({
+						servers: state.servers.map((s) =>
+							s.id === id ? { ...s, status: "disconnected" as const, tools: undefined, error: undefined } : s,
+						),
+					}));
+				} catch (error) {
+					const errorMsg = error instanceof Error ? error.message : "Disconnect failed";
+					set((state) => ({
+						servers: state.servers.map((s) =>
+							s.id === id ? { ...s, status: "error" as const, error: errorMsg } : s,
+						),
+					}));
+				}
+			},
 
 			updateServerStatus: (id, status, error) =>
 				set((state) => ({
@@ -313,35 +187,24 @@ export const useMcpStore = create<McpState>()(
 				})),
 
 			fetchMarketItems: async (page = 1, limit = 12, tag?: string, query?: string) => {
-				set({ isLoadingMarket: true, isLoading: true });
+				set({ isLoadingMarket: true, isLoading: true, marketError: null });
 				try {
-					// 模拟 API 调用延迟
-					await new Promise((resolve) => setTimeout(resolve, 300));
+					const response = await window.electron.mcp.market.search({
+						query: query || undefined,
+						tags: tag ? [tag] : undefined,
+						sortBy: "downloads",
+						page,
+						limit,
+					});
 
-					let items = [...MOCK_MARKET_ITEMS];
-
-					// 过滤标签
-					if (tag) {
-						items = items.filter((item) => item.tags.includes(tag));
+					if (!response.success || !response.data) {
+						throw new Error(response.error || "Failed to fetch market data");
 					}
 
-					// 搜索
-					if (query) {
-						const lowerQuery = query.toLowerCase();
-						items = items.filter(
-							(item) =>
-								item.name.toLowerCase().includes(lowerQuery) ||
-								item.description.toLowerCase().includes(lowerQuery) ||
-								item.tags.some((t) => t.toLowerCase().includes(lowerQuery)),
-						);
-					}
-
-					const total = items.length;
-					const start = (page - 1) * limit;
-					const paginatedItems = items.slice(start, start + limit);
+					const { items, total } = response.data;
 
 					set({
-						marketItems: paginatedItems,
+						marketItems: items,
 						marketTotal: total,
 						marketPage: page,
 						marketLimit: limit,
@@ -382,36 +245,59 @@ export const useMcpStore = create<McpState>()(
 				set((state) => ({
 					servers: [...state.servers, newServer],
 				}));
+
+				// 注册到主进程（持久化 + 运行时注册）
+				window.electron.mcp.addServer({
+					id: newServer.id,
+					name: newServer.name,
+					type: newServer.type,
+					transport: newServer.transport,
+					command: newServer.command,
+					args: newServer.args,
+					env: newServer.env,
+					url: newServer.url,
+					headers: newServer.headers,
+					description: newServer.description,
+					version: newServer.version,
+					enabled: true,
+				});
 			},
 
 			// 标签
 			setMarketTags: (tags) => set({ marketTags: tags }),
 
-			// 测试连接（模拟）
+			// 测试连接
 			testConnection: async (id: string) => {
 				const server = get().servers.find((s) => s.id === id);
 				if (!server) throw new Error("Server not found");
 
-				// 模拟测试延迟
-				await new Promise((resolve) => setTimeout(resolve, 1000));
+				set((state) => ({
+					servers: state.servers.map((s) =>
+						s.id === id ? { ...s, status: "connecting" as const, error: undefined } : s,
+					),
+				}));
 
-				// 随机成功或失败
-				const success = Math.random() > 0.3;
-				if (success) {
-					set((state) => ({
-						servers: state.servers.map((s) =>
-							s.id === id ? { ...s, status: "connected" as const } : s,
-						),
-					}));
-				} else {
+				try {
+					const response = await window.electron.mcp.connect(id);
+					if (response.success) {
+						set((state) => ({
+							servers: state.servers.map((s) =>
+								s.id === id ? { ...s, status: "connected" as const } : s,
+							),
+						}));
+					} else {
+						throw new Error(response.error || "Connection failed");
+					}
+				} catch (error) {
+					const errorMsg = error instanceof Error ? error.message : "Connection failed";
 					set((state) => ({
 						servers: state.servers.map((s) =>
 							s.id === id
-								? { ...s, status: "error" as const, error: "Connection failed" }
+								? { ...s, status: "error" as const, error: errorMsg }
 								: s,
 						),
 					}));
-					throw new Error("Connection failed");
+					throw error;
 				}
 			},
 

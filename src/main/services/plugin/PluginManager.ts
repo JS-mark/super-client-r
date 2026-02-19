@@ -6,7 +6,6 @@ import type {
 	PluginContext,
 	PluginInfo,
 	PluginManifest,
-	PluginState,
 } from "./types";
 import { app } from "electron";
 import { storeManager } from "../../store/StoreManager";
@@ -24,6 +23,7 @@ interface PluginActivationRecord {
 export class PluginManager extends EventEmitter {
 	private plugins = new Map<string, PluginInfo>();
 	private activePlugins = new Map<string, PluginActivationRecord>();
+	private commandRegistry = new Map<string, { pluginId: string; handler: (...args: unknown[]) => unknown }>();
 	private pluginsDir: string;
 	private globalStorageDir: string;
 	private isInitialized = false;
@@ -252,6 +252,13 @@ export class PluginManager extends EventEmitter {
 				subscription.dispose();
 			}
 
+			// 清理该插件注册的命令（safety net）
+			for (const [cmdId, entry] of this.commandRegistry) {
+				if (entry.pluginId === pluginId) {
+					this.commandRegistry.delete(cmdId);
+				}
+			}
+
 			// 从激活列表移除
 			this.activePlugins.delete(pluginId);
 
@@ -294,6 +301,7 @@ export class PluginManager extends EventEmitter {
 		const extensionPath = pluginInfo.path;
 		const extensionUri = `file://${extensionPath}`;
 		const storagePath = path.join(this.globalStorageDir, pluginInfo.id);
+		const subscriptions: { dispose(): void }[] = [];
 
 		return {
 			extensionPath,
@@ -301,9 +309,16 @@ export class PluginManager extends EventEmitter {
 			storageUri: `file://${storagePath}`,
 			globalStorageUri: `file://${this.globalStorageDir}`,
 			logUri: `file://${path.join(app.getPath("logs"), "plugins", pluginInfo.id)}`,
-			subscriptions: [],
+			subscriptions,
 			workspaceState: this.createMemento(`workspace:${pluginInfo.id}`),
 			globalState: this.createMemento(`global:${pluginInfo.id}`),
+			commands: {
+				registerCommand: (command: string, callback: (...args: unknown[]) => unknown) => {
+					const disposable = this.registerCommand(pluginInfo.id, command, callback);
+					subscriptions.push(disposable);
+					return disposable;
+				},
+			},
 		};
 	}
 
@@ -443,6 +458,51 @@ export class PluginManager extends EventEmitter {
 
 		// 停用插件
 		await this.deactivatePlugin(pluginId);
+	}
+
+	/**
+	 * 注册命令
+	 */
+	registerCommand(pluginId: string, commandId: string, handler: (...args: unknown[]) => unknown): { dispose(): void } {
+		this.commandRegistry.set(commandId, { pluginId, handler });
+		return {
+			dispose: () => {
+				this.commandRegistry.delete(commandId);
+			},
+		};
+	}
+
+	/**
+	 * 执行命令
+	 */
+	async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
+		const entry = this.commandRegistry.get(commandId);
+		if (!entry) {
+			throw new Error(`Command ${commandId} not found`);
+		}
+		if (!this.activePlugins.has(entry.pluginId)) {
+			throw new Error(`Plugin ${entry.pluginId} is not active`);
+		}
+		return entry.handler(...args);
+	}
+
+	/**
+	 * 获取已注册命令
+	 */
+	getRegisteredCommands(pluginId?: string): Array<{ command: string; pluginId: string; title?: string; category?: string }> {
+		const commands: Array<{ command: string; pluginId: string; title?: string; category?: string }> = [];
+		for (const [commandId, entry] of this.commandRegistry) {
+			if (pluginId && entry.pluginId !== pluginId) continue;
+			const pluginInfo = this.plugins.get(entry.pluginId);
+			const contributed = pluginInfo?.manifest.contributes?.commands?.find((c) => c.command === commandId);
+			commands.push({
+				command: commandId,
+				pluginId: entry.pluginId,
+				title: contributed?.title,
+				category: contributed?.category,
+			});
+		}
+		return commands;
 	}
 
 	/**

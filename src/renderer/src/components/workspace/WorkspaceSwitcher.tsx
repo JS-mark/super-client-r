@@ -219,7 +219,7 @@ export function WorkspaceSwitcher() {
 	const sortedWorkspaces = [...workspaces].sort((a, b) => a.order - b.order);
 
 	const handleCreate = (data: WorkspaceFormData) => {
-		const id = createWorkspace(data);
+		createWorkspace(data);
 		message.success(
 			t("workspaces.create.success", "工作区创建成功", { ns: "workspaces" }),
 		);
@@ -277,7 +277,7 @@ export function WorkspaceSwitcher() {
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 			message.success(t("workspaces.export.success", "工作区已导出"));
-		} catch (error) {
+		} catch {
 			message.error(
 				t("workspaces.export.error", "导出失败", { ns: "workspaces" }),
 			);

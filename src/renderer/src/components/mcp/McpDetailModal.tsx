@@ -2,19 +2,21 @@ import {
 	CloudDownloadOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
+	SettingOutlined,
 	StarFilled,
 } from "@ant-design/icons";
 import { Button, Modal, message, Tag } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
-import type { McpMarketItem } from "../../types/mcp";
+import type { McpMarketItem, McpServer } from "../../types/mcp";
 
 export interface McpDetailModalProps {
 	item: McpMarketItem | null;
 	open: boolean;
 	onClose: () => void;
 	onInstall: (item: McpMarketItem) => void;
+	onConfigure?: (server: McpServer) => void;
 }
 
 export const McpDetailModal: React.FC<McpDetailModalProps> = ({
@@ -22,6 +24,7 @@ export const McpDetailModal: React.FC<McpDetailModalProps> = ({
 	open,
 	onClose,
 	onInstall,
+	onConfigure,
 }) => {
 	const { t } = useTranslation();
 	const { servers, removeServer } = useMcpStore();
@@ -68,6 +71,17 @@ export const McpDetailModal: React.FC<McpDetailModalProps> = ({
 							<Button danger onClick={handleUninstall}>
 								<DeleteOutlined />
 								{t("actions.uninstall", { ns: "common" })}
+							</Button>
+							<Button
+								icon={<SettingOutlined />}
+								onClick={() => {
+									if (installedServer && onConfigure) {
+										onConfigure(installedServer);
+										onClose();
+									}
+								}}
+							>
+								{t("actions.configure", { ns: "mcp" })}
 							</Button>
 							<Button type="primary" disabled>
 								<DownloadOutlined />

@@ -36,6 +36,28 @@ export interface ValidateConfigResponse {
 	error?: string;
 }
 
+export interface SearchExecuteRequest {
+	provider: string;
+	query: string;
+	apiKey: string;
+	apiUrl?: string;
+	maxResults?: number;
+	config?: Record<string, unknown>;
+}
+
+export interface SearchResult {
+	title: string;
+	url: string;
+	snippet: string;
+}
+
+export interface SearchExecuteResponse {
+	results: SearchResult[];
+	provider: string;
+	query: string;
+	searchTimeMs: number;
+}
+
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;

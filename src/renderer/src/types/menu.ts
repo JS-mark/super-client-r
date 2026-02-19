@@ -73,7 +73,7 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			label: "plugins",
 			path: "/plugins",
 			iconType: "default",
-			iconContent: "PluginOutlined",
+			iconContent: "AppstoreOutlined",
 			enabled: true,
 			action: "navigate",
 		},

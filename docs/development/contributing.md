@@ -227,13 +227,13 @@ pnpm test --coverage
 ## 获取帮助
 
 - 查看 [文档](../guide/getting-started)
-- 加入 [Discord](https://discord.gg/your-server)
-- 发送邮件至：support@superclient.dev
+- 提交 [Issue](https://github.com/js-mark/super-client-r/issues)
+- 查看 [插件开发指南](../PLUGIN_DEVELOPMENT.md)
 
 ## 致谢
 
 感谢所有贡献者！
 
-<a href="https://github.com/your-org/super-client-r/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=your-org/super-client-r" />
+<a href="https://github.com/js-mark/super-client-r/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=js-mark/super-client-r" />
 </a>

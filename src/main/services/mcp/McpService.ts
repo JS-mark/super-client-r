@@ -12,12 +12,15 @@ import type {
 	McpTool,
 	McpServerType,
 } from "../../ipc/types";
+import { storeManager } from "../../store/StoreManager";
+import { logger } from "../../utils/logger";
 import { builtinMcpService } from "./BuiltinMcpService";
 import {
 	thirdPartyMcpService,
-	UnifiedToolResponse,
 } from "./ThirdPartyMcpService";
 import { mcpMarketService } from "./McpMarketService";
+
+const log = logger.withContext("MCP");
 
 interface McpConnection {
 	client: Client;
@@ -51,12 +54,15 @@ export class McpService extends EventEmitter {
 	private setupEventForwarding(): void {
 		// 转发第三方 MCP 服务的事件
 		thirdPartyMcpService.on("connected", (status) => {
+			log.info("Third-party server connected", { serverId: status.id });
 			this.emit("server-connected", status);
 		});
 		thirdPartyMcpService.on("disconnected", (id) => {
+			log.info("Third-party server disconnected", { serverId: id });
 			this.emit("server-disconnected", id);
 		});
 		thirdPartyMcpService.on("error", ({ id, error }) => {
+			log.error("Third-party server error", error instanceof Error ? error : new Error(String(error)), { serverId: id });
 			this.emit("server-error", { id, error });
 		});
 		thirdPartyMcpService.on("tool-called", (data) => {
@@ -68,6 +74,15 @@ export class McpService extends EventEmitter {
 	 * 添加 MCP 服务器配置
 	 */
 	addServer(config: McpServerConfig): void {
+		log.info("Adding server", {
+			id: config.id,
+			name: config.name,
+			type: config.type,
+			transport: config.transport,
+			command: config.command,
+			args: config.args,
+		});
+
 		this.servers.set(config.id, config);
 
 		// 根据类型初始化
@@ -89,6 +104,9 @@ export class McpService extends EventEmitter {
 				break;
 		}
 
+		// 持久化到 electron-store
+		storeManager.saveMcpServer(config);
+
 		this.emit("server-added", config);
 	}
 
@@ -97,7 +115,12 @@ export class McpService extends EventEmitter {
 	 */
 	async removeServer(id: string): Promise<void> {
 		const config = this.servers.get(id);
-		if (!config) return;
+		if (!config) {
+			log.warn("Remove server: not found", { id });
+			return;
+		}
+
+		log.info("Removing server", { id, name: config.name, type: config.type });
 
 		await this.disconnect(id);
 
@@ -114,6 +137,11 @@ export class McpService extends EventEmitter {
 		}
 
 		this.servers.delete(id);
+
+		// 从持久化存储中删除
+		storeManager.deleteMcpServer(id);
+
+		log.info("Server removed", { id, name: config.name });
 		this.emit("server-removed", id);
 	}
 
@@ -129,6 +157,70 @@ export class McpService extends EventEmitter {
 	 */
 	getServer(id: string): McpServerConfig | undefined {
 		return this.servers.get(id);
+	}
+
+	/**
+	 * 更新 MCP 服务器配置
+	 */
+	updateServer(id: string, updates: Partial<McpServerConfig>): void {
+		const existing = this.servers.get(id);
+		if (!existing) {
+			log.warn("Update server: not found", { id });
+			return;
+		}
+
+		log.info("Updating server config", { id, name: existing.name, updates });
+
+		const updated = { ...existing, ...updates, id };
+		this.servers.set(id, updated);
+		storeManager.saveMcpServer(updated);
+		this.emit("server-updated", updated);
+	}
+
+	/**
+	 * 从持久化存储加载已保存的服务器配置到内存
+	 * 只注册，不自动连接
+	 */
+	loadPersistedServers(): void {
+		const persisted = storeManager.getMcpServers();
+		log.info("Loading persisted servers", { count: persisted.length });
+
+		let loaded = 0;
+		for (const config of persisted) {
+			if (this.servers.has(config.id)) {
+				log.debug("Skipping already registered server", { id: config.id, name: config.name });
+				continue;
+			}
+
+			this.servers.set(config.id, config);
+
+			switch (config.type) {
+				case "builtin":
+				case "market":
+					this.serverStatus.set(config.id, {
+						id: config.id,
+						status: "disconnected",
+						type: config.type,
+						transport: config.transport,
+					});
+					break;
+				case "third-party":
+					thirdPartyMcpService.addServer(config);
+					thirdPartyMcpService.registerServer(config);
+					break;
+			}
+
+			loaded++;
+			log.debug("Loaded persisted server", {
+				id: config.id,
+				name: config.name,
+				type: config.type,
+				transport: config.transport,
+				command: config.command,
+			});
+		}
+
+		log.info("Persisted servers loaded", { loaded, total: persisted.length });
 	}
 
 	/**
@@ -155,7 +247,7 @@ export class McpService extends EventEmitter {
 	getAllServerStatus(): McpServerStatus[] {
 		const statuses: McpServerStatus[] = [];
 
-		for (const [id, config] of this.servers.entries()) {
+		for (const id of this.servers.keys()) {
 			const status = this.getServerStatus(id);
 			if (status) {
 				statuses.push(status);
@@ -171,8 +263,11 @@ export class McpService extends EventEmitter {
 	async connect(id: string): Promise<McpServerStatus> {
 		const config = this.servers.get(id);
 		if (!config) {
+			log.error("Connect failed: server not found", undefined, { id });
 			throw new Error(`Server ${id} not found`);
 		}
+
+		log.info("Connecting to server", { id, name: config.name, type: config.type, transport: config.transport });
 
 		// 根据类型选择连接方式
 		switch (config.type) {
@@ -182,6 +277,7 @@ export class McpService extends EventEmitter {
 			case "third-party":
 				return thirdPartyMcpService.connect(id);
 			default:
+				log.error("Connect failed: unknown server type", undefined, { id, type: config.type });
 				throw new Error(`Unknown server type: ${config.type}`);
 		}
 	}
@@ -192,6 +288,8 @@ export class McpService extends EventEmitter {
 	async disconnect(id: string): Promise<void> {
 		const config = this.servers.get(id);
 		if (!config) return;
+
+		log.info("Disconnecting server", { id, name: config.name, type: config.type });
 
 		switch (config.type) {
 			case "builtin":
@@ -216,6 +314,7 @@ export class McpService extends EventEmitter {
 		const config = this.servers.get(serverId);
 
 		if (!config) {
+			log.warn("Tool call failed: server not found", { serverId, toolName });
 			return {
 				success: false,
 				error: `Server ${serverId} not found`,
@@ -224,6 +323,8 @@ export class McpService extends EventEmitter {
 				duration: 0,
 			};
 		}
+
+		log.debug("Calling tool", { serverId, serverName: config.name, toolName });
 
 		try {
 			let result: unknown;
@@ -252,6 +353,7 @@ export class McpService extends EventEmitter {
 			}
 
 			const duration = Date.now() - startTime;
+			log.debug("Tool call completed", { serverId, toolName, durationMs: duration });
 			this.emit("tool-called", { serverId, toolName, args, duration });
 
 			return {
@@ -263,6 +365,7 @@ export class McpService extends EventEmitter {
 			};
 		} catch (error) {
 			const duration = Date.now() - startTime;
+			log.error("Tool call failed", error instanceof Error ? error : new Error(String(error)), { serverId, toolName, durationMs: duration });
 			this.emit("tool-error", { serverId, toolName, error, duration });
 
 			return {
@@ -359,6 +462,14 @@ export class McpService extends EventEmitter {
 		this.serverStatus.set(id, status);
 		this.emit("server-connecting", { id });
 
+		log.info("Connecting stdio server", {
+			id,
+			name: config.name,
+			command: config.command,
+			args: config.args,
+			env: config.env ? Object.keys(config.env) : undefined,
+		});
+
 		try {
 			// 创建 MCP 客户端
 			const client = new Client(
@@ -380,6 +491,7 @@ export class McpService extends EventEmitter {
 
 			// 连接
 			await client.connect(transport);
+			log.info("Stdio transport connected", { id, name: config.name });
 
 			// 存储连接
 			this.stdioConnections.set(id, { client, transport, config });
@@ -392,6 +504,13 @@ export class McpService extends EventEmitter {
 				inputSchema: tool.inputSchema as any,
 			}));
 
+			log.info("Server connected successfully", {
+				id,
+				name: config.name,
+				toolCount: status.tools.length,
+				tools: status.tools.map((t) => t.name),
+			});
+
 			status.status = "connected";
 			this.serverStatus.set(id, status);
 			this.emit("server-connected", status);
@@ -401,6 +520,14 @@ export class McpService extends EventEmitter {
 			status.status = "error";
 			status.error = error instanceof Error ? error.message : "Unknown error";
 			this.serverStatus.set(id, status);
+
+			log.error("Stdio connection failed", error instanceof Error ? error : new Error(String(error)), {
+				id,
+				name: config.name,
+				command: config.command,
+				args: config.args,
+			});
+
 			this.emit("server-error", { id, error });
 			throw error;
 		}
@@ -415,8 +542,9 @@ export class McpService extends EventEmitter {
 			try {
 				await connection.client.close();
 				await connection.transport.close();
+				log.info("Stdio server disconnected", { id, name: connection.config.name });
 			} catch (error) {
-				console.error(`Error disconnecting MCP server ${id}:`, error);
+				log.error("Error during stdio disconnect", error instanceof Error ? error : new Error(String(error)), { id });
 			}
 			this.stdioConnections.delete(id);
 		}
@@ -441,6 +569,7 @@ export class McpService extends EventEmitter {
 	): Promise<unknown> {
 		const connection = this.stdioConnections.get(serverId);
 		if (!connection) {
+			log.warn("Stdio tool call failed: not connected", { serverId, toolName });
 			throw new Error(`Server ${serverId} is not connected`);
 		}
 

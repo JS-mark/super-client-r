@@ -1,12 +1,10 @@
 import {
   ClockCircleOutlined,
-  CloseOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
 import { Button, Empty, Input, List, Modal, Tag, theme } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { cn } from "../../lib/utils";
 import type { Message } from "../../stores/chatStore";
 import { useMessageStore } from "../../stores/messageStore";
 
@@ -80,7 +78,7 @@ export function MessageSearch({
     const regex = new RegExp(`(${escapeRegExp(searchQuery)})`, "gi");
     const parts = text.split(regex);
 
-    return parts.map((part, i) =>
+    return parts.map((part) =>
       regex.test(part) ? (
         <mark
           key={part}

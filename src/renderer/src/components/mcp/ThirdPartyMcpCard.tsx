@@ -1,15 +1,14 @@
 import {
 	DeleteOutlined,
+	DisconnectOutlined,
 	EditOutlined,
-	EyeOutlined,
 	GlobalOutlined,
 	LinkOutlined,
-	ReloadOutlined,
-	SyncOutlined,
+	PlayCircleOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Modal, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
 import type { McpServer } from "../../types/mcp";
@@ -20,10 +19,10 @@ export const ThirdPartyMcpCard: React.FC<{
 	onEdit: () => void;
 }> = ({ server, onEdit }) => {
 	const { t } = useTranslation();
-	const { removeServer, toggleServer, testConnection } = useMcpStore();
-	const [testing, setTesting] = useState(false);
+	const { removeServer, testConnection, disconnectServer } = useMcpStore();
+	const [connecting, setConnecting] = useState(false);
 
-	const handleDelete = (e: React.MouseEvent) => {
+	const handleDelete = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
 		Modal.confirm({
 			title: t("confirm.delete", { ns: "mcp" }),
@@ -35,25 +34,33 @@ export const ThirdPartyMcpCard: React.FC<{
 				);
 			},
 		});
-	};
+	}, [removeServer, server.id, server.name, t]);
 
-	const handleToggle = async (e: React.MouseEvent) => {
+	const handleConnect = useCallback(async (e: React.MouseEvent) => {
 		e.stopPropagation();
-		toggleServer(server.id);
-	};
-
-	const handleTest = async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		setTesting(true);
+		setConnecting(true);
 		try {
 			await testConnection(server.id);
-			message.success(t("messages.testSuccess", { ns: "mcp" }));
+			message.success(t("messages.connectSuccess", { ns: "mcp" }));
 		} catch {
-			message.error(t("messages.testFailed", { ns: "mcp" }));
+			message.error(t("messages.connectError", { ns: "mcp" }));
 		} finally {
-			setTesting(false);
+			setConnecting(false);
 		}
-	};
+	}, [testConnection, server.id, t]);
+
+	const handleDisconnect = useCallback(async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		try {
+			await disconnectServer(server.id);
+			message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
+		} catch {
+			message.error(t("messages.disconnectError", { ns: "mcp" }));
+		}
+	}, [disconnectServer, server.id, t]);
+
+	const isConnected = server.status === "connected";
+	const isConnecting = server.status === "connecting" || connecting;
 
 	return (
 		<Card
@@ -74,67 +81,71 @@ export const ThirdPartyMcpCard: React.FC<{
 					<McpStatusBadge status={server.status} />
 				</div>
 			}
-			actions={[
-				<Tooltip title={t("actions.test", { ns: "mcp" })} key="test">
-					<Button
-						size="small"
-						type="text"
-						icon={<EyeOutlined />}
-						onClick={handleTest}
-						loading={testing}
-					/>
-				</Tooltip>,
-				<Tooltip
-					title={
-						server.enabled
-							? t("actions.disable", { ns: "mcp" })
-							: t("actions.enable", { ns: "mcp" })
-					}
-					key="toggle"
-				>
-					<Button
-						size="small"
-						type="text"
-						icon={server.enabled ? <SyncOutlined /> : <ReloadOutlined />}
-						onClick={handleToggle}
-					/>
-				</Tooltip>,
-				<Tooltip title={t("actions.edit", { ns: "common" })} key="edit">
-					<Button
-						size="small"
-						type="text"
-						icon={<EditOutlined />}
-						onClick={onEdit}
-					/>
-				</Tooltip>,
-				<Tooltip title={t("actions.delete", { ns: "common" })} key="delete">
-					<Button
-						size="small"
-						type="text"
-						danger
-						icon={<DeleteOutlined />}
-						onClick={handleDelete}
-					/>
-				</Tooltip>,
-			]}
 		>
 			<div className="flex flex-col h-24 justify-between">
 				<div className="text-sm text-gray-500">
 					<p className="line-clamp-2">{server.description || "-"}</p>
 				</div>
 				<div className="flex justify-between items-center mt-2">
-					<Tag color="green">{server.transport}</Tag>
-					{server.url && (
-						<div className="flex items-center gap-1 text-xs text-gray-400 truncate max-w-[150px]">
-							<LinkOutlined />
-							<span className="truncate">{server.url}</span>
-						</div>
-					)}
-					{server.command && (
-						<div className="flex items-center gap-1 text-xs text-gray-400 truncate max-w-[150px]">
-							<span className="truncate">{server.command}</span>
-						</div>
-					)}
+					<div className="flex items-center gap-2">
+						<Tag color="green">{server.transport}</Tag>
+						{server.url && (
+							<div className="flex items-center gap-1 text-xs text-gray-400 truncate max-w-[120px]">
+								<LinkOutlined />
+								<span className="truncate">{server.url}</span>
+							</div>
+						)}
+						{server.command && (
+							<span className="text-xs text-gray-400 truncate max-w-[120px]">
+								{server.command}
+							</span>
+						)}
+					</div>
+					<div className="flex gap-1">
+						{isConnected ? (
+							<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
+								<Button
+									size="small"
+									type="text"
+									icon={<DisconnectOutlined />}
+									onClick={handleDisconnect}
+								/>
+							</Tooltip>
+						) : (
+							<Tooltip
+								title={
+									server.status === "error" && server.error
+										? server.error
+										: t("actions.connect", { ns: "mcp" })
+								}
+							>
+								<Button
+									size="small"
+									type="text"
+									icon={<PlayCircleOutlined style={server.status === "error" ? { color: "#ff4d4f" } : undefined} />}
+									onClick={handleConnect}
+									loading={isConnecting}
+								/>
+							</Tooltip>
+						)}
+						<Tooltip title={t("edit", { ns: "mcp" })}>
+							<Button
+								size="small"
+								type="text"
+								icon={<EditOutlined />}
+								onClick={onEdit}
+							/>
+						</Tooltip>
+						<Tooltip title={t("actions.delete", { ns: "mcp" })}>
+							<Button
+								size="small"
+								type="text"
+								danger
+								icon={<DeleteOutlined />}
+								onClick={handleDelete}
+							/>
+						</Tooltip>
+					</div>
 				</div>
 			</div>
 		</Card>

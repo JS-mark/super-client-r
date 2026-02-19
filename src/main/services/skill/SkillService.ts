@@ -3,6 +3,7 @@
  * 管理 skills 的安装、卸载和执行
  */
 
+import { app } from "electron";
 import { EventEmitter } from "events";
 import fs from "fs/promises";
 import path from "path";
@@ -33,41 +34,69 @@ export class SkillService extends EventEmitter {
 	 */
 	async initialize(): Promise<void> {
 		try {
-			// 确保 skills 目录存在
+			// 扫描用户数据目录下的 skills
 			await fs.mkdir(this.skillsDir, { recursive: true });
+			await this.scanSkillsDir(this.skillsDir);
 
-			// 扫描 skills 目录
-			const entries = await fs.readdir(this.skillsDir, { withFileTypes: true });
-
-			for (const entry of entries) {
-				if (entry.isDirectory()) {
-					const skillPath = path.join(this.skillsDir, entry.name);
-					const manifestPath = path.join(skillPath, "manifest.json");
-
-					try {
-						const manifestContent = await fs.readFile(manifestPath, "utf-8");
-						const manifest: SkillManifest = JSON.parse(manifestContent);
-
-						// 验证 manifest
-						if (this.isValidManifest(manifest)) {
-							const config: SkillConfig = {
-								id: manifest.id,
-								manifest,
-								path: skillPath,
-								enabled: true,
-							};
-
-							this.skills.set(manifest.id, config);
-							this.emit("loaded", manifest);
-						}
-					} catch (error) {
-						console.error(`Failed to load skill from ${skillPath}:`, error);
-					}
+			// 开发模式下额外扫描项目内置 skills 目录
+			if (!app.isPackaged) {
+				const builtinDir = path.join(app.getAppPath(), "skills");
+				try {
+					await fs.access(builtinDir);
+					await this.scanSkillsDir(builtinDir);
+				} catch {
+					// 内置 skills 目录不存在，跳过
 				}
 			}
 		} catch (error) {
 			console.error("Failed to initialize skill service:", error);
 			throw error;
+		}
+	}
+
+	/**
+	 * 扫描指定目录下的 skills
+	 */
+	private async scanSkillsDir(dir: string): Promise<void> {
+		const entries = await fs.readdir(dir, { withFileTypes: true });
+
+		for (const entry of entries) {
+			if (entry.isDirectory()) {
+				const skillPath = path.join(dir, entry.name);
+				const manifestPath = path.join(skillPath, "manifest.json");
+
+				try {
+					const manifestContent = await fs.readFile(manifestPath, "utf-8");
+					const manifest: SkillManifest = JSON.parse(manifestContent);
+
+					if (this.isValidManifest(manifest)) {
+						// 跳过已加载的同 ID skill（用户目录优先）
+						if (this.skills.has(manifest.id)) continue;
+
+						// Auto-load systemPrompt from prompts/main.txt if not inline
+						if (!manifest.systemPrompt) {
+							const promptPath = path.join(skillPath, "prompts", "main.txt");
+							try {
+								manifest.systemPrompt = await fs.readFile(promptPath, "utf-8");
+							} catch {
+								// No prompts/main.txt, skip
+							}
+						}
+
+						const config: SkillConfig = {
+							id: manifest.id,
+							manifest,
+							path: skillPath,
+							enabled: true,
+						};
+
+						this.skills.set(manifest.id, config);
+						this.emit("loaded", manifest);
+					}
+				} catch {
+					// Skill directory without valid manifest, skip
+				}
+			}
 		}
 	}
 
@@ -296,17 +325,34 @@ export class SkillService extends EventEmitter {
 				};
 			}
 
-			// TODO: 实现动态加载和执行 skill 代码
-			// 这需要使用动态 import 或 child_process 来执行 skill 代码
-			// 出于安全考虑，应该在沙箱环境中执行
+			// 动态加载并执行 skill 代码
+			const modulePath = `file://${implPath}`;
+			const skillModule = await import(modulePath);
+
+			// 查找匹配的导出函数: 优先 toolName，再 default 对象上的 toolName，最后 default 函数
+			const handler =
+				skillModule[toolName] ||
+				(skillModule.default && typeof skillModule.default === "object"
+					? skillModule.default[toolName]
+					: undefined) ||
+				(typeof skillModule.default === "function"
+					? skillModule.default
+					: undefined);
+
+			if (typeof handler !== "function") {
+				return {
+					success: false,
+					error: `Tool function "${toolName}" not found in skill ${skillId}`,
+				};
+			}
+
+			const result = await handler(input);
 
 			this.emit("executed", { skillId, toolName, input });
 
 			return {
 				success: true,
-				output: {
-					result: `Executed ${toolName} with input: ${JSON.stringify(input)}`,
-				},
+				output: result,
 			};
 		} catch (error) {
 			const errorMessage =
@@ -315,6 +361,27 @@ export class SkillService extends EventEmitter {
 				success: false,
 				error: errorMessage,
 			};
+		}
+	}
+
+	/**
+	 * 获取 skill 的系统提示词
+	 */
+	async getSystemPrompt(id: string): Promise<string | null> {
+		const skill = this.skills.get(id);
+		if (!skill) return null;
+
+		// 优先使用 manifest.systemPrompt 内联值
+		if (skill.manifest.systemPrompt) {
+			return skill.manifest.systemPrompt;
+		}
+
+		// 尝试从 prompts/main.txt 读取
+		const promptPath = path.join(skill.path, "prompts", "main.txt");
+		try {
+			return await fs.readFile(promptPath, "utf-8");
+		} catch {
+			return null;
 		}
 	}
 

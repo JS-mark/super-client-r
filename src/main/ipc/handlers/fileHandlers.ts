@@ -1,5 +1,5 @@
 import { app, dialog, ipcMain, shell } from "electron";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, statSync, copyFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, copyFileSync } from "fs";
 import { join, extname, basename } from "path";
 import { FILE_CHANNELS } from "../channels";
 
@@ -191,11 +191,7 @@ export function registerFileHandlers() {
 	});
 
 	// 获取附件列表
-	ipcMain.handle(FILE_CHANNELS.LIST_ATTACHMENTS, async (_, filter?: {
-		conversationId?: string;
-		messageId?: string;
-		type?: string;
-	}) => {
+	ipcMain.handle(FILE_CHANNELS.LIST_ATTACHMENTS, async (_) => {
 		try {
 			const attachmentsDir = getAttachmentsDir();
 			if (!existsSync(attachmentsDir)) {

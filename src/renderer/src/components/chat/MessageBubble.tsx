@@ -81,7 +81,7 @@ export const MessageBubble: React.FC<{
 					? { effect: "fade-in" as const, step: 5, interval: 50 }
 					: undefined
 			}
-			contentRender={(_content, info) => {
+			contentRender={(_content, _info) => {
 				if (!displayContent) return null;
 				return renderContent(displayContent);
 			}}

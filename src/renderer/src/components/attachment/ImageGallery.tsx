@@ -11,7 +11,7 @@ import {
 	CloseOutlined,
 } from "@ant-design/icons";
 import { cn } from "../../lib/utils";
-import { useAttachmentStore, type Attachment } from "../../stores/attachmentStore";
+import type { Attachment } from "../../stores/attachmentStore";
 
 interface ImageGalleryProps {
 	attachments: Attachment[];
@@ -80,31 +80,6 @@ export function ImageGallery({
 			handleNext();
 		}
 	};
-
-	// Keyboard navigation
-	const handleKeyDown = useCallback(
-		(e: React.KeyboardEvent) => {
-			switch (e.key) {
-				case "ArrowLeft":
-					handlePrev();
-					break;
-				case "ArrowRight":
-					handleNext();
-					break;
-				case "Escape":
-					onClose();
-					break;
-				case "+":
-				case "=":
-					handleZoomIn();
-					break;
-				case "-":
-					handleZoomOut();
-					break;
-			}
-		},
-		[handlePrev, handleNext, onClose]
-	);
 
 	if (!currentImage) return null;
 

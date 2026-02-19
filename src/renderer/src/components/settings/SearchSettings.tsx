@@ -4,7 +4,6 @@ import {
 	EditOutlined,
 	ExportOutlined,
 	PlusOutlined,
-	SearchOutlined,
 	StarFilled,
 	StarOutlined,
 } from "@ant-design/icons";

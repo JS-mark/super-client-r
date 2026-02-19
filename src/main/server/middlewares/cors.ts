@@ -1,4 +1,3 @@
-import cors from "@koa/cors";
 import type { Context, Next } from "koa";
 
 // CORS 配置中间件

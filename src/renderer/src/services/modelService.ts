@@ -53,9 +53,22 @@ export const modelService = {
 		baseUrl: string;
 		apiKey: string;
 		model: string;
-		messages: { role: "user" | "assistant" | "system"; content: string }[];
+		messages: Array<
+			| { role: "user" | "assistant" | "system"; content: string }
+			| { role: "assistant"; content: null; tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+			| { role: "tool"; tool_call_id: string; content: string }
+		>;
 		maxTokens?: number;
 		temperature?: number;
+		tools?: Array<{
+			type: "function";
+			function: {
+				name: string;
+				description: string;
+				parameters: Record<string, unknown>;
+			};
+		}>;
+		toolMapping?: Record<string, { serverId: string; toolName: string }>;
 	}) => window.electron.llm.chatCompletion(request),
 
 	stopStream: (requestId: string) => window.electron.llm.stopStream(requestId),

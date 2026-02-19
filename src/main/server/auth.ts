@@ -134,7 +134,7 @@ export class ApiKeyManager {
 		const apiKey = this.apiKeys.get(id);
 		if (apiKey) {
 			// Return without hash for security
-			const { keyHash, ...safeApiKey } = apiKey;
+			const { keyHash: _keyHash, ...safeApiKey } = apiKey;
 			return { ...safeApiKey, keyHash: "" } as ApiKey;
 		}
 		return undefined;
@@ -260,7 +260,7 @@ export function verifyToken(token: string): JwtPayload | null {
 		}
 
 		return payload;
-	} catch (error) {
+	} catch {
 		return null;
 	}
 }

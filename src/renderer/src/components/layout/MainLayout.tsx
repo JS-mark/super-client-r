@@ -17,6 +17,7 @@ import { useAppShortcuts } from "../../hooks/useAppShortcuts";
 import { cn } from "../../lib/utils";
 import { type AppInfo, appService } from "../../services/appService";
 import { useMenuStore } from "../../stores/menuStore";
+import { useModelStore } from "../../stores/modelStore";
 import {
 	getAvatarColor,
 	getUserInitials,
@@ -39,6 +40,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	ApiOutlined,
 	StarOutlined,
 	FolderOutlined,
+	// Alias for legacy persisted configs
+	PluginOutlined: AppstoreOutlined,
 };
 
 /**
@@ -168,9 +171,17 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 
 	const menuItems = useMenuStore((state) => state.items);
 	const { user, isLoggedIn, logout } = useUserStore();
+	const loadProviders = useModelStore((s) => s.loadProviders);
+	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
 
 	const [aboutModalOpen, setAboutModalOpen] = useState(false);
 	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+
+	// Initialize model store on app mount so all pages can access providers
+	useEffect(() => {
+		loadProviders();
+		loadActiveModel();
+	}, [loadProviders, loadActiveModel]);
 
 	useEffect(() => {
 		appService.getInfo().then((info) => {

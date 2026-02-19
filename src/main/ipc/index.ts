@@ -8,6 +8,7 @@ import { registerAgentHandlers } from "./handlers/agentHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
 import { registerAuthHandlers } from "./handlers/authHandlers";
+import { registerChatHandlers } from "./handlers/chatHandlers";
 import { registerFileHandlers } from "./handlers/fileHandlers";
 import { registerLogHandlers } from "./handlers/logHandlers";
 import { registerModelHandlers } from "./handlers/modelHandlers";
@@ -24,6 +25,7 @@ import { registerWindowControlHandlers } from "./handlers/windowHandlers";
 export function registerIpcHandlers(): void {
 	registerAgentHandlers();
 	registerAuthHandlers();
+	registerChatHandlers();
 	registerSkillHandlers();
 	registerMcpHandlers();
 	registerAppHandlers();

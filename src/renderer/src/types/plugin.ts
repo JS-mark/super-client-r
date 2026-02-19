@@ -186,6 +186,14 @@ export interface FileStat {
 	mtime: number;
 }
 
+// 插件命令
+export interface PluginCommand {
+	command: string;
+	pluginId: string;
+	title?: string;
+	category?: string;
+}
+
 // 插件激活上下文
 export interface PluginContext {
 	readonly extensionPath: string;
@@ -196,6 +204,12 @@ export interface PluginContext {
 	readonly subscriptions: { dispose(): void }[];
 	readonly workspaceState: Memento;
 	readonly globalState: Memento;
+	readonly commands: {
+		registerCommand(
+			command: string,
+			callback: (...args: unknown[]) => unknown,
+		): { dispose(): void };
+	};
 }
 
 // 存储接口

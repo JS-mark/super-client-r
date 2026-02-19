@@ -254,7 +254,7 @@ export function formatShortcut(key: string, isMac: boolean): string {
 					return part.charAt(0).toUpperCase() + part.slice(1);
 			}
 		})
-		.join(isMac ? "" : "+");
+		.join(" + ");
 }
 
 // 检查是否为修饰键

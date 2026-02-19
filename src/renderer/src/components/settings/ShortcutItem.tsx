@@ -2,7 +2,6 @@ import {
 	CheckOutlined,
 	CompassOutlined,
 	EditFilled,
-	EditOutlined,
 	GlobalOutlined,
 	MessageOutlined,
 	ReloadOutlined,

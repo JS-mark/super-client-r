@@ -159,16 +159,6 @@ export function ModelManageModal({
 		[models, onModelsChange],
 	);
 
-	const handleRemoveModel = useCallback(
-		(modelId: string) => {
-			const updated = models.map((m) =>
-				m.id === modelId ? { ...m, enabled: false } : m,
-			);
-			onModelsChange(updated);
-		},
-		[models, onModelsChange],
-	);
-
 	const handleRemoveGroup = useCallback(
 		(groupName: string) => {
 			const updated = models.map((m) => {

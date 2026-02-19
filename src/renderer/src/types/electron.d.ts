@@ -52,6 +52,7 @@ export interface SkillManifest {
 	icon?: string;
 	permissions?: string[];
 	tools?: SkillTool[];
+	systemPrompt?: string;
 }
 
 export interface SkillTool {
@@ -208,6 +209,45 @@ export interface IPCResponse<T = unknown> {
 	error?: string;
 }
 
+export type SearchProviderType =
+	| "zhipu"
+	| "tavily"
+	| "searxng"
+	| "exa"
+	| "exa_mcp"
+	| "bocha"
+	| "sogou"
+	| "google"
+	| "bing"
+	| "baidu";
+
+export interface SearchConfig {
+	id: string;
+	provider: SearchProviderType;
+	name: string;
+	apiKey: string;
+	apiUrl?: string;
+	enabled: boolean;
+	isDefault?: boolean;
+	config?: Record<string, unknown>;
+}
+
+export interface SearchExecuteRequest {
+	provider: string;
+	query: string;
+	apiKey: string;
+	apiUrl?: string;
+	maxResults?: number;
+	config?: Record<string, unknown>;
+}
+
+export interface SearchExecuteResponse {
+	results: { title: string; url: string; snippet: string }[];
+	provider: string;
+	query: string;
+	searchTimeMs: number;
+}
+
 export interface AttachmentInfo {
 	id: string;
 	name: string;
@@ -318,9 +358,21 @@ export interface FetchModelsResponse {
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error";
+	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
 	content?: string;
 	error?: string;
+	toolCall?: {
+		id: string;
+		name: string;
+		arguments: string;
+	};
+	toolResult?: {
+		toolCallId: string;
+		name: string;
+		result: unknown;
+		isError?: boolean;
+		duration?: number;
+	};
 	usage?: {
 		inputTokens?: number;
 		outputTokens?: number;
@@ -330,6 +382,41 @@ export interface ChatStreamEvent {
 		firstTokenMs?: number;
 		totalMs?: number;
 	};
+}
+
+export interface ChatMessagePersist {
+	id: string;
+	role: "user" | "assistant" | "system" | "tool";
+	content: string;
+	timestamp: number;
+	type?: "text" | "tool_use" | "tool_result" | "error";
+	toolCall?: {
+		id: string;
+		name: string;
+		input: Record<string, unknown>;
+		status: "pending" | "success" | "error";
+		result?: unknown;
+		error?: string;
+		duration?: number;
+	};
+	metadata?: {
+		model?: string;
+		tokens?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		duration?: number;
+		firstTokenMs?: number;
+		tokensPerSecond?: number;
+	};
+}
+
+export interface ConversationSummary {
+	id: string;
+	name: string;
+	createdAt: number;
+	updatedAt: number;
+	messageCount: number;
+	preview: string;
 }
 
 export interface ElectronAPI {
@@ -371,6 +458,7 @@ export interface ElectronAPI {
 		>;
 		enableSkill: (id: string) => Promise<IPCResponse>;
 		disableSkill: (id: string) => Promise<IPCResponse>;
+		getSystemPrompt: (id: string) => Promise<IPCResponse<string | null>>;
 	};
 
 	// MCP 相关
@@ -382,6 +470,7 @@ export interface ElectronAPI {
 		getTools: (id: string) => Promise<IPCResponse<McpTool[]>>;
 		addServer: (config: McpServerConfig) => Promise<IPCResponse>;
 		removeServer: (id: string) => Promise<IPCResponse>;
+		updateServer: (id: string, config: Partial<McpServerConfig>) => Promise<IPCResponse>;
 		getAllStatus: () => Promise<IPCResponse<McpServerStatus[]>>;
 		callTool: (
 			serverId: string,
@@ -416,11 +505,37 @@ export interface ElectronAPI {
 		};
 	};
 
+	// Chat History API
+	chat: {
+		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
+		createConversation: (name: string) => Promise<IPCResponse<ConversationSummary>>;
+		deleteConversation: (id: string) => Promise<IPCResponse>;
+		renameConversation: (conversationId: string, name: string) => Promise<IPCResponse>;
+		getMessages: (conversationId: string) => Promise<IPCResponse<ChatMessagePersist[]>>;
+		saveMessages: (conversationId: string, messages: ChatMessagePersist[]) => Promise<IPCResponse>;
+		appendMessage: (conversationId: string, message: ChatMessagePersist) => Promise<IPCResponse>;
+		updateMessage: (conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>) => Promise<IPCResponse>;
+		clearMessages: (conversationId: string) => Promise<IPCResponse>;
+		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
+		setLastConversation: (id: string) => Promise<IPCResponse>;
+	};
+
 	// 主题 API
 	theme: {
 		get: () => Promise<IPCResponse<string>>;
 		set: (mode: string) => Promise<IPCResponse<boolean>>;
 		onChange: (callback: (mode: string) => void) => () => void;
+	};
+
+	// 搜索配置 API
+	search: {
+		getConfigs: () => Promise<IPCResponse<{ configs: SearchConfig[]; defaultProvider?: SearchProviderType }>>;
+		saveConfig: (config: SearchConfig) => Promise<IPCResponse>;
+		deleteConfig: (id: string) => Promise<IPCResponse>;
+		setDefault: (provider: SearchProviderType | null) => Promise<IPCResponse>;
+		getDefault: () => Promise<IPCResponse<SearchProviderType | undefined>>;
+		validateConfig: (config: SearchConfig) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
+		execute: (request: SearchExecuteRequest) => Promise<IPCResponse<SearchExecuteResponse>>;
 	};
 
 	// 文件附件 API
@@ -486,9 +601,22 @@ export interface ElectronAPI {
 			baseUrl: string;
 			apiKey: string;
 			model: string;
-			messages: { role: "user" | "assistant" | "system"; content: string }[];
+			messages: Array<
+				| { role: "user" | "assistant" | "system"; content: string }
+				| { role: "assistant"; content: null; tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+				| { role: "tool"; tool_call_id: string; content: string }
+			>;
 			maxTokens?: number;
 			temperature?: number;
+			tools?: Array<{
+				type: "function";
+				function: {
+					name: string;
+					description: string;
+					parameters: Record<string, unknown>;
+				};
+			}>;
+			toolMapping?: Record<string, { serverId: string; toolName: string }>;
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Upload, message, Progress } from "antd";
+import { Button, message, Progress } from "antd";
 import { UploadOutlined, PaperClipOutlined, CloseOutlined } from "@ant-design/icons";
 import { cn } from "../../lib/utils";
 import { useAttachmentStore, type Attachment } from "../../stores/attachmentStore";
@@ -44,7 +44,6 @@ export function FileUpload({
 	const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
 	const [isDragging, setIsDragging] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const { uploadFile } = useAttachmentStore();
 
 	const handleFileSelect = useCallback(async (files: FileList | null) => {
 		if (!files || files.length === 0) return;

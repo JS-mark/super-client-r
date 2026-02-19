@@ -1,21 +1,23 @@
 import { App } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildSystemPrompt } from "../prompt";
 import { agentClient } from "../services/agent/agentService";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
+import { searchService } from "../services/search/searchService";
 import { skillClient } from "../services/skill/skillService";
 import { type Message, useChatStore } from "../stores/chatStore";
 import { useModelStore } from "../stores/modelStore";
+import type { SearchConfig } from "../types/search";
 
-export type ChatMode = "direct" | "agent" | "skill" | "mcp";
+export type ChatMode = "direct" | "agent" | "skill";
 
 export interface ChatOptions {
 	mode?: ChatMode;
 	agentId?: string;
 	skillId?: string;
-	skillToolName?: string;
-	mcpServerId?: string;
-	mcpToolName?: string;
+	searchEngine?: string;
+	searchConfigs?: SearchConfig[];
 }
 
 export function useChat() {
@@ -40,9 +42,6 @@ export function useChat() {
 	const [chatMode, setChatMode] = useState<ChatMode>("direct");
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
-	const [selectedMcpServerId, setSelectedMcpServerId] = useState<string | null>(
-		null,
-	);
 
 	const currentRequestIdRef = useRef<string | null>(null);
 	const streamContentRef = useRef("");
@@ -55,9 +54,63 @@ export function useChat() {
 			if (event.type === "chunk" && event.content) {
 				streamContentRef.current += event.content;
 				appendStreamingContent(event.content);
+			} else if (event.type === "tool_call" && event.toolCall) {
+				// Model is calling a tool — show a tool message in the chat
+				const toolMessage: Message = {
+					id: `tool_${event.toolCall.id}`,
+					role: "tool",
+					content: `Calling tool: ${event.toolCall.name}`,
+					timestamp: Date.now(),
+					type: "tool_use",
+					toolCall: {
+						id: event.toolCall.id,
+						name: event.toolCall.name,
+						input: (() => {
+							try {
+								return JSON.parse(event.toolCall!.arguments || "{}");
+							} catch {
+								return {};
+							}
+						})(),
+						status: "pending",
+					},
+				};
+				addMessage(toolMessage);
+
+				// Finalize any accumulated assistant content before tool calls
+				if (streamContentRef.current) {
+					updateLastMessage(streamContentRef.current);
+					streamContentRef.current = "";
+					setStreamingContent("");
+				}
+			} else if (event.type === "tool_result" && event.toolResult) {
+				// Tool execution completed — update the tool message
+				const toolMsgId = `tool_${event.toolResult.toolCallId}`;
+				updateMessageToolCall(toolMsgId, {
+					status: event.toolResult.isError ? "error" : "success",
+					result: event.toolResult.result,
+					error: event.toolResult.isError ? String(event.toolResult.result) : undefined,
+					duration: event.toolResult.duration,
+				});
+
+				// After tool results, model will stream more — add a new assistant message
+				const assistantMessage: Message = {
+					id: `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+					role: "assistant",
+					content: "",
+					timestamp: Date.now(),
+				};
+				addMessage(assistantMessage);
 			} else if (event.type === "done") {
 				// Persist the accumulated streaming content to the last message
-				updateLastMessage(streamContentRef.current);
+				if (streamContentRef.current) {
+					updateLastMessage(streamContentRef.current);
+				}
+				// Persist the complete assistant message to disk
+				const { currentConversationId, persistMessages } = useChatStore.getState();
+				if (currentConversationId) {
+					persistMessages();
+				}
 				// Store token usage and timing if available
 				const allMessages = useChatStore.getState().messages;
 				const lastAssistant = allMessages[allMessages.length - 1];
@@ -100,13 +153,14 @@ export function useChat() {
 			}
 		});
 		return unsubscribe;
-	}, [appendStreamingContent, setStreaming, setStreamingContent, updateLastMessage, updateMessageMetadata, message]);
+	}, [addMessage, appendStreamingContent, setStreaming, setStreamingContent, updateLastMessage, updateMessageToolCall, updateMessageMetadata, message]);
 
 	/**
 	 * Send message in direct chat mode (via IPC to main process)
+	 * Automatically includes MCP tools when servers are connected.
 	 */
 	const sendDirectMessage = useCallback(
-		async (content: string) => {
+		async (content: string, options?: { searchEngine?: string; searchConfigs?: SearchConfig[] }) => {
 			const active = useModelStore.getState().getActiveProviderModel();
 			if (!active) {
 				message.error("No active model selected. Please configure a model in Settings → Models.");
@@ -125,12 +179,79 @@ export function useChat() {
 			try {
 				// Read latest messages from store (not closure) to handle retry correctly
 				const currentMessages = useChatStore.getState().messages;
-				const history = currentMessages
+				const history: Array<{ role: "user" | "assistant" | "system"; content: string }> = currentMessages
 					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
 					.map((m) => ({
 						role: m.role as "user" | "assistant",
 						content: m.content,
 					}));
+
+				// Inject system prompt: global default + model custom system prompt
+				const systemPrompt = buildSystemPrompt(model.systemPrompt);
+				history.unshift({
+					role: "system",
+					content: systemPrompt,
+				});
+
+				// Search augmentation: if a search engine is selected, execute search and prepend results
+				if (options?.searchEngine && options.searchConfigs) {
+					const searchConfig = options.searchConfigs.find(
+						(c) => c.provider === options.searchEngine && c.enabled,
+					);
+					if (searchConfig) {
+						try {
+							const searchResult = await searchService.execute({
+								provider: searchConfig.provider,
+								query: content,
+								apiKey: searchConfig.apiKey,
+								apiUrl: searchConfig.apiUrl,
+								maxResults: 5,
+								config: searchConfig.config,
+							});
+							if (searchResult.success && searchResult.data && searchResult.data.results.length > 0) {
+								const searchContext = searchResult.data.results
+									.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`)
+									.join("\n\n");
+								// Insert after system prompt (index 0) so global prompt stays first
+								history.splice(1, 0, {
+									role: "system",
+									content: `The following are web search results for the user's query "${content}" (searched via ${searchResult.data.provider} in ${searchResult.data.searchTimeMs}ms). Use these results to provide an informed, up-to-date response. Cite sources when relevant.\n\n${searchContext}`,
+								});
+							}
+						} catch (searchError) {
+							console.warn("[useChat] Search failed, continuing without search results:", searchError);
+						}
+					}
+				}
+
+				// Auto-fetch MCP tools from all connected servers
+				let tools: Array<{
+					type: "function";
+					function: { name: string; description: string; parameters: Record<string, unknown> };
+				}> | undefined;
+				let toolMapping: Record<string, { serverId: string; toolName: string }> | undefined;
+
+				try {
+					const mcpTools = await mcpClient.getAllTools();
+					if (mcpTools.length > 0) {
+						tools = [];
+						toolMapping = {};
+						for (const { serverId, tool } of mcpTools) {
+							const prefixedName = `${serverId}__${tool.name}`;
+							tools.push({
+								type: "function",
+								function: {
+									name: prefixedName,
+									description: tool.description || "",
+									parameters: tool.inputSchema || { type: "object", properties: {} },
+								},
+							});
+							toolMapping[prefixedName] = { serverId, toolName: tool.name };
+						}
+					}
+				} catch (err) {
+					console.warn("[useChat] Failed to fetch MCP tools, continuing without tools:", err);
+				}
 
 				await modelService.chatCompletion({
 					requestId,
@@ -138,6 +259,8 @@ export function useChat() {
 					apiKey: provider.apiKey,
 					model: model.id,
 					messages: history,
+					tools,
+					toolMapping,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send direct message:", error);
@@ -240,136 +363,76 @@ export function useChat() {
 	);
 
 	/**
-	 * Execute Skill
+	 * Send message in skill mode (LLM streaming with skill systemPrompt injection)
 	 */
-	const executeSkill = useCallback(
-		async (content: string, skillId?: string, toolName?: string) => {
+	const sendSkillMessage = useCallback(
+		async (content: string, skillId?: string) => {
 			if (!skillId) {
 				message.error("No skill selected");
 				return;
 			}
 
-			const skill = await skillClient.getSkill(skillId).catch(() => null);
-			if (!skill) {
-				message.error("Skill not found");
+			const active = useModelStore.getState().getActiveProviderModel();
+			if (!active) {
+				message.error("No active model selected. Please configure a model in Settings → Models.");
 				return;
 			}
 
-			if (!toolName && skill.tools && skill.tools.length > 0) {
-				toolName = skill.tools[0].name;
+			const { provider, model } = active;
+
+			// 获取 skill 的系统提示词
+			let skillSystemPrompt: string | null = null;
+			try {
+				skillSystemPrompt = await skillClient.getSystemPrompt(skillId);
+			} catch {
+				console.warn("[useChat] Failed to load skill system prompt");
 			}
 
-			if (!toolName) {
-				message.error("No tool available for this skill");
-				return;
-			}
+			setStreaming(true);
+			setStreamingContent("");
+			streamContentRef.current = "";
 
-			const toolMessage: Message = {
-				id: `skill_${Date.now()}`,
-				role: "tool",
-				content: `Executing skill: ${skill.name}`,
-				timestamp: Date.now(),
-				type: "tool_use",
-				toolCall: {
-					id: `skill_${Date.now()}`,
-					name: `${skill.name}.${toolName}`,
-					input: { content },
-					status: "pending",
-				},
-			};
-			addMessage(toolMessage);
+			const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+			currentRequestIdRef.current = requestId;
 
 			try {
-				const startTime = Date.now();
-				const result = await skillClient.executeSkill(skillId, toolName, {
-					content,
-					timestamp: Date.now(),
+				const currentMessages = useChatStore.getState().messages;
+				const history: { role: "user" | "assistant" | "system"; content: string }[] = currentMessages
+					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
+					.map((m) => ({
+						role: m.role as "user" | "assistant",
+						content: m.content,
+					}));
+
+				// 构建系统提示词: 全局默认 + Skill 上下文 + 模型自定义
+				const basePrompt = buildSystemPrompt(model.systemPrompt);
+				const systemPrompt = skillSystemPrompt
+					? `${basePrompt}\n\n--- Skill Context ---\n${skillSystemPrompt}`
+					: basePrompt;
+
+				history.unshift({
+					role: "system",
+					content: systemPrompt,
 				});
 
-				const duration = Date.now() - startTime;
-
-				updateMessageToolCall(toolMessage.id, {
-					status: result.success ? "success" : "error",
-					result: result.output,
-					error: result.error,
-					duration,
-				});
-
-				if (!result.success) {
-					message.error(`Skill execution failed: ${result.error}`);
-				}
-			} catch (error: unknown) {
-				console.error("[useChat] Failed to execute skill:", error);
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				updateMessageToolCall(toolMessage.id, {
-					status: "error",
-					error: errorMsg,
-				});
-				message.error(`Error: ${errorMsg}`);
-			}
-		},
-		[addMessage, updateMessageToolCall, message],
-	);
-
-	/**
-	 * Execute MCP Tool
-	 */
-	const executeMcpTool = useCallback(
-		async (content: string, serverId?: string, toolName?: string) => {
-			if (!serverId) {
-				message.error("No MCP server selected");
-				return;
-			}
-
-			const tools = await mcpClient.getTools(serverId).catch(() => []);
-			if (!toolName && tools.length > 0) {
-				toolName = tools[0].name;
-			}
-
-			if (!toolName) {
-				message.error("No tool available");
-				return;
-			}
-
-			const toolMessage: Message = {
-				id: `mcp_${Date.now()}`,
-				role: "tool",
-				content: `Calling MCP tool: ${toolName}`,
-				timestamp: Date.now(),
-				type: "tool_use",
-				toolCall: {
-					id: `mcp_${Date.now()}`,
-					name: toolName,
-					input: { content },
-					status: "pending",
-				},
-			};
-			addMessage(toolMessage);
-
-			try {
-				const startTime = Date.now();
-				const result = await mcpClient.callTool(serverId, toolName, {
-					content,
-				});
-
-				const duration = Date.now() - startTime;
-
-				updateMessageToolCall(toolMessage.id, {
-					status: "success",
-					result,
-					duration,
+				await modelService.chatCompletion({
+					requestId,
+					baseUrl: provider.baseUrl,
+					apiKey: provider.apiKey,
+					model: model.id,
+					messages: history,
 				});
 			} catch (error: unknown) {
-				console.error("[useChat] Failed to execute MCP tool:", error);
+				console.error("[useChat] Failed to send skill message:", error);
 				const errorMsg = error instanceof Error ? error.message : String(error);
-				updateMessageToolCall(toolMessage.id, {
-					status: "error",
-					error: errorMsg,
-				});
 				message.error(`Error: ${errorMsg}`);
+				setStreaming(false);
+				setStreamingContent("");
+				streamContentRef.current = "";
+				currentRequestIdRef.current = null;
 			}
 		},
-		[addMessage, updateMessageToolCall, message],
+		[message, setStreaming, setStreamingContent],
 	);
 
 	/**
@@ -448,6 +511,13 @@ export function useChat() {
 			const mode = options?.mode || chatMode;
 			const content = input.trim();
 
+			// Auto-create conversation if none exists
+			const { currentConversationId, createConversation } = useChatStore.getState();
+			if (!currentConversationId) {
+				const name = content.slice(0, 50);
+				await createConversation(name);
+			}
+
 			const userMessage: Message = {
 				id: `user_${Date.now()}`,
 				role: "user",
@@ -457,15 +527,13 @@ export function useChat() {
 			addMessage(userMessage);
 			setInput("");
 
-			if (mode === "direct" || mode === "agent") {
-				const assistantMessage: Message = {
-					id: `assistant_${Date.now()}`,
-					role: "assistant",
-					content: "",
-					timestamp: Date.now(),
-				};
-				addMessage(assistantMessage);
-			}
+			const assistantMessage: Message = {
+				id: `assistant_${Date.now()}`,
+				role: "assistant",
+				content: "",
+				timestamp: Date.now(),
+			};
+			addMessage(assistantMessage);
 
 			switch (mode) {
 				case "agent":
@@ -475,22 +543,17 @@ export function useChat() {
 					);
 					break;
 				case "skill":
-					await executeSkill(
+					await sendSkillMessage(
 						content,
 						options?.skillId || selectedSkillId || undefined,
-						options?.skillToolName,
-					);
-					break;
-				case "mcp":
-					await executeMcpTool(
-						content,
-						options?.mcpServerId || selectedMcpServerId || undefined,
-						options?.mcpToolName,
 					);
 					break;
 				case "direct":
 				default:
-					await sendDirectMessage(content);
+					await sendDirectMessage(content, {
+						searchEngine: options?.searchEngine,
+						searchConfigs: options?.searchConfigs,
+					});
 					break;
 			}
 		},
@@ -499,12 +562,10 @@ export function useChat() {
 			chatMode,
 			selectedAgentId,
 			selectedSkillId,
-			selectedMcpServerId,
 			addMessage,
 			sendDirectMessage,
 			sendAgentMessage,
-			executeSkill,
-			executeMcpTool,
+			sendSkillMessage,
 		],
 	);
 
@@ -524,14 +585,12 @@ export function useChat() {
 		chatMode,
 		selectedAgentId,
 		selectedSkillId,
-		selectedMcpServerId,
 
 		// Setters
 		setInput,
 		setChatMode,
 		setSelectedAgentId,
 		setSelectedSkillId,
-		setSelectedMcpServerId,
 
 		// Actions
 		sendMessage,

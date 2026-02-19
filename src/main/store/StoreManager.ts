@@ -6,6 +6,10 @@
 import Store from "electron-store";
 import type {
 	ActiveModelSelection,
+	ChatMessagePersist,
+	ConversationData,
+	ConversationSummary,
+	McpServerConfig,
 	ModelProvider,
 	ProviderModel,
 } from "../ipc/types";
@@ -47,6 +51,8 @@ export interface AppConfig {
 	// Model providers
 	modelProviders?: ModelProvider[];
 	activeModelSelection?: ActiveModelSelection;
+	// MCP servers
+	mcpServers?: McpServerConfig[];
 	// Plugin related
 	plugins?: unknown[];
 	pluginsData?: Record<string, unknown>;
@@ -76,9 +82,16 @@ export interface AppData {
 	lastSessionId?: string;
 }
 
+export interface ChatStoreData {
+	conversations: Record<string, ConversationData>;
+	conversationOrder: string[];
+	lastConversationId?: string;
+}
+
 export class StoreManager {
 	private _configStore: Store<AppConfig> | null = null;
 	private _dataStore: Store<AppData> | null = null;
+	private _chatStore: Store<ChatStoreData> | null = null;
 
 	private get configStore(): Store<AppConfig> {
 		if (!this._configStore) {
@@ -106,6 +119,20 @@ export class StoreManager {
 			}) as Store<AppData>;
 		}
 		return this._dataStore;
+	}
+
+	private get chatStore(): Store<ChatStoreData> {
+		if (!this._chatStore) {
+			const StoreClass = (Store as any).default || Store;
+			this._chatStore = new StoreClass({
+				name: "chat-history",
+				defaults: {
+					conversations: {},
+					conversationOrder: [],
+				},
+			}) as Store<ChatStoreData>;
+		}
+		return this._chatStore;
 	}
 
 	// ============ 配置相关 ============
@@ -205,6 +232,30 @@ export class StoreManager {
 		return this.configStore.get("defaultSearchProvider");
 	}
 
+	// ============ MCP 服务器持久化 ============
+
+	getMcpServers(): McpServerConfig[] {
+		return this.configStore.get("mcpServers") || [];
+	}
+
+	saveMcpServer(config: McpServerConfig): void {
+		const servers = this.getMcpServers();
+		const existingIndex = servers.findIndex((s) => s.id === config.id);
+
+		if (existingIndex >= 0) {
+			servers[existingIndex] = config;
+		} else {
+			servers.push(config);
+		}
+
+		this.configStore.set("mcpServers", servers);
+	}
+
+	deleteMcpServer(id: string): void {
+		const servers = this.getMcpServers().filter((s) => s.id !== id);
+		this.configStore.set("mcpServers", servers);
+	}
+
 	// ============ Model Provider 相关 ============
 
 	getModelProviders(): ModelProvider[] {
@@ -282,11 +333,144 @@ export class StoreManager {
 		}
 	}
 
+	// ============ 对话管理 (Chat History) ============
+
+	private static MAX_MESSAGES_PER_CONVERSATION = 500;
+
+	getConversationList(): ConversationSummary[] {
+		const order = this.chatStore.get("conversationOrder") || [];
+		const conversations = this.chatStore.get("conversations") || {};
+		return order
+			.filter((id) => conversations[id])
+			.map((id) => {
+				const c = conversations[id];
+				return {
+					id: c.id,
+					name: c.name,
+					createdAt: c.createdAt,
+					updatedAt: c.updatedAt,
+					messageCount: c.messageCount,
+					preview: c.preview,
+				};
+			});
+	}
+
+	createConversation(name: string): ConversationSummary {
+		const id = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+		const now = Date.now();
+		const conv: ConversationData = {
+			id,
+			name,
+			createdAt: now,
+			updatedAt: now,
+			messageCount: 0,
+			preview: "",
+			messages: [],
+		};
+		this.chatStore.set(`conversations.${id}` as keyof ChatStoreData, conv as any);
+		const order = this.chatStore.get("conversationOrder") || [];
+		this.chatStore.set("conversationOrder", [id, ...order]);
+		return {
+			id: conv.id,
+			name: conv.name,
+			createdAt: conv.createdAt,
+			updatedAt: conv.updatedAt,
+			messageCount: conv.messageCount,
+			preview: conv.preview,
+		};
+	}
+
+	deleteConversation(id: string): void {
+		const conversations = this.chatStore.get("conversations") || {};
+		delete conversations[id];
+		this.chatStore.set("conversations", conversations);
+		const order = this.chatStore.get("conversationOrder") || [];
+		this.chatStore.set(
+			"conversationOrder",
+			order.filter((cid) => cid !== id),
+		);
+		const lastId = this.chatStore.get("lastConversationId");
+		if (lastId === id) {
+			this.chatStore.delete("lastConversationId" as keyof ChatStoreData);
+		}
+	}
+
+	renameConversation(id: string, name: string): void {
+		const conv = this.chatStore.get(`conversations.${id}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) throw new Error(`Conversation not found: ${id}`);
+		conv.name = name;
+		conv.updatedAt = Date.now();
+		this.chatStore.set(`conversations.${id}` as keyof ChatStoreData, conv as any);
+	}
+
+	getMessages(conversationId: string): ChatMessagePersist[] {
+		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) return [];
+		return conv.messages || [];
+	}
+
+	saveMessages(conversationId: string, messages: ChatMessagePersist[]): void {
+		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) throw new Error(`Conversation not found: ${conversationId}`);
+		const trimmed = messages.slice(-StoreManager.MAX_MESSAGES_PER_CONVERSATION);
+		conv.messages = trimmed;
+		conv.messageCount = trimmed.length;
+		conv.updatedAt = Date.now();
+		const firstUser = trimmed.find((m) => m.role === "user");
+		conv.preview = firstUser ? firstUser.content.slice(0, 100) : "";
+		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
+	}
+
+	appendMessage(conversationId: string, message: ChatMessagePersist): void {
+		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) throw new Error(`Conversation not found: ${conversationId}`);
+		conv.messages = conv.messages || [];
+		conv.messages.push(message);
+		if (conv.messages.length > StoreManager.MAX_MESSAGES_PER_CONVERSATION) {
+			conv.messages = conv.messages.slice(-StoreManager.MAX_MESSAGES_PER_CONVERSATION);
+		}
+		conv.messageCount = conv.messages.length;
+		conv.updatedAt = Date.now();
+		if (message.role === "user" && !conv.preview) {
+			conv.preview = message.content.slice(0, 100);
+		}
+		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
+	}
+
+	updateChatMessage(conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>): void {
+		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) return;
+		const idx = (conv.messages || []).findIndex((m) => m.id === messageId);
+		if (idx === -1) return;
+		conv.messages[idx] = { ...conv.messages[idx], ...updates };
+		conv.updatedAt = Date.now();
+		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
+	}
+
+	clearConversationMessages(conversationId: string): void {
+		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
+		if (!conv) return;
+		conv.messages = [];
+		conv.messageCount = 0;
+		conv.preview = "";
+		conv.updatedAt = Date.now();
+		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
+	}
+
+	getChatLastConversationId(): string | undefined {
+		return this.chatStore.get("lastConversationId");
+	}
+
+	setChatLastConversationId(id: string): void {
+		this.chatStore.set("lastConversationId", id);
+	}
+
 	// ============ 清除所有数据 ============
 
 	clearAll(): void {
 		this.configStore.clear();
 		this.dataStore.clear();
+		this.chatStore.clear();
 	}
 }
 

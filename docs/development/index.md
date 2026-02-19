@@ -104,3 +104,7 @@ src/
 - [项目结构](./structure) - 深入了解代码组织
 - [代码规范](./coding-standards) - 编写一致的代码
 - [系统架构](./architecture) - 理解整体架构
+- [IPC 通信](./ipc) - 进程间通信机制
+- [状态管理](./state) - Zustand 状态管理
+- [贡献指南](./contributing) - 参与项目贡献
+- [插件开发](../PLUGIN_DEVELOPMENT.md) - 开发自定义插件

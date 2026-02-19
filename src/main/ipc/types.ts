@@ -47,6 +47,7 @@ export interface SkillManifest {
 	icon?: string;
 	permissions?: string[];
 	tools?: SkillTool[];
+	systemPrompt?: string;
 }
 
 export interface SkillTool {
@@ -201,6 +202,66 @@ export interface ChatHistory {
 	messages: ChatMessage[];
 	createdAt: number;
 	updatedAt: number;
+}
+
+export interface ChatMessagePersist {
+	id: string;
+	role: "user" | "assistant" | "system" | "tool";
+	content: string;
+	timestamp: number;
+	type?: "text" | "tool_use" | "tool_result" | "error";
+	toolCall?: {
+		id: string;
+		name: string;
+		input: Record<string, unknown>;
+		status: "pending" | "success" | "error";
+		result?: unknown;
+		error?: string;
+		duration?: number;
+	};
+	metadata?: {
+		model?: string;
+		tokens?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		duration?: number;
+		firstTokenMs?: number;
+		tokensPerSecond?: number;
+	};
+}
+
+export interface ConversationSummary {
+	id: string;
+	name: string;
+	createdAt: number;
+	updatedAt: number;
+	messageCount: number;
+	preview: string;
+}
+
+export interface ConversationData extends ConversationSummary {
+	messages: ChatMessagePersist[];
+}
+
+export interface AppendMessageRequest {
+	conversationId: string;
+	message: ChatMessagePersist;
+}
+
+export interface UpdateMessageRequest {
+	conversationId: string;
+	messageId: string;
+	updates: Partial<ChatMessagePersist>;
+}
+
+export interface SaveMessagesRequest {
+	conversationId: string;
+	messages: ChatMessagePersist[];
+}
+
+export interface RenameConversationRequest {
+	conversationId: string;
+	name: string;
 }
 
 // ============ Log 相关类型 ============
@@ -397,16 +458,50 @@ export interface ChatCompletionRequest {
 	baseUrl: string;
 	apiKey: string;
 	model: string;
-	messages: { role: "user" | "assistant" | "system"; content: string }[];
+	messages: Array<
+		| { role: "user" | "assistant" | "system"; content: string }
+		| { role: "assistant"; content: null; tool_calls: OpenAIToolCall[] }
+		| { role: "tool"; tool_call_id: string; content: string }
+	>;
 	maxTokens?: number;
 	temperature?: number;
+	tools?: Array<{
+		type: "function";
+		function: {
+			name: string;
+			description: string;
+			parameters: Record<string, unknown>;
+		};
+	}>;
+	toolMapping?: Record<string, { serverId: string; toolName: string }>;
+}
+
+export interface OpenAIToolCall {
+	id: string;
+	type: "function";
+	function: {
+		name: string;
+		arguments: string;
+	};
 }
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error";
+	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
 	content?: string;
 	error?: string;
+	toolCall?: {
+		id: string;
+		name: string;
+		arguments: string;
+	};
+	toolResult?: {
+		toolCallId: string;
+		name: string;
+		result: unknown;
+		isError?: boolean;
+		duration?: number;
+	};
 	usage?: {
 		inputTokens?: number;
 		outputTokens?: number;
@@ -416,6 +511,30 @@ export interface ChatStreamEvent {
 		firstTokenMs?: number;
 		totalMs?: number;
 	};
+}
+
+// ============ Search 相关类型 ============
+
+export interface SearchExecuteRequest {
+	provider: string;
+	query: string;
+	apiKey: string;
+	apiUrl?: string;
+	maxResults?: number;
+	config?: Record<string, unknown>;
+}
+
+export interface SearchResult {
+	title: string;
+	url: string;
+	snippet: string;
+}
+
+export interface SearchExecuteResponse {
+	results: SearchResult[];
+	provider: string;
+	query: string;
+	searchTimeMs: number;
 }
 
 // ============ IPC 请求/响应类型 ============

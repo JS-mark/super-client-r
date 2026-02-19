@@ -83,6 +83,20 @@ export function registerSkillHandlers(): void {
 		},
 	);
 
+	// 获取 skill 系统提示词
+	ipcMain.handle(
+		SKILL_CHANNELS.GET_SYSTEM_PROMPT,
+		async (_event: IpcMainInvokeEvent, skillId: string) => {
+			try {
+				const skillService = getSkillService();
+				const prompt = await skillService.getSystemPrompt(skillId);
+				return { success: true, data: prompt };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
+
 	// 获取所有可用工具
 	ipcMain.handle("skill:get-all-tools", () => {
 		const skillService = getSkillService();

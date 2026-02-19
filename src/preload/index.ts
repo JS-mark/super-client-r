@@ -46,6 +46,7 @@ export interface ElectronAPI {
 		>;
 		enableSkill: (id: string) => Promise<IPCResponse>;
 		disableSkill: (id: string) => Promise<IPCResponse>;
+		getSystemPrompt: (id: string) => Promise<IPCResponse<string | null>>;
 	};
 
 	// MCP 相关
@@ -57,6 +58,7 @@ export interface ElectronAPI {
 		getTools: (id: string) => Promise<IPCResponse<McpTool[]>>;
 		addServer: (config: McpServerConfig) => Promise<IPCResponse>;
 		removeServer: (id: string) => Promise<IPCResponse>;
+		updateServer: (id: string, config: Partial<McpServerConfig>) => Promise<IPCResponse>;
 		getAllStatus: () => Promise<IPCResponse<McpServerStatus[]>>;
 		callTool: (
 			serverId: string,
@@ -91,6 +93,21 @@ export interface ElectronAPI {
 		};
 	};
 
+	// Chat History API
+	chat: {
+		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
+		createConversation: (name: string) => Promise<IPCResponse<ConversationSummary>>;
+		deleteConversation: (id: string) => Promise<IPCResponse>;
+		renameConversation: (conversationId: string, name: string) => Promise<IPCResponse>;
+		getMessages: (conversationId: string) => Promise<IPCResponse<ChatMessagePersist[]>>;
+		saveMessages: (conversationId: string, messages: ChatMessagePersist[]) => Promise<IPCResponse>;
+		appendMessage: (conversationId: string, message: ChatMessagePersist) => Promise<IPCResponse>;
+		updateMessage: (conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>) => Promise<IPCResponse>;
+		clearMessages: (conversationId: string) => Promise<IPCResponse>;
+		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
+		setLastConversation: (id: string) => Promise<IPCResponse>;
+	};
+
 	// 主题 API
 	theme: {
 		get: () => Promise<IPCResponse<string>>;
@@ -106,6 +123,7 @@ export interface ElectronAPI {
 		setDefault: (provider: SearchProviderType | null) => Promise<IPCResponse>;
 		getDefault: () => Promise<IPCResponse<SearchProviderType | undefined>>;
 		validateConfig: (config: SearchConfig) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
+		execute: (request: SearchExecuteRequest) => Promise<IPCResponse<SearchExecuteResponse>>;
 	};
 
 	// 文件附件 API
@@ -171,9 +189,22 @@ export interface ElectronAPI {
 			baseUrl: string;
 			apiKey: string;
 			model: string;
-			messages: { role: "user" | "assistant" | "system"; content: string }[];
+			messages: Array<
+				| { role: "user" | "assistant" | "system"; content: string }
+				| { role: "assistant"; content: null; tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+				| { role: "tool"; tool_call_id: string; content: string }
+			>;
 			maxTokens?: number;
 			temperature?: number;
+			tools?: Array<{
+				type: "function";
+				function: {
+					name: string;
+					description: string;
+					parameters: Record<string, unknown>;
+				};
+			}>;
+			toolMapping?: Record<string, { serverId: string; toolName: string }>;
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
@@ -239,6 +270,7 @@ export interface SkillManifest {
 	icon?: string;
 	permissions?: string[];
 	tools?: SkillTool[];
+	systemPrompt?: string;
 }
 
 export interface SkillTool {
@@ -508,15 +540,93 @@ export interface FetchModelsResponse {
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error";
+	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
 	content?: string;
 	error?: string;
+	toolCall?: {
+		id: string;
+		name: string;
+		arguments: string;
+	};
+	toolResult?: {
+		toolCallId: string;
+		name: string;
+		result: unknown;
+		isError?: boolean;
+		duration?: number;
+	};
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	};
+	timing?: {
+		firstTokenMs?: number;
+		totalMs?: number;
+	};
 }
 
 export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
 	error?: string;
+}
+
+export interface SearchExecuteRequest {
+	provider: string;
+	query: string;
+	apiKey: string;
+	apiUrl?: string;
+	maxResults?: number;
+	config?: Record<string, unknown>;
+}
+
+export interface SearchResult {
+	title: string;
+	url: string;
+	snippet: string;
+}
+
+export interface SearchExecuteResponse {
+	results: SearchResult[];
+	provider: string;
+	query: string;
+	searchTimeMs: number;
+}
+
+export interface ChatMessagePersist {
+	id: string;
+	role: "user" | "assistant" | "system" | "tool";
+	content: string;
+	timestamp: number;
+	type?: "text" | "tool_use" | "tool_result" | "error";
+	toolCall?: {
+		id: string;
+		name: string;
+		input: Record<string, unknown>;
+		status: "pending" | "success" | "error";
+		result?: unknown;
+		error?: string;
+		duration?: number;
+	};
+	metadata?: {
+		model?: string;
+		tokens?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		duration?: number;
+		firstTokenMs?: number;
+		tokensPerSecond?: number;
+	};
+}
+
+export interface ConversationSummary {
+	id: string;
+	name: string;
+	createdAt: number;
+	updatedAt: number;
+	messageCount: number;
+	preview: string;
 }
 
 export interface AttachmentInfo {
@@ -575,15 +685,16 @@ const electronAPI: ElectronAPI = {
 
 	// Skill API
 	skill: {
-		listSkills: () => ipcRenderer.invoke("skill:list-skills"),
-		installSkill: (source) => ipcRenderer.invoke("skill:install-skill", source),
-		uninstallSkill: (id) => ipcRenderer.invoke("skill:uninstall-skill", id),
-		getSkill: (id) => ipcRenderer.invoke("skill:get-skill", id),
+		listSkills: () => ipcRenderer.invoke("skill:list"),
+		installSkill: (source) => ipcRenderer.invoke("skill:install", source),
+		uninstallSkill: (id) => ipcRenderer.invoke("skill:uninstall", id),
+		getSkill: (id) => ipcRenderer.invoke("skill:get", id),
 		executeSkill: (skillId, toolName, input) =>
-			ipcRenderer.invoke("skill:execute-skill", skillId, toolName, input),
+			ipcRenderer.invoke("skill:execute", skillId, toolName, input),
 		getAllTools: () => ipcRenderer.invoke("skill:get-all-tools"),
 		enableSkill: (id) => ipcRenderer.invoke("skill:enable", id),
 		disableSkill: (id) => ipcRenderer.invoke("skill:disable", id),
+		getSystemPrompt: (id) => ipcRenderer.invoke("skill:get-system-prompt", id),
 	},
 
 	// MCP API
@@ -595,6 +706,7 @@ const electronAPI: ElectronAPI = {
 		getTools: (id) => ipcRenderer.invoke("mcp:get-tools", id),
 		addServer: (config) => ipcRenderer.invoke("mcp:add-server", config),
 		removeServer: (id) => ipcRenderer.invoke("mcp:remove-server", id),
+		updateServer: (id, config) => ipcRenderer.invoke("mcp:update-server", { id, config }),
 		getAllStatus: () => ipcRenderer.invoke("mcp:get-all-status"),
 		callTool: (serverId, toolName, args) =>
 			ipcRenderer.invoke("mcp:call-tool", serverId, toolName, args),
@@ -624,6 +736,25 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
+	// Chat History API
+	chat: {
+		listConversations: () => ipcRenderer.invoke("chat:list-conversations"),
+		createConversation: (name: string) => ipcRenderer.invoke("chat:create-conversation", name),
+		deleteConversation: (id: string) => ipcRenderer.invoke("chat:delete-conversation", id),
+		renameConversation: (conversationId: string, name: string) =>
+			ipcRenderer.invoke("chat:rename-conversation", { conversationId, name }),
+		getMessages: (conversationId: string) => ipcRenderer.invoke("chat:get-messages", conversationId),
+		saveMessages: (conversationId: string, messages: ChatMessagePersist[]) =>
+			ipcRenderer.invoke("chat:save-messages", { conversationId, messages }),
+		appendMessage: (conversationId: string, message: ChatMessagePersist) =>
+			ipcRenderer.invoke("chat:append-message", { conversationId, message }),
+		updateMessage: (conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>) =>
+			ipcRenderer.invoke("chat:update-message", { conversationId, messageId, updates }),
+		clearMessages: (conversationId: string) => ipcRenderer.invoke("chat:clear-messages", conversationId),
+		getLastConversation: () => ipcRenderer.invoke("chat:get-last-conversation"),
+		setLastConversation: (id: string) => ipcRenderer.invoke("chat:set-last-conversation", id),
+	},
+
 	// 主题 API
 	theme: {
 		get: () => ipcRenderer.invoke("theme:get"),
@@ -643,6 +774,7 @@ const electronAPI: ElectronAPI = {
 		setDefault: (provider: SearchProviderType | null) => ipcRenderer.invoke("search:set-default", provider),
 		getDefault: () => ipcRenderer.invoke("search:get-default"),
 		validateConfig: (config: SearchConfig) => ipcRenderer.invoke("search:validate-config", config),
+		execute: (request: SearchExecuteRequest) => ipcRenderer.invoke("search:execute", request),
 	},
 
 	// 文件附件 API

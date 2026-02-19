@@ -95,6 +95,8 @@
 	"providers": "Providers",
 	"defaultModel": "Default Model",
 	"mcpServices": "MCP Services",
+	"settingsMcpDesc": "Manage your MCP server connections",
+	"goToMcpMarket": "MCP Market",
 	"apiKeys": "API Keys",
 	"skillsmpApi": "SkillsMP API",
 	"skillsmpApiKey": "API Key",

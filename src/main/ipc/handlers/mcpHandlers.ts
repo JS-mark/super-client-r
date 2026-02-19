@@ -67,7 +67,7 @@ export function registerMcpHandlers(): void {
 
 	// 添加服务器
 	ipcMain.handle(
-		"mcp:add-server",
+		MCP_CHANNELS.ADD_SERVER,
 		(_event: IpcMainInvokeEvent, config: McpServerConfig) => {
 			try {
 				mcpService.addServer(config);
@@ -80,7 +80,7 @@ export function registerMcpHandlers(): void {
 
 	// 移除服务器
 	ipcMain.handle(
-		"mcp:remove-server",
+		MCP_CHANNELS.REMOVE_SERVER,
 		async (_event: IpcMainInvokeEvent, id: string) => {
 			try {
 				await mcpService.removeServer(id);
@@ -92,10 +92,23 @@ export function registerMcpHandlers(): void {
 	);
 
 	// 获取所有服务器状态
-	ipcMain.handle("mcp:get-all-status", () => {
+	ipcMain.handle(MCP_CHANNELS.GET_ALL_STATUS, () => {
 		const statuses = mcpService.getAllServerStatus();
 		return { success: true, data: statuses };
 	});
+
+	// 更新服务器配置
+	ipcMain.handle(
+		MCP_CHANNELS.UPDATE_SERVER,
+		(_event: IpcMainInvokeEvent, { id, config }: { id: string; config: Partial<McpServerConfig> }) => {
+			try {
+				mcpService.updateServer(id, config);
+				return { success: true };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 调用工具
 	ipcMain.handle(
@@ -310,13 +323,11 @@ export function registerMcpHandlers(): void {
 		}
 	});
 
-	// 设置市场 API URL
-	ipcMain.handle("mcp:market:set-api-url", (_event: IpcMainInvokeEvent, url: string) => {
-		try {
-			mcpMarketService.setApiUrl(url);
-			return { success: true };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
+	// 设置市场 API URL（当前使用 npm 注册表，此接口保留兼容性）
+	ipcMain.handle("mcp:market:set-api-url", (_event: IpcMainInvokeEvent, _url: string) => {
+		return { success: true };
 	});
+
+	// 启动时从持久化存储加载已安装的 MCP 服务器
+	mcpService.loadPersistedServers();
 }

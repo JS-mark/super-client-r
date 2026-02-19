@@ -20,6 +20,16 @@ export default defineConfig({
       { text: '指南', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
       { text: '开发', link: '/development/' },
+      {
+        text: '更多',
+        items: [
+          { text: '插件开发', link: '/PLUGIN_DEVELOPMENT' },
+          { text: '产品需求', link: '/PRD' },
+          { text: '功能路线图', link: '/FEATURE_ROADMAP' },
+          { text: '设计规范', link: '/DESIGN' },
+          { text: '贡献指南', link: '/CONTRIBUTING' },
+        ]
+      },
     ],
     sidebar: {
       '/guide/': [
@@ -37,6 +47,7 @@ export default defineConfig({
             { text: 'AI 聊天', link: '/guide/features/chat' },
             { text: 'MCP 服务器', link: '/guide/features/mcp' },
             { text: '技能系统', link: '/guide/features/skills' },
+            { text: '插件系统', link: '/PLUGIN_DEVELOPMENT' },
             { text: 'HTTP API', link: '/guide/features/api' },
           ]
         },
@@ -65,6 +76,13 @@ export default defineConfig({
             { text: '系统架构', link: '/development/architecture' },
             { text: 'IPC 通信', link: '/development/ipc' },
             { text: '状态管理', link: '/development/state' },
+          ]
+        },
+        {
+          text: '扩展开发',
+          items: [
+            { text: '插件开发', link: '/PLUGIN_DEVELOPMENT' },
+            { text: 'OAuth 配置', link: '/OAUTH_SETUP' },
           ]
         },
         {

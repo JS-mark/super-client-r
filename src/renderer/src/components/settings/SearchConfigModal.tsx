@@ -46,6 +46,9 @@ export function SearchConfigModal({
 	const [saving, setSaving] = useState(false);
 	const [validating, setValidating] = useState(false);
 
+	// Reactively watch apiKey so the validate button enables/disables properly
+	const watchedApiKey = Form.useWatch("apiKey", form);
+
 	const currentProvider = useMemo(() => {
 		return selectedProvider ? getProviderInfo(selectedProvider) : null;
 	}, [selectedProvider]);
@@ -298,7 +301,7 @@ export function SearchConfigModal({
 									size="small"
 									onClick={handleValidateConfig}
 									loading={validating}
-									disabled={!form.getFieldValue("apiKey")}
+									disabled={!watchedApiKey}
 								>
 									<CheckCircleOutlined />
 									{t("search.validate", { ns: "settings" })}

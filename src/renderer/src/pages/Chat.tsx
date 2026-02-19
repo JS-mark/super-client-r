@@ -8,6 +8,7 @@ import {
 	EditOutlined,
 	ExportOutlined,
 	FileTextOutlined,
+	HistoryOutlined,
 	LeftOutlined,
 	MoreOutlined,
 	PlusOutlined,
@@ -19,32 +20,42 @@ import {
 	StarFilled,
 	StarOutlined,
 	TagsOutlined,
+	ThunderboltOutlined,
 	ToolOutlined,
 	TranslationOutlined,
 	UserOutlined,
 } from "@ant-design/icons";
 import { Bubble, Prompts, Sender, Welcome } from "@ant-design/x";
 import type { BubbleListRef } from "@ant-design/x/es/bubble";
-import { Avatar, Button, Dropdown, Flex, message, Tooltip, theme } from "antd";
+import { Avatar, Button, Dropdown, Flex, message, Select, Tooltip, Typography, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { AttachmentList } from "../components/attachment";
 import { FileUploadButton } from "../components/attachment/FileUpload";
 import { ChatExportDialog } from "../components/chat/ChatExportDialog";
+import { ChatSidebar } from "../components/chat/ChatSidebar";
+import { MessageContextMenu } from "../components/chat/MessageContextMenu";
 import { MessageSearch } from "../components/chat/MessageSearch";
+import { ChatModePanel } from "../components/chat/ChatModePanel";
+import type { ChatModeSelection } from "../components/chat/ChatModePanel";
+import { SlashCommandPanel } from "../components/chat/SlashCommandPanel";
 import {
 	SearchEnginePanel,
 	useSearchEngine,
 } from "../components/chat/SearchEnginePanel";
-import { MessageContextMenu } from "../components/chat/MessageContextMenu";
 import { ToolCallCard } from "../components/chat/ToolCallCard";
-import { Markdown } from "../components/Markdown";
 import { MainLayout } from "../components/layout/MainLayout";
+import { Markdown } from "../components/Markdown";
+import { ProviderIcon } from "../components/models/ProviderIcon";
+import type { ModelProviderPreset } from "../types/models";
 import { useChat } from "../hooks/useChat";
 import { useTitle } from "../hooks/useTitle";
 import type { Attachment } from "../stores/attachmentStore";
+import { useChatStore } from "../stores/chatStore";
 import { useMessageStore } from "../stores/messageStore";
+import { useModelStore } from "../stores/modelStore";
 import {
 	getShortcutFromEvent,
 	normalizeShortcut,
@@ -69,15 +80,136 @@ const PRIMARY_TOOLBAR_ITEMS: ToolbarItem[] = [
 // Extra toolbar items - shown when "More" is expanded
 const EXTRA_TOOLBAR_ITEMS: ToolbarItem[] = [
 	{ id: "tags", icon: <TagsOutlined />, label: "toolbar.tags" },
-	{ id: "translate", icon: <TranslationOutlined />, label: "toolbar.translate" },
+	{
+		id: "translate",
+		icon: <TranslationOutlined />,
+		label: "toolbar.translate",
+	},
 	{ id: "settings", icon: <SettingOutlined />, label: "toolbar.settings" },
 ];
 
+const { Text } = Typography;
 const { useToken } = theme;
+
+/**
+ * Inline model selector shown on the welcome screen when no model is active.
+ */
+const ModelSelectPrompt: React.FC<{
+	token: any;
+	t: any;
+	getAllEnabledModels: () => { provider: any; model: any }[];
+	setActiveModel: (selection: { providerId: string; modelId: string }) => Promise<void>;
+	navigate: (path: string) => void;
+	messageApi: any;
+}> = ({ token, t, getAllEnabledModels, setActiveModel, navigate, messageApi }) => {
+	const enabledModels = getAllEnabledModels();
+
+	const handleSelect = useCallback(
+		async (value: string) => {
+			const [providerId, modelId] = value.split("||");
+			await setActiveModel({ providerId, modelId });
+			messageApi.success(t("modelSelected", "Model selected", { ns: "chat" }));
+		},
+		[setActiveModel, messageApi, t],
+	);
+
+	if (enabledModels.length === 0) {
+		return (
+			<div
+				className="mt-6 p-6 rounded-xl border text-center max-w-md"
+				style={{
+					borderColor: token.colorWarningBorder,
+					backgroundColor: token.colorWarningBg,
+				}}
+			>
+				<SettingOutlined
+					className="text-3xl mb-3"
+					style={{ color: token.colorWarning }}
+				/>
+				<div
+					className="text-sm font-medium mb-2"
+					style={{ color: token.colorText }}
+				>
+					{t("noModelsConfigured", "No models configured", { ns: "chat" })}
+				</div>
+				<Text
+					type="secondary"
+					className="text-xs block mb-4"
+				>
+					{t("noModelsConfiguredDesc", "Please add and enable a model provider in settings first.", { ns: "chat" })}
+				</Text>
+				<Button
+					type="primary"
+					icon={<SettingOutlined />}
+					onClick={() => navigate("/settings?tab=models")}
+				>
+					{t("goToModelSettings", "Go to Model Settings", { ns: "chat" })}
+				</Button>
+			</div>
+		);
+	}
+
+	// Group models by provider
+	const groupedOptions = enabledModels.reduce<
+		Record<string, { providerName: string; preset: ModelProviderPreset; models: { label: React.ReactNode; value: string }[] }>
+	>((acc, { provider, model }) => {
+		if (!acc[provider.id]) {
+			acc[provider.id] = {
+				providerName: provider.name,
+				preset: provider.preset,
+				models: [],
+			};
+		}
+		acc[provider.id].models.push({
+			label: model.name,
+			value: `${provider.id}||${model.id}`,
+		});
+		return acc;
+	}, {});
+
+	const selectOptions = Object.entries(groupedOptions).map(
+		([, group]) => ({
+			label: (
+				<span className="flex items-center gap-2">
+					<ProviderIcon preset={group.preset} size={16} />
+					{group.providerName}
+				</span>
+			),
+			options: group.models,
+		}),
+	);
+
+	return (
+		<div
+			className="mt-6 p-6 rounded-xl border max-w-md w-full"
+			style={{
+				borderColor: token.colorPrimaryBorder,
+				backgroundColor: token.colorPrimaryBg,
+			}}
+		>
+			<div
+				className="text-sm font-medium mb-3"
+				style={{ color: token.colorText }}
+			>
+				{t("selectModelToStart", "Select a model to start chatting", { ns: "chat" })}
+			</div>
+			<Select
+				className="w-full"
+				size="large"
+				placeholder={t("selectModel", "Select a model...", { ns: "chat" })}
+				onChange={handleSelect}
+				showSearch
+				optionFilterProp="label"
+				options={selectOptions}
+			/>
+		</div>
+	);
+};
 
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
+	const navigate = useNavigate();
 
 	const {
 		messages,
@@ -91,15 +223,26 @@ const Chat: React.FC = () => {
 		retryMessage,
 		editMessage,
 		deleteMessage,
+		chatMode,
+		setChatMode,
+		selectedSkillId,
+		setSelectedSkillId,
 	} = useChat();
 
 	// Search engine state
-	const { selectedEngine, setSelectedEngine, currentEngine } =
+	const { selectedEngine, setSelectedEngine, currentEngine, searchConfigs, hasSearchEngines } =
 		useSearchEngine();
+
+	// Model selection state
+	const getAllEnabledModels = useModelStore((s) => s.getAllEnabledModels);
+	const setActiveModel = useModelStore((s) => s.setActiveModel);
+	const isModelLoading = useModelStore((s) => s.isLoading);
+	const hasActiveModel = !!useModelStore((s) => s.getActiveProviderModel)();
 
 	// Message search and export dialogs
 	const [isSearchOpen, setIsSearchOpen] = useState(false);
 	const [isExportOpen, setIsExportOpen] = useState(false);
+	const [sidebarOpen, setSidebarOpen] = useState(false);
 
 	// Title bar and page title
 	const pageTitle = useMemo(
@@ -134,9 +277,15 @@ const Chat: React.FC = () => {
 							className="rounded-lg"
 						/>
 					</Tooltip>
-					<Tooltip
-						title={t("chat.toolbar.export", "导出", { ns: "chat" })}
-					>
+					<Tooltip title={t("chat.searchHistory", "搜索历史", { ns: "chat" })}>
+						<Button
+							type="text"
+							icon={<HistoryOutlined />}
+							onClick={() => setSidebarOpen(true)}
+							className="rounded-lg"
+						/>
+					</Tooltip>
+					<Tooltip title={t("chat.toolbar.export", "导出", { ns: "chat" })}>
 						<Button
 							type="text"
 							icon={<ExportOutlined />}
@@ -145,9 +294,7 @@ const Chat: React.FC = () => {
 							className="rounded-lg"
 						/>
 					</Tooltip>
-					<Tooltip
-						title={t("chat.toolbar.clear", "清空", { ns: "chat" })}
-					>
+					<Tooltip title={t("chat.toolbar.clear", "清空", { ns: "chat" })}>
 						<Button
 							type="text"
 							icon={<ClearOutlined />}
@@ -163,8 +310,49 @@ const Chat: React.FC = () => {
 	);
 	useTitle(pageTitle);
 
+	// Conversation management
+	const {
+		currentConversationId,
+		loadConversations,
+		createConversation,
+		switchConversation,
+		pendingInput,
+		setPendingInput,
+	} = useChatStore();
+
+	// Load conversations on mount and restore last conversation
+	useEffect(() => {
+		const init = async () => {
+			await loadConversations();
+			const res = await window.electron.chat.getLastConversation();
+			if (res.success && res.data) {
+				switchConversation(res.data);
+			}
+		};
+		init();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
+
+	// Consume pendingInput from plugins or other sources
+	useEffect(() => {
+		if (pendingInput) {
+			setInput(pendingInput);
+			setPendingInput(null);
+		}
+	}, [pendingInput, setInput, setPendingInput]);
+
+	const handleNewChat = useCallback(() => {
+		createConversation();
+	}, [createConversation]);
+
 	const bubbleListRef = useRef<BubbleListRef>(null);
 	const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
+	const [modePanelOpen, setModePanelOpen] = useState(false);
+	const [slashPanelOpen, setSlashPanelOpen] = useState(false);
+	const [slashQuery, setSlashQuery] = useState("");
+	const [slashSkills, setSlashSkills] = useState<import("../types/electron").SkillManifest[]>([]);
+	const [slashHighlight, setSlashHighlight] = useState(0);
+	const senderWrapperRef = useRef<HTMLDivElement>(null);
 	const [toolbarExpanded, setToolbarExpanded] = useState(false);
 	const { isBookmarked } = useMessageStore();
 
@@ -172,17 +360,108 @@ const Chat: React.FC = () => {
 	const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
 
 	// Conversation ID for message operations
-	const conversationId = "default"; // TODO: Use actual conversation ID
+	const conversationId = currentConversationId || "default";
 
 	const handleSend = useCallback(
 		(value: string) => {
 			if ((value.trim() || attachedFiles.length > 0) && !isStreaming) {
-				sendMessage();
+				sendMessage({
+					mode: chatMode,
+					skillId: chatMode === "skill" ? selectedSkillId ?? undefined : undefined,
+					searchEngine: chatMode === "direct" ? selectedEngine : undefined,
+					searchConfigs: chatMode === "direct" ? searchConfigs : undefined,
+				});
 				setAttachedFiles([]);
 			}
 		},
-		[attachedFiles.length, isStreaming, sendMessage],
+		[attachedFiles.length, isStreaming, sendMessage, chatMode, selectedSkillId, selectedEngine, searchConfigs],
 	);
+
+	// Mode selection callback
+	const handleModeSelect = useCallback(
+		(selection: ChatModeSelection) => {
+			setChatMode(selection.mode);
+			if (selection.mode === "skill" && selection.skillId) {
+				setSelectedSkillId(selection.skillId);
+			}
+			setModePanelOpen(false);
+		},
+		[setChatMode, setSelectedSkillId],
+	);
+
+	// Load skills once for slash command
+	useEffect(() => {
+		import("../services/skill/skillService").then(({ skillClient }) => {
+			skillClient.listSkills().then(setSlashSkills).catch(() => setSlashSkills([]));
+		});
+	}, []);
+
+	// Filtered skill list for slash command
+	const slashFilteredSkills = useMemo(() => {
+		if (!slashPanelOpen) return [];
+		return slashSkills.filter((s) => {
+			if (!slashQuery) return true;
+			const q = slashQuery.toLowerCase();
+			return s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q);
+		});
+	}, [slashPanelOpen, slashSkills, slashQuery]);
+
+	// Reset highlight when query changes
+	useEffect(() => {
+		setSlashHighlight(0);
+	}, [slashQuery]);
+
+	// Slash command skill selection
+	const handleSlashSelect = useCallback(
+		(skillId: string, _skillName: string) => {
+			setChatMode("skill");
+			setSelectedSkillId(skillId);
+			setInput(`/${skillId} `);
+			setSlashPanelOpen(false);
+			setSlashQuery("");
+		},
+		[setChatMode, setSelectedSkillId, setInput],
+	);
+
+	// Use refs so the native capture listener always sees fresh values
+	const slashStateRef = useRef({ open: false, skills: [] as typeof slashFilteredSkills, highlight: 0 });
+	slashStateRef.current = { open: slashPanelOpen, skills: slashFilteredSkills, highlight: slashHighlight };
+
+	// Native capture-phase keydown: fires before Sender's internal handlers
+	useEffect(() => {
+		const el = senderWrapperRef.current;
+		if (!el) return;
+
+		const handleKeyDown = (e: KeyboardEvent) => {
+			const { open, skills, highlight } = slashStateRef.current;
+			if (!open) return;
+
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				setSlashHighlight(highlight < skills.length - 1 ? highlight + 1 : 0);
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				setSlashHighlight(highlight > 0 ? highlight - 1 : skills.length - 1);
+			} else if (e.key === "Enter") {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				if (skills.length > 0) {
+					const skill = skills[highlight];
+					handleSlashSelect(skill.id, skill.name);
+				}
+			} else if (e.key === "Escape") {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				setSlashPanelOpen(false);
+				setSlashQuery("");
+			}
+		};
+
+		el.addEventListener("keydown", handleKeyDown, true);
+		return () => el.removeEventListener("keydown", handleKeyDown, true);
+	}, [handleSlashSelect]);
 
 	// Suggestion prompts for the welcome screen
 	const suggestionItems = useMemo(
@@ -200,8 +479,7 @@ const Chat: React.FC = () => {
 				icon: <CodeOutlined style={{ color: "#2563eb" }} />,
 				label: t("suggestions.fibonacci", {
 					ns: "chat",
-					defaultValue:
-						"Write a Python function to calculate fibonacci",
+					defaultValue: "Write a Python function to calculate fibonacci",
 				}),
 			},
 			{
@@ -226,8 +504,7 @@ const Chat: React.FC = () => {
 
 	const handlePromptClick = useCallback(
 		(info: { data: { key: string; label?: React.ReactNode } }) => {
-			const label =
-				typeof info.data.label === "string" ? info.data.label : "";
+			const label = typeof info.data.label === "string" ? info.data.label : "";
 			if (label) {
 				setInput(label);
 			}
@@ -253,11 +530,8 @@ const Chat: React.FC = () => {
 	);
 
 	// Bookmark handlers (reused from MessageContextMenu)
-	const {
-		addBookmark,
-		removeBookmark,
-		getBookmarkByMessageId,
-	} = useMessageStore();
+	const { addBookmark, removeBookmark, getBookmarkByMessageId } =
+		useMessageStore();
 
 	const handleCopyMessage = useCallback(
 		(content: string) => {
@@ -296,7 +570,9 @@ const Chat: React.FC = () => {
 			const bm = getBookmarkByMessageId(msg.id);
 			if (bm) {
 				removeBookmark(bm.id);
-				message.success(t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }));
+				message.success(
+					t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }),
+				);
 			} else if (msg.role === "user" || msg.role === "assistant") {
 				addBookmark({
 					messageId: msg.id,
@@ -308,7 +584,14 @@ const Chat: React.FC = () => {
 				message.success(t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }));
 			}
 		},
-		[addBookmark, removeBookmark, getBookmarkByMessageId, conversationId, message, t],
+		[
+			addBookmark,
+			removeBookmark,
+			getBookmarkByMessageId,
+			conversationId,
+			message,
+			t,
+		],
 	);
 
 	// Bubble.List role config
@@ -362,9 +645,7 @@ const Chat: React.FC = () => {
 			const isTool = msg.role === "tool";
 			const isCurrentlyStreaming = isAssistant && isStreaming && isLast;
 			const displayContent =
-				isAssistant && isStreaming && isLast
-					? streamingContent
-					: msg.content;
+				isAssistant && isStreaming && isLast ? streamingContent : msg.content;
 
 			// Tool call messages
 			if (isTool && msg.toolCall) {
@@ -394,11 +675,9 @@ const Chat: React.FC = () => {
 							conversationId={conversationId}
 							onDelete={() => {
 								message.info(
-									t(
-										"chat.messageDeleteNotImplemented",
-										"消息删除功能待实现",
-										{ ns: "chat" },
-									),
+									t("chat.messageDeleteNotImplemented", "消息删除功能待实现", {
+										ns: "chat",
+									}),
 								);
 							}}
 						>
@@ -432,7 +711,8 @@ const Chat: React.FC = () => {
 						if (meta?.tokens != null) {
 							const parts = [`Tokens: ${meta.tokens}`];
 							if (meta.inputTokens != null) parts.push(`↑${meta.inputTokens}`);
-							if (meta.outputTokens != null) parts.push(`↓${meta.outputTokens}`);
+							if (meta.outputTokens != null)
+								parts.push(`↓${meta.outputTokens}`);
 							tooltipLines.push(parts.join(" "));
 						}
 					} else if (meta?.inputTokens != null) {
@@ -441,7 +721,11 @@ const Chat: React.FC = () => {
 
 					// Token display text
 					let tokenText = "";
-					if (isAssistantMsg && meta?.inputTokens != null && meta?.outputTokens != null) {
+					if (
+						isAssistantMsg &&
+						meta?.inputTokens != null &&
+						meta?.outputTokens != null
+					) {
 						tokenText = `↑${meta.inputTokens} ↓${meta.outputTokens}`;
 					} else if (meta?.inputTokens != null) {
 						tokenText = `↑${meta.inputTokens}`;
@@ -477,36 +761,43 @@ const Chat: React.FC = () => {
 						</div>
 					);
 
-					const tokenInfoWithTooltip = tooltipLines.length > 0 ? (
-						<Tooltip
-							title={tooltipLines.map((line, i) => (
-								<div key={i}>{line}</div>
-							))}
-						>
-							{tokenInfo}
-						</Tooltip>
-					) : tokenInfo;
+					const tokenInfoWithTooltip =
+						tooltipLines.length > 0 ? (
+							<Tooltip
+								title={tooltipLines.map((line, i) => <div key={i}>{line}</div>)}
+							>
+								{tokenInfo}
+							</Tooltip>
+						) : (
+							tokenInfo
+						);
 
 					// Action buttons (appear on hover)
 					const actionBtnStyle = { color: token.colorTextTertiary };
 
 					// More dropdown items for assistant messages
-					const moreMenuItems = isAssistantMsg ? [
-						{
-							key: "bookmark",
-							icon: isBookmarked(msg.id) ? <StarFilled className="text-yellow-500" /> : <StarOutlined />,
-							label: isBookmarked(msg.id)
-								? t("chat.removeBookmark", "取消收藏", { ns: "chat" })
-								: t("actions.bookmark", "收藏", { ns: "chat" }),
-							onClick: () => handleToggleBookmark(msg),
-						},
-						{
-							key: "export",
-							icon: <DownloadOutlined />,
-							label: t("actions.export", "导出", { ns: "chat" }),
-							onClick: () => handleExportMessage(msg),
-						},
-					] : [];
+					const moreMenuItems = isAssistantMsg
+						? [
+							{
+								key: "bookmark",
+								icon: isBookmarked(msg.id) ? (
+									<StarFilled className="text-yellow-500" />
+								) : (
+									<StarOutlined />
+								),
+								label: isBookmarked(msg.id)
+									? t("chat.removeBookmark", "取消收藏", { ns: "chat" })
+									: t("actions.bookmark", "收藏", { ns: "chat" }),
+								onClick: () => handleToggleBookmark(msg),
+							},
+							{
+								key: "export",
+								icon: <DownloadOutlined />,
+								label: t("actions.export", "导出", { ns: "chat" }),
+								onClick: () => handleExportMessage(msg),
+							},
+						]
+						: [];
 
 					const actionButtons = (
 						<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -561,7 +852,9 @@ const Chat: React.FC = () => {
 											onClick={() => handleCopyMessage(msg.content)}
 										/>
 									</Tooltip>
-									<Tooltip title={t("actions.regenerate", "重新生成", { ns: "chat" })}>
+									<Tooltip
+										title={t("actions.regenerate", "重新生成", { ns: "chat" })}
+									>
 										<Button
 											type="text"
 											size="small"
@@ -632,12 +925,21 @@ const Chat: React.FC = () => {
 
 	return (
 		<MainLayout>
-			<div
-				className="flex flex-col h-full"
-				style={{ backgroundColor: token.colorBgLayout }}
-			>
-				{/* Chat Area */}
-				<div className="flex-1 overflow-hidden w-full">
+			<div className="flex h-full">
+				{/* Chat History Drawer */}
+				<ChatSidebar
+					open={sidebarOpen}
+					onClose={() => setSidebarOpen(false)}
+					onNewChat={handleNewChat}
+				/>
+
+				{/* Main Chat Area */}
+				<div
+					className="flex flex-col flex-1 h-full min-w-0"
+					style={{ backgroundColor: token.colorBgLayout }}
+				>
+					{/* Chat Area */}
+					<div className="flex-1 overflow-hidden w-full">
 					{messages.length === 0 ? (
 						<div className="flex flex-col items-center justify-center h-full w-full px-4 sm:px-6">
 							<Welcome
@@ -662,19 +964,32 @@ const Chat: React.FC = () => {
 									},
 								}}
 							/>
-							<div className="mt-6">
-								<Prompts
-									items={suggestionItems}
-									onItemClick={handlePromptClick}
-									wrap
-									styles={{
-										item: {
-											flex: "1 1 calc(50% - 8px)",
-											minWidth: 200,
-										},
-									}}
+							{/* Model selector prompt when no model is active */}
+							{!hasActiveModel && !isModelLoading && (
+								<ModelSelectPrompt
+									token={token}
+									t={t}
+									getAllEnabledModels={getAllEnabledModels}
+									setActiveModel={setActiveModel}
+									navigate={navigate}
+									messageApi={message}
 								/>
-							</div>
+							)}
+							{hasActiveModel && (
+								<div className="mt-6">
+									<Prompts
+										items={suggestionItems}
+										onItemClick={handlePromptClick}
+										wrap
+										styles={{
+											item: {
+												flex: "1 1 calc(50% - 8px)",
+												minWidth: 200,
+											},
+										}}
+									/>
+								</div>
+							)}
 						</div>
 					) : (
 						<Bubble.List
@@ -696,16 +1011,42 @@ const Chat: React.FC = () => {
 
 				{/* Input Area */}
 				<div className="px-6 py-4">
-					<div className="relative w-full mx-auto max-w-4xl">
+					<div ref={senderWrapperRef} className="relative w-full mx-auto max-w-4xl">
+						{/* Chat Mode Panel */}
+						{modePanelOpen && (
+							<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+								<ChatModePanel
+									chatMode={chatMode}
+									selectedSkillId={selectedSkillId}
+									onSelect={handleModeSelect}
+									onClose={() => setModePanelOpen(false)}
+								/>
+							</div>
+						)}
+
+						{/* Slash Command Panel */}
+						{slashPanelOpen && (
+							<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+								<SlashCommandPanel
+									skills={slashFilteredSkills}
+									highlightIndex={slashHighlight}
+									onSelect={handleSlashSelect}
+									onHighlightChange={setSlashHighlight}
+									onClose={() => {
+										setSlashPanelOpen(false);
+										setSlashQuery("");
+									}}
+								/>
+							</div>
+						)}
+
 						{/* Search Engine Panel */}
 						{searchPopoverOpen && (
 							<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
 								<SearchEnginePanel
 									selectedEngine={selectedEngine}
 									onSelectEngine={setSelectedEngine}
-									onClose={() =>
-										setSearchPopoverOpen(false)
-									}
+									onClose={() => setSearchPopoverOpen(false)}
 								/>
 							</div>
 						)}
@@ -716,9 +1057,7 @@ const Chat: React.FC = () => {
 								<AttachmentList
 									attachments={attachedFiles}
 									onRemove={(id) =>
-										setAttachedFiles((prev) =>
-											prev.filter((f) => f.id !== id),
-										)
+										setAttachedFiles((prev) => prev.filter((f) => f.id !== id))
 									}
 								/>
 							</div>
@@ -727,41 +1066,42 @@ const Chat: React.FC = () => {
 						{/* Sender component */}
 						<Sender
 							value={input}
-							onChange={(val) => setInput(val)}
+							onChange={(val) => {
+								setInput(val);
+								// Show slash panel only for "/command" with no space (still selecting)
+								if (val.startsWith("/") && !val.slice(1).includes(" ")) {
+									setSlashPanelOpen(true);
+									setSlashQuery(val.slice(1));
+								} else if (slashPanelOpen) {
+									setSlashPanelOpen(false);
+									setSlashQuery("");
+								}
+							}}
 							onSubmit={handleSend}
-							onCancel={
-								isStreaming ? stopCurrentStream : undefined
-							}
+							onCancel={isStreaming ? stopCurrentStream : undefined}
 							loading={isStreaming}
 							placeholder={t(
 								"chat.placeholder",
 								"在这里输入消息，按 Enter 发送",
 							)}
 							onKeyDown={(e) => {
-								const { getShortcut } =
-									useShortcutStore.getState();
-								const sendShortcut =
-									getShortcut("send-message");
-								const newLineShortcut =
-									getShortcut("new-line");
+								const { getShortcut } = useShortcutStore.getState();
+								const sendShortcut = getShortcut("send-message");
+								const newLineShortcut = getShortcut("new-line");
 								const pressed = normalizeShortcut(
 									getShortcutFromEvent(e.nativeEvent),
 								);
 
 								if (
 									newLineShortcut?.enabled &&
-									normalizeShortcut(
-										newLineShortcut.currentKey,
-									) === pressed
+									normalizeShortcut(newLineShortcut.currentKey) === pressed
 								) {
 									return;
 								}
 
 								if (
 									sendShortcut?.enabled &&
-									normalizeShortcut(
-										sendShortcut.currentKey,
-									) === pressed
+									normalizeShortcut(sendShortcut.currentKey) === pressed
 								) {
 									e.preventDefault();
 									handleSend(input);
@@ -775,140 +1115,118 @@ const Chat: React.FC = () => {
 							footer={(_footerNode, { components }) => {
 								const { SendButton } = components;
 								return (
-									<Flex
-										justify="space-between"
-										align="center"
-									>
+									<Flex justify="space-between" align="center">
 										<Flex align="center" gap={4}>
-											{/* File upload */}
-											<FileUploadButton
-												onUploadComplete={(
-													attachments,
-												) => {
-													setAttachedFiles(
-														(prev) => [
-															...prev,
-															...attachments,
-														],
-													);
-												}}
-												conversationId={
-													conversationId
-												}
-											/>
-
-											<div
-												className="w-px h-5 mx-1"
-												style={{
-													backgroundColor:
-														token.colorBorder,
-												}}
-											/>
-
-											{/* Primary toolbar items */}
-											{PRIMARY_TOOLBAR_ITEMS.map(
-												(item) => (
-													<Tooltip
-														key={item.id}
-														title={t(
-															item.label,
-															{
-																ns: "chat",
-															},
-														)}
-													>
-														<Button
-															type="text"
-															size="small"
-															icon={
-																item.icon
-															}
-															onClick={() =>
-																handleToolbarClick(
-																	item.id,
-																)
-															}
-														/>
-													</Tooltip>
-												),
-											)}
-
-											{/* Search engine */}
+											{/* Mode selector */}
 											<Tooltip
-												title={t(
-													"chat.toolbar.search",
-													"搜索",
-													{ ns: "chat" },
-												)}
+												title={t("chatMode.switchMode", "切换模式", { ns: "chat" })}
 											>
 												<Button
 													type="text"
 													size="small"
-													icon={
-														currentEngine.icon
-													}
-													onClick={() =>
-														setSearchPopoverOpen(
-															!searchPopoverOpen,
-														)
-													}
+													icon={chatMode === "skill" ? <ThunderboltOutlined /> : <RobotOutlined />}
+													onClick={() => {
+														setModePanelOpen(!modePanelOpen);
+														if (searchPopoverOpen) setSearchPopoverOpen(false);
+													}}
 													style={
-														searchPopoverOpen
-															? {
-																	backgroundColor:
-																		token.colorBgTextHover,
-																}
+														modePanelOpen
+															? { backgroundColor: token.colorBgTextHover }
 															: undefined
 													}
-												/>
+												>
+													<span className="text-xs">
+														{t(`chatMode.${chatMode}`, { ns: "chat" })}
+													</span>
+												</Button>
 											</Tooltip>
+
+											<div
+												className="w-px h-3 opacity-25"
+												style={{
+													backgroundColor: token.colorBorder,
+												}}
+											/>
+
+											{/* File upload */}
+											<FileUploadButton
+												onUploadComplete={(attachments) => {
+													setAttachedFiles((prev) => [...prev, ...attachments]);
+												}}
+												conversationId={conversationId}
+											/>
+
+											{/* Primary toolbar items */}
+											{PRIMARY_TOOLBAR_ITEMS.map((item) => (
+												<Tooltip
+													key={item.id}
+													title={t(item.label, {
+														ns: "chat",
+													})}
+												>
+													<Button
+														type="text"
+														size="small"
+														icon={item.icon}
+														onClick={() => handleToolbarClick(item.id)}
+													/>
+												</Tooltip>
+											))}
+
+											{/* Search engine - only show when engines are configured */}
+											{hasSearchEngines && (
+												<Tooltip
+													title={t("chat.toolbar.search", "搜索", { ns: "chat" })}
+												>
+													<Button
+														type="text"
+														size="small"
+														icon={currentEngine?.icon ?? <SearchOutlined />}
+														onClick={() =>
+															setSearchPopoverOpen(!searchPopoverOpen)
+														}
+														style={
+															searchPopoverOpen
+																? {
+																	backgroundColor: token.colorBgTextHover,
+																}
+																: undefined
+														}
+													/>
+												</Tooltip>
+											)}
 
 											{/* Extra items - visible when expanded */}
 											{toolbarExpanded && (
 												<>
 													<div
-														className="w-px h-5 mx-1"
+														className="w-px h-3 opacity-25"
 														style={{
-															backgroundColor:
-																token.colorBorder,
+															backgroundColor: token.colorBorder,
 														}}
 													/>
-													{EXTRA_TOOLBAR_ITEMS.map(
-														(item) => (
-															<Tooltip
-																key={
-																	item.id
-																}
-																title={t(
-																	item.label,
-																	{
-																		ns: "chat",
-																	},
-																)}
-															>
-																<Button
-																	type="text"
-																	size="small"
-																	icon={
-																		item.icon
-																	}
-																	onClick={() =>
-																		handleToolbarClick(
-																			item.id,
-																		)
-																	}
-																/>
-															</Tooltip>
-														),
-													)}
+													{EXTRA_TOOLBAR_ITEMS.map((item) => (
+														<Tooltip
+															key={item.id}
+															title={t(item.label, {
+																ns: "chat",
+															})}
+														>
+															<Button
+																type="text"
+																size="small"
+																icon={item.icon}
+																onClick={() => handleToolbarClick(item.id)}
+															/>
+														</Tooltip>
+													))}
 												</>
 											)}
 
 											<div
-												className="w-px h-5 mx-1"
+												className="w-px h-3 opacity-25"
 												style={{
-													backgroundColor:
-														token.colorBorder,
+													backgroundColor: token.colorBorder,
 												}}
 											/>
 
@@ -916,20 +1234,12 @@ const Chat: React.FC = () => {
 											<Tooltip
 												title={
 													toolbarExpanded
-														? t(
-																"toolbar.collapse",
-																"收起",
-																{
-																	ns: "chat",
-																},
-															)
-														: t(
-																"toolbar.more",
-																"更多",
-																{
-																	ns: "chat",
-																},
-															)
+														? t("toolbar.collapse", "收起", {
+															ns: "chat",
+														})
+														: t("toolbar.more", "更多", {
+															ns: "chat",
+														})
 												}
 											>
 												<Button
@@ -942,21 +1252,13 @@ const Chat: React.FC = () => {
 															<RightOutlined />
 														)
 													}
-													onClick={() =>
-														setToolbarExpanded(
-															(prev) =>
-																!prev,
-														)
-													}
+													onClick={() => setToolbarExpanded((prev) => !prev)}
 												/>
 											</Tooltip>
 										</Flex>
 
 										{/* Built-in SendButton */}
-										<SendButton
-											type="primary"
-											shape="circle"
-										/>
+										<SendButton type="primary" shape="circle" />
 									</Flex>
 								);
 							}}
@@ -966,6 +1268,7 @@ const Chat: React.FC = () => {
 						/>
 					</div>
 				</div>
+			</div>
 			</div>
 
 			{/* Message Search Dialog */}

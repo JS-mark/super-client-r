@@ -1,1 +1,1 @@
-export { LLMService, llmService } from "./LLMService";
+export { LLMService, llmService, type ToolExecutor } from "./LLMService";

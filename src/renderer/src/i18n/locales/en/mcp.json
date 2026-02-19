@@ -73,7 +73,21 @@
 		"uninstall": "Uninstall",
 		"test": "Test Connection",
 		"enable": "Enable",
-		"disable": "Disable"
+		"disable": "Disable",
+		"connect": "Connect",
+		"disconnect": "Disconnect",
+		"settings": "Settings",
+		"configure": "Configure",
+		"delete": "Delete"
+	},
+	"config": {
+		"title": "MCP Settings",
+		"saveAndReconnect": "Save & Reconnect",
+		"noConfig": "This MCP server has no configurable options",
+		"onePerLine": "one per line",
+		"argsHint": "Space-separated arguments",
+		"envVars": "Environment Variables",
+		"envHint": "One per line, KEY=VALUE format"
 	},
 	"confirm": {
 		"delete": "Confirm Delete",

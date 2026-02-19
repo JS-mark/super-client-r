@@ -14,14 +14,6 @@ interface ShortcutHandlers {
 	[shortcutId: string]: ShortcutHandler;
 }
 
-// 作用域优先级（高优先级可以覆盖低优先级）
-const SCOPE_PRIORITY: ShortcutScope[] = [
-	"input",
-	"chat",
-	"navigation",
-	"global",
-];
-
 // 检查元素是否可输入
 function isInputElement(element: HTMLElement): boolean {
 	const tagName = element.tagName.toLowerCase();

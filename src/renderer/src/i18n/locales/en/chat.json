@@ -85,6 +85,47 @@
 		"firstToken": "First token",
 		"speed": "Speed"
 	},
+	"noModelsConfigured": "No models configured",
+	"noModelsConfiguredDesc": "Please add and enable a model provider in settings first.",
+	"goToModelSettings": "Go to Model Settings",
+	"selectModelToStart": "Select a model to start chatting",
+	"selectModel": "Select a model...",
+	"modelSelected": "Model selected",
+	"sidebar": {
+		"newChat": "New Chat",
+		"searchConversations": "Search...",
+		"noConversations": "No conversations yet",
+		"noResults": "No matching conversations",
+		"today": "Today",
+		"yesterday": "Yesterday",
+		"last7Days": "Last 7 Days",
+		"last30Days": "Last 30 Days",
+		"older": "Older",
+		"justNow": "just now",
+		"minutesAgo": "{{count}}m",
+		"hoursAgo": "{{count}}h",
+		"daysAgo": "{{count}}d",
+		"rename": "Rename",
+		"delete": "Delete",
+		"collapse": "Collapse",
+		"expand": "Expand"
+	},
+	"slashCommand": {
+		"title": "Select Skill",
+		"noResults": "No matching skills found",
+		"hint": "Type / to quickly select a skill"
+	},
+	"chatMode": {
+		"direct": "Direct",
+		"mcp": "MCP Tools",
+		"skill": "Skills",
+		"selectServer": "Select Server",
+		"selectTool": "Select Tool",
+		"noConnectedServers": "No connected MCP servers",
+		"noTools": "No tools available",
+		"switchMode": "Switch Mode",
+		"close": "Close"
+	},
 	"actions": {
 		"retry": "Retry",
 		"edit": "Edit",

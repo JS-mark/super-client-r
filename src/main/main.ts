@@ -18,6 +18,7 @@ import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
 import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
 import { setLogViewerOpener } from "./ipc/handlers/logHandlers";
+import { initializePluginManager } from "./ipc/handlers/pluginHandlers";
 import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
 import { localServer } from "./server";
 import { logDatabaseService } from "./services/log";
@@ -197,8 +198,6 @@ function createLogViewerWindow(): void {
 		minWidth: 800,
 		minHeight: 500,
 		frame: false,
-		titleBarStyle: "hiddenInset",
-		trafficLightPosition: { x: -20, y: -20 },
 		icon: getAppIconPath(),
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.js"),
@@ -435,6 +434,11 @@ app.whenReady().then(async () => {
 	registerWindowHandlers();
 	setLogViewerOpener(createLogViewerWindow);
 	logger.info("IPC handlers registered");
+
+	// 初始化插件管理器（从存储加载已安装插件并自动激活）
+	initializePluginManager().catch((error) => {
+		logger.error("Failed to initialize plugin manager", error);
+	});
 
 	// 初始化技能服务
 	// 使用 pathService 提供的路径，实现 dev/release 隔离

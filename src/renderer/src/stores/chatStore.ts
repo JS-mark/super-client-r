@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { chatHistoryService } from "../services/chatHistoryService";
+import type { ConversationSummary } from "../types/electron";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageType = "text" | "tool_use" | "tool_result" | "error";
@@ -32,25 +33,22 @@ export interface Message {
 	};
 }
 
-export interface ChatSession {
-	id: string;
-	name: string;
-	createdAt: number;
-	updatedAt: number;
-	messageCount: number;
-}
-
 interface ChatState {
 	// Messages
 	messages: Message[];
 	isStreaming: boolean;
 	streamingContent: string;
 
-	// Sessions
-	sessions: ChatSession[];
-	currentSessionId: string | null;
+	// Pending input (from plugins, etc.)
+	pendingInput: string | null;
+	setPendingInput: (input: string | null) => void;
 
-	// Actions
+	// Conversations
+	conversations: ConversationSummary[];
+	currentConversationId: string | null;
+	isLoadingConversations: boolean;
+
+	// Message actions
 	addMessage: (message: Message) => void;
 	updateLastMessage: (content: string) => void;
 	updateMessageToolCall: (messageId: string, toolCall: Partial<ToolCall>) => void;
@@ -63,190 +61,243 @@ interface ChatState {
 	updateMessageContent: (messageId: string, content: string) => void;
 	deleteMessagesFrom: (messageId: string) => void;
 
-	// Session actions
-	createSession: (name?: string) => string;
-	switchSession: (sessionId: string) => void;
-	deleteSession: (sessionId: string) => void;
-	renameSession: (sessionId: string, name: string) => void;
+	// Conversation actions
+	loadConversations: () => Promise<void>;
+	createConversation: (name?: string) => Promise<string | null>;
+	switchConversation: (conversationId: string) => Promise<void>;
+	deleteConversation: (conversationId: string) => Promise<void>;
+	renameConversation: (conversationId: string, name: string) => Promise<void>;
+
+	// Persistence helpers
+	persistMessages: () => void;
 }
 
-export const useChatStore = create<ChatState>()(
-	persist(
-		(set, get) => ({
-			messages: [],
-			isStreaming: false,
-			streamingContent: "",
-			sessions: [],
-			currentSessionId: null,
+export const useChatStore = create<ChatState>()((set, get) => ({
+	messages: [],
+	isStreaming: false,
+	streamingContent: "",
+	pendingInput: null,
+	setPendingInput: (input) => set({ pendingInput: input }),
+	conversations: [],
+	currentConversationId: null,
+	isLoadingConversations: false,
 
-			addMessage: (message) =>
-				set((state) => {
-					const newMessages = [...state.messages, message];
-					// Update session message count
-					if (state.currentSessionId) {
-						const updatedSessions = state.sessions.map((s) =>
-							s.id === state.currentSessionId
-								? { ...s, messageCount: newMessages.length, updatedAt: Date.now() }
-								: s,
-						);
-						return { messages: newMessages, sessions: updatedSessions };
-					}
-					return { messages: newMessages };
-				}),
+	addMessage: (message) => {
+		set((state) => ({ messages: [...state.messages, message] }));
+		// Fire-and-forget persist
+		const { currentConversationId } = get();
+		if (currentConversationId) {
+			chatHistoryService.appendMessage(currentConversationId, message).catch(() => {});
+		}
+	},
 
-			updateLastMessage: (content) =>
-				set((state) => {
-					const lastMsg = state.messages[state.messages.length - 1];
-					if (!lastMsg) return state;
-					const newMessages = [...state.messages];
-					newMessages[newMessages.length - 1] = { ...lastMsg, content };
-					return { messages: newMessages };
-				}),
-
-			updateMessageToolCall: (messageId, toolCallUpdate) =>
-				set((state) => {
-					const messageIndex = state.messages.findIndex((m) => m.id === messageId);
-					if (messageIndex === -1) return state;
-
-					const newMessages = [...state.messages];
-					const message = newMessages[messageIndex];
-					newMessages[messageIndex] = {
-						...message,
-						toolCall: { ...message.toolCall, ...toolCallUpdate } as ToolCall,
-					};
-					return { messages: newMessages };
-				}),
-
-			updateMessageMetadata: (messageId, metadataUpdate) =>
-				set((state) => {
-					const messageIndex = state.messages.findIndex((m) => m.id === messageId);
-					if (messageIndex === -1) return state;
-
-					const newMessages = [...state.messages];
-					const message = newMessages[messageIndex];
-					newMessages[messageIndex] = {
-						...message,
-						metadata: { ...message.metadata, ...metadataUpdate },
-					};
-					return { messages: newMessages };
-				}),
-
-			setStreaming: (streaming) => set({ isStreaming: streaming }),
-
-			setStreamingContent: (content) => set({ streamingContent: content }),
-
-			appendStreamingContent: (content) =>
-				set((state) => ({
-					streamingContent: state.streamingContent + content,
-				})),
-
-			clearMessages: () =>
-				set((state) => {
-					// Clear messages for current session
-					if (state.currentSessionId) {
-						const updatedSessions = state.sessions.map((s) =>
-							s.id === state.currentSessionId
-								? { ...s, messageCount: 0, updatedAt: Date.now() }
-								: s,
-						);
-						return { messages: [], sessions: updatedSessions };
-					}
-					return { messages: [] };
-				}),
-
-			deleteMessage: (messageId) =>
-				set((state) => {
-					const newMessages = state.messages.filter((m) => m.id !== messageId);
-					if (state.currentSessionId) {
-						const updatedSessions = state.sessions.map((s) =>
-							s.id === state.currentSessionId
-								? { ...s, messageCount: newMessages.length, updatedAt: Date.now() }
-								: s,
-						);
-						return { messages: newMessages, sessions: updatedSessions };
-					}
-					return { messages: newMessages };
-				}),
-
-			updateMessageContent: (messageId, content) =>
-				set((state) => {
-					const idx = state.messages.findIndex((m) => m.id === messageId);
-					if (idx === -1) return state;
-					const newMessages = [...state.messages];
-					newMessages[idx] = { ...newMessages[idx], content };
-					return { messages: newMessages };
-				}),
-
-			deleteMessagesFrom: (messageId) =>
-				set((state) => {
-					const idx = state.messages.findIndex((m) => m.id === messageId);
-					if (idx === -1) return state;
-					const newMessages = state.messages.slice(0, idx);
-					if (state.currentSessionId) {
-						const updatedSessions = state.sessions.map((s) =>
-							s.id === state.currentSessionId
-								? { ...s, messageCount: newMessages.length, updatedAt: Date.now() }
-								: s,
-						);
-						return { messages: newMessages, sessions: updatedSessions };
-					}
-					return { messages: newMessages };
-				}),
-
-			createSession: (name) => {
-				const sessionId = `session_${Date.now()}`;
-				const newSession: ChatSession = {
-					id: sessionId,
-					name: name || `Chat ${get().sessions.length + 1}`,
-					createdAt: Date.now(),
-					updatedAt: Date.now(),
-					messageCount: 0,
-				};
-				set((state) => ({
-					sessions: [newSession, ...state.sessions],
-					currentSessionId: sessionId,
-					messages: [], // Start with empty messages for new session
-				}));
-				return sessionId;
-			},
-
-			switchSession: (sessionId) =>
-				set((state) => {
-					// In a real implementation, you'd load messages for this session
-					// For now, we just switch the session ID
-					return { currentSessionId: sessionId, messages: [] };
-				}),
-
-			deleteSession: (sessionId) =>
-				set((state) => {
-					const newSessions = state.sessions.filter((s) => s.id !== sessionId);
-					// If we're deleting the current session, switch to another one
-					let newCurrentSessionId = state.currentSessionId;
-					if (state.currentSessionId === sessionId) {
-						newCurrentSessionId = newSessions.length > 0 ? newSessions[0].id : null;
-					}
-					return {
-						sessions: newSessions,
-						currentSessionId: newCurrentSessionId,
-						messages:
-							state.currentSessionId === sessionId ? [] : state.messages,
-					};
-				}),
-
-			renameSession: (sessionId, name) =>
-				set((state) => ({
-					sessions: state.sessions.map((s) =>
-						s.id === sessionId ? { ...s, name } : s,
-					),
-				})),
+	updateLastMessage: (content) =>
+		set((state) => {
+			const lastMsg = state.messages[state.messages.length - 1];
+			if (!lastMsg) return state;
+			const newMessages = [...state.messages];
+			newMessages[newMessages.length - 1] = { ...lastMsg, content };
+			return { messages: newMessages };
 		}),
-		{
-			name: "chat-storage",
-			partialize: (state) => ({
-				sessions: state.sessions,
-				currentSessionId: state.currentSessionId,
-				// Don't persist messages in memory, they should be loaded from disk/DB
-			}),
-		},
-	),
-);
+
+	updateMessageToolCall: (messageId, toolCallUpdate) =>
+		set((state) => {
+			const messageIndex = state.messages.findIndex((m) => m.id === messageId);
+			if (messageIndex === -1) return state;
+
+			const newMessages = [...state.messages];
+			const message = newMessages[messageIndex];
+			newMessages[messageIndex] = {
+				...message,
+				toolCall: { ...message.toolCall, ...toolCallUpdate } as ToolCall,
+			};
+			return { messages: newMessages };
+		}),
+
+	updateMessageMetadata: (messageId, metadataUpdate) => {
+		set((state) => {
+			const messageIndex = state.messages.findIndex((m) => m.id === messageId);
+			if (messageIndex === -1) return state;
+
+			const newMessages = [...state.messages];
+			const message = newMessages[messageIndex];
+			newMessages[messageIndex] = {
+				...message,
+				metadata: { ...message.metadata, ...metadataUpdate },
+			};
+			return { messages: newMessages };
+		});
+		// Persist updated message
+		const { currentConversationId, messages } = get();
+		if (currentConversationId) {
+			const msg = messages.find((m) => m.id === messageId);
+			if (msg) {
+				chatHistoryService
+					.updateMessage(currentConversationId, messageId, {
+						metadata: msg.metadata,
+					})
+					.catch(() => {});
+			}
+		}
+	},
+
+	setStreaming: (streaming) => set({ isStreaming: streaming }),
+
+	setStreamingContent: (content) => set({ streamingContent: content }),
+
+	appendStreamingContent: (content) =>
+		set((state) => ({
+			streamingContent: state.streamingContent + content,
+		})),
+
+	clearMessages: () => {
+		const { currentConversationId } = get();
+		set({ messages: [] });
+		if (currentConversationId) {
+			chatHistoryService.clearMessages(currentConversationId).catch(() => {});
+		}
+	},
+
+	deleteMessage: (messageId) => {
+		set((state) => ({
+			messages: state.messages.filter((m) => m.id !== messageId),
+		}));
+		get().persistMessages();
+	},
+
+	updateMessageContent: (messageId, content) => {
+		set((state) => {
+			const idx = state.messages.findIndex((m) => m.id === messageId);
+			if (idx === -1) return state;
+			const newMessages = [...state.messages];
+			newMessages[idx] = { ...newMessages[idx], content };
+			return { messages: newMessages };
+		});
+		const { currentConversationId } = get();
+		if (currentConversationId) {
+			chatHistoryService
+				.updateMessage(currentConversationId, messageId, { content })
+				.catch(() => {});
+		}
+	},
+
+	deleteMessagesFrom: (messageId) => {
+		set((state) => {
+			const idx = state.messages.findIndex((m) => m.id === messageId);
+			if (idx === -1) return state;
+			return { messages: state.messages.slice(0, idx) };
+		});
+		get().persistMessages();
+	},
+
+	// ============ Conversation actions ============
+
+	loadConversations: async () => {
+		set({ isLoadingConversations: true });
+		try {
+			const res = await chatHistoryService.listConversations();
+			if (res.success && res.data) {
+				set({ conversations: res.data });
+			}
+		} finally {
+			set({ isLoadingConversations: false });
+		}
+	},
+
+	createConversation: async (name) => {
+		try {
+			const res = await chatHistoryService.createConversation(name || "New Chat");
+			if (res.success && res.data) {
+				set((state) => ({
+					conversations: [res.data!, ...state.conversations],
+					currentConversationId: res.data!.id,
+					messages: [],
+				}));
+				chatHistoryService.setLastConversation(res.data.id).catch(() => {});
+				return res.data.id;
+			}
+		} catch (error) {
+			console.error("[chatStore] Failed to create conversation:", error);
+		}
+		return null;
+	},
+
+	switchConversation: async (conversationId) => {
+		const { isStreaming, currentConversationId } = get();
+		if (isStreaming) return; // Don't switch while streaming
+		if (conversationId === currentConversationId) return;
+
+		set({ currentConversationId: conversationId, messages: [] });
+
+		try {
+			const res = await chatHistoryService.getMessages(conversationId);
+			if (res.success && res.data) {
+				set({ messages: res.data as Message[] });
+			}
+		} catch (error) {
+			console.error("[chatStore] Failed to load messages:", error);
+		}
+
+		chatHistoryService.setLastConversation(conversationId).catch(() => {});
+	},
+
+	deleteConversation: async (conversationId) => {
+		try {
+			const res = await chatHistoryService.deleteConversation(conversationId);
+			if (res.success) {
+				set((state) => {
+					const newConversations = state.conversations.filter(
+						(c) => c.id !== conversationId,
+					);
+					const isCurrent = state.currentConversationId === conversationId;
+					return {
+						conversations: newConversations,
+						currentConversationId: isCurrent ? null : state.currentConversationId,
+						messages: isCurrent ? [] : state.messages,
+					};
+				});
+			}
+		} catch (error) {
+			console.error("[chatStore] Failed to delete conversation:", error);
+		}
+	},
+
+	renameConversation: async (conversationId, name) => {
+		try {
+			const res = await chatHistoryService.renameConversation(conversationId, name);
+			if (res.success) {
+				set((state) => ({
+					conversations: state.conversations.map((c) =>
+						c.id === conversationId ? { ...c, name } : c,
+					),
+				}));
+			}
+		} catch (error) {
+			console.error("[chatStore] Failed to rename conversation:", error);
+		}
+	},
+
+	persistMessages: () => {
+		const { currentConversationId, messages } = get();
+		if (currentConversationId) {
+			chatHistoryService
+				.saveMessages(currentConversationId, messages)
+				.then(() => {
+					// Update conversation summary in local state
+					set((state) => ({
+						conversations: state.conversations.map((c) =>
+							c.id === currentConversationId
+								? {
+									...c,
+									messageCount: messages.length,
+									updatedAt: Date.now(),
+									preview: messages.find((m) => m.role === "user")?.content.slice(0, 100) || c.preview,
+								}
+								: c,
+						),
+					}));
+				})
+				.catch(() => {});
+		}
+	},
+}));

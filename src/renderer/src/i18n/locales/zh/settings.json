@@ -96,6 +96,8 @@
 	"providers": "服务商",
 	"defaultModel": "默认模型",
 	"mcpServices": "MCP 服务",
+	"settingsMcpDesc": "管理 MCP 服务器连接",
+	"goToMcpMarket": "MCP 市场",
 	"apiKeys": "API Keys",
 	"skillsmpApi": "SkillsMP API",
 	"skillsmpApiKey": "API Key",

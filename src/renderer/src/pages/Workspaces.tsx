@@ -148,7 +148,7 @@ export default function Workspaces() {
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 			message.success(t("workspaces.export.success", "工作区已导出", { ns: "workspaces" }));
-		} catch (error) {
+		} catch {
 			message.error(t("workspaces.export.error", "导出失败"));
 		}
 	};
@@ -170,7 +170,7 @@ export default function Workspaces() {
 						} else {
 							message.error(t("workspaces.import.invalidFormat", "无效的工作区文件格式", { ns: "workspaces" }));
 						}
-					} catch (error) {
+					} catch {
 						message.error(t("workspaces.import.error", "导入失败", { ns: "workspaces" }));
 					}
 				};

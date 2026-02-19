@@ -60,7 +60,7 @@ export const GeneralSettings: React.FC = () => {
 	const handleOpenPath = async () => {
 		try {
 			await appService.openPath(userDataPath);
-		} catch (e) {
+		} catch {
 			message.error(
 				t("openPathError", "Failed to open path", { ns: "settings" }),
 			);
@@ -75,7 +75,7 @@ export const GeneralSettings: React.FC = () => {
 			} else {
 				message.info(result.message);
 			}
-		} catch (e) {
+		} catch {
 			message.error(
 				t("checkUpdateError", "Failed to check updates", { ns: "settings" }),
 			);

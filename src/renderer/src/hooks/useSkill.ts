@@ -33,7 +33,6 @@ export function useSkill() {
 		fetchMarketSkills,
 		setMarketDomain,
 		installSkill: installToStore,
-		uninstallSkill: uninstallFromStore,
 		updateSkill: updateInStore,
 	} = useSkillStore();
 

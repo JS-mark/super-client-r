@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ChatSession, Message } from "./chatStore";
+import type { Message } from "./chatStore";
 
 // 工作区类型
 export type WorkspaceType = "personal" | "work" | "project" | "temp";

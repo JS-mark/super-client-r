@@ -244,3 +244,4 @@ rm -rf ~/.config/super-client-r
 - [快速开始](./getting-started) - 开始使用应用
 - [AI 聊天](./features/chat) - 了解聊天功能
 - [开发指南](../development/) - 参与项目开发
+- [插件开发](../PLUGIN_DEVELOPMENT.md) - 开发自定义插件

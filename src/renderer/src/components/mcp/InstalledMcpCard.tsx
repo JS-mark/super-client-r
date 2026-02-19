@@ -1,13 +1,13 @@
 import {
 	ApiOutlined,
 	DeleteOutlined,
-	EyeOutlined,
-	ReloadOutlined,
-	SyncOutlined,
+	DisconnectOutlined,
+	PlayCircleOutlined,
+	SettingOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Modal, message, Tag, Tooltip } from "antd";
 import type * as React from "react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
 import type { McpServer } from "../../types/mcp";
@@ -16,12 +16,13 @@ import { McpStatusBadge } from "./McpStatusBadge";
 export const InstalledMcpCard: React.FC<{
 	server: McpServer;
 	onView: () => void;
-}> = ({ server, onView }) => {
+	onConfigure?: (server: McpServer) => void;
+}> = ({ server, onView, onConfigure }) => {
 	const { t } = useTranslation();
-	const { removeServer, toggleServer, testConnection } = useMcpStore();
-	const [testing, setTesting] = useState(false);
+	const { removeServer, testConnection, disconnectServer } = useMcpStore();
+	const [connecting, setConnecting] = useState(false);
 
-	const handleDelete = (e: React.MouseEvent) => {
+	const handleDelete = useCallback((e: React.MouseEvent) => {
 		e.stopPropagation();
 		Modal.confirm({
 			title: t("confirm.delete", { ns: "mcp" }),
@@ -33,25 +34,38 @@ export const InstalledMcpCard: React.FC<{
 				);
 			},
 		});
-	};
+	}, [removeServer, server.id, server.name, t]);
 
-	const handleToggle = async (e: React.MouseEvent) => {
+	const handleConnect = useCallback(async (e: React.MouseEvent) => {
 		e.stopPropagation();
-		toggleServer(server.id);
-	};
-
-	const handleTest = async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		setTesting(true);
+		setConnecting(true);
 		try {
 			await testConnection(server.id);
-			message.success(t("messages.testSuccess", { ns: "mcp" }));
+			message.success(t("messages.connectSuccess", { ns: "mcp" }));
 		} catch {
-			message.error(t("messages.testFailed", { ns: "mcp" }));
+			message.error(t("messages.connectError", { ns: "mcp" }));
 		} finally {
-			setTesting(false);
+			setConnecting(false);
 		}
-	};
+	}, [testConnection, server.id, t]);
+
+	const handleDisconnect = useCallback(async (e: React.MouseEvent) => {
+		e.stopPropagation();
+		try {
+			await disconnectServer(server.id);
+			message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
+		} catch {
+			message.error(t("messages.disconnectError", { ns: "mcp" }));
+		}
+	}, [disconnectServer, server.id, t]);
+
+	const handleConfigure = useCallback((e: React.MouseEvent) => {
+		e.stopPropagation();
+		onConfigure?.(server);
+	}, [onConfigure, server]);
+
+	const isConnected = server.status === "connected";
+	const isConnecting = server.status === "connecting" || connecting;
 
 	return (
 		<Card
@@ -81,30 +95,41 @@ export const InstalledMcpCard: React.FC<{
 				<div className="flex justify-between items-center mt-2">
 					<Tag>{server.transport}</Tag>
 					<div className="flex gap-1">
-						<Tooltip title={t("actions.test", { ns: "mcp" })}>
+						{isConnected ? (
+							<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
+								<Button
+									size="small"
+									type="text"
+									icon={<DisconnectOutlined />}
+									onClick={handleDisconnect}
+								/>
+							</Tooltip>
+						) : (
+							<Tooltip
+								title={
+									server.status === "error" && server.error
+										? server.error
+										: t("actions.connect", { ns: "mcp" })
+								}
+							>
+								<Button
+									size="small"
+									type="text"
+									icon={<PlayCircleOutlined style={server.status === "error" ? { color: "#ff4d4f" } : undefined} />}
+									onClick={handleConnect}
+									loading={isConnecting}
+								/>
+							</Tooltip>
+						)}
+						<Tooltip title={t("actions.settings", { ns: "mcp" })}>
 							<Button
 								size="small"
 								type="text"
-								icon={<EyeOutlined />}
-								onClick={handleTest}
-								loading={testing}
+								icon={<SettingOutlined />}
+								onClick={handleConfigure}
 							/>
 						</Tooltip>
-						<Tooltip
-							title={
-								server.enabled
-									? t("actions.disable", { ns: "mcp" })
-									: t("actions.enable", { ns: "mcp" })
-							}
-						>
-							<Button
-								size="small"
-								type="text"
-								icon={server.enabled ? <SyncOutlined /> : <ReloadOutlined />}
-								onClick={handleToggle}
-							/>
-						</Tooltip>
-						<Tooltip title={t("actions.delete", { ns: "common" })}>
+						<Tooltip title={t("actions.delete", { ns: "mcp" })}>
 							<Button
 								size="small"
 								type="text"

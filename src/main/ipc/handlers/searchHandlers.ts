@@ -1,8 +1,27 @@
 import { ipcMain } from "electron";
 import { storeManager, type SearchConfig, type SearchProviderType } from "../../store";
 import { SEARCH_CHANNELS } from "../channels";
+import { searchService } from "../../services/search/SearchService";
+import type { SearchExecuteRequest } from "../types";
 
 export function registerSearchHandlers() {
+	// 执行搜索
+	ipcMain.handle(SEARCH_CHANNELS.EXECUTE, async (_, request: SearchExecuteRequest) => {
+		try {
+			console.log(`[SearchHandler] Executing search: provider=${request.provider}, query="${request.query}"`);
+			const result = await searchService.execute(request);
+			console.log(`[SearchHandler] Search completed: ${result.results.length} results in ${result.searchTimeMs}ms`);
+			return { success: true, data: result };
+		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : "Search execution failed";
+			console.error(`[SearchHandler] Search failed:`, errorMsg);
+			return {
+				success: false,
+				error: errorMsg,
+			};
+		}
+	});
+
 	// 获取所有搜索配置
 	ipcMain.handle(SEARCH_CHANNELS.GET_CONFIGS, () => {
 		try {
@@ -78,40 +97,49 @@ export function registerSearchHandlers() {
 		}
 	});
 
-	// 验证搜索配置（模拟验证，实际应调用对应 API）
+	// 验证搜索配置 — 执行一次实际搜索来验证 API Key
 	ipcMain.handle(SEARCH_CHANNELS.VALIDATE_CONFIG, async (_, config: SearchConfig) => {
 		try {
-			// 模拟 API 验证延迟
-			await new Promise((resolve) => setTimeout(resolve, 500));
-
-			// 简单验证：检查 API Key 是否为空
+			// 基本检查
 			if (!config.apiKey || config.apiKey.trim() === "") {
-				return {
-					success: false,
-					valid: false,
-					error: "API Key is required",
-				};
+				// SearXNG 不一定需要 apiKey
+				if (config.provider !== "searxng") {
+					return {
+						success: true,
+						data: { valid: false, error: "API Key is required" },
+					};
+				}
 			}
 
-			// 对于需要 API URL 的服务商，检查 URL 是否有效
 			if (config.provider === "searxng" && (!config.apiUrl || config.apiUrl.trim() === "")) {
 				return {
-					success: false,
-					valid: false,
-					error: "API URL is required for SearXNG",
+					success: true,
+					data: { valid: false, error: "API URL is required for SearXNG" },
 				};
 			}
 
-			// 模拟验证成功
+			// 执行一次真实搜索来验证凭据
+			console.log(`[SearchHandler] Validating ${config.provider} config...`);
+			const result = await searchService.execute({
+				provider: config.provider,
+				query: "test",
+				apiKey: config.apiKey,
+				apiUrl: config.apiUrl,
+				maxResults: 1,
+				config: config.config,
+			});
+			console.log(`[SearchHandler] Validation succeeded for ${config.provider}, got ${result.results.length} results in ${result.searchTimeMs}ms`);
+
 			return {
 				success: true,
-				valid: true,
+				data: { valid: true },
 			};
 		} catch (error) {
+			const errorMsg = error instanceof Error ? error.message : "Validation failed";
+			console.error(`[SearchHandler] Validation failed for ${config.provider}:`, errorMsg);
 			return {
-				success: false,
-				valid: false,
-				error: error instanceof Error ? error.message : "Validation failed",
+				success: true,
+				data: { valid: false, error: errorMsg },
 			};
 		}
 	});

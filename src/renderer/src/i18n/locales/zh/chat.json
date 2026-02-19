@@ -85,6 +85,47 @@
 		"firstToken": "首字时延",
 		"speed": "每秒"
 	},
+	"noModelsConfigured": "尚未配置模型",
+	"noModelsConfiguredDesc": "请先在设置中添加并启用模型服务商。",
+	"goToModelSettings": "前往模型设置",
+	"selectModelToStart": "选择一个模型开始对话",
+	"selectModel": "选择模型...",
+	"modelSelected": "模型已选择",
+	"sidebar": {
+		"newChat": "新对话",
+		"searchConversations": "搜索...",
+		"noConversations": "暂无对话记录",
+		"noResults": "未找到匹配的对话",
+		"today": "今天",
+		"yesterday": "昨天",
+		"last7Days": "最近 7 天",
+		"last30Days": "最近 30 天",
+		"older": "更早",
+		"justNow": "刚刚",
+		"minutesAgo": "{{count}}分钟前",
+		"hoursAgo": "{{count}}小时前",
+		"daysAgo": "{{count}}天前",
+		"rename": "重命名",
+		"delete": "删除",
+		"collapse": "收起",
+		"expand": "展开"
+	},
+	"slashCommand": {
+		"title": "选择技能",
+		"noResults": "未找到匹配的技能",
+		"hint": "输入 / 快速选择技能"
+	},
+	"chatMode": {
+		"direct": "直聊",
+		"mcp": "MCP 工具",
+		"skill": "技能",
+		"selectServer": "选择服务器",
+		"selectTool": "选择工具",
+		"noConnectedServers": "暂无已连接的 MCP 服务器",
+		"noTools": "暂无可用工具",
+		"switchMode": "切换模式",
+		"close": "关闭"
+	},
 	"actions": {
 		"retry": "重试",
 		"edit": "编辑",

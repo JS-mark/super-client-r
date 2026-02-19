@@ -5,6 +5,7 @@ import {
 	GlobalOutlined,
 	LinkOutlined,
 	PlusOutlined,
+	ReloadOutlined,
 	SaveOutlined,
 	SearchOutlined,
 	ShopOutlined,
@@ -34,6 +35,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
 import { InstalledMcpCard } from "../components/mcp/InstalledMcpCard";
+import { McpConfigModal } from "../components/mcp/McpConfigModal";
 import { McpDetailModal } from "../components/mcp/McpDetailModal";
 import { McpMarketCard } from "../components/mcp/McpMarketCard";
 import {
@@ -44,9 +46,28 @@ import {
 import { ThirdPartyMcpCard } from "../components/mcp/ThirdPartyMcpCard";
 import { useTitle } from "../hooks/useTitle";
 import { useMcpStore } from "../stores/mcpStore";
-import type { McpMarketItem, McpServer } from "../types/mcp";
+import type { McpMarketItem, McpServer, BuiltinMcpDefinition } from "../types/mcp";
 
 const PAGE_SIZE = 12;
+
+/**
+ * Match a server to its builtin definition by command + npm package in args.
+ * Name-based matching fails because builtin names are Chinese (e.g., "文件系统")
+ * while installed server names come from npm packages.
+ */
+function findBuiltinDefinition(
+	server: McpServer,
+	definitions: BuiltinMcpDefinition[],
+): BuiltinMcpDefinition | undefined {
+	if (!server.command) return undefined;
+	return definitions.find((def) => {
+		if (server.command !== def.command) return false;
+		// Find the npm package name in the definition args (the non-flag arg)
+		const defPackage = def.args.find((a) => !a.startsWith("-"));
+		if (!defPackage) return false;
+		return server.args?.includes(defPackage) ?? false;
+	});
+}
 
 const McpMarket: React.FC = () => {
 	const { t } = useTranslation();
@@ -74,6 +95,7 @@ const McpMarket: React.FC = () => {
 		servers,
 		marketItems,
 		marketTotal,
+		marketError,
 		isLoading,
 		fetchMarketItems,
 		installMarketItem,
@@ -89,9 +111,18 @@ const McpMarket: React.FC = () => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [selectedTag, setSelectedTag] = useState<string | null>(null);
 	const [thirdPartyForm] = Form.useForm();
+	const [builtinDefinitions, setBuiltinDefinitions] = useState<BuiltinMcpDefinition[]>([]);
+	const [configModalOpen, setConfigModalOpen] = useState(false);
+	const [configuringServer, setConfiguringServer] = useState<McpServer | null>(null);
 
 	useEffect(() => {
 		fetchMarketItems();
+		// 获取内置 MCP 定义
+		window.electron.mcp.builtin.getDefinitions().then((res) => {
+			if (res.success && res.data) {
+				setBuiltinDefinitions(res.data);
+			}
+		});
 	}, [fetchMarketItems]);
 
 	useEffect(() => {
@@ -186,6 +217,99 @@ const McpMarket: React.FC = () => {
 		thirdPartyForm.resetFields();
 	};
 
+	const handleOpenConfig = useCallback((server: McpServer) => {
+		setConfiguringServer(server);
+		setConfigModalOpen(true);
+	}, []);
+
+	const handleSaveConfig = useCallback(async (serverId: string, config: Record<string, unknown>) => {
+		const server = servers.find((s) => s.id === serverId);
+		if (!server) return;
+
+		try {
+			if (config.__generic) {
+				// Generic mode: directly update command/args/env/url
+				const updates: Partial<McpServer> = {};
+
+				if (server.transport === "stdio") {
+					if (config._command) updates.command = config._command as string;
+					if (config._args !== undefined) {
+						updates.args = (config._args as string).split(" ").filter(Boolean);
+					}
+					if (config._env !== undefined) {
+						const envStr = config._env as string;
+						if (envStr.trim()) {
+							const env: Record<string, string> = {};
+							for (const line of envStr.split("\n")) {
+								const trimmed = line.trim();
+								if (!trimmed) continue;
+								const eqIdx = trimmed.indexOf("=");
+								if (eqIdx > 0) {
+									env[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
+								}
+							}
+							updates.env = env;
+						} else {
+							updates.env = undefined;
+						}
+					}
+				} else {
+					if (config._url) updates.url = config._url as string;
+				}
+
+				if (server.status === "connected") {
+					await window.electron.mcp.disconnect(serverId);
+				}
+
+				await window.electron.mcp.updateServer(serverId, updates);
+
+				const { updateServer } = useMcpStore.getState();
+				updateServer(serverId, {
+					...updates,
+					status: "disconnected",
+					tools: undefined,
+				});
+			} else {
+				// Schema mode: use builtin createConfig
+				const def = findBuiltinDefinition(server, builtinDefinitions);
+				if (!def) return;
+
+				const res = await window.electron.mcp.builtin.createConfig(def.id, config);
+				if (!res.success || !res.data) {
+					message.error(res.error || "Failed to create config");
+					return;
+				}
+
+				const newConfig = res.data;
+
+				if (server.status === "connected") {
+					await window.electron.mcp.disconnect(serverId);
+				}
+
+				await window.electron.mcp.updateServer(serverId, {
+					command: newConfig.command,
+					args: newConfig.args,
+					env: newConfig.env,
+				});
+
+				const { updateServer } = useMcpStore.getState();
+				updateServer(serverId, {
+					command: newConfig.command,
+					args: newConfig.args,
+					env: newConfig.env,
+					status: "disconnected",
+					tools: undefined,
+				});
+			}
+
+			setConfigModalOpen(false);
+			setConfiguringServer(null);
+			message.success(t("messages.saveSuccess", { ns: "mcp" }));
+		} catch {
+			message.error(t("messages.saveError", { ns: "mcp" }));
+		}
+	}, [servers, builtinDefinitions, t]);
+
 	const allTags = useMemo(() => {
 		const tagSet = new Set<string>();
 		for (const item of marketItems) {
@@ -202,6 +326,7 @@ const McpMarket: React.FC = () => {
 				<MarketTab
 					marketItems={marketItems}
 					marketTotal={marketTotal}
+					marketError={marketError}
 					isLoading={isLoading}
 					servers={servers}
 					searchTerm={marketSearchTerm}
@@ -214,6 +339,7 @@ const McpMarket: React.FC = () => {
 					onPageChange={handlePageChange}
 					onItemClick={(item) => { setSelectedItem(item); setModalOpen(true); }}
 					onInstall={handleInstall}
+					onConfigure={handleOpenConfig}
 					onSearch={() => {
 						setCurrentPage(1);
 						fetchMarketItems(1, PAGE_SIZE, selectedTag || undefined, marketSearchTerm);
@@ -247,6 +373,7 @@ const McpMarket: React.FC = () => {
 					servers={filterServers(servers, installedSearchTerm)}
 					searchTerm={installedSearchTerm}
 					onSearchChange={setInstalledSearchTerm}
+					onConfigure={handleOpenConfig}
 				/>
 			),
 		},
@@ -266,6 +393,7 @@ const McpMarket: React.FC = () => {
 					open={modalOpen}
 					onClose={() => { setModalOpen(false); setSelectedItem(null); }}
 					onInstall={handleInstall}
+					onConfigure={handleOpenConfig}
 				/>
 
 				<ThirdPartyFormModal
@@ -275,6 +403,23 @@ const McpMarket: React.FC = () => {
 					onCancel={() => setThirdPartyModalOpen(false)}
 					onFinish={handleSaveThirdParty}
 				/>
+
+				<McpConfigModal
+					open={configModalOpen}
+					server={configuringServer}
+					configSchema={
+						configuringServer
+							? findBuiltinDefinition(configuringServer, builtinDefinitions)?.configSchema
+							: undefined
+					}
+					builtinDefinition={
+						configuringServer
+							? findBuiltinDefinition(configuringServer, builtinDefinitions)
+							: undefined
+					}
+					onSave={handleSaveConfig}
+					onCancel={() => { setConfigModalOpen(false); setConfiguringServer(null); }}
+				/>
 			</div>
 		</MainLayout>
 	);
@@ -283,12 +428,13 @@ const McpMarket: React.FC = () => {
 // --- Tab sub-components ---
 
 function MarketTab({
-	marketItems, marketTotal, isLoading, servers, searchTerm, onSearchChange,
+	marketItems, marketTotal, marketError, isLoading, servers, searchTerm, onSearchChange,
 	selectedTag, onTagChange, allTags, currentPage, pageSize, onPageChange,
-	onItemClick, onInstall, onSearch,
+	onItemClick, onInstall, onConfigure, onSearch,
 }: {
 	marketItems: McpMarketItem[];
 	marketTotal: number;
+	marketError: string | null;
 	isLoading: boolean;
 	servers: McpServer[];
 	searchTerm: string;
@@ -301,6 +447,7 @@ function MarketTab({
 	onPageChange: (page: number) => void;
 	onItemClick: (item: McpMarketItem) => void;
 	onInstall: (item: McpMarketItem) => void;
+	onConfigure: (server: McpServer) => void;
 	onSearch: () => void;
 }) {
 	const { t } = useTranslation();
@@ -338,6 +485,19 @@ function MarketTab({
 			<div className="flex-1 overflow-y-auto min-h-0">
 				{isLoading ? (
 					<div className="flex justify-center items-center py-20"><Spin size="large" /></div>
+				) : marketError ? (
+					<Empty
+						description={
+							<div className="text-center">
+								<p className="mb-2">{t("marketError", { ns: "mcp", defaultValue: "Failed to load marketplace data" })}</p>
+								<p className="text-xs opacity-60 mb-3">{marketError}</p>
+								<Button icon={<ReloadOutlined />} onClick={onSearch}>
+									{t("retry", { ns: "common", defaultValue: "Retry" })}
+								</Button>
+							</div>
+						}
+						className="py-20"
+					/>
 				) : marketItems.length === 0 ? (
 					<Empty description={t("noData", { ns: "mcp" })} className="py-20" />
 				) : (
@@ -349,6 +509,7 @@ function MarketTab({
 								onClick={() => onItemClick(item)}
 								onInstall={() => onInstall(item)}
 								isInstalled={servers.some((s) => s.name === item.name)}
+								onConfigure={onConfigure}
 							/>
 						))}
 					</div>
@@ -406,11 +567,12 @@ function ThirdPartyTab({
 }
 
 function InstalledTab({
-	servers, searchTerm, onSearchChange,
+	servers, searchTerm, onSearchChange, onConfigure,
 }: {
 	servers: McpServer[];
 	searchTerm: string;
 	onSearchChange: (v: string) => void;
+	onConfigure: (server: McpServer) => void;
 }) {
 	const { t } = useTranslation();
 
@@ -430,7 +592,12 @@ function InstalledTab({
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 					{servers.map((server) => (
-						<InstalledMcpCard key={server.id} server={server} onView={() => {}} />
+						<InstalledMcpCard
+							key={server.id}
+							server={server}
+							onView={() => {}}
+							onConfigure={onConfigure}
+						/>
 					))}
 				</div>
 			)}

@@ -1,5 +1,6 @@
 import type {
 	PluginInfo,
+	PluginCommand,
 	MarketPlugin,
 } from "../types/plugin";
 // IPC 通道定义（与主进程保持一致）
@@ -15,6 +16,8 @@ const PLUGIN_CHANNELS = {
 	SEARCH_MARKET: "plugin:searchMarket",
 	GET_MARKET_PLUGIN: "plugin:getMarketPlugin",
 	DOWNLOAD_PLUGIN: "plugin:download",
+	GET_COMMANDS: "plugin:getCommands",
+	EXECUTE_COMMAND: "plugin:executeCommand",
 	GET_STORAGE: "plugin:getStorage",
 	SET_STORAGE: "plugin:setStorage",
 	DELETE_STORAGE: "plugin:deleteStorage",
@@ -152,6 +155,30 @@ export const pluginService = {
 			throw new Error(result.error);
 		}
 		return result.data!;
+	},
+
+	// ============ 命令 ============
+
+	/**
+	 * 获取已注册命令
+	 */
+	async getCommands(pluginId?: string): Promise<PluginCommand[]> {
+		const result = await window.electron.ipc.invoke(PLUGIN_CHANNELS.GET_COMMANDS, { pluginId }) as IPCResult<PluginCommand[]>;
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data || [];
+	},
+
+	/**
+	 * 执行命令
+	 */
+	async executeCommand<T = unknown>(command: string, ...args: unknown[]): Promise<T> {
+		const result = await window.electron.ipc.invoke(PLUGIN_CHANNELS.EXECUTE_COMMAND, { command, args }) as IPCResult<T>;
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data as T;
 	},
 
 	// ============ 插件存储 ============

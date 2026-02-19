@@ -233,9 +233,7 @@ export class LogDatabaseService extends EventEmitter {
 			bindings.endTime = params.endTime;
 		}
 
-		let usesFts = false;
 		if (params.keyword?.trim()) {
-			usesFts = true;
 			conditions.push(
 				"logs.id IN (SELECT rowid FROM logs_fts WHERE logs_fts MATCH @keyword)",
 			);

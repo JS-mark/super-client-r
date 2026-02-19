@@ -1,0 +1,199 @@
+/**
+ * 内置插件定义
+ * 包含市场元数据、清单和源代码
+ */
+
+// 市场插件元数据
+export interface BuiltinMarketPlugin {
+	id: string;
+	name: string;
+	displayName: string;
+	description: string;
+	version: string;
+	author: string;
+	icon?: string;
+	categories: string[];
+	downloads: number;
+	rating: number;
+	installed?: boolean;
+}
+
+// 内置市场插件列表
+export const BUILTIN_MARKET_PLUGINS: BuiltinMarketPlugin[] = [
+	{
+		id: "prompt-templates",
+		name: "prompt-templates",
+		displayName: "Prompt Templates",
+		description:
+			"Curated AI prompt templates for common tasks: translate, summarize, code review, explain, fix grammar, write email, brainstorm, and refactor code.",
+		version: "1.0.0",
+		author: "Super Client Team",
+		icon: "📝",
+		categories: ["productivity", "prompts"],
+		downloads: 12580,
+		rating: 4.9,
+	},
+];
+
+// Prompt Templates 插件清单
+export const PROMPT_TEMPLATES_MANIFEST = {
+	name: "prompt-templates",
+	displayName: "Prompt Templates",
+	version: "1.0.0",
+	description:
+		"Curated AI prompt templates for common tasks: translate, summarize, code review, explain, fix grammar, write email, brainstorm, and refactor code.",
+	author: "Super Client Team",
+	main: "index.js",
+	icon: "📝",
+	categories: ["productivity", "prompts"],
+	engines: { "super-client-r": "^1.0.0" },
+	activationEvents: ["onStartup"],
+	contributes: {
+		commands: [
+			{
+				command: "prompt-templates.list",
+				title: "List Templates",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.translate",
+				title: "Translate",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.summarize",
+				title: "Summarize",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.codeReview",
+				title: "Code Review",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.explain",
+				title: "Explain",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.fixGrammar",
+				title: "Fix Grammar",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.writeEmail",
+				title: "Write Email",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.brainstorm",
+				title: "Brainstorm",
+				category: "Prompt Templates",
+			},
+			{
+				command: "prompt-templates.refactorCode",
+				title: "Refactor Code",
+				category: "Prompt Templates",
+			},
+		],
+	},
+};
+
+// Prompt Templates 插件源代码
+export const PROMPT_TEMPLATES_SOURCE = `"use strict";
+
+const TEMPLATES = [
+  {
+    id: "translate",
+    command: "prompt-templates.translate",
+    name: "Translate",
+    description: "Translate text to a specified language",
+    template: "Please translate the following text to {{language}}:\\n\\n{{text}}"
+  },
+  {
+    id: "summarize",
+    command: "prompt-templates.summarize",
+    name: "Summarize",
+    description: "Summarize content concisely",
+    template: "Please summarize the following content in a concise manner, highlighting the key points:\\n\\n{{text}}"
+  },
+  {
+    id: "codeReview",
+    command: "prompt-templates.codeReview",
+    name: "Code Review",
+    description: "Review code for issues and improvements",
+    template: "Please review the following code. Point out any bugs, security issues, performance problems, and suggest improvements:\\n\\n\\\`\\\`\\\`\\n{{code}}\\n\\\`\\\`\\\`"
+  },
+  {
+    id: "explain",
+    command: "prompt-templates.explain",
+    name: "Explain",
+    description: "Explain a concept or code in simple terms",
+    template: "Please explain the following in simple, easy-to-understand terms:\\n\\n{{text}}"
+  },
+  {
+    id: "fixGrammar",
+    command: "prompt-templates.fixGrammar",
+    name: "Fix Grammar",
+    description: "Fix grammar and spelling errors",
+    template: "Please fix any grammar, spelling, and punctuation errors in the following text. Only return the corrected text without explanations:\\n\\n{{text}}"
+  },
+  {
+    id: "writeEmail",
+    command: "prompt-templates.writeEmail",
+    name: "Write Email",
+    description: "Draft a professional email",
+    template: "Please write a professional email with the following details:\\n\\nRecipient: {{recipient}}\\nSubject: {{subject}}\\nKey points: {{points}}"
+  },
+  {
+    id: "brainstorm",
+    command: "prompt-templates.brainstorm",
+    name: "Brainstorm",
+    description: "Brainstorm ideas on a topic",
+    template: "Please brainstorm 10 creative ideas about the following topic. For each idea, provide a brief description:\\n\\nTopic: {{topic}}"
+  },
+  {
+    id: "refactorCode",
+    command: "prompt-templates.refactorCode",
+    name: "Refactor Code",
+    description: "Refactor code for better quality",
+    template: "Please refactor the following code to improve readability, maintainability, and performance. Explain the changes you made:\\n\\n\\\`\\\`\\\`\\n{{code}}\\n\\\`\\\`\\\`"
+  }
+];
+
+module.exports = {
+  activate(context) {
+    console.log("[Prompt Templates] Activating...");
+
+    // Register list command
+    context.commands.registerCommand("prompt-templates.list", function() {
+      return TEMPLATES.map(function(t) {
+        return { id: t.id, name: t.name, description: t.description, template: t.template };
+      });
+    });
+
+    // Register individual template commands
+    TEMPLATES.forEach(function(tmpl) {
+      context.commands.registerCommand(tmpl.command, function() {
+        return { id: tmpl.id, name: tmpl.name, description: tmpl.description, template: tmpl.template };
+      });
+    });
+
+    console.log("[Prompt Templates] Activated with " + TEMPLATES.length + " templates");
+  },
+  deactivate() {
+    console.log("[Prompt Templates] Deactivated");
+  }
+};
+`;
+
+// Map of builtin plugin IDs to their manifest and source
+export const BUILTIN_PLUGIN_SOURCES: Record<
+	string,
+	{ manifest: Record<string, unknown>; source: string }
+> = {
+	"prompt-templates": {
+		manifest: PROMPT_TEMPLATES_MANIFEST,
+		source: PROMPT_TEMPLATES_SOURCE,
+	},
+};
