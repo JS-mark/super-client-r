@@ -5,6 +5,15 @@ import type { ConversationSummary } from "../types/electron";
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageType = "text" | "tool_use" | "tool_result" | "error";
 
+/**
+ * Chat session lifecycle states:
+ * - idle: 空闲 — waiting for user input (also the state after completion/stop/error)
+ * - preparing: 创建中 — building request (fetching MCP tools, constructing system prompt)
+ * - streaming: 聊天中 — receiving streamed response chunks from LLM
+ * - tool_calling: 工具调用中 — model is executing MCP tool calls
+ */
+export type ChatSessionStatus = "idle" | "preparing" | "streaming" | "tool_calling";
+
 export interface ToolCall {
 	id: string;
 	name: string;
@@ -38,6 +47,7 @@ export interface Message {
 interface ChatState {
 	// Messages
 	messages: Message[];
+	sessionStatus: ChatSessionStatus;
 	isStreaming: boolean;
 	streamingContent: string;
 
@@ -55,6 +65,7 @@ interface ChatState {
 	updateLastMessage: (content: string) => void;
 	updateMessageToolCall: (messageId: string, toolCall: Partial<ToolCall>) => void;
 	updateMessageMetadata: (messageId: string, metadata: Partial<NonNullable<Message["metadata"]>>) => void;
+	setSessionStatus: (status: ChatSessionStatus) => void;
 	setStreaming: (streaming: boolean) => void;
 	setStreamingContent: (content: string) => void;
 	appendStreamingContent: (content: string) => void;
@@ -76,6 +87,7 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>()((set, get) => ({
 	messages: [],
+	sessionStatus: "idle",
 	isStreaming: false,
 	streamingContent: "",
 	pendingInput: null,
@@ -143,7 +155,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 	},
 
-	setStreaming: (streaming) => set({ isStreaming: streaming }),
+	setSessionStatus: (status) => set({ sessionStatus: status, isStreaming: status !== "idle" }),
+
+	setStreaming: (streaming) => set({
+		isStreaming: streaming,
+		sessionStatus: streaming ? "streaming" : "idle",
+	}),
 
 	setStreamingContent: (content) => set({ streamingContent: content }),
 
@@ -225,8 +242,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	},
 
 	switchConversation: async (conversationId) => {
-		const { isStreaming, currentConversationId } = get();
-		if (isStreaming) return; // Don't switch while streaming
+		const { sessionStatus, currentConversationId } = get();
+		if (sessionStatus !== "idle") return; // Don't switch while active
 		if (conversationId === currentConversationId) return;
 
 		set({ currentConversationId: conversationId, messages: [] });
