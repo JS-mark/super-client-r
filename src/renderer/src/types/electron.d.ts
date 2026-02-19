@@ -67,8 +67,8 @@ export interface SkillExecutionResult {
 	error?: string;
 }
 
-export type McpServerType = "builtin" | "third-party" | "market";
-export type McpTransportType = "stdio" | "sse" | "http";
+export type McpServerType = "builtin" | "third-party" | "market" | "internal";
+export type McpTransportType = "stdio" | "sse" | "http" | "internal";
 
 export interface McpServerConfig {
 	id: string;
@@ -518,6 +518,7 @@ export interface ElectronAPI {
 		clearMessages: (conversationId: string) => Promise<IPCResponse>;
 		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
 		setLastConversation: (id: string) => Promise<IPCResponse>;
+		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
 	};
 
 	// 主题 API
@@ -620,6 +621,36 @@ export interface ElectronAPI {
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
+	};
+
+	// 皮肤 API
+	skin: {
+		getActiveSkin: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
+		setActiveSkin: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
+		onTokensChanged: (callback: (tokens: Record<string, unknown> | null) => void) => () => void;
+	};
+
+	// Markdown 主题 API
+	markdownTheme: {
+		getActive: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
+		setActive: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
+	};
+
+	// 系统信息 API
+	system: {
+		getHomedir: () => Promise<IPCResponse<string>>;
+		getEnvInfo: () => Promise<IPCResponse<{
+			os: string;
+			platform: string;
+			arch: string;
+			nodeVersion: string;
+			electronVersion: string;
+			v8Version: string;
+			homedir: string;
+			cwd: string;
+			appVersion: string;
+			locale: string;
+		}>>;
 	};
 
 	// 通用 IPC

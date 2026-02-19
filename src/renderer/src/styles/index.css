@@ -270,6 +270,337 @@ body {
   }
 }
 
+/* ==========================================
+   GitHub-Flavored Markdown Typography (x-markdown)
+   Tailwind v4 preflight resets headings, lists, etc.
+   These rules restore GitHub-style markdown rendering
+   with full dark mode support.
+   ========================================== */
+
+.x-markdown {
+  --md-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --md-border-color: #d1d9e0;
+  --md-border-color-muted: #d8dee4;
+  --md-fg-default: #1f2328;
+  --md-fg-muted: #59636e;
+  --md-bg-subtle: #f6f8fa;
+  --md-accent-fg: #0969da;
+  --md-accent-emphasis: #0969da;
+  --md-danger-fg: #d1242f;
+  --md-neutral-muted: rgba(175, 184, 193, 0.2);
+
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--md-fg-default);
+}
+
+.dark .x-markdown {
+  --md-border-color: #3d444d;
+  --md-border-color-muted: #3d444d;
+  --md-fg-default: #e6edf3;
+  --md-fg-muted: #9198a1;
+  --md-bg-subtle: #161b22;
+  --md-accent-fg: #4493f8;
+  --md-accent-emphasis: #4493f8;
+  --md-danger-fg: #f85149;
+  --md-neutral-muted: rgba(110, 118, 129, 0.4);
+}
+
+/* ---- Headings ---- */
+.x-markdown h1,
+.x-markdown h2,
+.x-markdown h3,
+.x-markdown h4,
+.x-markdown h5,
+.x-markdown h6 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.x-markdown h1:first-child,
+.x-markdown h2:first-child,
+.x-markdown h3:first-child,
+.x-markdown h4:first-child,
+.x-markdown h5:first-child,
+.x-markdown h6:first-child {
+  margin-top: 0;
+}
+
+.x-markdown h1 {
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-border-color-muted);
+}
+
+.x-markdown h2 {
+  font-size: 1.5em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--md-border-color-muted);
+}
+
+.x-markdown h3 {
+  font-size: 1.25em;
+}
+
+.x-markdown h4 {
+  font-size: 1em;
+}
+
+.x-markdown h5 {
+  font-size: 0.875em;
+}
+
+.x-markdown h6 {
+  font-size: 0.85em;
+  color: var(--md-fg-muted);
+}
+
+/* ---- Paragraphs ---- */
+.x-markdown p {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.x-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Strong / Emphasis ---- */
+.x-markdown strong {
+  font-weight: 600;
+}
+
+/* ---- Links ---- */
+.x-markdown a {
+  color: var(--md-accent-fg);
+  text-decoration: none;
+}
+
+.x-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* ---- Inline code ---- */
+.x-markdown :not(pre) > code {
+  background: var(--md-neutral-muted);
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  font-size: 85%;
+  font-family: var(--md-font-mono);
+  white-space: break-spaces;
+}
+
+/* ---- Code blocks ---- */
+.x-markdown pre {
+  background: var(--md-bg-subtle);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  font-family: var(--md-font-mono);
+  font-size: 85%;
+  line-height: 1.45;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.x-markdown pre:last-child {
+  margin-bottom: 0;
+}
+
+.x-markdown pre code {
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  font-size: 100%;
+  white-space: pre;
+  word-break: normal;
+}
+
+/* ---- Blockquote ---- */
+.x-markdown blockquote {
+  border-left: 0.25em solid var(--md-border-color);
+  margin: 0 0 16px 0;
+  padding: 0 1em;
+  color: var(--md-fg-muted);
+}
+
+.x-markdown blockquote:last-child {
+  margin-bottom: 0;
+}
+
+.x-markdown blockquote > :first-child {
+  margin-top: 0;
+}
+
+.x-markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* ---- Lists ---- */
+.x-markdown ul,
+.x-markdown ol {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-left: 2em;
+}
+
+.x-markdown ul:last-child,
+.x-markdown ol:last-child {
+  margin-bottom: 0;
+}
+
+.x-markdown ul ul,
+.x-markdown ul ol,
+.x-markdown ol ul,
+.x-markdown ol ol {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.x-markdown ol > li {
+  list-style-type: decimal;
+}
+
+.x-markdown ul > li {
+  list-style-type: disc;
+}
+
+.x-markdown li {
+  margin-top: 0.25em;
+}
+
+.x-markdown li + li {
+  margin-top: 0.25em;
+}
+
+.x-markdown li > p {
+  margin-top: 16px;
+}
+
+/* Task lists */
+.x-markdown li input[type="checkbox"] {
+  margin-right: 0.35em;
+  vertical-align: middle;
+}
+
+/* ---- Table (GitHub style) ---- */
+.x-markdown table:not(pre table) {
+  border-collapse: collapse;
+  border-spacing: 0;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow: auto;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.x-markdown table:not(pre table):last-child {
+  margin-bottom: 0;
+}
+
+.x-markdown table:not(pre table) th {
+  font-weight: 600;
+  background: var(--md-bg-subtle);
+}
+
+.x-markdown table:not(pre table) th,
+.x-markdown table:not(pre table) td {
+  border: 1px solid var(--md-border-color);
+  padding: 6px 13px;
+}
+
+.x-markdown table:not(pre table) tr {
+  background-color: transparent;
+  border-top: 1px solid var(--md-border-color-muted);
+}
+
+.x-markdown table:not(pre table) tr:nth-child(2n) {
+  background-color: var(--md-bg-subtle);
+}
+
+/* ---- Horizontal rule ---- */
+.x-markdown hr {
+  border: 0;
+  height: 0.25em;
+  padding: 0;
+  margin: 24px 0;
+  background-color: var(--md-border-color);
+  border-radius: 2px;
+}
+
+/* ---- Images ---- */
+.x-markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+/* ---- Definition list / description ---- */
+.x-markdown dl {
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.x-markdown dl dt {
+  padding: 0;
+  margin-top: 16px;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.x-markdown dl dd {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+/* ---- Keyboard tag ---- */
+.x-markdown kbd {
+  display: inline-block;
+  padding: 3px 5px;
+  font: 11px var(--md-font-mono);
+  line-height: 10px;
+  color: var(--md-fg-default);
+  vertical-align: middle;
+  background-color: var(--md-bg-subtle);
+  border: solid 1px var(--md-border-color-muted);
+  border-bottom-color: var(--md-border-color);
+  border-radius: 6px;
+  box-shadow: inset 0 -1px 0 var(--md-border-color);
+}
+
+/* ---- Details / Summary ---- */
+.x-markdown details {
+  margin-bottom: 16px;
+}
+
+.x-markdown details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ---- Footnotes ---- */
+.x-markdown .footnotes {
+  font-size: 85%;
+  color: var(--md-fg-muted);
+  border-top: 1px solid var(--md-border-color);
+  padding-top: 16px;
+  margin-top: 32px;
+}
+
+/* ---- Spacing between adjacent block elements ---- */
+.x-markdown > *:first-child {
+  margin-top: 0 !important;
+}
+
+.x-markdown > *:last-child {
+  margin-bottom: 0 !important;
+}
+
 /* Milkdown System Prompt Editor - compact overrides */
 .milkdown-system-prompt .milkdown .ProseMirror {
   padding: 12px 16px;

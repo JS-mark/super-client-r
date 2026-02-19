@@ -77,6 +77,15 @@ export interface PluginContributions {
 	resources?: {
 		[key: string]: string;
 	};
+
+	// 主题/皮肤
+	themes?: Array<{
+		id: string;
+		label: string;
+		icon?: string;
+		style: string;
+		antdTokens?: string;
+	}>;
 }
 
 // 插件清单

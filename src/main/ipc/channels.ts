@@ -51,6 +51,8 @@ export const CHAT_CHANNELS = {
 	// 上次对话
 	GET_LAST_CONVERSATION: "chat:get-last-conversation",
 	SET_LAST_CONVERSATION: "chat:set-last-conversation",
+	// 对话目录
+	GET_CONVERSATION_DIR: "chat:get-conversation-dir",
 } as const;
 
 // MCP 相关通道
@@ -71,6 +73,14 @@ export const MCP_CHANNELS = {
 	UPDATE_SERVER: "mcp:update-server",
 	// 获取所有状态
 	GET_ALL_STATUS: "mcp:get-all-status",
+} as const;
+
+// 系统信息相关通道
+export const SYSTEM_CHANNELS = {
+	// 获取用户主目录
+	GET_HOMEDIR: "system:get-homedir",
+	// 获取环境信息（用于系统提示词注入）
+	GET_ENV_INFO: "system:get-env-info",
 } as const;
 
 // App 相关通道
@@ -281,4 +291,5 @@ export type IPCChannel =
 	| (typeof AUTH_CHANNELS)[keyof typeof AUTH_CHANNELS]
 	| (typeof UPDATE_CHANNELS)[keyof typeof UPDATE_CHANNELS]
 	| (typeof MODEL_CHANNELS)[keyof typeof MODEL_CHANNELS]
-	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS];
+	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS]
+	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS];

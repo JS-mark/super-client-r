@@ -42,6 +42,14 @@ export const PLUGIN_CHANNELS = {
   // 快捷键
   GET_KEYBINDINGS: "plugin:getKeybindings",
   SET_KEYBINDINGS: "plugin:setKeybindings",
+
+  // 皮肤
+  GET_ACTIVE_SKIN: "plugin:getActiveSkin",
+  SET_ACTIVE_SKIN: "plugin:setActiveSkin",
+
+  // Markdown 主题
+  GET_ACTIVE_MARKDOWN_THEME: "plugin:getActiveMarkdownTheme",
+  SET_ACTIVE_MARKDOWN_THEME: "plugin:setActiveMarkdownTheme",
 } as const;
 
 // Market plugins sourced from builtin definitions
@@ -346,6 +354,16 @@ export function registerPluginHandlers(): void {
             builtinSource.source,
             "utf-8",
           );
+          // Write extra files (e.g., theme.css, tokens.json for skin plugins)
+          if (builtinSource.extraFiles) {
+            for (const [fileName, content] of Object.entries(builtinSource.extraFiles)) {
+              await fs.writeFile(
+                path.join(tmpDir, fileName),
+                content,
+                "utf-8",
+              );
+            }
+          }
         } else {
           // Fallback: stub plugin
           const manifest = {
@@ -535,6 +553,119 @@ module.exports = {
     ): Promise<{ success: boolean; error?: string }> => {
       try {
         storeManager.setConfig("keybindings", keybindings);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  // ============ 皮肤 ============
+
+  // 获取当前激活的皮肤
+  ipcMain.handle(
+    PLUGIN_CHANNELS.GET_ACTIVE_SKIN,
+    async (): Promise<{ success: boolean; data?: { pluginId: string; themeId: string } | null; error?: string }> => {
+      try {
+        const skinInfo = pluginManager.getActiveSkinId();
+        return { success: true, data: skinInfo };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  // 设置激活的皮肤
+  ipcMain.handle(
+    PLUGIN_CHANNELS.SET_ACTIVE_SKIN,
+    async (
+      _event,
+      { pluginId, themeId }: { pluginId: string | null; themeId?: string },
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        if (pluginId === null) {
+          // Restore default
+          await pluginManager.removeSkinCSS();
+        } else {
+          if (!themeId) {
+            return { success: false, error: "themeId is required" };
+          }
+          const pluginInfo = pluginManager.getPlugin(pluginId);
+          if (!pluginInfo) {
+            return { success: false, error: `Plugin ${pluginId} not found` };
+          }
+          if (!pluginManager.isSkinPlugin(pluginInfo)) {
+            return { success: false, error: `Plugin ${pluginId} is not a skin plugin` };
+          }
+          // Ensure plugin is activated
+          if (!pluginManager.isPluginActive(pluginId)) {
+            await pluginManager.enablePlugin(pluginId);
+          }
+          // applySkinCSS handles removing old CSS internally
+          await pluginManager.applySkinCSS(pluginInfo, themeId);
+        }
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  // ============ Markdown 主题 ============
+
+  // 获取当前激活的 Markdown 主题
+  ipcMain.handle(
+    PLUGIN_CHANNELS.GET_ACTIVE_MARKDOWN_THEME,
+    async (): Promise<{ success: boolean; data?: { pluginId: string; themeId: string } | null; error?: string }> => {
+      try {
+        const themeInfo = pluginManager.getActiveMarkdownThemeId();
+        return { success: true, data: themeInfo };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  );
+
+  // 设置激活的 Markdown 主题
+  ipcMain.handle(
+    PLUGIN_CHANNELS.SET_ACTIVE_MARKDOWN_THEME,
+    async (
+      _event,
+      { pluginId, themeId }: { pluginId: string | null; themeId?: string },
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        if (pluginId === null) {
+          await pluginManager.removeMarkdownCSS();
+        } else {
+          if (!themeId) {
+            return { success: false, error: "themeId is required" };
+          }
+          const pluginInfo = pluginManager.getPlugin(pluginId);
+          if (!pluginInfo) {
+            return { success: false, error: `Plugin ${pluginId} not found` };
+          }
+          if (!pluginManager.isMarkdownThemePlugin(pluginInfo)) {
+            return { success: false, error: `Plugin ${pluginId} is not a markdown theme plugin` };
+          }
+          // Ensure plugin is activated
+          if (!pluginManager.isPluginActive(pluginId)) {
+            await pluginManager.enablePlugin(pluginId);
+          }
+          // applyMarkdownCSS handles removing old CSS internally
+          await pluginManager.applyMarkdownCSS(pluginInfo, themeId);
+        }
         return { success: true };
       } catch (error) {
         return {

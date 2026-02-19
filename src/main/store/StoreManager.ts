@@ -6,9 +6,6 @@
 import Store from "electron-store";
 import type {
 	ActiveModelSelection,
-	ChatMessagePersist,
-	ConversationData,
-	ConversationSummary,
 	McpServerConfig,
 	ModelProvider,
 	ProviderModel,
@@ -58,6 +55,10 @@ export interface AppConfig {
 	pluginsData?: Record<string, unknown>;
 	// Keybindings
 	keybindings?: Record<string, string>;
+	// Active skin (pluginId + themeId)
+	activeSkin?: { pluginId: string; themeId: string };
+	// Active markdown theme (pluginId + themeId)
+	activeMarkdownTheme?: { pluginId: string; themeId: string };
 	// OAuth credentials
 	googleClientId?: string;
 	githubClientId?: string;
@@ -82,16 +83,9 @@ export interface AppData {
 	lastSessionId?: string;
 }
 
-export interface ChatStoreData {
-	conversations: Record<string, ConversationData>;
-	conversationOrder: string[];
-	lastConversationId?: string;
-}
-
 export class StoreManager {
 	private _configStore: Store<AppConfig> | null = null;
 	private _dataStore: Store<AppData> | null = null;
-	private _chatStore: Store<ChatStoreData> | null = null;
 
 	private get configStore(): Store<AppConfig> {
 		if (!this._configStore) {
@@ -121,20 +115,6 @@ export class StoreManager {
 		return this._dataStore;
 	}
 
-	private get chatStore(): Store<ChatStoreData> {
-		if (!this._chatStore) {
-			const StoreClass = (Store as any).default || Store;
-			this._chatStore = new StoreClass({
-				name: "chat-history",
-				defaults: {
-					conversations: {},
-					conversationOrder: [],
-				},
-			}) as Store<ChatStoreData>;
-		}
-		return this._chatStore;
-	}
-
 	// ============ 配置相关 ============
 
 	getConfig<K extends keyof AppConfig>(key: K): AppConfig[K] | undefined {
@@ -143,6 +123,10 @@ export class StoreManager {
 
 	setConfig<K extends keyof AppConfig>(key: K, value: AppConfig[K]): void {
 		this.configStore.set(key, value);
+	}
+
+	deleteConfig<K extends keyof AppConfig>(key: K): void {
+		this.configStore.delete(key);
 	}
 
 	getAllConfig(): AppConfig {
@@ -333,144 +317,11 @@ export class StoreManager {
 		}
 	}
 
-	// ============ 对话管理 (Chat History) ============
-
-	private static MAX_MESSAGES_PER_CONVERSATION = 500;
-
-	getConversationList(): ConversationSummary[] {
-		const order = this.chatStore.get("conversationOrder") || [];
-		const conversations = this.chatStore.get("conversations") || {};
-		return order
-			.filter((id) => conversations[id])
-			.map((id) => {
-				const c = conversations[id];
-				return {
-					id: c.id,
-					name: c.name,
-					createdAt: c.createdAt,
-					updatedAt: c.updatedAt,
-					messageCount: c.messageCount,
-					preview: c.preview,
-				};
-			});
-	}
-
-	createConversation(name: string): ConversationSummary {
-		const id = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-		const now = Date.now();
-		const conv: ConversationData = {
-			id,
-			name,
-			createdAt: now,
-			updatedAt: now,
-			messageCount: 0,
-			preview: "",
-			messages: [],
-		};
-		this.chatStore.set(`conversations.${id}` as keyof ChatStoreData, conv as any);
-		const order = this.chatStore.get("conversationOrder") || [];
-		this.chatStore.set("conversationOrder", [id, ...order]);
-		return {
-			id: conv.id,
-			name: conv.name,
-			createdAt: conv.createdAt,
-			updatedAt: conv.updatedAt,
-			messageCount: conv.messageCount,
-			preview: conv.preview,
-		};
-	}
-
-	deleteConversation(id: string): void {
-		const conversations = this.chatStore.get("conversations") || {};
-		delete conversations[id];
-		this.chatStore.set("conversations", conversations);
-		const order = this.chatStore.get("conversationOrder") || [];
-		this.chatStore.set(
-			"conversationOrder",
-			order.filter((cid) => cid !== id),
-		);
-		const lastId = this.chatStore.get("lastConversationId");
-		if (lastId === id) {
-			this.chatStore.delete("lastConversationId" as keyof ChatStoreData);
-		}
-	}
-
-	renameConversation(id: string, name: string): void {
-		const conv = this.chatStore.get(`conversations.${id}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) throw new Error(`Conversation not found: ${id}`);
-		conv.name = name;
-		conv.updatedAt = Date.now();
-		this.chatStore.set(`conversations.${id}` as keyof ChatStoreData, conv as any);
-	}
-
-	getMessages(conversationId: string): ChatMessagePersist[] {
-		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) return [];
-		return conv.messages || [];
-	}
-
-	saveMessages(conversationId: string, messages: ChatMessagePersist[]): void {
-		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) throw new Error(`Conversation not found: ${conversationId}`);
-		const trimmed = messages.slice(-StoreManager.MAX_MESSAGES_PER_CONVERSATION);
-		conv.messages = trimmed;
-		conv.messageCount = trimmed.length;
-		conv.updatedAt = Date.now();
-		const firstUser = trimmed.find((m) => m.role === "user");
-		conv.preview = firstUser ? firstUser.content.slice(0, 100) : "";
-		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
-	}
-
-	appendMessage(conversationId: string, message: ChatMessagePersist): void {
-		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) throw new Error(`Conversation not found: ${conversationId}`);
-		conv.messages = conv.messages || [];
-		conv.messages.push(message);
-		if (conv.messages.length > StoreManager.MAX_MESSAGES_PER_CONVERSATION) {
-			conv.messages = conv.messages.slice(-StoreManager.MAX_MESSAGES_PER_CONVERSATION);
-		}
-		conv.messageCount = conv.messages.length;
-		conv.updatedAt = Date.now();
-		if (message.role === "user" && !conv.preview) {
-			conv.preview = message.content.slice(0, 100);
-		}
-		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
-	}
-
-	updateChatMessage(conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>): void {
-		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) return;
-		const idx = (conv.messages || []).findIndex((m) => m.id === messageId);
-		if (idx === -1) return;
-		conv.messages[idx] = { ...conv.messages[idx], ...updates };
-		conv.updatedAt = Date.now();
-		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
-	}
-
-	clearConversationMessages(conversationId: string): void {
-		const conv = this.chatStore.get(`conversations.${conversationId}` as keyof ChatStoreData) as unknown as ConversationData | undefined;
-		if (!conv) return;
-		conv.messages = [];
-		conv.messageCount = 0;
-		conv.preview = "";
-		conv.updatedAt = Date.now();
-		this.chatStore.set(`conversations.${conversationId}` as keyof ChatStoreData, conv as any);
-	}
-
-	getChatLastConversationId(): string | undefined {
-		return this.chatStore.get("lastConversationId");
-	}
-
-	setChatLastConversationId(id: string): void {
-		this.chatStore.set("lastConversationId", id);
-	}
-
 	// ============ 清除所有数据 ============
 
 	clearAll(): void {
 		this.configStore.clear();
 		this.dataStore.clear();
-		this.chatStore.clear();
 	}
 }
 

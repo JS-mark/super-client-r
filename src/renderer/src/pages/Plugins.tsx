@@ -38,6 +38,7 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
 import { pluginService } from "../services/pluginService";
 import { useChatStore } from "../stores/chatStore";
+import { useSkinStore } from "../stores/skinStore";
 import type { MarketPlugin, PluginCommand, PluginInfo } from "../types/plugin";
 
 const { Search } = Input;
@@ -55,6 +56,12 @@ export default function Plugins() {
 	const { token } = useToken();
 	const navigate = useNavigate();
 	const setPendingInput = useChatStore((s) => s.setPendingInput);
+	const activeSkinPluginId = useSkinStore((s) => s.activeSkinPluginId);
+	const activeSkinThemeId = useSkinStore((s) => s.activeSkinThemeId);
+	const setActiveSkin = useSkinStore((s) => s.setActiveSkin);
+	const activeMarkdownPluginId = useSkinStore((s) => s.activeMarkdownPluginId);
+	const activeMarkdownThemeId = useSkinStore((s) => s.activeMarkdownThemeId);
+	const setActiveMarkdownTheme = useSkinStore((s) => s.setActiveMarkdownTheme);
 
 	// 设置标题栏
 	const pageTitle = useMemo(
@@ -233,6 +240,72 @@ export default function Plugins() {
 		}
 	}, []);
 
+	// 激活主题
+	const handleActivateTheme = useCallback(
+		async (pluginId: string, themeId: string) => {
+			try {
+				setLoading(true);
+				await window.electron.skin.setActiveSkin(pluginId, themeId);
+				setActiveSkin(pluginId, themeId);
+				message.success(t("plugins.skinActivated", "皮肤已启用", { ns: "plugins" }));
+				loadInstalledPlugins();
+			} catch (error) {
+				message.error(String(error));
+			} finally {
+				setLoading(false);
+			}
+		},
+		[setActiveSkin, loadInstalledPlugins, t],
+	);
+
+	// 恢复默认皮肤
+	const handleRestoreDefaultSkin = useCallback(async () => {
+		try {
+			setLoading(true);
+			await window.electron.skin.setActiveSkin(null);
+			setActiveSkin(null, null);
+			message.success(t("plugins.skinRestored", "已恢复默认主题", { ns: "plugins" }));
+			loadInstalledPlugins();
+		} catch (error) {
+			message.error(String(error));
+		} finally {
+			setLoading(false);
+		}
+	}, [setActiveSkin, loadInstalledPlugins, t]);
+
+	// 激活 Markdown 主题
+	const handleActivateMarkdownTheme = useCallback(
+		async (pluginId: string, themeId: string) => {
+			try {
+				setLoading(true);
+				await window.electron.markdownTheme.setActive(pluginId, themeId);
+				setActiveMarkdownTheme(pluginId, themeId);
+				message.success(t("plugins.markdownThemeActivated", "Markdown 主题已启用", { ns: "plugins" }));
+				loadInstalledPlugins();
+			} catch (error) {
+				message.error(String(error));
+			} finally {
+				setLoading(false);
+			}
+		},
+		[setActiveMarkdownTheme, loadInstalledPlugins, t],
+	);
+
+	// 恢复默认 Markdown 主题
+	const handleRestoreDefaultMarkdown = useCallback(async () => {
+		try {
+			setLoading(true);
+			await window.electron.markdownTheme.setActive(null);
+			setActiveMarkdownTheme(null, null);
+			message.success(t("plugins.markdownThemeRestored", "已恢复默认 Markdown 样式", { ns: "plugins" }));
+			loadInstalledPlugins();
+		} catch (error) {
+			message.error(String(error));
+		} finally {
+			setLoading(false);
+		}
+	}, [setActiveMarkdownTheme, loadInstalledPlugins, t]);
+
 	// 复制模板
 	const handleCopyTemplate = useCallback(() => {
 		if (commandResult?.template) {
@@ -267,6 +340,11 @@ export default function Plugins() {
 				(c) => !c.command.endsWith(".list"),
 			);
 			const isActive = plugin.state === "active";
+			const isSkin = plugin.manifest.categories?.includes("theme") && (plugin.manifest.contributes?.themes?.length ?? 0) > 0;
+			const isMarkdownTheme = plugin.manifest.categories?.includes("markdown") && (plugin.manifest.contributes?.themes?.length ?? 0) > 0;
+			const themes = plugin.manifest.contributes?.themes || [];
+			const hasSkinActive = isSkin && activeSkinPluginId === plugin.id;
+			const hasMarkdownActive = isMarkdownTheme && activeMarkdownPluginId === plugin.id;
 
 			const stateConfig: Record<
 				string,
@@ -403,6 +481,92 @@ export default function Plugins() {
 							)}
 						</div>
 
+						{/* Skin theme selection */}
+						{isSkin && isActive && themes.length > 0 && (
+							<div className="mt-3">
+								<div className="flex flex-wrap gap-2">
+									{themes.map((themeItem: { id: string; label: string; icon?: string }) => {
+										const isThemeActive = hasSkinActive && activeSkinThemeId === themeItem.id;
+										return (
+											<Button
+												key={themeItem.id}
+												size="small"
+												type={isThemeActive ? "primary" : "default"}
+												onClick={() => {
+													if (isThemeActive) {
+														handleRestoreDefaultSkin();
+													} else {
+														handleActivateTheme(plugin.id, themeItem.id);
+													}
+												}}
+												loading={loading}
+												style={{
+													borderRadius: 6,
+													fontSize: 12,
+												}}
+											>
+												{themeItem.icon ? `${themeItem.icon} ` : ""}{themeItem.label}
+											</Button>
+										);
+									})}
+								</div>
+								{hasSkinActive && (
+									<Button
+										type="link"
+										size="small"
+										onClick={handleRestoreDefaultSkin}
+										loading={loading}
+										style={{ padding: "4px 0", fontSize: 12, height: "auto" }}
+									>
+										{t("plugins.restoreDefault", "恢复默认", { ns: "plugins" })}
+									</Button>
+								)}
+							</div>
+						)}
+
+						{/* Markdown theme selection */}
+						{isMarkdownTheme && isActive && themes.length > 0 && (
+							<div className="mt-3">
+								<div className="flex flex-wrap gap-2">
+									{themes.map((themeItem: { id: string; label: string; icon?: string }) => {
+										const isMdThemeActive = hasMarkdownActive && activeMarkdownThemeId === themeItem.id;
+										return (
+											<Button
+												key={themeItem.id}
+												size="small"
+												type={isMdThemeActive ? "primary" : "default"}
+												onClick={() => {
+													if (isMdThemeActive) {
+														handleRestoreDefaultMarkdown();
+													} else {
+														handleActivateMarkdownTheme(plugin.id, themeItem.id);
+													}
+												}}
+												loading={loading}
+												style={{
+													borderRadius: 6,
+													fontSize: 12,
+												}}
+											>
+												{themeItem.icon ? `${themeItem.icon} ` : ""}{themeItem.label}
+											</Button>
+										);
+									})}
+								</div>
+								{hasMarkdownActive && (
+									<Button
+										type="link"
+										size="small"
+										onClick={handleRestoreDefaultMarkdown}
+										loading={loading}
+										style={{ padding: "4px 0", fontSize: 12, height: "auto" }}
+									>
+										{t("plugins.restoreDefault", "恢复默认", { ns: "plugins" })}
+									</Button>
+								)}
+							</div>
+						)}
+
 						{/* Error */}
 						{plugin.error && (
 							<div
@@ -474,9 +638,18 @@ export default function Plugins() {
 			executingCommand,
 			token,
 			t,
+			loading,
+			activeSkinPluginId,
+			activeSkinThemeId,
+			activeMarkdownPluginId,
+			activeMarkdownThemeId,
 			handleTogglePlugin,
 			handleUninstallPlugin,
 			handleExecuteCommand,
+			handleActivateTheme,
+			handleRestoreDefaultSkin,
+			handleActivateMarkdownTheme,
+			handleRestoreDefaultMarkdown,
 		],
 	);
 

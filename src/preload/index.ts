@@ -106,6 +106,7 @@ export interface ElectronAPI {
 		clearMessages: (conversationId: string) => Promise<IPCResponse>;
 		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
 		setLastConversation: (id: string) => Promise<IPCResponse>;
+		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
 	};
 
 	// 主题 API
@@ -208,6 +209,36 @@ export interface ElectronAPI {
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
+	};
+
+	// 皮肤 API
+	skin: {
+		getActiveSkin: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
+		setActiveSkin: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
+		onTokensChanged: (callback: (tokens: Record<string, unknown> | null) => void) => () => void;
+	};
+
+	// Markdown 主题 API
+	markdownTheme: {
+		getActive: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
+		setActive: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
+	};
+
+	// 系统信息 API
+	system: {
+		getHomedir: () => Promise<IPCResponse<string>>;
+		getEnvInfo: () => Promise<IPCResponse<{
+			os: string;
+			platform: string;
+			arch: string;
+			nodeVersion: string;
+			electronVersion: string;
+			v8Version: string;
+			homedir: string;
+			cwd: string;
+			appVersion: string;
+			locale: string;
+		}>>;
 	};
 
 	// 通用 IPC
@@ -753,6 +784,7 @@ const electronAPI: ElectronAPI = {
 		clearMessages: (conversationId: string) => ipcRenderer.invoke("chat:clear-messages", conversationId),
 		getLastConversation: () => ipcRenderer.invoke("chat:get-last-conversation"),
 		setLastConversation: (id: string) => ipcRenderer.invoke("chat:set-last-conversation", id),
+		getConversationDir: (id: string) => ipcRenderer.invoke("chat:get-conversation-dir", id),
 	},
 
 	// 主题 API
@@ -871,6 +903,29 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.on("llm:stream-event", listener);
 			return () => ipcRenderer.off("llm:stream-event", listener);
 		},
+	},
+
+	// 皮肤 API
+	skin: {
+		getActiveSkin: () => ipcRenderer.invoke("plugin:getActiveSkin"),
+		setActiveSkin: (pluginId: string | null, themeId?: string) => ipcRenderer.invoke("plugin:setActiveSkin", { pluginId, themeId }),
+		onTokensChanged: (callback: (tokens: Record<string, unknown> | null) => void) => {
+			const listener = (_event: unknown, tokens: Record<string, unknown> | null) => callback(tokens);
+			ipcRenderer.on("skin:tokens-changed", listener);
+			return () => ipcRenderer.off("skin:tokens-changed", listener);
+		},
+	},
+
+	// Markdown 主题 API
+	markdownTheme: {
+		getActive: () => ipcRenderer.invoke("plugin:getActiveMarkdownTheme"),
+		setActive: (pluginId: string | null, themeId?: string) => ipcRenderer.invoke("plugin:setActiveMarkdownTheme", { pluginId, themeId }),
+	},
+
+	// 系统信息 API
+	system: {
+		getHomedir: () => ipcRenderer.invoke("system:get-homedir"),
+		getEnvInfo: () => ipcRenderer.invoke("system:get-env-info"),
 	},
 
 	// 通用 IPC

@@ -7,6 +7,7 @@ import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
+import { useSkinStore } from "./stores/skinStore";
 import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
 
 const ANTD_LOCALES: Record<string, typeof zhCN> = {
@@ -20,6 +21,9 @@ function App() {
 	// 从 store 获取实际主题
 	const actualTheme = useThemeStore((state) => state.actualTheme);
 	const { i18n } = useTranslation();
+	const antdTokenOverrides = useSkinStore((state) => state.antdTokenOverrides);
+	const initSkin = useSkinStore((state) => state.initialize);
+	const setAntdTokenOverrides = useSkinStore((state) => state.setAntdTokenOverrides);
 	const antdLocale = useMemo(
 		() => ANTD_LOCALES[i18n.language] || zhCN,
 		[i18n.language],
@@ -28,6 +32,15 @@ function App() {
 	useEffect(() => {
 		initSystemThemeDetection();
 	}, []);
+
+	// 初始化皮肤
+	useEffect(() => {
+		initSkin();
+		const unsubscribe = window.electron.skin.onTokensChanged((tokens) => {
+			setAntdTokenOverrides(tokens);
+		});
+		return unsubscribe;
+	}, [initSkin, setAntdTokenOverrides]);
 
 	useEffect(() => {
 		// Global navigation handler from main process
@@ -48,6 +61,27 @@ function App() {
 			}
 		};
 	}, []);
+
+	// Extract skin token overrides (supports light/dark format)
+	const skinOverrides = useMemo(() => {
+		const data = antdTokenOverrides as Record<string, unknown> | null;
+		if (!data) return { token: undefined, components: undefined };
+		// New format: { light: { token, components }, dark: { token, components } }
+		if (data.light || data.dark) {
+			const modeData = (actualTheme === "dark" ? data.dark : data.light) as Record<string, unknown> | undefined;
+			return {
+				token: modeData?.token as Record<string, unknown> | undefined,
+				components: modeData?.components as Record<string, unknown> | undefined,
+			};
+		}
+		// Legacy format: { token, components }
+		return {
+			token: data.token as Record<string, unknown> | undefined,
+			components: data.components as Record<string, unknown> | undefined,
+		};
+	}, [antdTokenOverrides, actualTheme]);
+	const skinTokens = skinOverrides.token;
+	const skinComponents = skinOverrides.components;
 
 	// 根据实际主题选择算法
 	const antdTheme = {
@@ -74,6 +108,8 @@ function App() {
 			// 字体
 			fontFamily:
 				"-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+			// Skin token overrides
+			...skinTokens,
 		},
 		components: {
 			Layout: {
@@ -135,6 +171,8 @@ function App() {
 			Dropdown: {
 				colorBgElevated: actualTheme === "dark" ? "#1f1f1f" : "#ffffff",
 			},
+			// Skin component overrides
+			...skinComponents,
 		},
 	};
 

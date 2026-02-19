@@ -24,6 +24,13 @@
     "pluginDisabled": "Plugin disabled",
     "pluginInstalled": "Plugin installed successfully",
     "pluginUninstalled": "Plugin uninstalled",
-    "downloadSuccess": "Plugin downloaded and installed successfully"
+    "downloadSuccess": "Plugin downloaded and installed successfully",
+    "skinActivated": "Skin activated",
+    "skinRestored": "Restored to default theme",
+    "skinActive": "Skin Active",
+    "restoreDefault": "Restore Default",
+    "activateSkin": "Activate Skin",
+    "markdownThemeActivated": "Markdown theme activated",
+    "markdownThemeRestored": "Restored to default Markdown style"
   }
 }

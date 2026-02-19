@@ -7,7 +7,7 @@ import type {
 	PluginInfo,
 	PluginManifest,
 } from "./types";
-import { app } from "electron";
+import { app, BrowserWindow } from "electron";
 import { storeManager } from "../../store/StoreManager";
 
 interface PluginActivationRecord {
@@ -27,6 +27,16 @@ export class PluginManager extends EventEmitter {
 	private pluginsDir: string;
 	private globalStorageDir: string;
 	private isInitialized = false;
+
+	// Skin state: stores { pluginId, themeId } or null
+	private activeSkinPluginId: string | null = null;
+	private activeSkinThemeId: string | null = null;
+	private skinCssKeys = new Map<number, string>(); // BrowserWindow.id → cssKey
+
+	// Markdown theme state: separate from skin
+	private activeMarkdownPluginId: string | null = null;
+	private activeMarkdownThemeId: string | null = null;
+	private markdownCssKeys = new Map<number, string>(); // BrowserWindow.id → cssKey
 
 	constructor() {
 		super();
@@ -169,6 +179,10 @@ export class PluginManager extends EventEmitter {
 			}
 		}
 		await this.savePluginsToStorage();
+
+		// Restore active skin and markdown theme after all plugins activated
+		await this.restoreActiveSkin();
+		await this.restoreActiveMarkdownTheme();
 	}
 
 	/**
@@ -257,6 +271,16 @@ export class PluginManager extends EventEmitter {
 				if (entry.pluginId === pluginId) {
 					this.commandRegistry.delete(cmdId);
 				}
+			}
+
+			// If this is the active skin's plugin, remove its CSS
+			if (this.activeSkinPluginId === pluginId) {
+				await this.removeSkinCSS();
+			}
+
+			// If this is the active markdown theme's plugin, remove its CSS
+			if (this.activeMarkdownPluginId === pluginId) {
+				await this.removeMarkdownCSS();
 			}
 
 			// 从激活列表移除
@@ -531,6 +555,258 @@ export class PluginManager extends EventEmitter {
 	 */
 	getActivePlugins(): string[] {
 		return Array.from(this.activePlugins.keys());
+	}
+
+	// ============ 皮肤管理 ============
+
+	/**
+	 * 检查插件是否为皮肤插件
+	 */
+	isSkinPlugin(pluginInfo: PluginInfo): boolean {
+		return (
+			(pluginInfo.manifest.categories?.includes("theme") ?? false) &&
+			(pluginInfo.manifest.contributes?.themes?.length ?? 0) > 0
+		);
+	}
+
+	/**
+	 * 获取当前激活的皮肤信息
+	 */
+	getActiveSkinId(): { pluginId: string; themeId: string } | null {
+		if (this.activeSkinPluginId && this.activeSkinThemeId) {
+			return { pluginId: this.activeSkinPluginId, themeId: this.activeSkinThemeId };
+		}
+		return null;
+	}
+
+	/**
+	 * 移除当前皮肤CSS（仅清理注入的CSS，不广播不清状态）
+	 */
+	private async removeCurrentSkinCSSOnly(): Promise<void> {
+		const windows = BrowserWindow.getAllWindows();
+		for (const win of windows) {
+			const key = this.skinCssKeys.get(win.id);
+			if (key) {
+				try {
+					await win.webContents.removeInsertedCSS(key);
+				} catch {
+					// Window may have been closed
+				}
+			}
+		}
+		this.skinCssKeys.clear();
+	}
+
+	/**
+	 * 应用皮肤CSS（指定主题ID）
+	 */
+	async applySkinCSS(pluginInfo: PluginInfo, themeId: string): Promise<void> {
+		const themes = pluginInfo.manifest.contributes?.themes;
+		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
+		if (!themeEntry) {
+			console.error(`[PluginManager] Theme ${themeId} not found in plugin ${pluginInfo.id}`);
+			return;
+		}
+
+		// Read CSS file
+		const cssPath = path.join(pluginInfo.path, themeEntry.style);
+		let css: string;
+		try {
+			css = await fs.readFile(cssPath, "utf-8");
+		} catch (error) {
+			console.error(`[PluginManager] Failed to read skin CSS at ${cssPath}:`, error);
+			return;
+		}
+
+		// Read optional tokens
+		let tokens: Record<string, unknown> | null = null;
+		if (themeEntry.antdTokens) {
+			try {
+				const tokensPath = path.join(pluginInfo.path, themeEntry.antdTokens);
+				const tokensContent = await fs.readFile(tokensPath, "utf-8");
+				tokens = JSON.parse(tokensContent);
+			} catch (error) {
+				console.warn(`[PluginManager] Failed to read skin tokens:`, error);
+			}
+		}
+
+		// Remove old CSS first (without broadcasting null tokens)
+		await this.removeCurrentSkinCSSOnly();
+
+		// Inject CSS into all windows
+		const windows = BrowserWindow.getAllWindows();
+		for (const win of windows) {
+			try {
+				const key = await win.webContents.insertCSS(css);
+				this.skinCssKeys.set(win.id, key);
+			} catch (error) {
+				console.error(`[PluginManager] Failed to inject CSS into window ${win.id}:`, error);
+			}
+		}
+
+		this.activeSkinPluginId = pluginInfo.id;
+		this.activeSkinThemeId = themeId;
+		storeManager.setConfig("activeSkin", { pluginId: pluginInfo.id, themeId });
+
+		// Broadcast tokens to renderer
+		for (const win of windows) {
+			win.webContents.send("skin:tokens-changed", tokens);
+		}
+
+		this.emit("skinApplied", pluginInfo.id, themeId);
+		console.log(`[PluginManager] Theme ${themeId} from plugin ${pluginInfo.id} applied`);
+	}
+
+	/**
+	 * 移除当前皮肤CSS
+	 */
+	async removeSkinCSS(): Promise<void> {
+		await this.removeCurrentSkinCSSOnly();
+
+		this.activeSkinPluginId = null;
+		this.activeSkinThemeId = null;
+		storeManager.deleteConfig("activeSkin");
+
+		// Broadcast null tokens
+		const windows = BrowserWindow.getAllWindows();
+		for (const win of windows) {
+			win.webContents.send("skin:tokens-changed", null);
+		}
+
+		this.emit("skinRemoved");
+		console.log("[PluginManager] Skin removed, restored defaults");
+	}
+
+	/**
+	 * 恢复上次激活的皮肤（应用启动时）
+	 */
+	async restoreActiveSkin(): Promise<void> {
+		const saved = storeManager.getConfig("activeSkin") as { pluginId: string; themeId: string } | string | undefined;
+		if (!saved) return;
+
+		// Handle legacy string format
+		const skinInfo = typeof saved === "string"
+			? { pluginId: saved, themeId: "" }
+			: saved;
+
+		if (skinInfo.pluginId && skinInfo.themeId) {
+			const pluginInfo = this.plugins.get(skinInfo.pluginId);
+			if (pluginInfo && this.isSkinPlugin(pluginInfo) && pluginInfo.enabled) {
+				await this.applySkinCSS(pluginInfo, skinInfo.themeId);
+			}
+		}
+	}
+
+	// ============ Markdown 主题管理 ============
+
+	/**
+	 * 检查插件是否为 Markdown 主题插件
+	 */
+	isMarkdownThemePlugin(pluginInfo: PluginInfo): boolean {
+		return (
+			(pluginInfo.manifest.categories?.includes("markdown") ?? false) &&
+			(pluginInfo.manifest.contributes?.themes?.length ?? 0) > 0
+		);
+	}
+
+	/**
+	 * 获取当前激活的 Markdown 主题信息
+	 */
+	getActiveMarkdownThemeId(): { pluginId: string; themeId: string } | null {
+		if (this.activeMarkdownPluginId && this.activeMarkdownThemeId) {
+			return { pluginId: this.activeMarkdownPluginId, themeId: this.activeMarkdownThemeId };
+		}
+		return null;
+	}
+
+	/**
+	 * 移除当前 Markdown CSS（仅清理注入的CSS，不清状态）
+	 */
+	private async removeCurrentMarkdownCSSOnly(): Promise<void> {
+		const windows = BrowserWindow.getAllWindows();
+		for (const win of windows) {
+			const key = this.markdownCssKeys.get(win.id);
+			if (key) {
+				try {
+					await win.webContents.removeInsertedCSS(key);
+				} catch {
+					// Window may have been closed
+				}
+			}
+		}
+		this.markdownCssKeys.clear();
+	}
+
+	/**
+	 * 应用 Markdown 主题 CSS
+	 */
+	async applyMarkdownCSS(pluginInfo: PluginInfo, themeId: string): Promise<void> {
+		const themes = pluginInfo.manifest.contributes?.themes;
+		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
+		if (!themeEntry) {
+			console.error(`[PluginManager] Markdown theme ${themeId} not found in plugin ${pluginInfo.id}`);
+			return;
+		}
+
+		// Read CSS file
+		const cssPath = path.join(pluginInfo.path, themeEntry.style);
+		let css: string;
+		try {
+			css = await fs.readFile(cssPath, "utf-8");
+		} catch (error) {
+			console.error(`[PluginManager] Failed to read markdown theme CSS at ${cssPath}:`, error);
+			return;
+		}
+
+		// Remove old CSS first (without clearing state)
+		await this.removeCurrentMarkdownCSSOnly();
+
+		// Inject CSS into all windows
+		const windows = BrowserWindow.getAllWindows();
+		for (const win of windows) {
+			try {
+				const key = await win.webContents.insertCSS(css);
+				this.markdownCssKeys.set(win.id, key);
+			} catch (error) {
+				console.error(`[PluginManager] Failed to inject markdown CSS into window ${win.id}:`, error);
+			}
+		}
+
+		this.activeMarkdownPluginId = pluginInfo.id;
+		this.activeMarkdownThemeId = themeId;
+		storeManager.setConfig("activeMarkdownTheme", { pluginId: pluginInfo.id, themeId });
+
+		this.emit("markdownThemeApplied", pluginInfo.id, themeId);
+		console.log(`[PluginManager] Markdown theme ${themeId} from plugin ${pluginInfo.id} applied`);
+	}
+
+	/**
+	 * 移除当前 Markdown 主题 CSS
+	 */
+	async removeMarkdownCSS(): Promise<void> {
+		await this.removeCurrentMarkdownCSSOnly();
+
+		this.activeMarkdownPluginId = null;
+		this.activeMarkdownThemeId = null;
+		storeManager.deleteConfig("activeMarkdownTheme");
+
+		this.emit("markdownThemeRemoved");
+		console.log("[PluginManager] Markdown theme removed, restored defaults");
+	}
+
+	/**
+	 * 恢复上次激活的 Markdown 主题（应用启动时）
+	 */
+	async restoreActiveMarkdownTheme(): Promise<void> {
+		const saved = storeManager.getConfig("activeMarkdownTheme") as { pluginId: string; themeId: string } | undefined;
+		if (!saved) return;
+
+		if (saved.pluginId && saved.themeId) {
+			const pluginInfo = this.plugins.get(saved.pluginId);
+			if (pluginInfo && this.isMarkdownThemePlugin(pluginInfo) && pluginInfo.enabled) {
+				await this.applyMarkdownCSS(pluginInfo, saved.themeId);
+			}
+		}
 	}
 
 	/**

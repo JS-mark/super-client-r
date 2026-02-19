@@ -24,6 +24,13 @@
     "pluginDisabled": "插件已禁用",
     "pluginInstalled": "插件安装成功",
     "pluginUninstalled": "插件已卸载",
-    "downloadSuccess": "插件下载并安装成功"
+    "downloadSuccess": "插件下载并安装成功",
+    "skinActivated": "皮肤已启用",
+    "skinRestored": "已恢复默认主题",
+    "skinActive": "皮肤已启用",
+    "restoreDefault": "恢复默认",
+    "activateSkin": "启用皮肤",
+    "markdownThemeActivated": "Markdown 主题已启用",
+    "markdownThemeRestored": "已恢复默认 Markdown 样式"
   }
 }
