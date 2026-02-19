@@ -1,3 +1,4 @@
+import { theme } from "antd";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import type { AttachmentType } from "../../stores/attachmentStore";
@@ -23,15 +24,37 @@ const ICON_SIZE_MAP = {
 	xl: "w-8 h-8",
 };
 
-const TYPE_COLORS: Record<AttachmentType, string> = {
-	image: "bg-purple-100 text-purple-600",
-	document: "bg-blue-100 text-blue-600",
-	code: "bg-emerald-100 text-emerald-600",
-	audio: "bg-amber-100 text-amber-600",
-	video: "bg-rose-100 text-rose-600",
-	archive: "bg-slate-100 text-slate-600",
-	other: "bg-gray-100 text-gray-600",
+/**
+ * Hue-based accent colors per file type.
+ * We derive background + foreground from the antd token palette
+ * so that both light and dark themes are handled automatically.
+ */
+const TYPE_HUES: Record<AttachmentType, { bg: string; fg: string }> = {
+	image: { bg: "purple", fg: "purple" },
+	document: { bg: "blue", fg: "blue" },
+	code: { bg: "green", fg: "green" },
+	audio: { bg: "gold", fg: "gold" },
+	video: { bg: "red", fg: "red" },
+	archive: { bg: "grey", fg: "grey" },
+	other: { bg: "grey", fg: "grey" },
 };
+
+function useTypeColors(type: AttachmentType) {
+	const { token } = theme.useToken();
+	const hue = TYPE_HUES[type];
+
+	// Map hue names to antd token color pairs
+	const colorMap: Record<string, { bg: string; fg: string }> = {
+		purple: { bg: token.purple1, fg: token.purple6 },
+		blue: { bg: token.blue1, fg: token.blue6 },
+		green: { bg: token.green1, fg: token.green6 },
+		gold: { bg: token.gold1, fg: token.gold6 },
+		red: { bg: token.red1, fg: token.red6 },
+		grey: { bg: token.colorFillSecondary, fg: token.colorTextSecondary },
+	};
+
+	return colorMap[hue.bg] ?? colorMap.grey;
+}
 
 // SVG icons for each file type
 const FileTypeIcons: Record<AttachmentType, React.ReactNode> = {
@@ -87,15 +110,16 @@ const FileTypeIcons: Record<AttachmentType, React.ReactNode> = {
 
 export function FileIcon({ type, extension, size = "md", className }: FileIconProps) {
 	const { t } = useTranslation();
+	const colors = useTypeColors(type);
 
 	return (
 		<div
 			className={cn(
 				"rounded-lg flex items-center justify-center shrink-0",
 				SIZE_MAP[size],
-				TYPE_COLORS[type],
 				className
 			)}
+			style={{ backgroundColor: colors.bg, color: colors.fg }}
 			title={t(`attachment.type.${type}`, type)}
 		>
 			<div className={cn("flex items-center justify-center", ICON_SIZE_MAP[size])}>

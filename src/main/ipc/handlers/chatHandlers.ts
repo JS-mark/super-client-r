@@ -9,7 +9,7 @@ import type {
 	SaveMessagesRequest,
 	UpdateMessageRequest,
 } from "../types";
-import { storeManager } from "../../store/StoreManager";
+import { conversationStorage } from "../../services/chat/ConversationStorageService";
 
 export function registerChatHandlers(): void {
 	// ============ Conversation CRUD ============
@@ -18,7 +18,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.LIST_CONVERSATIONS,
 		async (): Promise<IPCResponse<ConversationSummary[]>> => {
 			try {
-				const list = storeManager.getConversationList();
+				const list = conversationStorage.getConversationList();
 				return { success: true, data: list };
 			} catch (error: unknown) {
 				const message =
@@ -32,7 +32,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.CREATE_CONVERSATION,
 		async (_event, name: string): Promise<IPCResponse<ConversationSummary>> => {
 			try {
-				const conv = storeManager.createConversation(name || "New Chat");
+				const conv = conversationStorage.createConversation(name || "New Chat");
 				return { success: true, data: conv };
 			} catch (error: unknown) {
 				const message =
@@ -46,7 +46,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.DELETE_CONVERSATION,
 		async (_event, id: string): Promise<IPCResponse> => {
 			try {
-				storeManager.deleteConversation(id);
+				conversationStorage.deleteConversation(id);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -60,7 +60,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.RENAME_CONVERSATION,
 		async (_event, request: RenameConversationRequest): Promise<IPCResponse> => {
 			try {
-				storeManager.renameConversation(request.conversationId, request.name);
+				conversationStorage.renameConversation(request.conversationId, request.name);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -76,7 +76,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.GET_MESSAGES,
 		async (_event, conversationId: string): Promise<IPCResponse<ChatMessagePersist[]>> => {
 			try {
-				const messages = storeManager.getMessages(conversationId);
+				const messages = conversationStorage.getMessages(conversationId);
 				return { success: true, data: messages };
 			} catch (error: unknown) {
 				const message =
@@ -90,7 +90,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.SAVE_MESSAGES,
 		async (_event, request: SaveMessagesRequest): Promise<IPCResponse> => {
 			try {
-				storeManager.saveMessages(request.conversationId, request.messages);
+				conversationStorage.saveMessages(request.conversationId, request.messages);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -104,7 +104,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.APPEND_MESSAGE,
 		async (_event, request: AppendMessageRequest): Promise<IPCResponse> => {
 			try {
-				storeManager.appendMessage(request.conversationId, request.message);
+				conversationStorage.appendMessage(request.conversationId, request.message);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -118,7 +118,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.UPDATE_MESSAGE,
 		async (_event, request: UpdateMessageRequest): Promise<IPCResponse> => {
 			try {
-				storeManager.updateChatMessage(
+				conversationStorage.updateChatMessage(
 					request.conversationId,
 					request.messageId,
 					request.updates,
@@ -136,7 +136,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.CLEAR_MESSAGES,
 		async (_event, conversationId: string): Promise<IPCResponse> => {
 			try {
-				storeManager.clearConversationMessages(conversationId);
+				conversationStorage.clearConversationMessages(conversationId);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -152,7 +152,7 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.GET_LAST_CONVERSATION,
 		async (): Promise<IPCResponse<string | undefined>> => {
 			try {
-				const id = storeManager.getChatLastConversationId();
+				const id = conversationStorage.getChatLastConversationId();
 				return { success: true, data: id };
 			} catch (error: unknown) {
 				const message =
@@ -166,11 +166,27 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.SET_LAST_CONVERSATION,
 		async (_event, id: string): Promise<IPCResponse> => {
 			try {
-				storeManager.setChatLastConversationId(id);
+				conversationStorage.setChatLastConversationId(id);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
 					error instanceof Error ? error.message : "Failed to set last conversation";
+				return { success: false, error: message };
+			}
+		},
+	);
+
+	// ============ Conversation Directory ============
+
+	ipcMain.handle(
+		CHAT_CHANNELS.GET_CONVERSATION_DIR,
+		async (_event, conversationId: string): Promise<IPCResponse<string>> => {
+			try {
+				const dir = conversationStorage.getConversationDir(conversationId);
+				return { success: true, data: dir };
+			} catch (error: unknown) {
+				const message =
+					error instanceof Error ? error.message : "Failed to get conversation dir";
 				return { success: false, error: message };
 			}
 		},

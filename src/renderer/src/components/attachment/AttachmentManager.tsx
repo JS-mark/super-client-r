@@ -7,6 +7,7 @@ import {
 	Dropdown,
 	message,
 	Badge,
+	theme,
 } from "antd";
 import {
 	SearchOutlined,
@@ -414,6 +415,7 @@ export function AttachmentList({
 	maxDisplay = 3,
 	className,
 }: AttachmentListProps) {
+	const { token } = theme.useToken();
 	const displayAttachments = attachments.slice(0, maxDisplay);
 	const remainingCount = attachments.length - maxDisplay;
 
@@ -422,14 +424,19 @@ export function AttachmentList({
 			{displayAttachments.map((attachment) => (
 				<div
 					key={attachment.id}
-					className="flex items-center gap-2 px-2 py-1 bg-slate-100  rounded-lg text-sm"
+					className="flex items-center gap-2 px-2 py-1 rounded-lg text-sm"
+					style={{
+						backgroundColor: token.colorFillSecondary,
+						color: token.colorText,
+					}}
 				>
 					<FileIcon type={attachment.type} size="sm" />
 					<span className="max-w-[120px] truncate">{attachment.name}</span>
 					{onRemove && (
 						<button
 							onClick={() => onRemove(attachment.id)}
-							className="ml-1 text-slate-400 hover:text-red-500"
+							className="ml-1 hover:opacity-80"
+							style={{ color: token.colorTextQuaternary }}
 						>
 							×
 						</button>
@@ -439,7 +446,10 @@ export function AttachmentList({
 			{remainingCount > 0 && (
 				<Badge
 					count={`+${remainingCount}`}
-					className="bg-slate-200  text-slate-600 "
+					style={{
+						backgroundColor: token.colorFillTertiary,
+						color: token.colorTextSecondary,
+					}}
 				/>
 			)}
 		</div>

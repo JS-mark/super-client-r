@@ -41,4 +41,7 @@ export const chatHistoryService = {
 
 	setLastConversation: (id: string): Promise<IPCResponse> =>
 		window.electron.chat.setLastConversation(id),
+
+	getConversationDir: (id: string): Promise<IPCResponse<string>> =>
+		window.electron.chat.getConversationDir(id),
 };

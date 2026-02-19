@@ -35,16 +35,62 @@ export const DEFAULT_SYSTEM_PROMPT = `You are a helpful, harmless, and honest AI
 6. When dealing with sensitive topics, remain objective and balanced.`;
 
 /**
+ * 本地环境信息
+ */
+export interface EnvInfo {
+	os: string;
+	platform: string;
+	arch: string;
+	nodeVersion: string;
+	electronVersion: string;
+	v8Version: string;
+	homedir: string;
+	cwd: string;
+	appVersion: string;
+	locale: string;
+}
+
+/**
+ * 构建环境上下文提示词
+ */
+function buildEnvContext(envInfo: EnvInfo): string {
+	const now = new Date();
+	const timeStr = now.toLocaleString(envInfo.locale || undefined, {
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hour12: false,
+	});
+
+	return `--- Local Environment ---
+OS: ${envInfo.os} (${envInfo.platform}/${envInfo.arch})
+Runtime: Node.js ${envInfo.nodeVersion}, Electron ${envInfo.electronVersion}
+App Version: ${envInfo.appVersion}
+User Home: ${envInfo.homedir}
+Working Directory: ${envInfo.cwd}
+Current Time: ${timeStr}
+Locale: ${envInfo.locale}`;
+}
+
+/**
  * 构建完整的系统提示词
  *
- * 拼接顺序：全局默认提示词 → 模型自定义提示词
+ * 拼接顺序：全局默认提示词 → 环境上下文 → 模型自定义提示词
  * 全局提示词始终在最前面，不可被模型自定义提示词覆盖。
  *
  * @param modelSystemPrompt - 模型配置中的自定义系统提示词（可选）
+ * @param envInfo - 本地环境信息（可选）
  * @returns 拼接后的完整系统提示词
  */
-export function buildSystemPrompt(modelSystemPrompt?: string): string {
+export function buildSystemPrompt(modelSystemPrompt?: string, envInfo?: EnvInfo): string {
 	const parts: string[] = [DEFAULT_SYSTEM_PROMPT];
+
+	if (envInfo) {
+		parts.push(buildEnvContext(envInfo));
+	}
 
 	if (modelSystemPrompt?.trim()) {
 		parts.push(modelSystemPrompt.trim());
@@ -54,6 +100,7 @@ export function buildSystemPrompt(modelSystemPrompt?: string): string {
 
 	logger.debug("Built system prompt", {
 		hasModelPrompt: !!modelSystemPrompt?.trim(),
+		hasEnvInfo: !!envInfo,
 		totalLength: result.length,
 	});
 

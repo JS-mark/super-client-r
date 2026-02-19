@@ -2,9 +2,13 @@ import { app, dialog, ipcMain, shell } from "electron";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, copyFileSync } from "fs";
 import { join, extname, basename } from "path";
 import { FILE_CHANNELS } from "../channels";
+import { conversationStorage } from "../../services/chat/ConversationStorageService";
 
-// 附件存储目录
-function getAttachmentsDir(): string {
+// 附件存储目录 (legacy flat dir, or per-conversation)
+function getAttachmentsDir(conversationId?: string): string {
+	if (conversationId) {
+		return conversationStorage.getAttachmentsDir(conversationId);
+	}
 	const dir = join(app.getPath("userData"), "attachments");
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
@@ -138,7 +142,7 @@ export function registerFileHandlers() {
 				return { success: false, error: "源文件不存在" };
 			}
 
-			const attachmentsDir = getAttachmentsDir();
+			const attachmentsDir = getAttachmentsDir(conversationId);
 			const originalName = customName || basename(sourcePath);
 			const uniqueName = generateUniqueFileName(originalName);
 			const targetPath = join(attachmentsDir, uniqueName);
@@ -191,9 +195,9 @@ export function registerFileHandlers() {
 	});
 
 	// 获取附件列表
-	ipcMain.handle(FILE_CHANNELS.LIST_ATTACHMENTS, async (_) => {
+	ipcMain.handle(FILE_CHANNELS.LIST_ATTACHMENTS, async (_, filter?: { conversationId?: string }) => {
 		try {
-			const attachmentsDir = getAttachmentsDir();
+			const attachmentsDir = getAttachmentsDir(filter?.conversationId);
 			if (!existsSync(attachmentsDir)) {
 				return { success: true, attachments: [] };
 			}
