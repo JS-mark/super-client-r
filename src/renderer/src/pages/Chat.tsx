@@ -322,6 +322,8 @@ const Chat: React.FC = () => {
 		switchConversation,
 		pendingInput,
 		setPendingInput,
+		pendingSkillId,
+		setPendingSkillId,
 	} = useChatStore();
 
 	// Load conversations on mount and restore last conversation
@@ -344,6 +346,15 @@ const Chat: React.FC = () => {
 			setPendingInput(null);
 		}
 	}, [pendingInput, setInput, setPendingInput]);
+
+	// Consume pendingSkillId from Skills page navigation
+	useEffect(() => {
+		if (pendingSkillId) {
+			setChatMode("skill");
+			setSelectedSkillId(pendingSkillId);
+			setPendingSkillId(null);
+		}
+	}, [pendingSkillId, setChatMode, setSelectedSkillId, setPendingSkillId]);
 
 	// Reset session model override when switching conversations
 	useEffect(() => {
@@ -652,6 +663,10 @@ const Chat: React.FC = () => {
 					content: {
 						background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
 						color: "#fff",
+						width: "fit-content",
+						marginLeft: "auto",
+						paddingInline: 10,
+						borderRadius: 12,
 					},
 				},
 			},
@@ -683,7 +698,7 @@ const Chat: React.FC = () => {
 
 	// Convert messages to Bubble.List items
 	const bubbleItems = useMemo(() => {
-		return messages.map((msg, idx) => {
+		return messages.flatMap((msg, idx) => {
 			const isLast = idx === messages.length - 1;
 			const isAssistant = msg.role === "assistant";
 			const isTool = msg.role === "tool";
@@ -691,6 +706,12 @@ const Chat: React.FC = () => {
 			const isCurrentlyStreaming = isAssistant && isStreaming && isLast;
 			const displayContent =
 				isAssistant && isStreaming && isLast ? streamingContent : msg.content;
+
+			// Skip empty assistant messages that aren't actively streaming
+			// (e.g. placeholder created after tool_result but model hasn't responded yet)
+			if (isAssistant && !displayContent && !isCurrentlyStreaming) {
+				return [];
+			}
 
 			// Check if this AI message is a continuation after tool call(s)
 			const prevMsg = idx > 0 ? messages[idx - 1] : null;
@@ -802,16 +823,16 @@ const Chat: React.FC = () => {
 
 			// Tool call messages — no header (part of same turn)
 			if (isTool && msg.toolCall) {
-				return {
+				return [{
 					key: msg.id || `msg-${idx}`,
 					role: "ai" as const,
 					content: "",
 					contentRender: () => <ToolCallCard toolCall={msg.toolCall!} />,
 					variant: "borderless" as const,
-				};
+				}];
 			}
 
-			return {
+			return [{
 				key: msg.id || `msg-${idx}`,
 				role: isUser ? ("user" as const) : ("ai" as const),
 				content: displayContent || "",
@@ -834,7 +855,7 @@ const Chat: React.FC = () => {
 								);
 							}}
 						>
-							<div>
+							<div className={isUser ? "user-bubble-content" : undefined}>
 								<Markdown
 									content={displayContent}
 									streaming={isCurrentlyStreaming}
@@ -1045,7 +1066,7 @@ const Chat: React.FC = () => {
 						</div>
 					);
 				})(),
-			};
+			}];
 		});
 	}, [
 		messages,

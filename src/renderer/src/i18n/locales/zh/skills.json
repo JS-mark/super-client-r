@@ -6,7 +6,10 @@
 	"noData": "暂无技能",
 	"noInstalled": "暂无已安装技能",
 	"searchPlaceholder": "搜索技能...",
+	"noBuiltin": "暂无内置技能",
+	"builtinDescription": "内置技能随应用一起提供，无需安装。点击卡片可直接在聊天中使用该技能。",
 	"tabs": {
+		"builtin": "内置技能",
 		"market": "市场",
 		"installed": "已安装"
 	},

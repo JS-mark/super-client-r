@@ -55,6 +55,10 @@ interface ChatState {
 	pendingInput: string | null;
 	setPendingInput: (input: string | null) => void;
 
+	// Pending skill selection (from Skills page, etc.)
+	pendingSkillId: string | null;
+	setPendingSkillId: (id: string | null) => void;
+
 	// Conversations
 	conversations: ConversationSummary[];
 	currentConversationId: string | null;
@@ -92,6 +96,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	streamingContent: "",
 	pendingInput: null,
 	setPendingInput: (input) => set({ pendingInput: input }),
+	pendingSkillId: null,
+	setPendingSkillId: (id) => set({ pendingSkillId: id }),
 	conversations: [],
 	currentConversationId: null,
 	isLoadingConversations: false,

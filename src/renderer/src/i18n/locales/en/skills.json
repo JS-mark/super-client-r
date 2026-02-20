@@ -6,7 +6,10 @@
 	"noData": "No skills found",
 	"noInstalled": "No installed skills",
 	"searchPlaceholder": "Search skills...",
+	"noBuiltin": "No built-in skills",
+	"builtinDescription": "Built-in skills are bundled with the app and require no installation. Click a card to use the skill in chat.",
 	"tabs": {
+		"builtin": "Built-in",
 		"market": "Market",
 		"installed": "Installed"
 	},

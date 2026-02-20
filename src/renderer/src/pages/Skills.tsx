@@ -1,4 +1,5 @@
 import {
+	AppstoreOutlined,
 	SearchOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
@@ -12,20 +13,25 @@ import {
 	theme,
 } from "antd";
 import * as React from "react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const { useToken } = theme;
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
+import { BuiltinSkillCard } from "../components/skill/BuiltinSkillCard";
 import { SkillCard } from "../components/skill/SkillCard";
 import { SkillDetailModal } from "../components/skill/SkillDetailModal";
 import { useTitle } from "../hooks/useTitle";
+import { useChatStore } from "../stores/chatStore";
 import { useSkillStore } from "../stores/skillStore";
+import type { SkillManifest } from "../types/electron";
 import type { Skill } from "../types/skills";
 
 const Skills: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
+	const navigate = useNavigate();
 
 	const pageTitle = useMemo(() => {
 		return (
@@ -58,6 +64,10 @@ const Skills: React.FC = () => {
 	const [currentPage, setCurrentPage] = React.useState(1);
 	const pageSize = 12;
 
+	// Built-in skills state
+	const [builtinSkills, setBuiltinSkills] = useState<SkillManifest[]>([]);
+	const [builtinLoading, setBuiltinLoading] = useState(false);
+
 	const handleSkillClick = (skill: Skill) => {
 		setSelectedSkill(skill);
 		setModalOpen(true);
@@ -68,9 +78,33 @@ const Skills: React.FC = () => {
 		setSelectedSkill(null);
 	};
 
+	// Navigate to chat with skill selected
+	const handleSelectBuiltinSkill = useCallback((skillId: string) => {
+		useChatStore.getState().setPendingSkillId(skillId);
+		navigate("/");
+	}, [navigate]);
+
 	React.useEffect(() => {
 		fetchMarketSkills();
 	}, [fetchMarketSkills]);
+
+	// Fetch built-in skills from main process
+	useEffect(() => {
+		const loadBuiltinSkills = async () => {
+			setBuiltinLoading(true);
+			try {
+				const res = await window.electron.skill.listSkills();
+				if (res.success && res.data) {
+					setBuiltinSkills(res.data);
+				}
+			} catch {
+				// ignore
+			} finally {
+				setBuiltinLoading(false);
+			}
+		};
+		loadBuiltinSkills();
+	}, []);
 
 	React.useEffect(() => {
 		const timeoutId = setTimeout(() => {
@@ -95,6 +129,49 @@ const Skills: React.FC = () => {
 	};
 
 	const items = [
+		{
+			key: "builtin",
+			label: (
+				<span className="flex items-center gap-1.5">
+					<AppstoreOutlined />
+					{t("tabs.builtin", { ns: "skills", defaultValue: "内置技能" })} ({builtinSkills.length})
+				</span>
+			),
+			children: (
+				<div className="h-full overflow-y-auto pr-2">
+					<div
+						className="mb-4 p-3 rounded-lg text-xs leading-relaxed"
+						style={{
+							backgroundColor: token.colorFillQuaternary,
+							color: token.colorTextSecondary,
+						}}
+					>
+						{t("builtinDescription", {
+							ns: "skills",
+							defaultValue: "内置技能随应用一起提供，无需安装。点击卡片可直接在聊天中使用该技能。",
+						})}
+					</div>
+					{builtinLoading ? (
+						<div className="flex justify-center items-center py-20"><Spin size="large" /></div>
+					) : builtinSkills.length === 0 ? (
+						<Empty
+							description={t("noBuiltin", { ns: "skills", defaultValue: "暂无内置技能" })}
+							className="py-20"
+						/>
+					) : (
+						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+							{builtinSkills.map((skill) => (
+								<BuiltinSkillCard
+									key={skill.id}
+									skill={skill}
+									onSelect={handleSelectBuiltinSkill}
+								/>
+							))}
+						</div>
+					)}
+				</div>
+			),
+		},
 		{
 			key: "market",
 			label: t("tabs.market", { ns: "skills" }),
@@ -180,7 +257,7 @@ const Skills: React.FC = () => {
 		<MainLayout>
 			<div className="p-4 h-full overflow-auto">
 				<Tabs
-					defaultActiveKey="market"
+					defaultActiveKey="builtin"
 					items={items}
 					className="flex-1 min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
 				/>
