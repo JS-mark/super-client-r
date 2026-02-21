@@ -49,7 +49,7 @@
 
 ### 伏笔管理规范
 
-每埋一条伏笔，立即记录到 `novel/progress.md`：
+每埋一条伏笔，立即记录到 `~/Desktop/novel/progress.md`：
 
 ```
 伏笔编号：F-XXX

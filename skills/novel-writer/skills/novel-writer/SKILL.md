@@ -21,6 +21,45 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, AskUser
 - 节奏张弛有度，不拖沓不赶工
 - 叙述中带适度黑色幽默和自嘲
 
+## 存储目录
+
+所有小说文件统一保存在桌面 `novel` 目录下：
+
+```
+~/Desktop/novel/
+├── outline.md                   # 故事大纲
+├── characters.md                # 角色档案
+├── progress.md                  # 创作进度 & 伏笔管理
+└── chapters/
+    ├── 第1卷/
+    │   ├── 第001章-标题.md
+    │   └── ...
+    └── 第2卷/
+```
+
+**重要：** 所有文件路径中的 `~/Desktop/novel/` 是固定根目录，不随项目工作目录变化。使用绝对路径 `$HOME/Desktop/novel/` 进行读写操作。
+
+## 启动加载流程（每次对话开始必须执行）
+
+**每次启动或进入创作时，必须先执行以下加载步骤：**
+
+1. 使用 Glob 工具检查 `~/Desktop/novel/` 目录是否存在
+2. 如果目录存在，**依次加载**：
+   - 使用 Read 读取 `~/Desktop/novel/outline.md`（故事大纲）
+   - 使用 Read 读取 `~/Desktop/novel/characters.md`（角色档案）
+   - 使用 Read 读取 `~/Desktop/novel/progress.md`（创作进度）
+   - 使用 Glob 查找 `~/Desktop/novel/chapters/**/*.md`，读取最近 1-2 章的内容（恢复上下文）
+3. 加载完成后，向用户简要汇报当前状态：
+   ```
+   📖 已加载创作存档
+   书名：《XXX》
+   当前进度：第X卷 · 第XX章
+   上章概要：XXX
+   下章预告：XXX
+   准备好了，随时可以继续！
+   ```
+4. 如果目录不存在或文件为空，说明是全新创作，引导用户从大纲阶段开始
+
 ## 创作工作流（必须按顺序执行）
 
 ### 阶段一：故事大纲
@@ -31,7 +70,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, AskUser
 2. **主线剧情** — 开局破冰 → 发展升级 → 高潮反转 → 结局收束
 3. **分卷规划** — 每卷含：卷名、核心事件、主要冲突、新登场角色、爽点设计、预计章节数
 
-完成后使用 Write 工具将大纲保存为项目文件（如 `novel/outline.md`），后续创作始终以此为基准。
+完成后使用 Write 工具保存到 `~/Desktop/novel/outline.md`，后续创作始终以此为基准。
 
 详细模板参见 **`references/outline-template.md`**。
 
@@ -39,7 +78,7 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, AskUser
 
 为每个重要角色建立档案，包括：基本信息、性格画像、背景故事、内心驱动、实力与成长线、人物关系网、反差感设计、登场规划。
 
-完成后保存为 `novel/characters.md`。
+完成后保存到 `~/Desktop/novel/characters.md`。
 
 详细模板参见 **`references/character-template.md`**。
 
@@ -60,11 +99,11 @@ allowed-tools: Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch, AskUser
 - 对话自然有辨识度，打斗/冲突有张力
 - 发现偏离主线时主动提醒用户
 
-每章写完使用 Write 工具保存为 `novel/chapters/第X卷/第XXX章-标题.md`。
+每章写完使用 Write 工具保存到 `~/Desktop/novel/chapters/第X卷/第XXX章-标题.md`。
 
 ### 阶段四：进度跟踪
 
-每完成一章后，在正文末尾附上进度报告，并更新 `novel/progress.md`：
+每完成一章后，在正文末尾附上进度报告，并更新 `~/Desktop/novel/progress.md`：
 
 ```
 📊 创作进度报告
