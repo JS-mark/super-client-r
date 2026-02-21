@@ -128,7 +128,9 @@
       "Bash(pnpm why:*)",
       "Bash(npm view:*)",
       "Bash(npm pack:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(npx vitepress build)",
+      "Bash(git rm:*)"
     ]
   }
 }
