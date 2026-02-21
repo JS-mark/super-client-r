@@ -555,8 +555,8 @@ const Chat: React.FC = () => {
 					mode: chatMode,
 					skillId:
 						chatMode === "skill" ? (selectedSkillId ?? undefined) : undefined,
-					searchEngine: chatMode === "direct" ? selectedEngine : undefined,
-					searchConfigs: chatMode === "direct" ? searchConfigs : undefined,
+					searchEngine: selectedEngine || undefined,
+					searchConfigs: searchConfigs,
 				});
 				setAttachedFiles([]);
 			}
@@ -1718,7 +1718,9 @@ const Chat: React.FC = () => {
 																	? {
 																			backgroundColor: token.colorBgTextHover,
 																		}
-																	: undefined
+																	: selectedEngine
+																		? { color: token.colorPrimary }
+																		: undefined
 															}
 														/>
 													</Tooltip>

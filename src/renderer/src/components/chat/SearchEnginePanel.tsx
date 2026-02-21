@@ -81,7 +81,7 @@ export function SearchEnginePanel({
 
 	// Only show enabled configs with apiKey
 	const enabledConfigs = useMemo(
-		() => searchConfigs.filter((c) => c.enabled && c.apiKey),
+		() => searchConfigs.filter((c) => c.enabled),
 		[searchConfigs],
 	);
 
@@ -180,7 +180,7 @@ export function useSearchEngine() {
 					setSelectedEngine(result.data.defaultProvider);
 				} else {
 					const firstEnabled = result.data.configs.find(
-						(c) => c.enabled && c.apiKey,
+						(c) => c.enabled,
 					);
 					if (firstEnabled) {
 						setSelectedEngine(firstEnabled.provider);
@@ -197,7 +197,7 @@ export function useSearchEngine() {
 	}, [loadSearchConfigs]);
 
 	const enabledConfigs = useMemo(
-		() => searchConfigs.filter((c) => c.enabled && c.apiKey),
+		() => searchConfigs.filter((c) => c.enabled),
 		[searchConfigs],
 	);
 

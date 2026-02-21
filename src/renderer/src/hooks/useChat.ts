@@ -504,6 +504,10 @@ export function useChat() {
 				});
 
 				// Search augmentation: if a search engine is selected, execute search and prepend results
+				console.log("[useChat] Search trigger check:", {
+					searchEngine: options?.searchEngine,
+					hasConfigs: !!options?.searchConfigs?.length,
+				});
 				if (options?.searchEngine && options.searchConfigs) {
 					const searchConfig = options.searchConfigs.find(
 						(c) => c.provider === options.searchEngine && c.enabled,
@@ -538,6 +542,9 @@ export function useChat() {
 							console.warn(
 								"[useChat] Search failed, continuing without search results:",
 								searchError,
+							);
+							message.warning(
+								`搜索失败: ${searchError instanceof Error ? searchError.message : "未知错误"}`,
 							);
 						}
 					}
