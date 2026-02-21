@@ -14,7 +14,12 @@ interface SkillState {
 	installedPage: number;
 	installedLimit: number;
 
-	fetchMarketSkills: (page?: number, limit?: number, domain?: string, search?: string) => Promise<void>;
+	fetchMarketSkills: (
+		page?: number,
+		limit?: number,
+		domain?: string,
+		search?: string,
+	) => Promise<void>;
 	setMarketPage: (page: number) => void;
 	setMarketDomain: (domain: string) => void;
 	setInstalledPage: (page: number) => void;
@@ -39,7 +44,12 @@ export const useSkillStore = create<SkillState>()(
 			installedPage: 1,
 			installedLimit: 12,
 
-			fetchMarketSkills: async (page = 1, limit = 12, domain?: string, search?: string) => {
+			fetchMarketSkills: async (
+				page = 1,
+				limit = 12,
+				domain?: string,
+				search?: string,
+			) => {
 				set({ isLoading: true });
 				try {
 					const currentDomain = domain || get().marketDomain;

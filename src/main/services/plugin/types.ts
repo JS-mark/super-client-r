@@ -183,9 +183,18 @@ export interface PluginAPI {
 
 	// 窗口
 	window: {
-		showInformationMessage(message: string, ...items: string[]): Promise<string | undefined>;
-		showWarningMessage(message: string, ...items: string[]): Promise<string | undefined>;
-		showErrorMessage(message: string, ...items: string[]): Promise<string | undefined>;
+		showInformationMessage(
+			message: string,
+			...items: string[]
+		): Promise<string | undefined>;
+		showWarningMessage(
+			message: string,
+			...items: string[]
+		): Promise<string | undefined>;
+		showErrorMessage(
+			message: string,
+			...items: string[]
+		): Promise<string | undefined>;
 		showInputBox(options?: InputBoxOptions): Promise<string | undefined>;
 		showQuickPick<T extends QuickPickItem>(
 			items: T[],
@@ -252,7 +261,9 @@ export interface InputBoxOptions {
 	placeHolder?: string;
 	password?: boolean;
 	ignoreFocusOut?: boolean;
-	validateInput?(value: string): string | undefined | Promise<string | undefined>;
+	validateInput?(
+		value: string,
+	): string | undefined | Promise<string | undefined>;
 }
 
 // QuickPick 选项

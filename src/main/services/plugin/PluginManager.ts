@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { app, BrowserWindow } from "electron";
 import { storeManager } from "../../store/StoreManager";
+import { BUILTIN_PLUGIN_SOURCES } from "./builtinPlugins";
 
 interface PluginActivationRecord {
 	plugin: Plugin;
@@ -23,7 +24,10 @@ interface PluginActivationRecord {
 export class PluginManager extends EventEmitter {
 	private plugins = new Map<string, PluginInfo>();
 	private activePlugins = new Map<string, PluginActivationRecord>();
-	private commandRegistry = new Map<string, { pluginId: string; handler: (...args: unknown[]) => unknown }>();
+	private commandRegistry = new Map<
+		string,
+		{ pluginId: string; handler: (...args: unknown[]) => unknown }
+	>();
 	private pluginsDir: string;
 	private globalStorageDir: string;
 	private isInitialized = false;
@@ -32,16 +36,24 @@ export class PluginManager extends EventEmitter {
 	private activeSkinPluginId: string | null = null;
 	private activeSkinThemeId: string | null = null;
 	private skinCssKeys = new Map<number, string>(); // BrowserWindow.id → cssKey
+	private activeSkinCSS: string | null = null; // cached CSS for re-injection on reload
+	private activeSkinTokens: Record<string, unknown> | null = null; // cached tokens for re-injection
 
 	// Markdown theme state: separate from skin
 	private activeMarkdownPluginId: string | null = null;
 	private activeMarkdownThemeId: string | null = null;
-	private markdownCssKeys = new Map<number, string>(); // BrowserWindow.id → cssKey
+	private activeMarkdownCSS: string | null = null; // cached CSS for renderer-side injection
+
+	// Track windows with reload listeners
+	private windowReloadListeners = new Map<number, () => void>();
 
 	constructor() {
 		super();
 		this.pluginsDir = path.join(app.getPath("userData"), "plugins");
-		this.globalStorageDir = path.join(app.getPath("userData"), "plugin-storage");
+		this.globalStorageDir = path.join(
+			app.getPath("userData"),
+			"plugin-storage",
+		);
 	}
 
 	/**
@@ -63,6 +75,9 @@ export class PluginManager extends EventEmitter {
 			// 扫描插件目录
 			await this.scanPluginsDirectory();
 
+			// 同步内置插件（版本更新时自动覆盖文件）
+			await this.syncBuiltinPlugins();
+
 			// 自动激活标记为启用的插件
 			await this.autoActivatePlugins();
 
@@ -81,7 +96,9 @@ export class PluginManager extends EventEmitter {
 	 */
 	private async loadPluginsFromStorage(): Promise<void> {
 		try {
-			const storedPlugins = storeManager.getConfig("plugins") as PluginInfo[] | undefined;
+			const storedPlugins = storeManager.getConfig("plugins") as
+				| PluginInfo[]
+				| undefined;
 			if (storedPlugins) {
 				for (const pluginInfo of storedPlugins) {
 					this.plugins.set(pluginInfo.id, {
@@ -91,7 +108,10 @@ export class PluginManager extends EventEmitter {
 				}
 			}
 		} catch (error) {
-			console.error("[PluginManager] Failed to load plugins from storage:", error);
+			console.error(
+				"[PluginManager] Failed to load plugins from storage:",
+				error,
+			);
 		}
 	}
 
@@ -100,7 +120,9 @@ export class PluginManager extends EventEmitter {
 	 */
 	private async scanPluginsDirectory(): Promise<void> {
 		try {
-			const entries = await fs.readdir(this.pluginsDir, { withFileTypes: true });
+			const entries = await fs.readdir(this.pluginsDir, {
+				withFileTypes: true,
+			});
 
 			for (const entry of entries) {
 				if (!entry.isDirectory()) continue;
@@ -133,7 +155,10 @@ export class PluginManager extends EventEmitter {
 						}
 					}
 				} catch (error) {
-					console.error(`[PluginManager] Failed to scan plugin at ${pluginPath}:`, error);
+					console.error(
+						`[PluginManager] Failed to scan plugin at ${pluginPath}:`,
+						error,
+					);
 				}
 			}
 		} catch (error) {
@@ -142,9 +167,74 @@ export class PluginManager extends EventEmitter {
 	}
 
 	/**
+	 * 同步内置插件：当源版本高于已安装版本时，覆盖磁盘文件
+	 */
+	private async syncBuiltinPlugins(): Promise<void> {
+		for (const [pluginId, source] of Object.entries(BUILTIN_PLUGIN_SOURCES)) {
+			const sourceVersion = (source.manifest as { version?: string }).version;
+			if (!sourceVersion) continue;
+
+			const installed = this.plugins.get(pluginId);
+			if (!installed) continue; // 未安装则跳过，等用户主动安装
+
+			const installedVersion = installed.manifest?.version;
+			if (installedVersion === sourceVersion) continue; // 版本相同则跳过
+
+			console.log(
+				`[PluginManager] Syncing builtin plugin ${pluginId}: ${installedVersion} → ${sourceVersion}`,
+			);
+
+			try {
+				const targetPath = installed.path;
+
+				// 写入 package.json
+				await fs.writeFile(
+					path.join(targetPath, "package.json"),
+					JSON.stringify(source.manifest, null, 2),
+					"utf-8",
+				);
+
+				// 写入 index.js（主入口）
+				await fs.writeFile(
+					path.join(targetPath, "index.js"),
+					source.source,
+					"utf-8",
+				);
+
+				// 写入额外文件（CSS 等）
+				if (source.extraFiles) {
+					for (const [fileName, content] of Object.entries(source.extraFiles)) {
+						await fs.writeFile(
+							path.join(targetPath, fileName),
+							content,
+							"utf-8",
+						);
+					}
+				}
+
+				// 更新内存中的 manifest
+				installed.manifest =
+					(await this.readManifest(targetPath)) ?? installed.manifest;
+				installed.updatedAt = Date.now();
+
+				console.log(
+					`[PluginManager] Builtin plugin ${pluginId} synced to v${sourceVersion}`,
+				);
+			} catch (error) {
+				console.error(
+					`[PluginManager] Failed to sync builtin plugin ${pluginId}:`,
+					error,
+				);
+			}
+		}
+	}
+
+	/**
 	 * 读取插件清单
 	 */
-	private async readManifest(pluginPath: string): Promise<PluginManifest | null> {
+	private async readManifest(
+		pluginPath: string,
+	): Promise<PluginManifest | null> {
 		try {
 			const manifestPath = path.join(pluginPath, "package.json");
 			const content = await fs.readFile(manifestPath, "utf-8");
@@ -152,13 +242,18 @@ export class PluginManager extends EventEmitter {
 
 			// 验证必需字段
 			if (!manifest.name || !manifest.version || !manifest.main) {
-				console.warn(`[PluginManager] Invalid manifest at ${pluginPath}: missing required fields`);
+				console.warn(
+					`[PluginManager] Invalid manifest at ${pluginPath}: missing required fields`,
+				);
 				return null;
 			}
 
 			return manifest;
 		} catch (error) {
-			console.error(`[PluginManager] Failed to read manifest at ${pluginPath}:`, error);
+			console.error(
+				`[PluginManager] Failed to read manifest at ${pluginPath}:`,
+				error,
+			);
 			return null;
 		}
 	}
@@ -172,7 +267,10 @@ export class PluginManager extends EventEmitter {
 				try {
 					await this.activatePlugin(id);
 				} catch (error) {
-					console.error(`[PluginManager] Failed to auto-activate plugin ${id}:`, error);
+					console.error(
+						`[PluginManager] Failed to auto-activate plugin ${id}:`,
+						error,
+					);
 					pluginInfo.state = "error";
 					pluginInfo.error = String(error);
 				}
@@ -291,7 +389,9 @@ export class PluginManager extends EventEmitter {
 			await this.savePluginsToStorage();
 
 			this.emit("pluginDeactivated", pluginId);
-			console.log(`[PluginManager] Plugin ${pluginId} deactivated successfully`);
+			console.log(
+				`[PluginManager] Plugin ${pluginId} deactivated successfully`,
+			);
 		} catch (error) {
 			pluginInfo.state = "error";
 			pluginInfo.error = String(error);
@@ -337,8 +437,15 @@ export class PluginManager extends EventEmitter {
 			workspaceState: this.createMemento(`workspace:${pluginInfo.id}`),
 			globalState: this.createMemento(`global:${pluginInfo.id}`),
 			commands: {
-				registerCommand: (command: string, callback: (...args: unknown[]) => unknown) => {
-					const disposable = this.registerCommand(pluginInfo.id, command, callback);
+				registerCommand: (
+					command: string,
+					callback: (...args: unknown[]) => unknown,
+				) => {
+					const disposable = this.registerCommand(
+						pluginInfo.id,
+						command,
+						callback,
+					);
 					subscriptions.push(disposable);
 					return disposable;
 				},
@@ -353,11 +460,16 @@ export class PluginManager extends EventEmitter {
 		const storageKey = `plugin:${key}`;
 		return {
 			get: <T>(keySuffix: string, defaultValue?: T): T | undefined => {
-				const data = storeManager.getConfig("pluginsData") as Record<string, T> | undefined;
+				const data = storeManager.getConfig("pluginsData") as
+					| Record<string, T>
+					| undefined;
 				return data?.[`${storageKey}.${keySuffix}`] ?? defaultValue;
 			},
 			update: async (keySuffix: string, value: unknown): Promise<void> => {
-				const data = (storeManager.getConfig("pluginsData") as Record<string, unknown> | undefined) || {};
+				const data =
+					(storeManager.getConfig("pluginsData") as
+						| Record<string, unknown>
+						| undefined) || {};
 				data[`${storageKey}.${keySuffix}`] = value;
 				storeManager.setConfig("pluginsData", data);
 			},
@@ -437,9 +549,14 @@ export class PluginManager extends EventEmitter {
 			await this.savePluginsToStorage();
 
 			this.emit("pluginUninstalled", pluginId);
-			console.log(`[PluginManager] Plugin ${pluginId} uninstalled successfully`);
+			console.log(
+				`[PluginManager] Plugin ${pluginId} uninstalled successfully`,
+			);
 		} catch (error) {
-			console.error(`[PluginManager] Failed to uninstall plugin ${pluginId}:`, error);
+			console.error(
+				`[PluginManager] Failed to uninstall plugin ${pluginId}:`,
+				error,
+			);
 			throw error;
 		}
 	}
@@ -487,7 +604,11 @@ export class PluginManager extends EventEmitter {
 	/**
 	 * 注册命令
 	 */
-	registerCommand(pluginId: string, commandId: string, handler: (...args: unknown[]) => unknown): { dispose(): void } {
+	registerCommand(
+		pluginId: string,
+		commandId: string,
+		handler: (...args: unknown[]) => unknown,
+	): { dispose(): void } {
 		this.commandRegistry.set(commandId, { pluginId, handler });
 		return {
 			dispose: () => {
@@ -499,7 +620,10 @@ export class PluginManager extends EventEmitter {
 	/**
 	 * 执行命令
 	 */
-	async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
+	async executeCommand(
+		commandId: string,
+		...args: unknown[]
+	): Promise<unknown> {
 		const entry = this.commandRegistry.get(commandId);
 		if (!entry) {
 			throw new Error(`Command ${commandId} not found`);
@@ -513,12 +637,26 @@ export class PluginManager extends EventEmitter {
 	/**
 	 * 获取已注册命令
 	 */
-	getRegisteredCommands(pluginId?: string): Array<{ command: string; pluginId: string; title?: string; category?: string }> {
-		const commands: Array<{ command: string; pluginId: string; title?: string; category?: string }> = [];
+	getRegisteredCommands(
+		pluginId?: string,
+	): Array<{
+		command: string;
+		pluginId: string;
+		title?: string;
+		category?: string;
+	}> {
+		const commands: Array<{
+			command: string;
+			pluginId: string;
+			title?: string;
+			category?: string;
+		}> = [];
 		for (const [commandId, entry] of this.commandRegistry) {
 			if (pluginId && entry.pluginId !== pluginId) continue;
 			const pluginInfo = this.plugins.get(entry.pluginId);
-			const contributed = pluginInfo?.manifest.contributes?.commands?.find((c) => c.command === commandId);
+			const contributed = pluginInfo?.manifest.contributes?.commands?.find(
+				(c) => c.command === commandId,
+			);
 			commands.push({
 				command: commandId,
 				pluginId: entry.pluginId,
@@ -574,7 +712,10 @@ export class PluginManager extends EventEmitter {
 	 */
 	getActiveSkinId(): { pluginId: string; themeId: string } | null {
 		if (this.activeSkinPluginId && this.activeSkinThemeId) {
-			return { pluginId: this.activeSkinPluginId, themeId: this.activeSkinThemeId };
+			return {
+				pluginId: this.activeSkinPluginId,
+				themeId: this.activeSkinThemeId,
+			};
 		}
 		return null;
 	}
@@ -604,7 +745,9 @@ export class PluginManager extends EventEmitter {
 		const themes = pluginInfo.manifest.contributes?.themes;
 		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
 		if (!themeEntry) {
-			console.error(`[PluginManager] Theme ${themeId} not found in plugin ${pluginInfo.id}`);
+			console.error(
+				`[PluginManager] Theme ${themeId} not found in plugin ${pluginInfo.id}`,
+			);
 			return;
 		}
 
@@ -614,7 +757,10 @@ export class PluginManager extends EventEmitter {
 		try {
 			css = await fs.readFile(cssPath, "utf-8");
 		} catch (error) {
-			console.error(`[PluginManager] Failed to read skin CSS at ${cssPath}:`, error);
+			console.error(
+				`[PluginManager] Failed to read skin CSS at ${cssPath}:`,
+				error,
+			);
 			return;
 		}
 
@@ -633,6 +779,10 @@ export class PluginManager extends EventEmitter {
 		// Remove old CSS first (without broadcasting null tokens)
 		await this.removeCurrentSkinCSSOnly();
 
+		// Cache CSS for re-injection on reload
+		this.activeSkinCSS = css;
+		this.activeSkinTokens = tokens;
+
 		// Inject CSS into all windows
 		const windows = BrowserWindow.getAllWindows();
 		for (const win of windows) {
@@ -640,7 +790,10 @@ export class PluginManager extends EventEmitter {
 				const key = await win.webContents.insertCSS(css);
 				this.skinCssKeys.set(win.id, key);
 			} catch (error) {
-				console.error(`[PluginManager] Failed to inject CSS into window ${win.id}:`, error);
+				console.error(
+					`[PluginManager] Failed to inject CSS into window ${win.id}:`,
+					error,
+				);
 			}
 		}
 
@@ -654,7 +807,9 @@ export class PluginManager extends EventEmitter {
 		}
 
 		this.emit("skinApplied", pluginInfo.id, themeId);
-		console.log(`[PluginManager] Theme ${themeId} from plugin ${pluginInfo.id} applied`);
+		console.log(
+			`[PluginManager] Theme ${themeId} from plugin ${pluginInfo.id} applied`,
+		);
 	}
 
 	/**
@@ -665,6 +820,8 @@ export class PluginManager extends EventEmitter {
 
 		this.activeSkinPluginId = null;
 		this.activeSkinThemeId = null;
+		this.activeSkinCSS = null;
+		this.activeSkinTokens = null;
 		storeManager.deleteConfig("activeSkin");
 
 		// Broadcast null tokens
@@ -681,13 +838,15 @@ export class PluginManager extends EventEmitter {
 	 * 恢复上次激活的皮肤（应用启动时）
 	 */
 	async restoreActiveSkin(): Promise<void> {
-		const saved = storeManager.getConfig("activeSkin") as { pluginId: string; themeId: string } | string | undefined;
+		const saved = storeManager.getConfig("activeSkin") as
+			| { pluginId: string; themeId: string }
+			| string
+			| undefined;
 		if (!saved) return;
 
 		// Handle legacy string format
-		const skinInfo = typeof saved === "string"
-			? { pluginId: saved, themeId: "" }
-			: saved;
+		const skinInfo =
+			typeof saved === "string" ? { pluginId: saved, themeId: "" } : saved;
 
 		if (skinInfo.pluginId && skinInfo.themeId) {
 			const pluginInfo = this.plugins.get(skinInfo.pluginId);
@@ -714,37 +873,43 @@ export class PluginManager extends EventEmitter {
 	 */
 	getActiveMarkdownThemeId(): { pluginId: string; themeId: string } | null {
 		if (this.activeMarkdownPluginId && this.activeMarkdownThemeId) {
-			return { pluginId: this.activeMarkdownPluginId, themeId: this.activeMarkdownThemeId };
+			return {
+				pluginId: this.activeMarkdownPluginId,
+				themeId: this.activeMarkdownThemeId,
+			};
 		}
 		return null;
 	}
 
 	/**
-	 * 移除当前 Markdown CSS（仅清理注入的CSS，不清状态）
+	 * 广播 Markdown 主题 CSS 到所有渲染进程窗口
 	 */
-	private async removeCurrentMarkdownCSSOnly(): Promise<void> {
+	private broadcastMarkdownCSS(css: string | null): void {
 		const windows = BrowserWindow.getAllWindows();
 		for (const win of windows) {
-			const key = this.markdownCssKeys.get(win.id);
-			if (key) {
+			if (!win.isDestroyed()) {
 				try {
-					await win.webContents.removeInsertedCSS(key);
+					win.webContents.send("markdown-theme:css-changed", css);
 				} catch {
 					// Window may have been closed
 				}
 			}
 		}
-		this.markdownCssKeys.clear();
 	}
 
 	/**
 	 * 应用 Markdown 主题 CSS
 	 */
-	async applyMarkdownCSS(pluginInfo: PluginInfo, themeId: string): Promise<void> {
+	async applyMarkdownCSS(
+		pluginInfo: PluginInfo,
+		themeId: string,
+	): Promise<void> {
 		const themes = pluginInfo.manifest.contributes?.themes;
 		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
 		if (!themeEntry) {
-			console.error(`[PluginManager] Markdown theme ${themeId} not found in plugin ${pluginInfo.id}`);
+			console.error(
+				`[PluginManager] Markdown theme ${themeId} not found in plugin ${pluginInfo.id}`,
+			);
 			return;
 		}
 
@@ -754,37 +919,36 @@ export class PluginManager extends EventEmitter {
 		try {
 			css = await fs.readFile(cssPath, "utf-8");
 		} catch (error) {
-			console.error(`[PluginManager] Failed to read markdown theme CSS at ${cssPath}:`, error);
+			console.error(
+				`[PluginManager] Failed to read markdown theme CSS at ${cssPath}:`,
+				error,
+			);
 			return;
 		}
 
-		// Remove old CSS first (without clearing state)
-		await this.removeCurrentMarkdownCSSOnly();
-
-		// Inject CSS into all windows
-		const windows = BrowserWindow.getAllWindows();
-		for (const win of windows) {
-			try {
-				const key = await win.webContents.insertCSS(css);
-				this.markdownCssKeys.set(win.id, key);
-			} catch (error) {
-				console.error(`[PluginManager] Failed to inject markdown CSS into window ${win.id}:`, error);
-			}
-		}
+		// Cache CSS and broadcast to renderer
+		this.activeMarkdownCSS = css;
+		this.broadcastMarkdownCSS(css);
 
 		this.activeMarkdownPluginId = pluginInfo.id;
 		this.activeMarkdownThemeId = themeId;
-		storeManager.setConfig("activeMarkdownTheme", { pluginId: pluginInfo.id, themeId });
+		storeManager.setConfig("activeMarkdownTheme", {
+			pluginId: pluginInfo.id,
+			themeId,
+		});
 
 		this.emit("markdownThemeApplied", pluginInfo.id, themeId);
-		console.log(`[PluginManager] Markdown theme ${themeId} from plugin ${pluginInfo.id} applied`);
+		console.log(
+			`[PluginManager] Markdown theme ${themeId} from plugin ${pluginInfo.id} applied`,
+		);
 	}
 
 	/**
 	 * 移除当前 Markdown 主题 CSS
 	 */
 	async removeMarkdownCSS(): Promise<void> {
-		await this.removeCurrentMarkdownCSSOnly();
+		this.activeMarkdownCSS = null;
+		this.broadcastMarkdownCSS(null);
 
 		this.activeMarkdownPluginId = null;
 		this.activeMarkdownThemeId = null;
@@ -795,16 +959,90 @@ export class PluginManager extends EventEmitter {
 	}
 
 	/**
+	 * 获取当前激活的 Markdown 主题 CSS 内容
+	 */
+	getActiveMarkdownThemeCSS(): string | null {
+		return this.activeMarkdownCSS;
+	}
+
+	/**
 	 * 恢复上次激活的 Markdown 主题（应用启动时）
 	 */
 	async restoreActiveMarkdownTheme(): Promise<void> {
-		const saved = storeManager.getConfig("activeMarkdownTheme") as { pluginId: string; themeId: string } | undefined;
+		const saved = storeManager.getConfig("activeMarkdownTheme") as
+			| { pluginId: string; themeId: string }
+			| undefined;
 		if (!saved) return;
 
 		if (saved.pluginId && saved.themeId) {
 			const pluginInfo = this.plugins.get(saved.pluginId);
-			if (pluginInfo && this.isMarkdownThemePlugin(pluginInfo) && pluginInfo.enabled) {
+			if (
+				pluginInfo &&
+				this.isMarkdownThemePlugin(pluginInfo) &&
+				pluginInfo.enabled
+			) {
 				await this.applyMarkdownCSS(pluginInfo, saved.themeId);
+			}
+		}
+	}
+
+	/**
+	 * 为窗口注册 did-finish-load 监听器，页面重载时自动重新注入 CSS
+	 */
+	setupWindowReloadListener(win: BrowserWindow): void {
+		if (this.windowReloadListeners.has(win.id)) return;
+
+		const listener = () => {
+			this.reinjectCSSForWindow(win).catch((err) => {
+				console.error(
+					`[PluginManager] Failed to re-inject CSS on reload for window ${win.id}:`,
+					err,
+				);
+			});
+		};
+
+		win.webContents.on("did-finish-load", listener);
+		this.windowReloadListeners.set(win.id, listener);
+
+		win.on("closed", () => {
+			this.windowReloadListeners.delete(win.id);
+			this.skinCssKeys.delete(win.id);
+		});
+	}
+
+	/**
+	 * 页面重载后重新注入当前活跃的 skin 和 markdown CSS
+	 */
+	private async reinjectCSSForWindow(win: BrowserWindow): Promise<void> {
+		if (win.isDestroyed()) return;
+
+		// Re-inject skin CSS
+		if (this.activeSkinCSS) {
+			try {
+				const key = await win.webContents.insertCSS(this.activeSkinCSS);
+				this.skinCssKeys.set(win.id, key);
+			} catch {
+				// Window may have been destroyed
+			}
+			// Re-broadcast skin tokens
+			if (this.activeSkinTokens) {
+				try {
+					win.webContents.send("skin:tokens-changed", this.activeSkinTokens);
+				} catch {
+					// ignore
+				}
+			}
+		}
+
+		// Re-broadcast markdown CSS to renderer
+		if (this.activeMarkdownCSS) {
+			try {
+				win.webContents.send(
+					"markdown-theme:css-changed",
+					this.activeMarkdownCSS,
+				);
+			} catch {
+				// Window may have been destroyed
 			}
 		}
 	}
@@ -846,7 +1084,10 @@ export class PluginManager extends EventEmitter {
 			try {
 				await this.deactivatePlugin(pluginId);
 			} catch (error) {
-				console.error(`[PluginManager] Failed to deactivate plugin ${pluginId} during dispose:`, error);
+				console.error(
+					`[PluginManager] Failed to deactivate plugin ${pluginId} during dispose:`,
+					error,
+				);
 			}
 		}
 

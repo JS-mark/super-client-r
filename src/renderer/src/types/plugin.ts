@@ -168,7 +168,9 @@ export interface InputBoxOptions {
 	placeHolder?: string;
 	password?: boolean;
 	ignoreFocusOut?: boolean;
-	validateInput?(value: string): string | undefined | Promise<string | undefined>;
+	validateInput?(
+		value: string,
+	): string | undefined | Promise<string | undefined>;
 }
 
 // QuickPick 选项

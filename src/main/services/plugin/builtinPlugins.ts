@@ -37,7 +37,8 @@ export const BUILTIN_MARKET_PLUGINS: BuiltinMarketPlugin[] = [
 		id: "builtin-themes",
 		name: "builtin-themes",
 		displayName: "Built-in Themes",
-		description: "A collection of beautiful themes including Ocean Blue, Rose Gold, and Forest Green. Each theme supports both light and dark mode.",
+		description:
+			"A collection of beautiful themes including Ocean Blue, Rose Gold, and Forest Green. Each theme supports both light and dark mode.",
 		version: "1.0.0",
 		author: "Super Client Team",
 		icon: "🎨",
@@ -49,8 +50,9 @@ export const BUILTIN_MARKET_PLUGINS: BuiltinMarketPlugin[] = [
 		id: "markdown-themes",
 		name: "markdown-themes",
 		displayName: "Markdown Themes",
-		description: "A collection of markdown rendering themes for chat messages. Includes Newsprint (serif), Vue Green, and Dracula styles.",
-		version: "1.0.0",
+		description:
+			"A collection of 8 markdown rendering themes for chat messages. Includes Newsprint, Vue Green, Dracula, Solarized Light, Nord, Monokai, GitHub Dimmed, and One Dark.",
+		version: "1.1.0",
 		author: "Super Client Team",
 		icon: "📖",
 		categories: ["markdown"],
@@ -228,7 +230,8 @@ const BUILTIN_THEMES_MANIFEST = {
 	name: "builtin-themes",
 	displayName: "Built-in Themes",
 	version: "1.0.0",
-	description: "A collection of beautiful themes including Ocean Blue, Rose Gold, and Forest Green.",
+	description:
+		"A collection of beautiful themes including Ocean Blue, Rose Gold, and Forest Green.",
 	author: "Super Client Team",
 	main: "index.js",
 	icon: "🎨",
@@ -283,52 +286,82 @@ const THEME_OCEAN_BLUE_CSS = `/* Ocean Blue Theme */
 }
 `;
 
-const THEME_OCEAN_BLUE_TOKENS = JSON.stringify({
-	light: {
-		token: {
-			colorPrimary: "#0969da",
-			colorInfo: "#0969da",
-			colorLink: "#0969da",
-			colorBgBase: "#ffffff",
-			colorTextBase: "rgba(0, 0, 0, 0.88)",
+const THEME_OCEAN_BLUE_TOKENS = JSON.stringify(
+	{
+		light: {
+			token: {
+				colorPrimary: "#0969da",
+				colorInfo: "#0969da",
+				colorLink: "#0969da",
+				colorBgBase: "#ffffff",
+				colorTextBase: "rgba(0, 0, 0, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#ffffff",
+					siderBg: "#f6f8fa",
+					triggerBg: "#ffffff",
+					triggerColor: "rgba(0, 0, 0, 0.65)",
+				},
+				Card: { colorBgContainer: "#ffffff" },
+				Input: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
+				Select: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
+				Button: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
+				Modal: {
+					contentBg: "#ffffff",
+					headerBg: "#ffffff",
+					footerBg: "#ffffff",
+				},
+				Drawer: { colorBgElevated: "#ffffff" },
+				Table: {
+					colorBgContainer: "#ffffff",
+					headerBg: "#f6f8fa",
+					borderColor: "#d0d7de",
+				},
+				Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
+				Popover: { colorBgElevated: "#ffffff" },
+				Dropdown: { colorBgElevated: "#ffffff" },
+			},
 		},
-		components: {
-			Layout: { headerBg: "#ffffff", siderBg: "#f6f8fa", triggerBg: "#ffffff", triggerColor: "rgba(0, 0, 0, 0.65)" },
-			Card: { colorBgContainer: "#ffffff" },
-			Input: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
-			Select: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
-			Button: { colorBgContainer: "#ffffff", colorBorder: "#d0d7de" },
-			Modal: { contentBg: "#ffffff", headerBg: "#ffffff", footerBg: "#ffffff" },
-			Drawer: { colorBgElevated: "#ffffff" },
-			Table: { colorBgContainer: "#ffffff", headerBg: "#f6f8fa", borderColor: "#d0d7de" },
-			Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
-			Popover: { colorBgElevated: "#ffffff" },
-			Dropdown: { colorBgElevated: "#ffffff" },
+		dark: {
+			token: {
+				colorPrimary: "#58a6ff",
+				colorInfo: "#58a6ff",
+				colorLink: "#58a6ff",
+				colorBgBase: "#0d1117",
+				colorTextBase: "rgba(255, 255, 255, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#161b22",
+					siderBg: "#0d1117",
+					triggerBg: "#1c2128",
+					triggerColor: "rgba(255, 255, 255, 0.65)",
+				},
+				Card: { colorBgContainer: "#161b22" },
+				Input: { colorBgContainer: "#0d1117", colorBorder: "#30363d" },
+				Select: { colorBgContainer: "#0d1117", colorBorder: "#30363d" },
+				Button: { colorBgContainer: "transparent", colorBorder: "#30363d" },
+				Modal: {
+					contentBg: "#161b22",
+					headerBg: "#161b22",
+					footerBg: "#161b22",
+				},
+				Drawer: { colorBgElevated: "#161b22" },
+				Table: {
+					colorBgContainer: "#161b22",
+					headerBg: "#1c2128",
+					borderColor: "#30363d",
+				},
+				Tooltip: { colorBgSpotlight: "#30363d" },
+				Popover: { colorBgElevated: "#161b22" },
+				Dropdown: { colorBgElevated: "#161b22" },
+			},
 		},
 	},
-	dark: {
-		token: {
-			colorPrimary: "#58a6ff",
-			colorInfo: "#58a6ff",
-			colorLink: "#58a6ff",
-			colorBgBase: "#0d1117",
-			colorTextBase: "rgba(255, 255, 255, 0.88)",
-		},
-		components: {
-			Layout: { headerBg: "#161b22", siderBg: "#0d1117", triggerBg: "#1c2128", triggerColor: "rgba(255, 255, 255, 0.65)" },
-			Card: { colorBgContainer: "#161b22" },
-			Input: { colorBgContainer: "#0d1117", colorBorder: "#30363d" },
-			Select: { colorBgContainer: "#0d1117", colorBorder: "#30363d" },
-			Button: { colorBgContainer: "transparent", colorBorder: "#30363d" },
-			Modal: { contentBg: "#161b22", headerBg: "#161b22", footerBg: "#161b22" },
-			Drawer: { colorBgElevated: "#161b22" },
-			Table: { colorBgContainer: "#161b22", headerBg: "#1c2128", borderColor: "#30363d" },
-			Tooltip: { colorBgSpotlight: "#30363d" },
-			Popover: { colorBgElevated: "#161b22" },
-			Dropdown: { colorBgElevated: "#161b22" },
-		},
-	},
-}, null, 2);
+	null,
+	2,
+);
 
 const THEME_ROSE_GOLD_CSS = `/* Rose Gold Theme */
 :root {
@@ -352,52 +385,82 @@ const THEME_ROSE_GOLD_CSS = `/* Rose Gold Theme */
 }
 `;
 
-const THEME_ROSE_GOLD_TOKENS = JSON.stringify({
-	light: {
-		token: {
-			colorPrimary: "#d4507a",
-			colorInfo: "#d4507a",
-			colorLink: "#d4507a",
-			colorBgBase: "#ffffff",
-			colorTextBase: "rgba(0, 0, 0, 0.88)",
+const THEME_ROSE_GOLD_TOKENS = JSON.stringify(
+	{
+		light: {
+			token: {
+				colorPrimary: "#d4507a",
+				colorInfo: "#d4507a",
+				colorLink: "#d4507a",
+				colorBgBase: "#ffffff",
+				colorTextBase: "rgba(0, 0, 0, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#ffffff",
+					siderBg: "#fdf2f5",
+					triggerBg: "#ffffff",
+					triggerColor: "rgba(0, 0, 0, 0.65)",
+				},
+				Card: { colorBgContainer: "#ffffff" },
+				Input: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
+				Select: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
+				Button: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
+				Modal: {
+					contentBg: "#ffffff",
+					headerBg: "#ffffff",
+					footerBg: "#ffffff",
+				},
+				Drawer: { colorBgElevated: "#ffffff" },
+				Table: {
+					colorBgContainer: "#ffffff",
+					headerBg: "#fdf2f5",
+					borderColor: "#f0d0d9",
+				},
+				Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
+				Popover: { colorBgElevated: "#ffffff" },
+				Dropdown: { colorBgElevated: "#ffffff" },
+			},
 		},
-		components: {
-			Layout: { headerBg: "#ffffff", siderBg: "#fdf2f5", triggerBg: "#ffffff", triggerColor: "rgba(0, 0, 0, 0.65)" },
-			Card: { colorBgContainer: "#ffffff" },
-			Input: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
-			Select: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
-			Button: { colorBgContainer: "#ffffff", colorBorder: "#f0d0d9" },
-			Modal: { contentBg: "#ffffff", headerBg: "#ffffff", footerBg: "#ffffff" },
-			Drawer: { colorBgElevated: "#ffffff" },
-			Table: { colorBgContainer: "#ffffff", headerBg: "#fdf2f5", borderColor: "#f0d0d9" },
-			Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
-			Popover: { colorBgElevated: "#ffffff" },
-			Dropdown: { colorBgElevated: "#ffffff" },
+		dark: {
+			token: {
+				colorPrimary: "#e87da1",
+				colorInfo: "#e87da1",
+				colorLink: "#e87da1",
+				colorBgBase: "#1a1015",
+				colorTextBase: "rgba(255, 255, 255, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#241820",
+					siderBg: "#1a1015",
+					triggerBg: "#2a1e25",
+					triggerColor: "rgba(255, 255, 255, 0.65)",
+				},
+				Card: { colorBgContainer: "#241820" },
+				Input: { colorBgContainer: "#1a1015", colorBorder: "#3d2832" },
+				Select: { colorBgContainer: "#1a1015", colorBorder: "#3d2832" },
+				Button: { colorBgContainer: "transparent", colorBorder: "#3d2832" },
+				Modal: {
+					contentBg: "#241820",
+					headerBg: "#241820",
+					footerBg: "#241820",
+				},
+				Drawer: { colorBgElevated: "#241820" },
+				Table: {
+					colorBgContainer: "#241820",
+					headerBg: "#2a1e25",
+					borderColor: "#3d2832",
+				},
+				Tooltip: { colorBgSpotlight: "#3d2832" },
+				Popover: { colorBgElevated: "#241820" },
+				Dropdown: { colorBgElevated: "#241820" },
+			},
 		},
 	},
-	dark: {
-		token: {
-			colorPrimary: "#e87da1",
-			colorInfo: "#e87da1",
-			colorLink: "#e87da1",
-			colorBgBase: "#1a1015",
-			colorTextBase: "rgba(255, 255, 255, 0.88)",
-		},
-		components: {
-			Layout: { headerBg: "#241820", siderBg: "#1a1015", triggerBg: "#2a1e25", triggerColor: "rgba(255, 255, 255, 0.65)" },
-			Card: { colorBgContainer: "#241820" },
-			Input: { colorBgContainer: "#1a1015", colorBorder: "#3d2832" },
-			Select: { colorBgContainer: "#1a1015", colorBorder: "#3d2832" },
-			Button: { colorBgContainer: "transparent", colorBorder: "#3d2832" },
-			Modal: { contentBg: "#241820", headerBg: "#241820", footerBg: "#241820" },
-			Drawer: { colorBgElevated: "#241820" },
-			Table: { colorBgContainer: "#241820", headerBg: "#2a1e25", borderColor: "#3d2832" },
-			Tooltip: { colorBgSpotlight: "#3d2832" },
-			Popover: { colorBgElevated: "#241820" },
-			Dropdown: { colorBgElevated: "#241820" },
-		},
-	},
-}, null, 2);
+	null,
+	2,
+);
 
 const THEME_FOREST_GREEN_CSS = `/* Forest Green Theme */
 :root {
@@ -421,52 +484,82 @@ const THEME_FOREST_GREEN_CSS = `/* Forest Green Theme */
 }
 `;
 
-const THEME_FOREST_GREEN_TOKENS = JSON.stringify({
-	light: {
-		token: {
-			colorPrimary: "#2da44e",
-			colorInfo: "#2da44e",
-			colorLink: "#2da44e",
-			colorBgBase: "#ffffff",
-			colorTextBase: "rgba(0, 0, 0, 0.88)",
+const THEME_FOREST_GREEN_TOKENS = JSON.stringify(
+	{
+		light: {
+			token: {
+				colorPrimary: "#2da44e",
+				colorInfo: "#2da44e",
+				colorLink: "#2da44e",
+				colorBgBase: "#ffffff",
+				colorTextBase: "rgba(0, 0, 0, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#ffffff",
+					siderBg: "#f0f7f2",
+					triggerBg: "#ffffff",
+					triggerColor: "rgba(0, 0, 0, 0.65)",
+				},
+				Card: { colorBgContainer: "#ffffff" },
+				Input: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
+				Select: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
+				Button: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
+				Modal: {
+					contentBg: "#ffffff",
+					headerBg: "#ffffff",
+					footerBg: "#ffffff",
+				},
+				Drawer: { colorBgElevated: "#ffffff" },
+				Table: {
+					colorBgContainer: "#ffffff",
+					headerBg: "#f0f7f2",
+					borderColor: "#c5deca",
+				},
+				Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
+				Popover: { colorBgElevated: "#ffffff" },
+				Dropdown: { colorBgElevated: "#ffffff" },
+			},
 		},
-		components: {
-			Layout: { headerBg: "#ffffff", siderBg: "#f0f7f2", triggerBg: "#ffffff", triggerColor: "rgba(0, 0, 0, 0.65)" },
-			Card: { colorBgContainer: "#ffffff" },
-			Input: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
-			Select: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
-			Button: { colorBgContainer: "#ffffff", colorBorder: "#c5deca" },
-			Modal: { contentBg: "#ffffff", headerBg: "#ffffff", footerBg: "#ffffff" },
-			Drawer: { colorBgElevated: "#ffffff" },
-			Table: { colorBgContainer: "#ffffff", headerBg: "#f0f7f2", borderColor: "#c5deca" },
-			Tooltip: { colorBgSpotlight: "rgba(0, 0, 0, 0.75)" },
-			Popover: { colorBgElevated: "#ffffff" },
-			Dropdown: { colorBgElevated: "#ffffff" },
+		dark: {
+			token: {
+				colorPrimary: "#3fb950",
+				colorInfo: "#3fb950",
+				colorLink: "#3fb950",
+				colorBgBase: "#0d1510",
+				colorTextBase: "rgba(255, 255, 255, 0.88)",
+			},
+			components: {
+				Layout: {
+					headerBg: "#141f18",
+					siderBg: "#0d1510",
+					triggerBg: "#1a2b20",
+					triggerColor: "rgba(255, 255, 255, 0.65)",
+				},
+				Card: { colorBgContainer: "#141f18" },
+				Input: { colorBgContainer: "#0d1510", colorBorder: "#263d2e" },
+				Select: { colorBgContainer: "#0d1510", colorBorder: "#263d2e" },
+				Button: { colorBgContainer: "transparent", colorBorder: "#263d2e" },
+				Modal: {
+					contentBg: "#141f18",
+					headerBg: "#141f18",
+					footerBg: "#141f18",
+				},
+				Drawer: { colorBgElevated: "#141f18" },
+				Table: {
+					colorBgContainer: "#141f18",
+					headerBg: "#1a2b20",
+					borderColor: "#263d2e",
+				},
+				Tooltip: { colorBgSpotlight: "#263d2e" },
+				Popover: { colorBgElevated: "#141f18" },
+				Dropdown: { colorBgElevated: "#141f18" },
+			},
 		},
 	},
-	dark: {
-		token: {
-			colorPrimary: "#3fb950",
-			colorInfo: "#3fb950",
-			colorLink: "#3fb950",
-			colorBgBase: "#0d1510",
-			colorTextBase: "rgba(255, 255, 255, 0.88)",
-		},
-		components: {
-			Layout: { headerBg: "#141f18", siderBg: "#0d1510", triggerBg: "#1a2b20", triggerColor: "rgba(255, 255, 255, 0.65)" },
-			Card: { colorBgContainer: "#141f18" },
-			Input: { colorBgContainer: "#0d1510", colorBorder: "#263d2e" },
-			Select: { colorBgContainer: "#0d1510", colorBorder: "#263d2e" },
-			Button: { colorBgContainer: "transparent", colorBorder: "#263d2e" },
-			Modal: { contentBg: "#141f18", headerBg: "#141f18", footerBg: "#141f18" },
-			Drawer: { colorBgElevated: "#141f18" },
-			Table: { colorBgContainer: "#141f18", headerBg: "#1a2b20", borderColor: "#263d2e" },
-			Tooltip: { colorBgSpotlight: "#263d2e" },
-			Popover: { colorBgElevated: "#141f18" },
-			Dropdown: { colorBgElevated: "#141f18" },
-		},
-	},
-}, null, 2);
+	null,
+	2,
+);
 
 // ============ Markdown 主题插件定义 ============
 
@@ -484,7 +577,7 @@ module.exports = {
 const MARKDOWN_THEMES_MANIFEST = {
 	name: "markdown-themes",
 	displayName: "Markdown Themes",
-	version: "1.0.0",
+	version: "1.1.0",
 	description: "A collection of markdown rendering themes for chat messages.",
 	author: "Super Client Team",
 	main: "index.js",
@@ -510,6 +603,36 @@ const MARKDOWN_THEMES_MANIFEST = {
 				label: "Dracula",
 				icon: "🧛",
 				style: "dracula.css",
+			},
+			{
+				id: "solarized-light",
+				label: "Solarized Light",
+				icon: "☀️",
+				style: "solarized-light.css",
+			},
+			{
+				id: "nord",
+				label: "Nord",
+				icon: "❄️",
+				style: "nord.css",
+			},
+			{
+				id: "monokai",
+				label: "Monokai",
+				icon: "🎨",
+				style: "monokai.css",
+			},
+			{
+				id: "github-dimmed",
+				label: "GitHub Dimmed",
+				icon: "🌙",
+				style: "github-dimmed.css",
+			},
+			{
+				id: "one-dark",
+				label: "One Dark",
+				icon: "🔮",
+				style: "one-dark.css",
 			},
 		],
 	},
@@ -672,10 +795,248 @@ const MARKDOWN_DRACULA_CSS = `/* Dracula Markdown Theme */
 }
 `;
 
+// Solarized Light: Ethan Schoonover's warm precision
+const MARKDOWN_SOLARIZED_LIGHT_CSS = `/* Solarized Light Markdown Theme */
+.x-markdown {
+  --md-font-mono: "Source Code Pro", ui-monospace, SFMono-Regular, monospace;
+  --md-border-color: #d3cfc2;
+  --md-border-color-muted: #e8e4d8;
+  --md-fg-default: #586e75;
+  --md-fg-muted: #93a1a1;
+  --md-bg-subtle: #eee8d5;
+  --md-accent-fg: #268bd2;
+  --md-accent-emphasis: #2aa198;
+  --md-danger-fg: #dc322f;
+  --md-neutral-muted: rgba(147, 161, 161, 0.15);
+  line-height: 1.65;
+}
+
+.dark .x-markdown {
+  --md-border-color: #3a4a50;
+  --md-border-color-muted: #2c3a40;
+  --md-fg-default: #93a1a1;
+  --md-fg-muted: #657b83;
+  --md-bg-subtle: #073642;
+  --md-accent-fg: #268bd2;
+  --md-accent-emphasis: #2aa198;
+  --md-danger-fg: #dc322f;
+  --md-neutral-muted: rgba(101, 123, 131, 0.2);
+}
+
+.x-markdown :not(pre) > code {
+  color: #d33682;
+  background: var(--md-neutral-muted);
+}
+
+.dark .x-markdown :not(pre) > code {
+  color: #d33682;
+}
+
+.x-markdown a { color: #268bd2; }
+.x-markdown a:hover { color: #2aa198; }
+.x-markdown strong { color: #073642; }
+.dark .x-markdown strong { color: #fdf6e3; }
+`;
+
+// Nord: Arctic, north-bluish color palette
+const MARKDOWN_NORD_CSS = `/* Nord Markdown Theme */
+.x-markdown {
+  --md-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  --md-border-color: #d8dee9;
+  --md-border-color-muted: #e5e9f0;
+  --md-fg-default: #2e3440;
+  --md-fg-muted: #4c566a;
+  --md-bg-subtle: #eceff4;
+  --md-accent-fg: #5e81ac;
+  --md-accent-emphasis: #81a1c1;
+  --md-danger-fg: #bf616a;
+  --md-neutral-muted: rgba(76, 86, 106, 0.1);
+}
+
+.dark .x-markdown {
+  --md-border-color: #3b4252;
+  --md-border-color-muted: #434c5e;
+  --md-fg-default: #d8dee9;
+  --md-fg-muted: #8690a3;
+  --md-bg-subtle: #2e3440;
+  --md-accent-fg: #88c0d0;
+  --md-accent-emphasis: #81a1c1;
+  --md-danger-fg: #bf616a;
+  --md-neutral-muted: rgba(67, 76, 94, 0.5);
+}
+
+.x-markdown :not(pre) > code {
+  color: #a3be8c;
+  background: var(--md-neutral-muted);
+}
+
+.x-markdown pre {
+  border: 1px solid var(--md-border-color-muted);
+}
+
+.x-markdown strong { color: #2e3440; }
+.dark .x-markdown strong { color: #eceff4; }
+.x-markdown blockquote { border-left-color: #81a1c1; }
+`;
+
+// Monokai: classic syntax-highlighting-inspired dark theme
+const MARKDOWN_MONOKAI_CSS = `/* Monokai Markdown Theme */
+.x-markdown {
+  --md-font-mono: "Fira Code", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --md-border-color: #595450;
+  --md-border-color-muted: #49443f;
+  --md-fg-default: #f8f8f2;
+  --md-fg-muted: #b0ab9f;
+  --md-bg-subtle: #2e2a27;
+  --md-accent-fg: #66d9ef;
+  --md-accent-emphasis: #a6e22e;
+  --md-danger-fg: #f92672;
+  --md-neutral-muted: rgba(73, 68, 63, 0.6);
+  color: #f8f8f2;
+}
+
+.dark .x-markdown {
+  --md-border-color: #595450;
+  --md-border-color-muted: #3e3a36;
+  --md-fg-default: #f8f8f2;
+  --md-fg-muted: #b0ab9f;
+  --md-bg-subtle: #272320;
+  --md-accent-fg: #66d9ef;
+  --md-accent-emphasis: #a6e22e;
+  --md-danger-fg: #f92672;
+  --md-neutral-muted: rgba(62, 58, 54, 0.6);
+}
+
+.x-markdown pre {
+  background: #272822;
+  border: 1px solid #49443f;
+}
+
+.x-markdown :not(pre) > code {
+  color: #e6db74;
+  background: rgba(73, 68, 63, 0.5);
+}
+
+.x-markdown a { color: #66d9ef; }
+.x-markdown a:hover { color: #a6e22e; }
+.x-markdown strong { color: #fd971f; }
+
+.x-markdown blockquote {
+  border-left-color: #ae81ff;
+  color: #b0ab9f;
+}
+
+.x-markdown table:not(pre table) th { background: #3e3a36; }
+.x-markdown table:not(pre table) tr:nth-child(2n) { background-color: rgba(73, 68, 63, 0.3); }
+`;
+
+// GitHub Dimmed: GitHub's dark dimmed color scheme
+const MARKDOWN_GITHUB_DIMMED_CSS = `/* GitHub Dimmed Markdown Theme */
+.x-markdown {
+  --md-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --md-border-color: #444c56;
+  --md-border-color-muted: #373e47;
+  --md-fg-default: #adbac7;
+  --md-fg-muted: #768390;
+  --md-bg-subtle: #2d333b;
+  --md-accent-fg: #539bf5;
+  --md-accent-emphasis: #539bf5;
+  --md-danger-fg: #e5534b;
+  --md-neutral-muted: rgba(99, 110, 123, 0.25);
+}
+
+.dark .x-markdown {
+  --md-border-color: #444c56;
+  --md-border-color-muted: #373e47;
+  --md-fg-default: #adbac7;
+  --md-fg-muted: #768390;
+  --md-bg-subtle: #22272e;
+  --md-accent-fg: #539bf5;
+  --md-accent-emphasis: #6cb6ff;
+  --md-danger-fg: #e5534b;
+  --md-neutral-muted: rgba(99, 110, 123, 0.3);
+}
+
+.x-markdown :not(pre) > code {
+  color: var(--md-accent-fg);
+  background: var(--md-neutral-muted);
+}
+
+.x-markdown pre {
+  background: #22272e;
+  border: 1px solid var(--md-border-color-muted);
+}
+
+.x-markdown blockquote {
+  border-left-color: #444c56;
+  color: var(--md-fg-muted);
+}
+`;
+
+// One Dark: Atom editor's iconic dark theme
+const MARKDOWN_ONE_DARK_CSS = `/* One Dark Markdown Theme */
+.x-markdown {
+  --md-font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  --md-border-color: #3e4451;
+  --md-border-color-muted: #2c313a;
+  --md-fg-default: #abb2bf;
+  --md-fg-muted: #7f848e;
+  --md-bg-subtle: #282c34;
+  --md-accent-fg: #61afef;
+  --md-accent-emphasis: #c678dd;
+  --md-danger-fg: #e06c75;
+  --md-neutral-muted: rgba(62, 68, 81, 0.5);
+  color: #abb2bf;
+}
+
+.dark .x-markdown {
+  --md-border-color: #3e4451;
+  --md-border-color-muted: #2c313a;
+  --md-fg-default: #abb2bf;
+  --md-fg-muted: #7f848e;
+  --md-bg-subtle: #21252b;
+  --md-accent-fg: #61afef;
+  --md-accent-emphasis: #c678dd;
+  --md-danger-fg: #e06c75;
+  --md-neutral-muted: rgba(44, 49, 58, 0.6);
+}
+
+.x-markdown pre {
+  background: #282c34;
+  border: 1px solid #3e4451;
+}
+
+.x-markdown :not(pre) > code {
+  color: #98c379;
+  background: rgba(62, 68, 81, 0.5);
+}
+
+.x-markdown a { color: #61afef; }
+.x-markdown a:hover { color: #c678dd; }
+.x-markdown strong { color: #e5c07b; }
+
+.x-markdown h1,
+.x-markdown h2 {
+  border-bottom-color: #3e4451;
+}
+
+.x-markdown blockquote {
+  border-left-color: #c678dd;
+  color: #7f848e;
+}
+
+.x-markdown table:not(pre table) th { background: #2c313a; }
+.x-markdown table:not(pre table) tr:nth-child(2n) { background-color: rgba(44, 49, 58, 0.4); }
+`;
+
 // Map of builtin plugin IDs to their manifest and source
 export const BUILTIN_PLUGIN_SOURCES: Record<
 	string,
-	{ manifest: Record<string, unknown>; source: string; extraFiles?: Record<string, string> }
+	{
+		manifest: Record<string, unknown>;
+		source: string;
+		extraFiles?: Record<string, string>;
+	}
 > = {
 	"prompt-templates": {
 		manifest: PROMPT_TEMPLATES_MANIFEST,
@@ -700,6 +1061,11 @@ export const BUILTIN_PLUGIN_SOURCES: Record<
 			"newsprint.css": MARKDOWN_NEWSPRINT_CSS,
 			"vue-green.css": MARKDOWN_VUE_GREEN_CSS,
 			"dracula.css": MARKDOWN_DRACULA_CSS,
+			"solarized-light.css": MARKDOWN_SOLARIZED_LIGHT_CSS,
+			"nord.css": MARKDOWN_NORD_CSS,
+			"monokai.css": MARKDOWN_MONOKAI_CSS,
+			"github-dimmed.css": MARKDOWN_GITHUB_DIMMED_CSS,
+			"one-dark.css": MARKDOWN_ONE_DARK_CSS,
 		},
 	},
 };

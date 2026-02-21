@@ -19,6 +19,7 @@ import {
 	message,
 	Modal,
 	Popconfirm,
+	Select,
 	Space,
 	Spin,
 	Switch,
@@ -103,9 +104,7 @@ export default function Plugins() {
 	const [commandResult, setCommandResult] = useState<TemplateResult | null>(
 		null,
 	);
-	const [executingCommand, setExecutingCommand] = useState<string | null>(
-		null,
-	);
+	const [executingCommand, setExecutingCommand] = useState<string | null>(null);
 
 	// 加载已安装插件
 	const loadInstalledPlugins = useCallback(async () => {
@@ -247,7 +246,9 @@ export default function Plugins() {
 				setLoading(true);
 				await window.electron.skin.setActiveSkin(pluginId, themeId);
 				setActiveSkin(pluginId, themeId);
-				message.success(t("plugins.skinActivated", "皮肤已启用", { ns: "plugins" }));
+				message.success(
+					t("plugins.skinActivated", "皮肤已启用", { ns: "plugins" }),
+				);
 				loadInstalledPlugins();
 			} catch (error) {
 				message.error(String(error));
@@ -264,7 +265,9 @@ export default function Plugins() {
 			setLoading(true);
 			await window.electron.skin.setActiveSkin(null);
 			setActiveSkin(null, null);
-			message.success(t("plugins.skinRestored", "已恢复默认主题", { ns: "plugins" }));
+			message.success(
+				t("plugins.skinRestored", "已恢复默认主题", { ns: "plugins" }),
+			);
 			loadInstalledPlugins();
 		} catch (error) {
 			message.error(String(error));
@@ -280,7 +283,11 @@ export default function Plugins() {
 				setLoading(true);
 				await window.electron.markdownTheme.setActive(pluginId, themeId);
 				setActiveMarkdownTheme(pluginId, themeId);
-				message.success(t("plugins.markdownThemeActivated", "Markdown 主题已启用", { ns: "plugins" }));
+				message.success(
+					t("plugins.markdownThemeActivated", "Markdown 主题已启用", {
+						ns: "plugins",
+					}),
+				);
 				loadInstalledPlugins();
 			} catch (error) {
 				message.error(String(error));
@@ -297,7 +304,11 @@ export default function Plugins() {
 			setLoading(true);
 			await window.electron.markdownTheme.setActive(null);
 			setActiveMarkdownTheme(null, null);
-			message.success(t("plugins.markdownThemeRestored", "已恢复默认 Markdown 样式", { ns: "plugins" }));
+			message.success(
+				t("plugins.markdownThemeRestored", "已恢复默认 Markdown 样式", {
+					ns: "plugins",
+				}),
+			);
 			loadInstalledPlugins();
 		} catch (error) {
 			message.error(String(error));
@@ -310,9 +321,7 @@ export default function Plugins() {
 	const handleCopyTemplate = useCallback(() => {
 		if (commandResult?.template) {
 			navigator.clipboard.writeText(commandResult.template);
-			message.success(
-				t("plugins.copied", "已复制到剪贴板", { ns: "plugins" }),
-			);
+			message.success(t("plugins.copied", "已复制到剪贴板", { ns: "plugins" }));
 		}
 	}, [commandResult, t]);
 
@@ -340,16 +349,18 @@ export default function Plugins() {
 				(c) => !c.command.endsWith(".list"),
 			);
 			const isActive = plugin.state === "active";
-			const isSkin = plugin.manifest.categories?.includes("theme") && (plugin.manifest.contributes?.themes?.length ?? 0) > 0;
-			const isMarkdownTheme = plugin.manifest.categories?.includes("markdown") && (plugin.manifest.contributes?.themes?.length ?? 0) > 0;
+			const isSkin =
+				plugin.manifest.categories?.includes("theme") &&
+				(plugin.manifest.contributes?.themes?.length ?? 0) > 0;
+			const isMarkdownTheme =
+				plugin.manifest.categories?.includes("markdown") &&
+				(plugin.manifest.contributes?.themes?.length ?? 0) > 0;
 			const themes = plugin.manifest.contributes?.themes || [];
 			const hasSkinActive = isSkin && activeSkinPluginId === plugin.id;
-			const hasMarkdownActive = isMarkdownTheme && activeMarkdownPluginId === plugin.id;
+			const hasMarkdownActive =
+				isMarkdownTheme && activeMarkdownPluginId === plugin.id;
 
-			const stateConfig: Record<
-				string,
-				{ color: string; text: string }
-			> = {
+			const stateConfig: Record<string, { color: string; text: string }> = {
 				installing: { color: "processing", text: "安装中" },
 				installed: { color: "default", text: "已安装" },
 				activating: { color: "processing", text: "激活中" },
@@ -383,22 +394,28 @@ export default function Plugins() {
 										background: isActive
 											? `linear-gradient(135deg, ${token.colorPrimary}, ${token.colorPrimaryActive})`
 											: token.colorFillSecondary,
-										color: isActive
-											? "#fff"
-											: token.colorTextSecondary,
+										color: isActive ? "#fff" : token.colorTextSecondary,
 									}}
 								>
 									{plugin.manifest.icon || "🔌"}
 								</div>
 								<div className="min-w-0">
-									<div className="font-semibold text-sm truncate" style={{ color: token.colorText }}>
+									<div
+										className="font-semibold text-sm truncate"
+										style={{ color: token.colorText }}
+									>
 										{plugin.manifest.displayName}
 									</div>
 									<div className="flex items-center gap-2 mt-0.5">
 										<Tag
 											color={stateInfo.color}
 											bordered={false}
-											style={{ margin: 0, fontSize: 11, lineHeight: "18px", padding: "0 6px" }}
+											style={{
+												margin: 0,
+												fontSize: 11,
+												lineHeight: "18px",
+												padding: "0 6px",
+											}}
 										>
 											{stateInfo.text}
 										</Tag>
@@ -420,10 +437,7 @@ export default function Plugins() {
 									/>
 								</Tooltip>
 								<Popconfirm
-									title={t(
-										"plugins.confirmUninstall",
-										"确定要卸载此插件吗？",
-									)}
+									title={t("plugins.confirmUninstall", "确定要卸载此插件吗？")}
 									onConfirm={() => handleUninstallPlugin(plugin.id)}
 									okText={t("common.yes", "是")}
 									cancelText={t("no", "否", { ns: "common" })}
@@ -485,30 +499,38 @@ export default function Plugins() {
 						{isSkin && isActive && themes.length > 0 && (
 							<div className="mt-3">
 								<div className="flex flex-wrap gap-2">
-									{themes.map((themeItem: { id: string; label: string; icon?: string }) => {
-										const isThemeActive = hasSkinActive && activeSkinThemeId === themeItem.id;
-										return (
-											<Button
-												key={themeItem.id}
-												size="small"
-												type={isThemeActive ? "primary" : "default"}
-												onClick={() => {
-													if (isThemeActive) {
-														handleRestoreDefaultSkin();
-													} else {
-														handleActivateTheme(plugin.id, themeItem.id);
-													}
-												}}
-												loading={loading}
-												style={{
-													borderRadius: 6,
-													fontSize: 12,
-												}}
-											>
-												{themeItem.icon ? `${themeItem.icon} ` : ""}{themeItem.label}
-											</Button>
-										);
-									})}
+									{themes.map(
+										(themeItem: {
+											id: string;
+											label: string;
+											icon?: string;
+										}) => {
+											const isThemeActive =
+												hasSkinActive && activeSkinThemeId === themeItem.id;
+											return (
+												<Button
+													key={themeItem.id}
+													size="small"
+													type={isThemeActive ? "primary" : "default"}
+													onClick={() => {
+														if (isThemeActive) {
+															handleRestoreDefaultSkin();
+														} else {
+															handleActivateTheme(plugin.id, themeItem.id);
+														}
+													}}
+													loading={loading}
+													style={{
+														borderRadius: 6,
+														fontSize: 12,
+													}}
+												>
+													{themeItem.icon ? `${themeItem.icon} ` : ""}
+													{themeItem.label}
+												</Button>
+											);
+										},
+									)}
 								</div>
 								{hasSkinActive && (
 									<Button
@@ -527,43 +549,35 @@ export default function Plugins() {
 						{/* Markdown theme selection */}
 						{isMarkdownTheme && isActive && themes.length > 0 && (
 							<div className="mt-3">
-								<div className="flex flex-wrap gap-2">
-									{themes.map((themeItem: { id: string; label: string; icon?: string }) => {
-										const isMdThemeActive = hasMarkdownActive && activeMarkdownThemeId === themeItem.id;
-										return (
-											<Button
-												key={themeItem.id}
-												size="small"
-												type={isMdThemeActive ? "primary" : "default"}
-												onClick={() => {
-													if (isMdThemeActive) {
-														handleRestoreDefaultMarkdown();
-													} else {
-														handleActivateMarkdownTheme(plugin.id, themeItem.id);
-													}
-												}}
-												loading={loading}
-												style={{
-													borderRadius: 6,
-													fontSize: 12,
-												}}
-											>
-												{themeItem.icon ? `${themeItem.icon} ` : ""}{themeItem.label}
-											</Button>
-										);
-									})}
-								</div>
-								{hasMarkdownActive && (
-									<Button
-										type="link"
-										size="small"
-										onClick={handleRestoreDefaultMarkdown}
-										loading={loading}
-										style={{ padding: "4px 0", fontSize: 12, height: "auto" }}
-									>
-										{t("plugins.restoreDefault", "恢复默认", { ns: "plugins" })}
-									</Button>
-								)}
+								<Select
+									size="small"
+									value={hasMarkdownActive ? activeMarkdownThemeId : undefined}
+									placeholder={t(
+										"plugins.selectMarkdownTheme",
+										"选择 Markdown 主题",
+										{ ns: "plugins" },
+									)}
+									allowClear
+									onChange={(value) => {
+										if (value) {
+											handleActivateMarkdownTheme(plugin.id, value);
+										} else {
+											handleRestoreDefaultMarkdown();
+										}
+									}}
+									loading={loading}
+									style={{ width: 200 }}
+									options={themes.map(
+										(themeItem: {
+											id: string;
+											label: string;
+											icon?: string;
+										}) => ({
+											value: themeItem.id,
+											label: `${themeItem.icon ? `${themeItem.icon} ` : ""}${themeItem.label}`,
+										}),
+									)}
+								/>
 							</div>
 						)}
 
@@ -677,11 +691,9 @@ export default function Plugins() {
 						</div>
 					) : marketPlugins.length === 0 ? (
 						<Empty
-							description={t(
-								"plugins.noMarketPlugins",
-								"暂无可用插件",
-								{ ns: "plugins" },
-							)}
+							description={t("plugins.noMarketPlugins", "暂无可用插件", {
+								ns: "plugins",
+							})}
 						/>
 					) : (
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -707,7 +719,10 @@ export default function Plugins() {
 											{plugin.icon || "🔌"}
 										</div>
 										<div className="min-w-0">
-											<div className="font-semibold text-sm truncate" style={{ color: token.colorText }}>
+											<div
+												className="font-semibold text-sm truncate"
+												style={{ color: token.colorText }}
+											>
 												{plugin.displayName}
 											</div>
 											<div
@@ -769,9 +784,7 @@ export default function Plugins() {
 												type="primary"
 												size="small"
 												icon={<DownloadOutlined />}
-												onClick={() =>
-													handleInstallFromMarket(plugin.id)
-												}
+												onClick={() => handleInstallFromMarket(plugin.id)}
 												loading={loading}
 											>
 												{t("plugins.install", "安装", {
@@ -818,16 +831,10 @@ export default function Plugins() {
 						</div>
 					) : installedPlugins.length === 0 ? (
 						<Empty
-							description={t(
-								"plugins.noInstalledPlugins",
-								"暂无已安装插件",
-							)}
+							description={t("plugins.noInstalledPlugins", "暂无已安装插件")}
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
 						>
-							<Button
-								type="primary"
-								onClick={() => setActiveTab("market")}
-							>
+							<Button type="primary" onClick={() => setActiveTab("market")}>
 								{t("plugins.browseMarket", "浏览插件市场", {
 									ns: "plugins",
 								})}
@@ -875,11 +882,9 @@ export default function Plugins() {
 								className="text-xs mt-1"
 								style={{ color: token.colorTextTertiary }}
 							>
-								{t(
-									"plugins.subtitle",
-									"管理和安装插件以扩展应用功能",
-									{ ns: "plugins" },
-								)}
+								{t("plugins.subtitle", "管理和安装插件以扩展应用功能", {
+									ns: "plugins",
+								})}
 							</p>
 						</div>
 						<Space>
