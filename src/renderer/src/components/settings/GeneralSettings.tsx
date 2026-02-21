@@ -1,8 +1,8 @@
 import {
-	FolderOpenOutlined,
-	GlobalOutlined,
-	SettingOutlined,
-	StarOutlined,
+  FolderOpenOutlined,
+  GlobalOutlined,
+  SettingOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Input, message, Select, Space, theme } from "antd";
 import type React from "react";
@@ -17,164 +17,165 @@ const { useToken } = theme;
 
 // 错误重试工具函数
 async function withRetry<T>(
-	fn: () => Promise<T>,
-	retries = 3,
-	delay = 1000,
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000,
 ): Promise<T> {
-	let lastError: Error | null = null;
-	for (let i = 0; i < retries; i++) {
-		try {
-			return await fn();
-		} catch (e) {
-			lastError = e as Error;
-			if (i < retries - 1) {
-				await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
-			}
-		}
-	}
-	throw lastError;
+  let lastError: Error | null = null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e as Error;
+      if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+      }
+    }
+  }
+  throw lastError;
 }
 
 export const GeneralSettings: React.FC = () => {
-	const { t, i18n } = useTranslation();
-	const { token } = useToken();
-	const [userDataPath, setUserDataPath] = useState("");
-	const [loading, setLoading] = useState(true);
+  const { t, i18n } = useTranslation();
+  const { token } = useToken();
+  const [userDataPath, setUserDataPath] = useState("");
+  const [loading, setLoading] = useState(true);
 
-	const loadData = useCallback(async () => {
-		try {
-			setLoading(true);
-			const path = await withRetry(() => appService.getUserDataPath());
-			setUserDataPath(path);
-		} catch (e) {
-			console.error("Failed to load general settings:", e);
-		} finally {
-			setLoading(false);
-		}
-	}, []);
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const path = await withRetry(() => appService.getUserDataPath());
+      setUserDataPath(path);
+    } catch (e) {
+      console.error("Failed to load general settings:", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-	useEffect(() => {
-		loadData();
-	}, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-	const handleOpenPath = async () => {
-		try {
-			await appService.openPath(userDataPath);
-		} catch {
-			message.error(
-				t("openPathError", "Failed to open path", { ns: "settings" }),
-			);
-		}
-	};
+  const handleOpenPath = async () => {
+    try {
+      await appService.openPath(userDataPath);
+    } catch {
+      message.error(
+        t("openPathError", "Failed to open path", { ns: "settings" }),
+      );
+    }
+  };
 
-	const handleCheckUpdate = async () => {
-		try {
-			const result = await appService.checkUpdate();
-			if (result.updateAvailable) {
-				message.success(result.message);
-			} else {
-				message.info(result.message);
-			}
-		} catch {
-			message.error(
-				t("checkUpdateError", "Failed to check updates", { ns: "settings" }),
-			);
-		}
-	};
+  const handleCheckUpdate = async () => {
+    try {
+      const result = await appService.checkUpdate();
+      if (result.updateAvailable) {
+        message.success(result.message);
+      } else {
+        message.info(result.message);
+      }
+    } catch {
+      message.error(
+        t("checkUpdateError", "Failed to check updates", { ns: "settings" }),
+      );
+    }
+  };
 
-	return (
-		<Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
-			<div className="space-y-6">
-				<SettingSection
-					title={t("userDataPath", "User Data Directory", {
-						ns: "settings",
-					})}
-				>
-					<div className="space-y-2">
-						<Space.Compact style={{ width: "100%" }}>
-							<Input
-								value={userDataPath}
-								readOnly
-								className="!rounded-l-xl"
-								placeholder={t(
-									"settings.userDataPathPlaceholder",
-									"User data directory path",
-								)}
-							/>
-							<Button
-								icon={<FolderOpenOutlined />}
-								onClick={handleOpenPath}
-								className="!rounded-r-xl"
-							>
-								{t("open", "Open", { ns: "settings" })}
-							</Button>
-						</Space.Compact>
-						<p className="text-xs" style={{ color: token.colorTextSecondary }}>
-							{t(
-								"settings.userDataPathHint",
-								"This directory stores application data and cannot be changed",
-							)}
-						</p>
-					</div>
-				</SettingSection>
+  return (
+    <Card className="!border-0 !shadow-none !bg-transparent" loading={loading}>
+      <div className="space-y-6">
+        <SettingSection
+          title={t("userDataPath", "User Data Directory", {
+            ns: "settings",
+          })}
+        >
+          <div className="space-y-2">
+            <Space.Compact style={{ width: "100%" }}>
+              <Input
+                value={userDataPath}
+                readOnly
+                className="!rounded-l-xl"
+                placeholder={t(
+                  "settings.userDataPathPlaceholder",
+                  "User data directory path",
+                )}
+              />
+              <Button
+                icon={<FolderOpenOutlined />}
+                onClick={handleOpenPath}
+                className="!rounded-r-xl"
+              >
+                {t("open", "Open", { ns: "settings" })}
+              </Button>
+            </Space.Compact>
+            <p className="text-xs" style={{ color: token.colorTextSecondary }}>
+              {t(
+                "userDataPathHint",
+                "This directory stores application data and cannot be changed",
+                { ns: "settings" },
+              )}
+            </p>
+          </div>
+        </SettingSection>
 
-				<SettingSection
-					title={t("preferences", "Preferences", { ns: "settings" })}
-					icon={<SettingOutlined />}
-				>
-					<ThemeSettings />
-					<div
-						className="flex items-center justify-between py-2 border-t"
-						style={{ borderColor: token.colorBorder }}
-					>
-						<div
-							className="flex items-center gap-2"
-							style={{ color: token.colorText }}
-						>
-							<GlobalOutlined className="text-sm" />
-							<span className="text-sm">
-								{t("language", "Language", { ns: "settings" })}
-							</span>
-						</div>
-						<Select
-							value={i18n.language}
-							onChange={(value) => i18n.changeLanguage(value)}
-							className="w-[100px]"
-							size="small"
-							variant="borderless"
-							popupMatchSelectWidth={false}
-							options={[
-								{
-									value: "zh",
-									label: <span className="text-sm">中文</span>,
-								},
-								{
-									value: "en",
-									label: <span className="text-sm">English</span>,
-								},
-							]}
-						/>
-					</div>
-				</SettingSection>
+        <SettingSection
+          title={t("preferences", "Preferences", { ns: "settings" })}
+          icon={<SettingOutlined />}
+        >
+          <ThemeSettings />
+          <div
+            className="flex items-center justify-between py-2 border-t"
+            style={{ borderColor: token.colorBorder }}
+          >
+            <div
+              className="flex items-center gap-2"
+              style={{ color: token.colorText }}
+            >
+              <GlobalOutlined className="text-sm" />
+              <span className="text-sm">
+                {t("language", "Language", { ns: "settings" })}
+              </span>
+            </div>
+            <Select
+              value={i18n.language}
+              onChange={(value) => i18n.changeLanguage(value)}
+              className="w-[100px]"
+              size="small"
+              variant="borderless"
+              popupMatchSelectWidth={false}
+              options={[
+                {
+                  value: "zh",
+                  label: <span className="text-sm">中文</span>,
+                },
+                {
+                  value: "en",
+                  label: <span className="text-sm">English</span>,
+                },
+              ]}
+            />
+          </div>
+        </SettingSection>
 
-				<FloatWidgetSettings />
+        <FloatWidgetSettings />
 
-				<SettingSection
-					title={t("updates", "Updates", { ns: "settings" })}
-					icon={<StarOutlined />}
-				>
-					<div className="flex items-center justify-between">
-						<p className="text-sm" style={{ color: token.colorTextSecondary }}>
-							{t("checkForUpdates", "Check for application updates", {
-								ns: "settings",
-							})}
-						</p>
-						<Button onClick={handleCheckUpdate} className="!rounded-lg">
-							{t("checkUpdate", "Check Update", { ns: "settings" })}
-						</Button>
-					</div>
-				</SettingSection>
-			</div>
-		</Card>
-	);
+        <SettingSection
+          title={t("updates", "Updates", { ns: "settings" })}
+          icon={<StarOutlined />}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm" style={{ color: token.colorTextSecondary }}>
+              {t("checkForUpdates", "Check for application updates", {
+                ns: "settings",
+              })}
+            </p>
+            <Button onClick={handleCheckUpdate} className="!rounded-lg">
+              {t("checkUpdate", "Check Update", { ns: "settings" })}
+            </Button>
+          </div>
+        </SettingSection>
+      </div>
+    </Card>
+  );
 };

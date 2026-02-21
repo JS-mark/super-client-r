@@ -117,20 +117,21 @@ const QuickActionsTab: React.FC = () => {
 				>
 					<div className="flex items-center gap-4">
 						<div
-							className={`w-10 h-10 rounded-lg flex items-center justify-center ${action.type === "primary"
+							className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+								action.type === "primary"
 									? "bg-blue-500 text-white"
 									: action.danger
 										? "text-red-500"
 										: ""
-								}`}
+							}`}
 							style={
 								action.danger
 									? { backgroundColor: token.colorErrorBg }
 									: action.type !== "primary"
 										? {
-											backgroundColor: token.colorBgContainer,
-											color: token.colorText,
-										}
+												backgroundColor: token.colorBgContainer,
+												color: token.colorText,
+											}
 										: undefined
 							}
 						>
@@ -237,44 +238,44 @@ const SystemInfoTab: React.FC = () => {
 
 	const infoItems = debugInfo
 		? [
-			{
-				label: t("appName", "应用名称", { ns: "settings" }),
-				value: (debugInfo.app as AppInfo)?.name || "N/A",
-			},
-			{
-				label: t("version", "版本", { ns: "settings" }),
-				value: (debugInfo.app as AppInfo)?.version || "N/A",
-			},
-			{
-				label: "Electron",
-				value: (debugInfo.app as AppInfo)?.electron || "N/A",
-			},
-			{ label: "Node.js", value: (debugInfo.app as AppInfo)?.node || "N/A" },
-			{
-				label: t("platform", "平台", { ns: "settings" }),
-				value: (debugInfo.app as AppInfo)?.platform || "N/A",
-			},
-			{
-				label: t("architecture", "架构", { ns: "settings" }),
-				value: (debugInfo.app as AppInfo)?.arch || "N/A",
-			},
-			{
-				label: t("userDataPath", "用户数据路径", { ns: "settings" }),
-				value: (debugInfo.userDataPath as string) || "N/A",
-				fullWidth: true,
-			},
-			{
-				label: t("apiStatus", "API 状态", { ns: "settings" }),
-				value:
-					(debugInfo.apiStatus as ApiStatus)?.status === "running"
-						? t("running", "运行中", { ns: "settings" })
-						: t("stopped", "已停止", { ns: "settings" }),
-			},
-			{
-				label: t("apiPort", "API 端口", { ns: "settings" }),
-				value: (debugInfo.apiStatus as ApiStatus)?.port || "N/A",
-			},
-		]
+				{
+					label: t("appName", "应用名称", { ns: "settings" }),
+					value: (debugInfo.app as AppInfo)?.name || "N/A",
+				},
+				{
+					label: t("version", "版本", { ns: "settings" }),
+					value: (debugInfo.app as AppInfo)?.version || "N/A",
+				},
+				{
+					label: "Electron",
+					value: (debugInfo.app as AppInfo)?.electron || "N/A",
+				},
+				{ label: "Node.js", value: (debugInfo.app as AppInfo)?.node || "N/A" },
+				{
+					label: t("platform", "平台", { ns: "settings" }),
+					value: (debugInfo.app as AppInfo)?.platform || "N/A",
+				},
+				{
+					label: t("architecture", "架构", { ns: "settings" }),
+					value: (debugInfo.app as AppInfo)?.arch || "N/A",
+				},
+				{
+					label: t("userDataPath", "用户数据路径", { ns: "settings" }),
+					value: (debugInfo.userDataPath as string) || "N/A",
+					fullWidth: true,
+				},
+				{
+					label: t("apiStatus", "API 状态", { ns: "settings" }),
+					value:
+						(debugInfo.apiStatus as ApiStatus)?.status === "running"
+							? t("running", "运行中", { ns: "settings" })
+							: t("stopped", "已停止", { ns: "settings" }),
+				},
+				{
+					label: t("apiPort", "API 端口", { ns: "settings" }),
+					value: (debugInfo.apiStatus as ApiStatus)?.port || "N/A",
+				},
+			]
 		: [];
 
 	return (
@@ -305,8 +306,9 @@ const SystemInfoTab: React.FC = () => {
 					{infoItems.map((item) => (
 						<div
 							key={item.value}
-							className={`p-4 rounded-xl border ${item.fullWidth ? "col-span-2" : ""
-								}`}
+							className={`p-4 rounded-xl border ${
+								item.fullWidth ? "col-span-2" : ""
+							}`}
 							style={{
 								backgroundColor: token.colorBgContainer,
 								borderColor: token.colorBorder,

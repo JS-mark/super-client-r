@@ -36,10 +36,30 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { token } = useToken();
 
 	const features = [
-		{ icon: <RocketOutlined />, titleKey: "about.features.aiChat.title", descKey: "about.features.aiChat.desc", color: "from-blue-500 to-cyan-500" },
-		{ icon: <CodeOutlined />, titleKey: "about.features.mcp.title", descKey: "about.features.mcp.desc", color: "from-purple-500 to-pink-500" },
-		{ icon: <StarOutlined />, titleKey: "about.features.skills.title", descKey: "about.features.skills.desc", color: "from-orange-500 to-red-500" },
-		{ icon: <InfoCircleOutlined />, titleKey: "about.features.localApi.title", descKey: "about.features.localApi.desc", color: "from-green-500 to-emerald-500" },
+		{
+			icon: <RocketOutlined />,
+			titleKey: "about.features.aiChat.title",
+			descKey: "about.features.aiChat.desc",
+			color: "from-blue-500 to-cyan-500",
+		},
+		{
+			icon: <CodeOutlined />,
+			titleKey: "about.features.mcp.title",
+			descKey: "about.features.mcp.desc",
+			color: "from-purple-500 to-pink-500",
+		},
+		{
+			icon: <StarOutlined />,
+			titleKey: "about.features.skills.title",
+			descKey: "about.features.skills.desc",
+			color: "from-orange-500 to-red-500",
+		},
+		{
+			icon: <InfoCircleOutlined />,
+			titleKey: "about.features.localApi.title",
+			descKey: "about.features.localApi.desc",
+			color: "from-green-500 to-emerald-500",
+		},
 	];
 
 	return (
@@ -62,7 +82,11 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 						</Tag>
 					</div>
 					<Paragraph className="!text-slate-400 !text-xs !mb-0">
-						{t("aboutDescription", "A powerful AI desktop client for seamless interaction with multiple AI services.", { ns: "settings" })}
+						{t(
+							"aboutDescription",
+							"A powerful AI desktop client for seamless interaction with multiple AI services.",
+							{ ns: "settings" },
+						)}
 					</Paragraph>
 				</div>
 			</div>
@@ -78,11 +102,23 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 							borderColor: token.colorBorder,
 						}}
 					>
-						<div className={`w-7 h-7 rounded-md bg-gradient-to-br ${feature.color} flex items-center justify-center mb-1.5 shadow-sm`}>
+						<div
+							className={`w-7 h-7 rounded-md bg-gradient-to-br ${feature.color} flex items-center justify-center mb-1.5 shadow-sm`}
+						>
 							<span className="text-white text-xs">{feature.icon}</span>
 						</div>
-						<h3 className="text-xs font-semibold mb-0.5 leading-tight" style={{ color: token.colorText }}>{t(feature.titleKey, { ns: "settings" })}</h3>
-						<p className="text-[10px] leading-tight" style={{ color: token.colorTextSecondary }}>{t(feature.descKey, { ns: "settings" })}</p>
+						<h3
+							className="text-xs font-semibold mb-0.5 leading-tight"
+							style={{ color: token.colorText }}
+						>
+							{t(feature.titleKey, { ns: "settings" })}
+						</h3>
+						<p
+							className="text-[10px] leading-tight"
+							style={{ color: token.colorTextSecondary }}
+						>
+							{t(feature.descKey, { ns: "settings" })}
+						</p>
 					</div>
 				))}
 			</div>
@@ -96,10 +132,23 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { token } = useToken();
 
 	const systemItems = [
-		{ label: t("platform", "Platform", { ns: "settings" }), value: appInfo?.platform === "darwin" ? "macOS" : appInfo?.platform || "N/A", icon: <InfoCircleOutlined /> },
-		{ label: t("architecture", "Arch", { ns: "settings" }), value: appInfo?.arch || "N/A", icon: <CodeOutlined /> },
+		{
+			label: t("platform", "Platform", { ns: "settings" }),
+			value:
+				appInfo?.platform === "darwin" ? "macOS" : appInfo?.platform || "N/A",
+			icon: <InfoCircleOutlined />,
+		},
+		{
+			label: t("architecture", "Arch", { ns: "settings" }),
+			value: appInfo?.arch || "N/A",
+			icon: <CodeOutlined />,
+		},
 		{ label: "Node.js", value: appInfo?.node || "N/A", icon: <CodeOutlined /> },
-		{ label: "Electron", value: appInfo?.electron || "N/A", icon: <CodeOutlined /> },
+		{
+			label: "Electron",
+			value: appInfo?.electron || "N/A",
+			icon: <CodeOutlined />,
+		},
 	];
 
 	return (
@@ -129,8 +178,18 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 								{item.icon}
 							</div>
 							<div className="min-w-0">
-								<div className="text-xs font-medium truncate" style={{ color: token.colorTextHeading }}>{item.value}</div>
-								<div className="text-[10px]" style={{ color: token.colorTextSecondary }}>{item.label}</div>
+								<div
+									className="text-xs font-medium truncate"
+									style={{ color: token.colorTextHeading }}
+								>
+									{item.value}
+								</div>
+								<div
+									className="text-[10px]"
+									style={{ color: token.colorTextSecondary }}
+								>
+									{item.label}
+								</div>
 							</div>
 						</div>
 					))}
@@ -149,12 +208,24 @@ const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="flex flex-wrap gap-1.5">
-					<Tag color="blue" className="!text-xs">AI Chat</Tag>
-					<Tag color="purple" className="!text-xs">MCP</Tag>
-					<Tag color="orange" className="!text-xs">Skills</Tag>
-					<Tag color="green" className="!text-xs">API</Tag>
-					<Tag color="cyan" className="!text-xs">i18n</Tag>
-					<Tag color="magenta" className="!text-xs">Dark</Tag>
+					<Tag color="blue" className="!text-xs">
+						AI Chat
+					</Tag>
+					<Tag color="purple" className="!text-xs">
+						MCP
+					</Tag>
+					<Tag color="orange" className="!text-xs">
+						Skills
+					</Tag>
+					<Tag color="green" className="!text-xs">
+						API
+					</Tag>
+					<Tag color="cyan" className="!text-xs">
+						i18n
+					</Tag>
+					<Tag color="magenta" className="!text-xs">
+						Dark
+					</Tag>
 				</div>
 			</Card>
 		</div>
@@ -185,22 +256,34 @@ const ChangelogTab: React.FC = () => {
 					{
 						color: "green",
 						label: "v0.0.1",
-						children: <span className="text-slate-500 text-xs">Initial release with core chat</span>,
+						children: (
+							<span className="text-slate-500 text-xs">
+								Initial release with core chat
+							</span>
+						),
 					},
 					{
 						color: "blue",
 						label: "MCP",
-						children: <span className="text-slate-500 text-xs">MCP server integration</span>,
+						children: (
+							<span className="text-slate-500 text-xs">
+								MCP server integration
+							</span>
+						),
 					},
 					{
 						color: "purple",
 						label: "Skills",
-						children: <span className="text-slate-500 text-xs">Skill marketplace</span>,
+						children: (
+							<span className="text-slate-500 text-xs">Skill marketplace</span>
+						),
 					},
 					{
 						color: "orange",
 						label: "API",
-						children: <span className="text-slate-500 text-xs">JWT & API key auth</span>,
+						children: (
+							<span className="text-slate-500 text-xs">JWT & API key auth</span>
+						),
 					},
 				]}
 			/>
@@ -209,7 +292,7 @@ const ChangelogTab: React.FC = () => {
 };
 
 // 团队 Tab - 更紧凑
-const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
+const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 	onCheckUpdate,
 	onOpenGitHub,
 	onReportBug,
@@ -235,11 +318,21 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 					<div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 mb-2">
 						<HeartOutlined className="text-lg text-white" />
 					</div>
-					<div className="font-medium text-sm" style={{ color: token.colorText }}>
-						{t("madeWith", "Made with", { ns: "settings" })} <HeartOutlined className="text-red-400 mx-1" /> {t("byTeam", "by Super Client Team", { ns: "settings" })}
+					<div
+						className="font-medium text-sm"
+						style={{ color: token.colorText }}
+					>
+						{t("madeWith", "Made with", { ns: "settings" })}{" "}
+						<HeartOutlined className="text-red-400 mx-1" />{" "}
+						{t("byTeam", "by Super Client Team", { ns: "settings" })}
 					</div>
-					<div className="text-xs mt-1" style={{ color: token.colorTextSecondary }}>
-						{t("about.thanks", "感谢所有贡献者和用户的支持", { ns: "settings" })}
+					<div
+						className="text-xs mt-1"
+						style={{ color: token.colorTextSecondary }}
+					>
+						{t("about.thanks", "感谢所有贡献者和用户的支持", {
+							ns: "settings",
+						})}
 					</div>
 				</div>
 			</Card>
@@ -256,8 +349,20 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | 'onOpenModal'>> = ({
 				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
-					<p className="mb-1">{t("about.licenseText", "This project is licensed under the MIT License.", { ns: "settings" })}</p>
-					<p>{t("about.licenseDesc", "You are free to use, modify, and distribute this software.", { ns: "settings" })}</p>
+					<p className="mb-1">
+						{t(
+							"about.licenseText",
+							"This project is licensed under the MIT License.",
+							{ ns: "settings" },
+						)}
+					</p>
+					<p>
+						{t(
+							"about.licenseDesc",
+							"You are free to use, modify, and distribute this software.",
+							{ ns: "settings" },
+						)}
+					</p>
 				</div>
 			</Card>
 
