@@ -77,14 +77,14 @@ novel-writer/
 
 ### 核心创作流程
 
-所有文件保存在 `~/Desktop/novel/` 目录下，每次启动自动加载已有存档。
+默认保存在 `~/Desktop/novel/`，支持自定义路径。每次启动自动加载已有存档。
 
 | 阶段 | 说明 | 输出文件 |
 |------|------|----------|
-| 故事大纲 | 世界观、主线、分卷规划 | `~/Desktop/novel/outline.md` |
-| 角色大纲 | 角色档案、登场规划 | `~/Desktop/novel/characters.md` |
-| 章节创作 | 3000-5000字/章 | `~/Desktop/novel/chapters/第X卷/第XXX章-标题.md` |
-| 进度管理 | 每章自动更新 | `~/Desktop/novel/progress.md` |
+| 故事大纲 | 世界观、主线、分卷规划 | `<NOVEL_ROOT>/outline.md` |
+| 角色大纲 | 角色档案、登场规划 | `<NOVEL_ROOT>/characters.md` |
+| 章节创作 | 3000-5000字/章 | `<NOVEL_ROOT>/chapters/第X卷/第XXX章-标题.md` |
+| 进度管理 | 每章自动更新 | `<NOVEL_ROOT>/progress.md` |
 
 ### 触发方式
 
@@ -132,10 +132,20 @@ novel-writer/
 
 ## 文件管理
 
-所有小说文件保存在桌面 `novel` 目录下（`~/Desktop/novel/`），不随项目工作目录变化：
+默认保存在 `~/Desktop/novel/`，可通过对话或 `/write` 命令参数自定义路径：
+
+```bash
+# 使用默认路径
+/write
+
+# 使用自定义路径
+/write ~/Documents/my-story
+```
+
+确定后的路径记为 `<NOVEL_ROOT>`，目录结构如下：
 
 ```
-~/Desktop/novel/
+<NOVEL_ROOT>/
 ├── outline.md                   # 故事大纲
 ├── characters.md                # 角色档案
 ├── progress.md                  # 创作进度 & 伏笔管理
@@ -148,7 +158,7 @@ novel-writer/
     └── ...
 ```
 
-**启动自动加载：** 每次触发 skill 或执行 `/write` 命令时，会自动读取已有的大纲、角色、进度和最近章节，恢复创作上下文。
+**启动自动加载：** 每次触发 skill 或执行 `/write` 命令时，自动读取已有的大纲、角色、进度和最近章节，恢复创作上下文。首次创作时会询问是否使用默认路径。
 
 ## 许可证
 
