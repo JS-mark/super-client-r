@@ -22,7 +22,9 @@ export function registerChatHandlers(): void {
 				return { success: true, data: list };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to list conversations";
+					error instanceof Error
+						? error.message
+						: "Failed to list conversations";
 				return { success: false, error: message };
 			}
 		},
@@ -36,7 +38,9 @@ export function registerChatHandlers(): void {
 				return { success: true, data: conv };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to create conversation";
+					error instanceof Error
+						? error.message
+						: "Failed to create conversation";
 				return { success: false, error: message };
 			}
 		},
@@ -50,7 +54,9 @@ export function registerChatHandlers(): void {
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to delete conversation";
+					error instanceof Error
+						? error.message
+						: "Failed to delete conversation";
 				return { success: false, error: message };
 			}
 		},
@@ -58,13 +64,21 @@ export function registerChatHandlers(): void {
 
 	ipcMain.handle(
 		CHAT_CHANNELS.RENAME_CONVERSATION,
-		async (_event, request: RenameConversationRequest): Promise<IPCResponse> => {
+		async (
+			_event,
+			request: RenameConversationRequest,
+		): Promise<IPCResponse> => {
 			try {
-				conversationStorage.renameConversation(request.conversationId, request.name);
+				conversationStorage.renameConversation(
+					request.conversationId,
+					request.name,
+				);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to rename conversation";
+					error instanceof Error
+						? error.message
+						: "Failed to rename conversation";
 				return { success: false, error: message };
 			}
 		},
@@ -74,7 +88,10 @@ export function registerChatHandlers(): void {
 
 	ipcMain.handle(
 		CHAT_CHANNELS.GET_MESSAGES,
-		async (_event, conversationId: string): Promise<IPCResponse<ChatMessagePersist[]>> => {
+		async (
+			_event,
+			conversationId: string,
+		): Promise<IPCResponse<ChatMessagePersist[]>> => {
 			try {
 				const messages = conversationStorage.getMessages(conversationId);
 				return { success: true, data: messages };
@@ -90,7 +107,10 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.SAVE_MESSAGES,
 		async (_event, request: SaveMessagesRequest): Promise<IPCResponse> => {
 			try {
-				conversationStorage.saveMessages(request.conversationId, request.messages);
+				conversationStorage.saveMessages(
+					request.conversationId,
+					request.messages,
+				);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -104,7 +124,10 @@ export function registerChatHandlers(): void {
 		CHAT_CHANNELS.APPEND_MESSAGE,
 		async (_event, request: AppendMessageRequest): Promise<IPCResponse> => {
 			try {
-				conversationStorage.appendMessage(request.conversationId, request.message);
+				conversationStorage.appendMessage(
+					request.conversationId,
+					request.message,
+				);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
@@ -156,7 +179,9 @@ export function registerChatHandlers(): void {
 				return { success: true, data: id };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to get last conversation";
+					error instanceof Error
+						? error.message
+						: "Failed to get last conversation";
 				return { success: false, error: message };
 			}
 		},
@@ -170,7 +195,9 @@ export function registerChatHandlers(): void {
 				return { success: true };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to set last conversation";
+					error instanceof Error
+						? error.message
+						: "Failed to set last conversation";
 				return { success: false, error: message };
 			}
 		},
@@ -186,7 +213,25 @@ export function registerChatHandlers(): void {
 				return { success: true, data: dir };
 			} catch (error: unknown) {
 				const message =
-					error instanceof Error ? error.message : "Failed to get conversation dir";
+					error instanceof Error
+						? error.message
+						: "Failed to get conversation dir";
+				return { success: false, error: message };
+			}
+		},
+	);
+
+	ipcMain.handle(
+		CHAT_CHANNELS.GET_WORKSPACE_DIR,
+		async (_event, conversationId: string): Promise<IPCResponse<string>> => {
+			try {
+				const dir = conversationStorage.getWorkspaceDir(conversationId);
+				return { success: true, data: dir };
+			} catch (error: unknown) {
+				const message =
+					error instanceof Error
+						? error.message
+						: "Failed to get workspace dir";
 				return { success: false, error: message };
 			}
 		},

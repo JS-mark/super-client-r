@@ -1,5 +1,7 @@
 import { App } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { SessionSettings } from "../components/chat/ChatSettingsModal";
+import { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 import { type EnvInfo, buildSystemPrompt } from "../prompt";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
@@ -9,6 +11,14 @@ import { type Message, useChatStore } from "../stores/chatStore";
 import { useModelStore } from "../stores/modelStore";
 import type { ActiveModelSelection } from "../types/models";
 import type { SearchConfig } from "../types/search";
+
+export type {
+	SessionSettings,
+	ToolCallMode,
+	ToolPermissionMode,
+	CustomParam,
+} from "../components/chat/ChatSettingsModal";
+export { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 
 export type ChatMode = "direct" | "agent" | "skill";
 
@@ -36,7 +46,11 @@ function sanitizeServerId(serverId: string): string {
 async function fetchMcpTools(): Promise<{
 	tools?: Array<{
 		type: "function";
-		function: { name: string; description: string; parameters: Record<string, unknown> };
+		function: {
+			name: string;
+			description: string;
+			parameters: Record<string, unknown>;
+		};
 	}>;
 	toolMapping?: Record<string, { serverId: string; toolName: string }>;
 	toolHint: string;
@@ -46,9 +60,16 @@ async function fetchMcpTools(): Promise<{
 		if (mcpTools.length > 0) {
 			const tools: Array<{
 				type: "function";
-				function: { name: string; description: string; parameters: Record<string, unknown> };
+				function: {
+					name: string;
+					description: string;
+					parameters: Record<string, unknown>;
+				};
 			}> = [];
-			const toolMapping: Record<string, { serverId: string; toolName: string }> = {};
+			const toolMapping: Record<
+				string,
+				{ serverId: string; toolName: string }
+			> = {};
 			for (const { serverId, tool } of mcpTools) {
 				const safePrefix = sanitizeServerId(serverId);
 				const prefixedName = `${safePrefix}__${tool.name}`;
@@ -62,7 +83,9 @@ async function fetchMcpTools(): Promise<{
 				});
 				toolMapping[prefixedName] = { serverId, toolName: tool.name };
 			}
-			const toolNames = tools.map((t) => t.function.name.split("__").pop()).join(", ");
+			const toolNames = tools
+				.map((t) => t.function.name.split("__").pop())
+				.join(", ");
 			const toolHint = `\n\nYou have access to the following tools and SHOULD actively use them when the user's request can benefit from them: ${toolNames}. Do not say you cannot access files, databases, or the web if a relevant tool is available — use the tool instead.`;
 			return { tools, toolMapping, toolHint };
 		}
@@ -70,6 +93,38 @@ async function fetchMcpTools(): Promise<{
 		console.warn("[useChat] Failed to fetch MCP tools:", err);
 	}
 	return { toolHint: "" };
+}
+
+/**
+ * Parse custom params from SessionSettings into a Record.
+ */
+function parseCustomParams(
+	params: Array<{ name: string; type: string; value: string }>,
+): Record<string, unknown> | undefined {
+	const valid = params.filter((p) => p.name.trim());
+	if (valid.length === 0) return undefined;
+	const result: Record<string, unknown> = {};
+	for (const p of valid) {
+		const key = p.name.trim();
+		switch (p.type) {
+			case "number":
+				result[key] = Number(p.value) || 0;
+				break;
+			case "boolean":
+				result[key] = p.value.toLowerCase() === "true";
+				break;
+			case "json":
+				try {
+					result[key] = JSON.parse(p.value);
+				} catch {
+					result[key] = p.value;
+				}
+				break;
+			default:
+				result[key] = p.value;
+		}
+	}
+	return result;
 }
 
 // 缓存环境信息（静态数据，应用生命周期内不变）
@@ -87,6 +142,29 @@ async function getEnvInfo(): Promise<EnvInfo | undefined> {
 		console.warn("[useChat] Failed to fetch env info:", err);
 	}
 	return undefined;
+}
+
+/**
+ * Get env info for system prompt injection.
+ * The cwd defaults to the user's home directory (set by the main process).
+ * Attaches the per-conversation workspace directory when available.
+ */
+async function getEnvInfoForPrompt(): Promise<EnvInfo | undefined> {
+	const envInfo = await getEnvInfo();
+	if (!envInfo) return undefined;
+
+	const conversationId = useChatStore.getState().currentConversationId;
+	if (!conversationId) return envInfo;
+
+	try {
+		const res = await window.electron.chat.getWorkspaceDir(conversationId);
+		if (res.success && res.data) {
+			return { ...envInfo, workspaceDir: res.data };
+		}
+	} catch (err) {
+		console.warn("[useChat] getWorkspaceDir failed:", err);
+	}
+	return envInfo;
 }
 
 export function useChat() {
@@ -113,8 +191,66 @@ export function useChat() {
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
 
+	// Pending tool approval state
+	const [pendingApproval, setPendingApproval] = useState<{
+		toolCallId: string;
+		name: string;
+		arguments: string;
+	} | null>(null);
+
 	// Session-scoped model override (does not affect global setting)
-	const [sessionModelOverride, setSessionModelOverride] = useState<ActiveModelSelection | null>(null);
+	const [sessionModelOverride, setSessionModelOverride] =
+		useState<ActiveModelSelection | null>(null);
+
+	// Session-scoped settings (tools, temperature, maxTokens, systemPrompt)
+	const [sessionSettings, setSessionSettings] = useState<SessionSettings>(
+		DEFAULT_SESSION_SETTINGS,
+	);
+
+	// Available MCP tools for permission settings UI
+	const [availableTools, setAvailableTools] = useState<
+		Array<{ prefixedName: string; displayName: string }>
+	>([]);
+
+	const respondToApproval = useCallback(
+		async (toolCallId: string, approved: boolean) => {
+			// Optimistic update: immediately reflect in UI
+			const toolMsgId = `tool_${toolCallId}`;
+			if (approved) {
+				updateMessageToolCall(toolMsgId, { status: "pending" });
+			} else {
+				updateMessageToolCall(toolMsgId, {
+					status: "error",
+					error: "Tool call rejected by user",
+				});
+			}
+			try {
+				await window.electron.llm.toolApprovalResponse(toolCallId, approved);
+			} catch (err) {
+				console.error("[useChat] toolApprovalResponse failed:", err);
+			}
+			setPendingApproval(null);
+		},
+		[updateMessageToolCall],
+	);
+
+	// Fetch available tools list for settings UI
+	useEffect(() => {
+		const loadTools = async () => {
+			try {
+				const mcpTools = await mcpClient.getAllTools();
+				const tools = mcpTools.map(({ serverId, tool }) => {
+					const safePrefix = sanitizeServerId(serverId);
+					const prefixedName = `${safePrefix}__${tool.name}`;
+					return { prefixedName, displayName: tool.name };
+				});
+				setAvailableTools(tools);
+			} catch {
+				setAvailableTools([]);
+			}
+		};
+		loadTools();
+	}, []);
 
 	const currentRequestIdRef = useRef<string | null>(null);
 	const streamContentRef = useRef("");
@@ -131,8 +267,12 @@ export function useChat() {
 	const getEffectiveModel = useCallback(() => {
 		if (sessionModelOverride) {
 			const { providers } = useModelStore.getState();
-			const provider = providers.find((p) => p.id === sessionModelOverride.providerId);
-			const model = provider?.models.find((m) => m.id === sessionModelOverride.modelId);
+			const provider = providers.find(
+				(p) => p.id === sessionModelOverride.providerId,
+			);
+			const model = provider?.models.find(
+				(m) => m.id === sessionModelOverride.modelId,
+			);
 			if (provider && model) return { provider, model };
 		}
 		return useModelStore.getState().getActiveProviderModel();
@@ -152,6 +292,15 @@ export function useChat() {
 				appendStreamingContent(event.content);
 			} else if (event.type === "tool_call" && event.toolCall) {
 				setSessionStatus("tool_calling");
+
+				// Finalize any accumulated assistant content BEFORE adding the tool message
+				// (updateLastMessage targets messages[last], which is still the assistant here)
+				if (streamContentRef.current) {
+					updateLastMessage(streamContentRef.current);
+					streamContentRef.current = "";
+					setStreamingContent("");
+				}
+
 				// Model is calling a tool — show a tool message in the chat
 				const toolMessage: Message = {
 					id: `tool_${event.toolCall.id}`,
@@ -173,13 +322,6 @@ export function useChat() {
 					},
 				};
 				addMessage(toolMessage);
-
-				// Finalize any accumulated assistant content before tool calls
-				if (streamContentRef.current) {
-					updateLastMessage(streamContentRef.current);
-					streamContentRef.current = "";
-					setStreamingContent("");
-				}
 			} else if (event.type === "tool_result" && event.toolResult) {
 				setSessionStatus("streaming");
 				// Tool execution completed — update the tool message
@@ -187,25 +329,49 @@ export function useChat() {
 				updateMessageToolCall(toolMsgId, {
 					status: event.toolResult.isError ? "error" : "success",
 					result: event.toolResult.result,
-					error: event.toolResult.isError ? String(event.toolResult.result) : undefined,
+					error: event.toolResult.isError
+						? String(event.toolResult.result)
+						: undefined,
 					duration: event.toolResult.duration,
 				});
 
 				// After tool results, model will stream more — add a new assistant message
+				const modelInfo = currentModelInfoRef.current;
 				const assistantMessage: Message = {
 					id: `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
 					role: "assistant",
 					content: "",
 					timestamp: Date.now(),
+					metadata: modelInfo
+						? {
+								model: modelInfo.model,
+								providerPreset: modelInfo.providerPreset,
+								providerName: modelInfo.providerName,
+							}
+						: undefined,
 				};
 				addMessage(assistantMessage);
+			} else if (event.type === "tool_approval_request" && event.toolApproval) {
+				// Update tool message to show inline approval UI
+				const toolMsgId = `tool_${event.toolApproval.toolCallId}`;
+				updateMessageToolCall(toolMsgId, {
+					status: "awaiting_approval",
+				});
+			} else if (event.type === "tool_rejected" && event.toolResult) {
+				// Update tool message to show rejection
+				const toolMsgId = `tool_${event.toolResult.toolCallId}`;
+				updateMessageToolCall(toolMsgId, {
+					status: "error",
+					error: String(event.toolResult.result),
+				});
 			} else if (event.type === "done") {
 				// Persist the accumulated streaming content to the last message
 				if (streamContentRef.current) {
 					updateLastMessage(streamContentRef.current);
 				}
 				// Persist the complete assistant message to disk
-				const { currentConversationId, persistMessages } = useChatStore.getState();
+				const { currentConversationId, persistMessages } =
+					useChatStore.getState();
 				if (currentConversationId) {
 					persistMessages();
 				}
@@ -215,9 +381,10 @@ export function useChat() {
 				if (lastAssistant?.role === "assistant") {
 					const outputTokens = event.usage?.outputTokens;
 					const totalMs = event.timing?.totalMs;
-					const tps = outputTokens && totalMs && totalMs > 0
-						? Math.round((outputTokens / totalMs) * 1000)
-						: undefined;
+					const tps =
+						outputTokens && totalMs && totalMs > 0
+							? Math.round((outputTokens / totalMs) * 1000)
+							: undefined;
 					const modelInfo = currentModelInfoRef.current;
 					updateMessageMetadata(lastAssistant.id, {
 						model: modelInfo?.model,
@@ -232,9 +399,9 @@ export function useChat() {
 					});
 					// Also store input tokens on the preceding user message
 					if (event.usage?.inputTokens) {
-						const userMsg = [...allMessages].reverse().find(
-							(m) => m.role === "user" && m.id !== lastAssistant.id,
-						);
+						const userMsg = [...allMessages]
+							.reverse()
+							.find((m) => m.role === "user" && m.id !== lastAssistant.id);
 						if (userMsg) {
 							updateMessageMetadata(userMsg.id, {
 								inputTokens: event.usage.inputTokens,
@@ -255,17 +422,31 @@ export function useChat() {
 			}
 		});
 		return unsubscribe;
-	}, [addMessage, appendStreamingContent, setSessionStatus, setStreamingContent, updateLastMessage, updateMessageToolCall, updateMessageMetadata, message]);
+	}, [
+		addMessage,
+		appendStreamingContent,
+		setSessionStatus,
+		setStreamingContent,
+		updateLastMessage,
+		updateMessageToolCall,
+		updateMessageMetadata,
+		message,
+	]);
 
 	/**
 	 * Send message in direct chat mode (via IPC to main process)
 	 * Automatically includes MCP tools when servers are connected.
 	 */
 	const sendDirectMessage = useCallback(
-		async (content: string, options?: { searchEngine?: string; searchConfigs?: SearchConfig[] }) => {
+		async (
+			content: string,
+			options?: { searchEngine?: string; searchConfigs?: SearchConfig[] },
+		) => {
 			const active = getEffectiveModel();
 			if (!active) {
-				message.error("No active model selected. Please configure a model in Settings → Models.");
+				message.error(
+					"No active model selected. Please configure a model in Settings → Models.",
+				);
 				return;
 			}
 
@@ -286,16 +467,37 @@ export function useChat() {
 			try {
 				// Read latest messages from store (not closure) to handle retry correctly
 				const currentMessages = useChatStore.getState().messages;
-				const history: Array<{ role: "user" | "assistant" | "system"; content: string }> = currentMessages
-					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
+				let chatHistory = currentMessages
+					.filter(
+						(m) =>
+							(m.role === "user" || m.role === "assistant") &&
+							m.content.length > 0,
+					)
 					.map((m) => ({
 						role: m.role as "user" | "assistant",
 						content: m.content,
 					}));
 
-				// Inject system prompt: global default + env context + model custom system prompt
-				const envInfo = await getEnvInfo();
-				const systemPrompt = buildSystemPrompt(model.systemPrompt, envInfo);
+				// Apply context count limit
+				if (
+					sessionSettings.contextCount !== -1 &&
+					chatHistory.length > sessionSettings.contextCount
+				) {
+					chatHistory = chatHistory.slice(-sessionSettings.contextCount);
+				}
+
+				const history: Array<{
+					role: "user" | "assistant" | "system";
+					content: string;
+				}> = chatHistory;
+
+				// Inject system prompt: session override > model custom > global default
+				const envInfo = await getEnvInfoForPrompt();
+				console.debug("[useChat] System prompt cwd:", envInfo?.cwd);
+				const baseSystemPrompt = sessionSettings.systemPrompt
+					? sessionSettings.systemPrompt
+					: model.systemPrompt;
+				const systemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo);
 				history.unshift({
 					role: "system",
 					content: systemPrompt,
@@ -316,9 +518,15 @@ export function useChat() {
 								maxResults: 5,
 								config: searchConfig.config,
 							});
-							if (searchResult.success && searchResult.data && searchResult.data.results.length > 0) {
+							if (
+								searchResult.success &&
+								searchResult.data &&
+								searchResult.data.results.length > 0
+							) {
 								const searchContext = searchResult.data.results
-									.map((r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`)
+									.map(
+										(r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`,
+									)
 									.join("\n\n");
 								// Insert after system prompt (index 0) so global prompt stays first
 								history.splice(1, 0, {
@@ -327,16 +535,31 @@ export function useChat() {
 								});
 							}
 						} catch (searchError) {
-							console.warn("[useChat] Search failed, continuing without search results:", searchError);
+							console.warn(
+								"[useChat] Search failed, continuing without search results:",
+								searchError,
+							);
 						}
 					}
 				}
 
-				// Auto-fetch MCP tools from all connected servers
-				const { tools, toolMapping, toolHint } = await fetchMcpTools();
-				if (toolHint) {
-					history[0].content += toolHint;
+				// Fetch MCP tools for function calling (skip if permission mode is "none")
+				const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
+				const mcpResult = isToolsDisabled
+					? { toolHint: "" }
+					: await fetchMcpTools();
+				const tools = isToolsDisabled ? undefined : mcpResult.tools;
+				const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+				if (mcpResult.toolHint) {
+					history[0].content += mcpResult.toolHint;
 				}
+
+				const toolPermission = isToolsDisabled
+					? undefined
+					: {
+							mode: sessionSettings.toolPermissionMode,
+							authorizedTools: sessionSettings.authorizedTools,
+						};
 
 				await modelService.chatCompletion({
 					requestId,
@@ -346,6 +569,18 @@ export function useChat() {
 					messages: history,
 					tools,
 					toolMapping,
+					toolPermission,
+					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					temperature: sessionSettings.temperatureEnabled
+						? sessionSettings.temperature
+						: undefined,
+					maxTokens: sessionSettings.maxTokens,
+					topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
+					stream: sessionSettings.streamingEnabled,
+					providerPreset: provider.preset,
+					extraParams: parseCustomParams(sessionSettings.customParams),
+					conversationId:
+						useChatStore.getState().currentConversationId ?? undefined,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send direct message:", error);
@@ -357,7 +592,13 @@ export function useChat() {
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
+		[
+			message,
+			setSessionStatus,
+			setStreamingContent,
+			getEffectiveModel,
+			sessionSettings,
+		],
 	);
 
 	/**
@@ -366,10 +607,12 @@ export function useChat() {
 	 * The LLM service handles multi-round tool execution automatically.
 	 */
 	const sendAgentMessage = useCallback(
-		async (content: string, _agentId?: string) => {
+		async (_content: string, _agentId?: string) => {
 			const active = getEffectiveModel();
 			if (!active) {
-				message.error("No active model selected. Please configure a model in Settings → Models.");
+				message.error(
+					"No active model selected. Please configure a model in Settings → Models.",
+				);
 				return;
 			}
 
@@ -389,16 +632,36 @@ export function useChat() {
 
 			try {
 				const currentMessages = useChatStore.getState().messages;
-				const history: { role: "user" | "assistant" | "system"; content: string }[] = currentMessages
-					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
+				let chatHistory = currentMessages
+					.filter(
+						(m) =>
+							(m.role === "user" || m.role === "assistant") &&
+							m.content.length > 0,
+					)
 					.map((m) => ({
 						role: m.role as "user" | "assistant",
 						content: m.content,
 					}));
 
+				// Apply context count limit
+				if (
+					sessionSettings.contextCount !== -1 &&
+					chatHistory.length > sessionSettings.contextCount
+				) {
+					chatHistory = chatHistory.slice(-sessionSettings.contextCount);
+				}
+
+				const history: {
+					role: "user" | "assistant" | "system";
+					content: string;
+				}[] = chatHistory;
+
 				// Build agentic system prompt
-				const envInfo = await getEnvInfo();
-				const basePrompt = buildSystemPrompt(model.systemPrompt, envInfo);
+				const envInfo = await getEnvInfoForPrompt();
+				const baseAgentPrompt = sessionSettings.systemPrompt
+					? sessionSettings.systemPrompt
+					: model.systemPrompt;
+				const basePrompt = buildSystemPrompt(baseAgentPrompt, envInfo);
 				const agentPrompt = `${basePrompt}\n\n--- Agent Mode ---\nYou are operating in Agent mode. You have access to tools and should proactively use them to accomplish the user's task. Break down complex tasks into steps, use available tools as needed, and provide comprehensive results. Think step by step and take action autonomously.`;
 
 				history.unshift({
@@ -406,11 +669,23 @@ export function useChat() {
 					content: agentPrompt,
 				});
 
-				// Auto-fetch MCP tools for agent mode
-				const { tools, toolMapping, toolHint } = await fetchMcpTools();
-				if (toolHint) {
-					history[0].content += toolHint;
+				// Fetch MCP tools for function calling (skip if permission mode is "none")
+				const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
+				const mcpResult = isToolsDisabled
+					? { toolHint: "" }
+					: await fetchMcpTools();
+				const tools = isToolsDisabled ? undefined : mcpResult.tools;
+				const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+				if (mcpResult.toolHint) {
+					history[0].content += mcpResult.toolHint;
 				}
+
+				const toolPermission = isToolsDisabled
+					? undefined
+					: {
+							mode: sessionSettings.toolPermissionMode,
+							authorizedTools: sessionSettings.authorizedTools,
+						};
 
 				await modelService.chatCompletion({
 					requestId,
@@ -420,6 +695,18 @@ export function useChat() {
 					messages: history,
 					tools,
 					toolMapping,
+					toolPermission,
+					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					temperature: sessionSettings.temperatureEnabled
+						? sessionSettings.temperature
+						: undefined,
+					maxTokens: sessionSettings.maxTokens,
+					topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
+					stream: sessionSettings.streamingEnabled,
+					providerPreset: provider.preset,
+					extraParams: parseCustomParams(sessionSettings.customParams),
+					conversationId:
+						useChatStore.getState().currentConversationId ?? undefined,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send agent message:", error);
@@ -431,7 +718,13 @@ export function useChat() {
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
+		[
+			message,
+			setSessionStatus,
+			setStreamingContent,
+			getEffectiveModel,
+			sessionSettings,
+		],
 	);
 
 	/**
@@ -446,7 +739,9 @@ export function useChat() {
 
 			const active = getEffectiveModel();
 			if (!active) {
-				message.error("No active model selected. Please configure a model in Settings → Models.");
+				message.error(
+					"No active model selected. Please configure a model in Settings → Models.",
+				);
 				return;
 			}
 
@@ -474,16 +769,36 @@ export function useChat() {
 
 			try {
 				const currentMessages = useChatStore.getState().messages;
-				const history: { role: "user" | "assistant" | "system"; content: string }[] = currentMessages
-					.filter((m) => (m.role === "user" || m.role === "assistant") && m.content.length > 0)
+				let chatHistory = currentMessages
+					.filter(
+						(m) =>
+							(m.role === "user" || m.role === "assistant") &&
+							m.content.length > 0,
+					)
 					.map((m) => ({
 						role: m.role as "user" | "assistant",
 						content: m.content,
 					}));
 
-				// 构建系统提示词: 全局默认 + 环境上下文 + Skill 上下文 + 模型自定义
-				const envInfo = await getEnvInfo();
-				const basePrompt = buildSystemPrompt(model.systemPrompt, envInfo);
+				// Apply context count limit
+				if (
+					sessionSettings.contextCount !== -1 &&
+					chatHistory.length > sessionSettings.contextCount
+				) {
+					chatHistory = chatHistory.slice(-sessionSettings.contextCount);
+				}
+
+				const history: {
+					role: "user" | "assistant" | "system";
+					content: string;
+				}[] = chatHistory;
+
+				// 构建系统提示词: 会话自定义 > 模型自定义 > 全局默认 + 环境上下文 + Skill 上下文
+				const envInfo = await getEnvInfoForPrompt();
+				const baseSkillPrompt = sessionSettings.systemPrompt
+					? sessionSettings.systemPrompt
+					: model.systemPrompt;
+				const basePrompt = buildSystemPrompt(baseSkillPrompt, envInfo);
 				const systemPrompt = skillSystemPrompt
 					? `${basePrompt}\n\n--- Skill Context ---\n${skillSystemPrompt}`
 					: basePrompt;
@@ -493,11 +808,23 @@ export function useChat() {
 					content: systemPrompt,
 				});
 
-				// Auto-fetch MCP tools so the model can autonomously invoke them in skill mode
-				const { tools, toolMapping, toolHint } = await fetchMcpTools();
-				if (toolHint) {
-					history[0].content += toolHint;
+				// Fetch MCP tools for function calling (skip if permission mode is "none")
+				const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
+				const mcpResult = isToolsDisabled
+					? { toolHint: "" }
+					: await fetchMcpTools();
+				const tools = isToolsDisabled ? undefined : mcpResult.tools;
+				const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+				if (mcpResult.toolHint) {
+					history[0].content += mcpResult.toolHint;
 				}
+
+				const toolPermission = isToolsDisabled
+					? undefined
+					: {
+							mode: sessionSettings.toolPermissionMode,
+							authorizedTools: sessionSettings.authorizedTools,
+						};
 
 				await modelService.chatCompletion({
 					requestId,
@@ -507,6 +834,18 @@ export function useChat() {
 					messages: history,
 					tools,
 					toolMapping,
+					toolPermission,
+					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					temperature: sessionSettings.temperatureEnabled
+						? sessionSettings.temperature
+						: undefined,
+					maxTokens: sessionSettings.maxTokens,
+					topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
+					stream: sessionSettings.streamingEnabled,
+					providerPreset: provider.preset,
+					extraParams: parseCustomParams(sessionSettings.customParams),
+					conversationId:
+						useChatStore.getState().currentConversationId ?? undefined,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send skill message:", error);
@@ -518,7 +857,13 @@ export function useChat() {
 				currentRequestIdRef.current = null;
 			}
 		},
-		[message, setSessionStatus, setStreamingContent, getEffectiveModel],
+		[
+			message,
+			setSessionStatus,
+			setStreamingContent,
+			getEffectiveModel,
+			sessionSettings,
+		],
 	);
 
 	/**
@@ -539,7 +884,8 @@ export function useChat() {
 				deleteMessagesFrom(messageId);
 			} else if (target.role === "assistant") {
 				// Find the preceding user message
-				const precedingUser = [...allMessages.slice(0, idx)]
+				const precedingUser = allMessages
+					.slice(0, idx)
 					.reverse()
 					.find((m) => m.role === "user");
 				if (!precedingUser) return;
@@ -565,11 +911,13 @@ export function useChat() {
 				role: "assistant",
 				content: "",
 				timestamp: Date.now(),
-				metadata: retryActive ? {
-					model: retryActive.model.id,
-					providerPreset: retryActive.provider.preset,
-					providerName: retryActive.provider.name,
-				} : undefined,
+				metadata: retryActive
+					? {
+							model: retryActive.model.id,
+							providerPreset: retryActive.provider.preset,
+							providerName: retryActive.provider.name,
+						}
+					: undefined,
 			};
 			addMessage(assistantMessage);
 
@@ -604,7 +952,8 @@ export function useChat() {
 			const content = input.trim();
 
 			// Auto-create conversation if none exists
-			const { currentConversationId, createConversation } = useChatStore.getState();
+			const { currentConversationId, createConversation } =
+				useChatStore.getState();
 			if (!currentConversationId) {
 				const name = content.slice(0, 50);
 				await createConversation(name);
@@ -625,11 +974,13 @@ export function useChat() {
 				role: "assistant",
 				content: "",
 				timestamp: Date.now(),
-				metadata: activeForMeta ? {
-					model: activeForMeta.model.id,
-					providerPreset: activeForMeta.provider.preset,
-					providerName: activeForMeta.provider.name,
-				} : undefined,
+				metadata: activeForMeta
+					? {
+							model: activeForMeta.model.id,
+							providerPreset: activeForMeta.provider.preset,
+							providerName: activeForMeta.provider.name,
+						}
+					: undefined,
 			};
 			addMessage(assistantMessage);
 
@@ -700,6 +1051,8 @@ export function useChat() {
 		selectedAgentId,
 		selectedSkillId,
 		sessionModelOverride,
+		sessionSettings,
+		availableTools,
 
 		// Setters
 		setInput,
@@ -707,6 +1060,7 @@ export function useChat() {
 		setSelectedAgentId,
 		setSelectedSkillId,
 		setSessionModelOverride,
+		setSessionSettings,
 
 		// Actions
 		sendMessage,
@@ -716,5 +1070,6 @@ export function useChat() {
 		editMessage,
 		deleteMessage,
 		getEffectiveModel,
+		respondToApproval,
 	};
 }

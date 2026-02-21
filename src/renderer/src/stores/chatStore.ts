@@ -12,13 +12,17 @@ export type MessageType = "text" | "tool_use" | "tool_result" | "error";
  * - streaming: 聊天中 — receiving streamed response chunks from LLM
  * - tool_calling: 工具调用中 — model is executing MCP tool calls
  */
-export type ChatSessionStatus = "idle" | "preparing" | "streaming" | "tool_calling";
+export type ChatSessionStatus =
+	| "idle"
+	| "preparing"
+	| "streaming"
+	| "tool_calling";
 
 export interface ToolCall {
 	id: string;
 	name: string;
 	input: Record<string, unknown>;
-	status: "pending" | "success" | "error";
+	status: "pending" | "awaiting_approval" | "success" | "error";
 	result?: unknown;
 	error?: string;
 	duration?: number;
@@ -67,8 +71,14 @@ interface ChatState {
 	// Message actions
 	addMessage: (message: Message) => void;
 	updateLastMessage: (content: string) => void;
-	updateMessageToolCall: (messageId: string, toolCall: Partial<ToolCall>) => void;
-	updateMessageMetadata: (messageId: string, metadata: Partial<NonNullable<Message["metadata"]>>) => void;
+	updateMessageToolCall: (
+		messageId: string,
+		toolCall: Partial<ToolCall>,
+	) => void;
+	updateMessageMetadata: (
+		messageId: string,
+		metadata: Partial<NonNullable<Message["metadata"]>>,
+	) => void;
 	setSessionStatus: (status: ChatSessionStatus) => void;
 	setStreaming: (streaming: boolean) => void;
 	setStreamingContent: (content: string) => void;
@@ -107,7 +117,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		// Fire-and-forget persist
 		const { currentConversationId } = get();
 		if (currentConversationId) {
-			chatHistoryService.appendMessage(currentConversationId, message).catch(() => {});
+			chatHistoryService
+				.appendMessage(currentConversationId, message)
+				.catch(() => {});
 		}
 	},
 
@@ -161,12 +173,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 	},
 
-	setSessionStatus: (status) => set({ sessionStatus: status, isStreaming: status !== "idle" }),
+	setSessionStatus: (status) =>
+		set({ sessionStatus: status, isStreaming: status !== "idle" }),
 
-	setStreaming: (streaming) => set({
-		isStreaming: streaming,
-		sessionStatus: streaming ? "streaming" : "idle",
-	}),
+	setStreaming: (streaming) =>
+		set({
+			isStreaming: streaming,
+			sessionStatus: streaming ? "streaming" : "idle",
+		}),
 
 	setStreamingContent: (content) => set({ streamingContent: content }),
 
@@ -231,7 +245,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
 	createConversation: async (name) => {
 		try {
-			const res = await chatHistoryService.createConversation(name || "New Chat");
+			const res = await chatHistoryService.createConversation(
+				name || "New Chat",
+			);
 			if (res.success && res.data) {
 				set((state) => ({
 					conversations: [res.data!, ...state.conversations],
@@ -277,7 +293,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 					const isCurrent = state.currentConversationId === conversationId;
 					return {
 						conversations: newConversations,
-						currentConversationId: isCurrent ? null : state.currentConversationId,
+						currentConversationId: isCurrent
+							? null
+							: state.currentConversationId,
 						messages: isCurrent ? [] : state.messages,
 					};
 				});
@@ -289,7 +307,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
 	renameConversation: async (conversationId, name) => {
 		try {
-			const res = await chatHistoryService.renameConversation(conversationId, name);
+			const res = await chatHistoryService.renameConversation(
+				conversationId,
+				name,
+			);
 			if (res.success) {
 				set((state) => ({
 					conversations: state.conversations.map((c) =>
@@ -313,11 +334,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 						conversations: state.conversations.map((c) =>
 							c.id === currentConversationId
 								? {
-									...c,
-									messageCount: messages.length,
-									updatedAt: Date.now(),
-									preview: messages.find((m) => m.role === "user")?.content.slice(0, 100) || c.preview,
-								}
+										...c,
+										messageCount: messages.length,
+										updatedAt: Date.now(),
+										preview:
+											messages
+												.find((m) => m.role === "user")
+												?.content.slice(0, 100) || c.preview,
+									}
 								: c,
 						),
 					}));

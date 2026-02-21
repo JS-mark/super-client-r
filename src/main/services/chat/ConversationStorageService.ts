@@ -102,7 +102,9 @@ export class ConversationStorageService {
 			mkdirSync(this.chatsDir, { recursive: true });
 		}
 
-		logger.info(`Switched conversation storage to user: ${this.currentUserDir}`);
+		logger.info(
+			`Switched conversation storage to user: ${this.currentUserDir}`,
+		);
 	}
 
 	getCurrentUserDir(): string {
@@ -134,11 +136,15 @@ export class ConversationStorageService {
 			const convIds = Object.keys(conversations);
 			if (convIds.length === 0) {
 				renameSync(legacyPath, `${legacyPath}.bak`);
-				logger.info("Legacy chat-history.json had no conversations, renamed to .bak");
+				logger.info(
+					"Legacy chat-history.json had no conversations, renamed to .bak",
+				);
 				return;
 			}
 
-			logger.info(`Migrating ${convIds.length} conversations from legacy chat-history.json to user: ${this.currentUserDir}`);
+			logger.info(
+				`Migrating ${convIds.length} conversations from legacy chat-history.json to user: ${this.currentUserDir}`,
+			);
 
 			// Build ordered list: use order array first, then any remaining
 			const orderedIds = [
@@ -204,7 +210,9 @@ export class ConversationStorageService {
 			}
 
 			renameSync(legacyPath, `${legacyPath}.bak`);
-			logger.info("Migration complete. Legacy chat-history.json renamed to .bak");
+			logger.info(
+				"Migration complete. Legacy chat-history.json renamed to .bak",
+			);
 		} catch (error) {
 			logger.error(
 				"Migration from legacy chat-history.json failed",
@@ -465,6 +473,14 @@ export class ConversationStorageService {
 
 	getToolOutputsDir(conversationId: string): string {
 		const dir = join(this.chatsDir, conversationId, "tool-outputs");
+		if (!existsSync(dir)) {
+			mkdirSync(dir, { recursive: true });
+		}
+		return dir;
+	}
+
+	getWorkspaceDir(conversationId: string): string {
+		const dir = join(this.chatsDir, conversationId, "workspace");
 		if (!existsSync(dir)) {
 			mkdirSync(dir, { recursive: true });
 		}

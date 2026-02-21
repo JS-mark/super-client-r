@@ -94,7 +94,14 @@ export interface FetchModelsResponse {
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
+	type:
+		| "chunk"
+		| "done"
+		| "error"
+		| "tool_call"
+		| "tool_result"
+		| "tool_approval_request"
+		| "tool_rejected";
 	content?: string;
 	error?: string;
 	toolCall?: {
@@ -108,6 +115,11 @@ export interface ChatStreamEvent {
 		result: unknown;
 		isError?: boolean;
 		duration?: number;
+	};
+	toolApproval?: {
+		toolCallId: string;
+		name: string;
+		arguments: string;
 	};
 	usage?: {
 		inputTokens?: number;

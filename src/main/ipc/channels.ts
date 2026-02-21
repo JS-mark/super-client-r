@@ -53,6 +53,8 @@ export const CHAT_CHANNELS = {
 	SET_LAST_CONVERSATION: "chat:set-last-conversation",
 	// 对话目录
 	GET_CONVERSATION_DIR: "chat:get-conversation-dir",
+	// 工作目录
+	GET_WORKSPACE_DIR: "chat:get-workspace-dir",
 } as const;
 
 // MCP 相关通道
@@ -123,6 +125,8 @@ export const API_CHANNELS = {
 	RESTART: "api:restart",
 	// 设置端口
 	SET_PORT: "api:set-port",
+	// 获取 API 密钥
+	GET_API_KEY: "api:get-api-key",
 } as const;
 
 // 窗口控制相关通道
@@ -272,6 +276,8 @@ export const LLM_CHANNELS = {
 	STOP_STREAM: "llm:stop-stream",
 	// 流式事件 (main → renderer)
 	STREAM_EVENT: "llm:stream-event",
+	// 工具审批响应 (renderer → main)
+	TOOL_APPROVAL_RESPONSE: "llm:tool-approval-response",
 } as const;
 
 // 所有通道的联合类型

@@ -187,6 +187,19 @@ export interface BuiltinMcpDefinition {
 	configSchema?: Record<string, unknown>;
 }
 
+// ============ Tool Permission 相关类型 ============
+
+export type ToolPermissionMode =
+	| "none"
+	| "auto"
+	| "approve_always"
+	| "approve_except_authorized";
+
+export interface ToolPermissionConfig {
+	mode: ToolPermissionMode;
+	authorizedTools?: string[];
+}
+
 // ============ Chat 相关类型 ============
 
 export interface ChatMessage {
@@ -214,7 +227,7 @@ export interface ChatMessagePersist {
 		id: string;
 		name: string;
 		input: Record<string, unknown>;
-		status: "pending" | "success" | "error";
+		status: "pending" | "awaiting_approval" | "success" | "error";
 		result?: unknown;
 		error?: string;
 		duration?: number;
@@ -465,6 +478,8 @@ export interface ChatCompletionRequest {
 	>;
 	maxTokens?: number;
 	temperature?: number;
+	topP?: number;
+	stream?: boolean;
 	tools?: Array<{
 		type: "function";
 		function: {
@@ -474,6 +489,13 @@ export interface ChatCompletionRequest {
 		};
 	}>;
 	toolMapping?: Record<string, { serverId: string; toolName: string }>;
+	toolPermission?: ToolPermissionConfig;
+	/** "function" = native function calling API; "prompt" = inject tools into system prompt and parse from text */
+	toolCallMode?: "function" | "prompt";
+	providerPreset?: ModelProviderPreset;
+	extraParams?: Record<string, unknown>;
+	/** Conversation ID for resolving workspace directory in tool calls */
+	conversationId?: string;
 }
 
 export interface OpenAIToolCall {
@@ -487,7 +509,14 @@ export interface OpenAIToolCall {
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
+	type:
+		| "chunk"
+		| "done"
+		| "error"
+		| "tool_call"
+		| "tool_result"
+		| "tool_approval_request"
+		| "tool_rejected";
 	content?: string;
 	error?: string;
 	toolCall?: {
@@ -501,6 +530,11 @@ export interface ChatStreamEvent {
 		result: unknown;
 		isError?: boolean;
 		duration?: number;
+	};
+	toolApproval?: {
+		toolCallId: string;
+		name: string;
+		arguments: string;
 	};
 	usage?: {
 		inputTokens?: number;

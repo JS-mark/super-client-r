@@ -358,7 +358,14 @@ export interface FetchModelsResponse {
 
 export interface ChatStreamEvent {
 	requestId: string;
-	type: "chunk" | "done" | "error" | "tool_call" | "tool_result";
+	type:
+		| "chunk"
+		| "done"
+		| "error"
+		| "tool_call"
+		| "tool_result"
+		| "tool_approval_request"
+		| "tool_rejected";
 	content?: string;
 	error?: string;
 	toolCall?: {
@@ -372,6 +379,11 @@ export interface ChatStreamEvent {
 		result: unknown;
 		isError?: boolean;
 		duration?: number;
+	};
+	toolApproval?: {
+		toolCallId: string;
+		name: string;
+		arguments: string;
 	};
 	usage?: {
 		inputTokens?: number;
@@ -394,7 +406,7 @@ export interface ChatMessagePersist {
 		id: string;
 		name: string;
 		input: Record<string, unknown>;
-		status: "pending" | "success" | "error";
+		status: "pending" | "awaiting_approval" | "success" | "error";
 		result?: unknown;
 		error?: string;
 		duration?: number;
@@ -470,7 +482,10 @@ export interface ElectronAPI {
 		getTools: (id: string) => Promise<IPCResponse<McpTool[]>>;
 		addServer: (config: McpServerConfig) => Promise<IPCResponse>;
 		removeServer: (id: string) => Promise<IPCResponse>;
-		updateServer: (id: string, config: Partial<McpServerConfig>) => Promise<IPCResponse>;
+		updateServer: (
+			id: string,
+			config: Partial<McpServerConfig>,
+		) => Promise<IPCResponse>;
 		getAllStatus: () => Promise<IPCResponse<McpServerStatus[]>>;
 		callTool: (
 			serverId: string,
@@ -483,23 +498,57 @@ export interface ElectronAPI {
 		// 内置 MCP
 		builtin: {
 			getDefinitions: () => Promise<IPCResponse<BuiltinMcpDefinition[]>>;
-			createConfig: (definitionId: string, config?: Record<string, unknown>) => Promise<IPCResponse<McpServerConfig>>;
-			search: (params: { keyword?: string; tags?: string[] }) => Promise<IPCResponse<BuiltinMcpDefinition[]>>;
+			createConfig: (
+				definitionId: string,
+				config?: Record<string, unknown>,
+			) => Promise<IPCResponse<McpServerConfig>>;
+			search: (params: {
+				keyword?: string;
+				tags?: string[];
+			}) => Promise<IPCResponse<BuiltinMcpDefinition[]>>;
 		};
 		// 第三方 MCP
 		thirdParty: {
 			add: (config: McpServerConfig) => Promise<IPCResponse>;
-			proxy: (serverId: string, request: { endpoint: string; method: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; headers?: Record<string, string> }) => Promise<IPCResponse>;
+			proxy: (
+				serverId: string,
+				request: {
+					endpoint: string;
+					method: "GET" | "POST" | "PUT" | "DELETE";
+					body?: unknown;
+					headers?: Record<string, string>;
+				},
+			) => Promise<IPCResponse>;
 		};
 		// MCP 市场
 		market: {
-			search: (params: { query?: string; tags?: string[]; sortBy?: "downloads" | "rating" | "newest"; page?: number; limit?: number }) => Promise<IPCResponse<{ items: McpMarketItem[]; total: number; page: number; limit: number }>>;
+			search: (params: {
+				query?: string;
+				tags?: string[];
+				sortBy?: "downloads" | "rating" | "newest";
+				page?: number;
+				limit?: number;
+			}) => Promise<
+				IPCResponse<{
+					items: McpMarketItem[];
+					total: number;
+					page: number;
+					limit: number;
+				}>
+			>;
 			getPopular: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
 			getTopRated: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
 			getNewest: (limit?: number) => Promise<IPCResponse<McpMarketItem[]>>;
 			getDetail: (id: string) => Promise<IPCResponse<McpMarketItem | null>>;
 			getTags: () => Promise<IPCResponse<string[]>>;
-			install: (marketItem: McpMarketItem, customConfig?: { name?: string; env?: Record<string, string>; url?: string }) => Promise<IPCResponse<McpServerConfig>>;
+			install: (
+				marketItem: McpMarketItem,
+				customConfig?: {
+					name?: string;
+					env?: Record<string, string>;
+					url?: string;
+				},
+			) => Promise<IPCResponse<McpServerConfig>>;
 			getReadme: (marketItem: McpMarketItem) => Promise<IPCResponse<string>>;
 			setApiUrl: (url: string) => Promise<IPCResponse>;
 		};
@@ -508,17 +557,35 @@ export interface ElectronAPI {
 	// Chat History API
 	chat: {
 		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
-		createConversation: (name: string) => Promise<IPCResponse<ConversationSummary>>;
+		createConversation: (
+			name: string,
+		) => Promise<IPCResponse<ConversationSummary>>;
 		deleteConversation: (id: string) => Promise<IPCResponse>;
-		renameConversation: (conversationId: string, name: string) => Promise<IPCResponse>;
-		getMessages: (conversationId: string) => Promise<IPCResponse<ChatMessagePersist[]>>;
-		saveMessages: (conversationId: string, messages: ChatMessagePersist[]) => Promise<IPCResponse>;
-		appendMessage: (conversationId: string, message: ChatMessagePersist) => Promise<IPCResponse>;
-		updateMessage: (conversationId: string, messageId: string, updates: Partial<ChatMessagePersist>) => Promise<IPCResponse>;
+		renameConversation: (
+			conversationId: string,
+			name: string,
+		) => Promise<IPCResponse>;
+		getMessages: (
+			conversationId: string,
+		) => Promise<IPCResponse<ChatMessagePersist[]>>;
+		saveMessages: (
+			conversationId: string,
+			messages: ChatMessagePersist[],
+		) => Promise<IPCResponse>;
+		appendMessage: (
+			conversationId: string,
+			message: ChatMessagePersist,
+		) => Promise<IPCResponse>;
+		updateMessage: (
+			conversationId: string,
+			messageId: string,
+			updates: Partial<ChatMessagePersist>,
+		) => Promise<IPCResponse>;
 		clearMessages: (conversationId: string) => Promise<IPCResponse>;
 		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
 		setLastConversation: (id: string) => Promise<IPCResponse>;
 		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
+		getWorkspaceDir: (id: string) => Promise<IPCResponse<string>>;
 	};
 
 	// 主题 API
@@ -530,22 +597,50 @@ export interface ElectronAPI {
 
 	// 搜索配置 API
 	search: {
-		getConfigs: () => Promise<IPCResponse<{ configs: SearchConfig[]; defaultProvider?: SearchProviderType }>>;
+		getConfigs: () => Promise<
+			IPCResponse<{
+				configs: SearchConfig[];
+				defaultProvider?: SearchProviderType;
+			}>
+		>;
 		saveConfig: (config: SearchConfig) => Promise<IPCResponse>;
 		deleteConfig: (id: string) => Promise<IPCResponse>;
 		setDefault: (provider: SearchProviderType | null) => Promise<IPCResponse>;
 		getDefault: () => Promise<IPCResponse<SearchProviderType | undefined>>;
-		validateConfig: (config: SearchConfig) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
-		execute: (request: SearchExecuteRequest) => Promise<IPCResponse<SearchExecuteResponse>>;
+		validateConfig: (
+			config: SearchConfig,
+		) => Promise<IPCResponse<{ valid: boolean; error?: string }>>;
+		execute: (
+			request: SearchExecuteRequest,
+		) => Promise<IPCResponse<SearchExecuteResponse>>;
 	};
 
 	// 文件附件 API
 	file: {
-		selectFiles: (options?: { multiple?: boolean; filters?: { name: string; extensions: string[] }[] }) => Promise<IPCResponse<{ path: string; name: string; size: number; mimeType: string }[]>>;
-		readFile: (filePath: string, options?: { encoding?: BufferEncoding; maxSize?: number }) => Promise<IPCResponse<{ content: string; size: number }>>;
-		saveAttachment: (data: { sourcePath: string; conversationId?: string; messageId?: string; customName?: string }) => Promise<IPCResponse<AttachmentInfo>>;
+		selectFiles: (options?: {
+			multiple?: boolean;
+			filters?: { name: string; extensions: string[] }[];
+		}) => Promise<
+			IPCResponse<
+				{ path: string; name: string; size: number; mimeType: string }[]
+			>
+		>;
+		readFile: (
+			filePath: string,
+			options?: { encoding?: BufferEncoding; maxSize?: number },
+		) => Promise<IPCResponse<{ content: string; size: number }>>;
+		saveAttachment: (data: {
+			sourcePath: string;
+			conversationId?: string;
+			messageId?: string;
+			customName?: string;
+		}) => Promise<IPCResponse<AttachmentInfo>>;
 		deleteAttachment: (attachmentPath: string) => Promise<IPCResponse>;
-		listAttachments: (filter?: { conversationId?: string; messageId?: string; type?: string }) => Promise<IPCResponse<{ attachments: AttachmentInfo[] }>>;
+		listAttachments: (filter?: {
+			conversationId?: string;
+			messageId?: string;
+			type?: string;
+		}) => Promise<IPCResponse<{ attachments: AttachmentInfo[] }>>;
 		openAttachment: (attachmentPath: string) => Promise<IPCResponse>;
 		getAttachmentPath: () => Promise<IPCResponse<string>>;
 		copyFile: (filePath: string) => Promise<IPCResponse>;
@@ -558,7 +653,9 @@ export interface ElectronAPI {
 		getModules: () => Promise<string[]>;
 		rendererLog: (entry: RendererLogEntry) => Promise<{ success: boolean }>;
 		clearDb: () => Promise<{ success: boolean }>;
-		exportLogs: (params: LogQueryParams) => Promise<{ success: boolean; count?: number; filePath?: string }>;
+		exportLogs: (
+			params: LogQueryParams,
+		) => Promise<{ success: boolean; count?: number; filePath?: string }>;
 		openViewer: () => Promise<{ success: boolean }>;
 	};
 
@@ -571,13 +668,24 @@ export interface ElectronAPI {
 
 	// Update API
 	update: {
-		check: () => Promise<{ updateAvailable: boolean; version?: string; message: string }>;
+		check: () => Promise<{
+			updateAvailable: boolean;
+			version?: string;
+			message: string;
+		}>;
 		download: () => Promise<IPCResponse>;
 		install: () => Promise<void>;
 		onChecking: (callback: () => void) => () => void;
 		onAvailable: (callback: (info: unknown) => void) => () => void;
 		onNotAvailable: (callback: (info: unknown) => void) => () => void;
-		onProgress: (callback: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => () => void;
+		onProgress: (
+			callback: (progress: {
+				percent: number;
+				bytesPerSecond: number;
+				transferred: number;
+				total: number;
+			}) => void,
+		) => () => void;
 		onDownloaded: (callback: (info: unknown) => void) => () => void;
 		onError: (callback: (error: string) => void) => () => void;
 	};
@@ -588,11 +696,26 @@ export interface ElectronAPI {
 		getProvider: (id: string) => Promise<IPCResponse<ModelProvider>>;
 		saveProvider: (provider: ModelProvider) => Promise<IPCResponse>;
 		deleteProvider: (id: string) => Promise<IPCResponse>;
-		testConnection: (baseUrl: string, apiKey: string) => Promise<IPCResponse<TestConnectionResponse>>;
-		fetchModels: (baseUrl: string, apiKey: string, preset?: ModelProviderPreset) => Promise<IPCResponse<FetchModelsResponse>>;
-		updateModelConfig: (providerId: string, modelId: string, config: Partial<ProviderModel>) => Promise<IPCResponse>;
-		getActiveModel: () => Promise<IPCResponse<ActiveModelSelection | undefined>>;
-		setActiveModel: (selection: ActiveModelSelection | null) => Promise<IPCResponse>;
+		testConnection: (
+			baseUrl: string,
+			apiKey: string,
+		) => Promise<IPCResponse<TestConnectionResponse>>;
+		fetchModels: (
+			baseUrl: string,
+			apiKey: string,
+			preset?: ModelProviderPreset,
+		) => Promise<IPCResponse<FetchModelsResponse>>;
+		updateModelConfig: (
+			providerId: string,
+			modelId: string,
+			config: Partial<ProviderModel>,
+		) => Promise<IPCResponse>;
+		getActiveModel: () => Promise<
+			IPCResponse<ActiveModelSelection | undefined>
+		>;
+		setActiveModel: (
+			selection: ActiveModelSelection | null,
+		) => Promise<IPCResponse>;
 	};
 
 	// LLM API
@@ -604,7 +727,15 @@ export interface ElectronAPI {
 			model: string;
 			messages: Array<
 				| { role: "user" | "assistant" | "system"; content: string }
-				| { role: "assistant"; content: null; tool_calls: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }> }
+				| {
+						role: "assistant";
+						content: null;
+						tool_calls: Array<{
+							id: string;
+							type: "function";
+							function: { name: string; arguments: string };
+						}>;
+				  }
 				| { role: "tool"; tool_call_id: string; content: string }
 			>;
 			maxTokens?: number;
@@ -618,39 +749,64 @@ export interface ElectronAPI {
 				};
 			}>;
 			toolMapping?: Record<string, { serverId: string; toolName: string }>;
+			toolPermission?: {
+				mode: "none" | "auto" | "approve_always" | "approve_except_authorized";
+				authorizedTools?: string[];
+			};
+			conversationId?: string;
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
+		toolApprovalResponse: (
+			toolCallId: string,
+			approved: boolean,
+		) => Promise<IPCResponse>;
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
 	};
 
 	// 皮肤 API
 	skin: {
-		getActiveSkin: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
-		setActiveSkin: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
-		onTokensChanged: (callback: (tokens: Record<string, unknown> | null) => void) => () => void;
+		getActiveSkin: () => Promise<
+			IPCResponse<{ pluginId: string; themeId: string } | null>
+		>;
+		setActiveSkin: (
+			pluginId: string | null,
+			themeId?: string,
+		) => Promise<IPCResponse>;
+		onTokensChanged: (
+			callback: (tokens: Record<string, unknown> | null) => void,
+		) => () => void;
 	};
 
 	// Markdown 主题 API
 	markdownTheme: {
-		getActive: () => Promise<IPCResponse<{ pluginId: string; themeId: string } | null>>;
-		setActive: (pluginId: string | null, themeId?: string) => Promise<IPCResponse>;
+		getActive: () => Promise<
+			IPCResponse<{ pluginId: string; themeId: string } | null>
+		>;
+		setActive: (
+			pluginId: string | null,
+			themeId?: string,
+		) => Promise<IPCResponse>;
+		getCSS: () => Promise<IPCResponse<string | null>>;
+		onCSSChanged: (callback: (css: string | null) => void) => () => void;
 	};
 
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;
-		getEnvInfo: () => Promise<IPCResponse<{
-			os: string;
-			platform: string;
-			arch: string;
-			nodeVersion: string;
-			electronVersion: string;
-			v8Version: string;
-			homedir: string;
-			cwd: string;
-			appVersion: string;
-			locale: string;
-		}>>;
+		getEnvInfo: () => Promise<
+			IPCResponse<{
+				os: string;
+				platform: string;
+				arch: string;
+				nodeVersion: string;
+				electronVersion: string;
+				v8Version: string;
+				homedir: string;
+				cwd: string;
+				appVersion: string;
+				locale: string;
+			}>
+		>;
 	};
 
 	// 通用 IPC

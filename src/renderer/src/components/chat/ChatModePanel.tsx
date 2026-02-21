@@ -1,4 +1,8 @@
-import { ApiOutlined, RobotOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import {
+	ApiOutlined,
+	RobotOutlined,
+	ThunderboltOutlined,
+} from "@ant-design/icons";
 import { theme } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +43,10 @@ export function ChatModePanel({
 
 	// Load installed skills and MCP status on mount
 	useEffect(() => {
-		skillClient.listSkills().then(setSkills).catch(() => setSkills([]));
+		skillClient
+			.listSkills()
+			.then(setSkills)
+			.catch(() => setSkills([]));
 		mcpClient
 			.getAllTools()
 			.then((tools) => {
@@ -130,7 +137,10 @@ export function ChatModePanel({
 				>
 					<span
 						className="w-7 h-7 flex items-center justify-center rounded-md"
-						style={{ backgroundColor: token.colorPrimaryBg, color: token.colorPrimary }}
+						style={{
+							backgroundColor: token.colorPrimaryBg,
+							color: token.colorPrimary,
+						}}
 					>
 						<RobotOutlined />
 					</span>
@@ -152,16 +162,23 @@ export function ChatModePanel({
 							}}
 						>
 							<ApiOutlined className="text-[10px]" />
-							{t("chatMode.mcpStatus", "{{toolCount}} tools / {{serverCount}} servers", {
-								ns: "chat",
-								toolCount: mcpToolCount,
-								serverCount: mcpServerCount,
-							})}
+							{t(
+								"chatMode.mcpStatus",
+								"{{toolCount}} tools / {{serverCount}} servers",
+								{
+									ns: "chat",
+									toolCount: mcpToolCount,
+									serverCount: mcpServerCount,
+								},
+							)}
 						</span>
 					)}
 					{chatMode === "direct" && (
 						<span
-							className={cn("w-1.5 h-1.5 rounded-full", mcpToolCount > 0 ? "" : "ml-auto")}
+							className={cn(
+								"w-1.5 h-1.5 rounded-full",
+								mcpToolCount > 0 ? "" : "ml-auto",
+							)}
 							style={{ backgroundColor: token.colorPrimary }}
 						/>
 					)}
@@ -194,7 +211,10 @@ export function ChatModePanel({
 					>
 						<span
 							className="w-7 h-7 flex items-center justify-center rounded-md"
-							style={{ backgroundColor: token.colorSuccessBg, color: token.colorSuccess }}
+							style={{
+								backgroundColor: token.colorSuccessBg,
+								color: token.colorSuccess,
+							}}
 						>
 							<ThunderboltOutlined />
 						</span>
@@ -223,11 +243,15 @@ export function ChatModePanel({
 								className="w-full flex items-center gap-2 px-2 py-2 rounded transition-colors"
 								style={{
 									color: token.colorText,
-									backgroundColor: selectedSkillId === skill.id ? token.colorPrimaryBg : "transparent",
+									backgroundColor:
+										selectedSkillId === skill.id
+											? token.colorPrimaryBg
+											: "transparent",
 								}}
 								onMouseEnter={(e) => {
 									if (selectedSkillId !== skill.id) {
-										e.currentTarget.style.backgroundColor = token.colorFillTertiary;
+										e.currentTarget.style.backgroundColor =
+											token.colorFillTertiary;
 									}
 								}}
 								onMouseLeave={(e) => {
@@ -238,13 +262,21 @@ export function ChatModePanel({
 							>
 								<ThunderboltOutlined
 									className="text-xs flex-shrink-0"
-									style={{ color: selectedSkillId === skill.id ? token.colorPrimary : token.colorTextTertiary }}
+									style={{
+										color:
+											selectedSkillId === skill.id
+												? token.colorPrimary
+												: token.colorTextTertiary,
+									}}
 								/>
 								<div className="flex flex-col min-w-0 items-start">
 									<span
 										className="text-xs truncate"
 										style={{
-											color: selectedSkillId === skill.id ? token.colorPrimary : token.colorText,
+											color:
+												selectedSkillId === skill.id
+													? token.colorPrimary
+													: token.colorText,
 										}}
 									>
 										{skill.name}

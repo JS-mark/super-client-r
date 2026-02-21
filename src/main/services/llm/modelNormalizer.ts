@@ -28,7 +28,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "GPT-4o",
 		contextWindow: 128000,
 		maxTokens: 16384,
-		pricing: { currency: "USD", inputPricePerMillion: 2.5, outputPricePerMillion: 10 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 2.5,
+			outputPricePerMillion: 10,
+		},
 	},
 	"gpt-4o-mini": {
 		capabilities: ["vision", "tool_use", "web_search"],
@@ -36,7 +40,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "GPT-4o",
 		contextWindow: 128000,
 		maxTokens: 16384,
-		pricing: { currency: "USD", inputPricePerMillion: 0.15, outputPricePerMillion: 0.6 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.15,
+			outputPricePerMillion: 0.6,
+		},
 	},
 	"gpt-4-turbo": {
 		capabilities: ["vision", "tool_use"],
@@ -44,7 +52,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "GPT-4",
 		contextWindow: 128000,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 10, outputPricePerMillion: 30 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 10,
+			outputPricePerMillion: 30,
+		},
 	},
 	"gpt-4": {
 		capabilities: ["tool_use"],
@@ -52,7 +64,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "GPT-4",
 		contextWindow: 8192,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 30, outputPricePerMillion: 60 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 30,
+			outputPricePerMillion: 60,
+		},
 	},
 	"gpt-3.5-turbo": {
 		capabilities: ["tool_use"],
@@ -60,7 +76,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "GPT-3.5",
 		contextWindow: 16385,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 0.5, outputPricePerMillion: 1.5 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.5,
+			outputPricePerMillion: 1.5,
+		},
 	},
 	"gpt-5": {
 		capabilities: ["vision", "tool_use", "reasoning", "web_search"],
@@ -69,13 +89,17 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		contextWindow: 256000,
 		maxTokens: 32768,
 	},
-	"o1": {
+	o1: {
 		capabilities: ["vision", "reasoning", "tool_use"],
 		category: "chat",
 		group: "o-Series",
 		contextWindow: 200000,
 		maxTokens: 100000,
-		pricing: { currency: "USD", inputPricePerMillion: 15, outputPricePerMillion: 60 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 15,
+			outputPricePerMillion: 60,
+		},
 	},
 	"o1-mini": {
 		capabilities: ["reasoning"],
@@ -83,7 +107,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "o-Series",
 		contextWindow: 128000,
 		maxTokens: 65536,
-		pricing: { currency: "USD", inputPricePerMillion: 3, outputPricePerMillion: 12 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 3,
+			outputPricePerMillion: 12,
+		},
 	},
 	"o1-pro": {
 		capabilities: ["vision", "reasoning", "tool_use"],
@@ -92,7 +120,7 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		contextWindow: 200000,
 		maxTokens: 100000,
 	},
-	"o3": {
+	o3: {
 		capabilities: ["vision", "reasoning", "tool_use"],
 		category: "chat",
 		group: "o-Series",
@@ -105,7 +133,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "o-Series",
 		contextWindow: 200000,
 		maxTokens: 100000,
-		pricing: { currency: "USD", inputPricePerMillion: 1.1, outputPricePerMillion: 4.4 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 1.1,
+			outputPricePerMillion: 4.4,
+		},
 	},
 	"o4-mini": {
 		capabilities: ["vision", "reasoning", "tool_use"],
@@ -122,7 +154,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 4",
 		contextWindow: 200000,
 		maxTokens: 16000,
-		pricing: { currency: "USD", inputPricePerMillion: 3, outputPricePerMillion: 15 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 3,
+			outputPricePerMillion: 15,
+		},
 	},
 	"claude-opus-4": {
 		capabilities: ["vision", "tool_use"],
@@ -130,7 +166,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 4",
 		contextWindow: 200000,
 		maxTokens: 32000,
-		pricing: { currency: "USD", inputPricePerMillion: 15, outputPricePerMillion: 75 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 15,
+			outputPricePerMillion: 75,
+		},
 	},
 	"claude-3-7-sonnet": {
 		capabilities: ["vision", "tool_use", "reasoning"],
@@ -138,7 +178,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3.7",
 		contextWindow: 200000,
 		maxTokens: 16000,
-		pricing: { currency: "USD", inputPricePerMillion: 3, outputPricePerMillion: 15 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 3,
+			outputPricePerMillion: 15,
+		},
 	},
 	"claude-3-5-sonnet": {
 		capabilities: ["vision", "tool_use"],
@@ -146,7 +190,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3.5",
 		contextWindow: 200000,
 		maxTokens: 8192,
-		pricing: { currency: "USD", inputPricePerMillion: 3, outputPricePerMillion: 15 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 3,
+			outputPricePerMillion: 15,
+		},
 	},
 	"claude-3-5-haiku": {
 		capabilities: ["vision", "tool_use"],
@@ -154,7 +202,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3.5",
 		contextWindow: 200000,
 		maxTokens: 8192,
-		pricing: { currency: "USD", inputPricePerMillion: 0.8, outputPricePerMillion: 4 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.8,
+			outputPricePerMillion: 4,
+		},
 	},
 	"claude-3-opus": {
 		capabilities: ["vision", "tool_use"],
@@ -162,7 +214,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3",
 		contextWindow: 200000,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 15, outputPricePerMillion: 75 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 15,
+			outputPricePerMillion: 75,
+		},
 	},
 	"claude-3-sonnet": {
 		capabilities: ["vision", "tool_use"],
@@ -170,7 +226,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3",
 		contextWindow: 200000,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 3, outputPricePerMillion: 15 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 3,
+			outputPricePerMillion: 15,
+		},
 	},
 	"claude-3-haiku": {
 		capabilities: ["vision", "tool_use"],
@@ -178,7 +238,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Claude 3",
 		contextWindow: 200000,
 		maxTokens: 4096,
-		pricing: { currency: "USD", inputPricePerMillion: 0.25, outputPricePerMillion: 1.25 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.25,
+			outputPricePerMillion: 1.25,
+		},
 	},
 
 	// ========== Google ==========
@@ -209,7 +273,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Gemini 1.5",
 		contextWindow: 2000000,
 		maxTokens: 8192,
-		pricing: { currency: "USD", inputPricePerMillion: 1.25, outputPricePerMillion: 5 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 1.25,
+			outputPricePerMillion: 5,
+		},
 	},
 	"gemini-1.5-flash": {
 		capabilities: ["vision", "tool_use"],
@@ -217,7 +285,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Gemini 1.5",
 		contextWindow: 1000000,
 		maxTokens: 8192,
-		pricing: { currency: "USD", inputPricePerMillion: 0.075, outputPricePerMillion: 0.3 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.075,
+			outputPricePerMillion: 0.3,
+		},
 	},
 
 	// ========== DeepSeek ==========
@@ -227,7 +299,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "DeepSeek",
 		contextWindow: 64000,
 		maxTokens: 8192,
-		pricing: { currency: "CNY", inputPricePerMillion: 1, outputPricePerMillion: 2 },
+		pricing: {
+			currency: "CNY",
+			inputPricePerMillion: 1,
+			outputPricePerMillion: 2,
+		},
 	},
 	"deepseek-reasoner": {
 		capabilities: ["reasoning"],
@@ -235,7 +311,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "DeepSeek",
 		contextWindow: 64000,
 		maxTokens: 8192,
-		pricing: { currency: "CNY", inputPricePerMillion: 4, outputPricePerMillion: 16 },
+		pricing: {
+			currency: "CNY",
+			inputPricePerMillion: 4,
+			outputPricePerMillion: 16,
+		},
 	},
 	"deepseek-r1": {
 		capabilities: ["reasoning"],
@@ -259,7 +339,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Qwen",
 		contextWindow: 32000,
 		maxTokens: 8192,
-		pricing: { currency: "CNY", inputPricePerMillion: 20, outputPricePerMillion: 60 },
+		pricing: {
+			currency: "CNY",
+			inputPricePerMillion: 20,
+			outputPricePerMillion: 60,
+		},
 	},
 	"qwen-plus": {
 		capabilities: ["tool_use"],
@@ -267,7 +351,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Qwen",
 		contextWindow: 131072,
 		maxTokens: 8192,
-		pricing: { currency: "CNY", inputPricePerMillion: 0.8, outputPricePerMillion: 2 },
+		pricing: {
+			currency: "CNY",
+			inputPricePerMillion: 0.8,
+			outputPricePerMillion: 2,
+		},
 	},
 	"qwen-turbo": {
 		capabilities: ["tool_use"],
@@ -275,7 +363,11 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		group: "Qwen",
 		contextWindow: 131072,
 		maxTokens: 8192,
-		pricing: { currency: "CNY", inputPricePerMillion: 0.3, outputPricePerMillion: 0.6 },
+		pricing: {
+			currency: "CNY",
+			inputPricePerMillion: 0.3,
+			outputPricePerMillion: 0.6,
+		},
 	},
 	"qwen-vl-max": {
 		capabilities: ["vision", "tool_use"],
@@ -291,7 +383,7 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		contextWindow: 32000,
 		maxTokens: 8192,
 	},
-	"qwq": {
+	qwq: {
 		capabilities: ["reasoning"],
 		category: "chat",
 		group: "QwQ",
@@ -346,21 +438,33 @@ const KNOWN_MODELS: Record<string, KnownModelInfo> = {
 		category: "embedding",
 		group: "Embeddings",
 		supportsStreaming: false,
-		pricing: { currency: "USD", inputPricePerMillion: 0.13, outputPricePerMillion: 0 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.13,
+			outputPricePerMillion: 0,
+		},
 	},
 	"text-embedding-3-small": {
 		capabilities: ["embedding"],
 		category: "embedding",
 		group: "Embeddings",
 		supportsStreaming: false,
-		pricing: { currency: "USD", inputPricePerMillion: 0.02, outputPricePerMillion: 0 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.02,
+			outputPricePerMillion: 0,
+		},
 	},
 	"text-embedding-ada-002": {
 		capabilities: ["embedding"],
 		category: "embedding",
 		group: "Embeddings",
 		supportsStreaming: false,
-		pricing: { currency: "USD", inputPricePerMillion: 0.1, outputPricePerMillion: 0 },
+		pricing: {
+			currency: "USD",
+			inputPricePerMillion: 0.1,
+			outputPricePerMillion: 0,
+		},
 	},
 
 	// ========== Image Generation ==========
@@ -445,7 +549,13 @@ function inferCapabilities(modelId: string): ModelCapability[] {
 		id.includes("grok") ||
 		id.includes("deepseek-chat")
 	) {
-		if (!id.includes("embedding") && !id.includes("embed") && !id.includes("dall-e") && !id.includes("tts") && !id.includes("whisper")) {
+		if (
+			!id.includes("embedding") &&
+			!id.includes("embed") &&
+			!id.includes("dall-e") &&
+			!id.includes("tts") &&
+			!id.includes("whisper")
+		) {
 			caps.push("tool_use");
 		}
 	}
@@ -471,9 +581,19 @@ function inferCategory(modelId: string): ModelCategory {
 
 	if (id.includes("embedding") || id.includes("embed")) return "embedding";
 	if (id.includes("rerank")) return "reranking";
-	if (id.includes("dall-e") || id.includes("stable-diffusion") || id.includes("midjourney")) return "image_generation";
+	if (
+		id.includes("dall-e") ||
+		id.includes("stable-diffusion") ||
+		id.includes("midjourney")
+	)
+		return "image_generation";
 	if (id.includes("whisper") || id.includes("tts")) return "audio";
-	if (id.includes("code") || id.includes("codestral") || id.includes("starcoder")) return "code";
+	if (
+		id.includes("code") ||
+		id.includes("codestral") ||
+		id.includes("starcoder")
+	)
+		return "code";
 
 	return "chat";
 }
@@ -488,8 +608,10 @@ function inferGroup(modelId: string): string | undefined {
 	if (id.startsWith("gpt-4o")) return "GPT-4o";
 	if (id.startsWith("gpt-4")) return "GPT-4";
 	if (id.startsWith("gpt-3.5")) return "GPT-3.5";
-	if (id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4")) return "o-Series";
-	if (id.startsWith("claude-opus-4") || id.startsWith("claude-sonnet-4")) return "Claude 4";
+	if (id.startsWith("o1") || id.startsWith("o3") || id.startsWith("o4"))
+		return "o-Series";
+	if (id.startsWith("claude-opus-4") || id.startsWith("claude-sonnet-4"))
+		return "Claude 4";
 	if (id.startsWith("claude-3-7")) return "Claude 3.7";
 	if (id.startsWith("claude-3-5")) return "Claude 3.5";
 	if (id.startsWith("claude-3")) return "Claude 3";
@@ -563,7 +685,8 @@ function normalizeModel(
 		enabled: true,
 		capabilities: inferCapabilities(raw.id),
 		category: inferCategory(raw.id),
-		supportsStreaming: inferCategory(raw.id) === "chat" || inferCategory(raw.id) === "code",
+		supportsStreaming:
+			inferCategory(raw.id) === "chat" || inferCategory(raw.id) === "code",
 	};
 }
 
@@ -581,7 +704,9 @@ export function normalizeModels(
  * Ensure a ProviderModel from storage has all required fields (backward compatibility).
  * Fills in defaults for models stored before the type expansion.
  */
-export function ensureModelDefaults(model: Record<string, unknown>): ProviderModel {
+export function ensureModelDefaults(
+	model: Record<string, unknown>,
+): ProviderModel {
 	const m = model as Partial<ProviderModel> & { id: string; name: string };
 	return {
 		id: m.id,
