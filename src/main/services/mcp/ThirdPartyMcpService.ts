@@ -202,7 +202,11 @@ export class ThirdPartyMcpService extends EventEmitter {
 
 		try {
 			// 调用第三方 MCP 工具
-			const result = await this.executeToolCall(connection.config, toolName, args);
+			const result = await this.executeToolCall(
+				connection.config,
+				toolName,
+				args,
+			);
 
 			connection.lastUsed = Date.now();
 			this.emit("tool-called", { serverId, toolName, args });

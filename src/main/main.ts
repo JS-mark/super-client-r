@@ -45,6 +45,8 @@ if (!app.isPackaged) {
 }
 app.commandLine.appendSwitch("disable-gpu");
 app.commandLine.appendSwitch("disable-software-rasterizer");
+// 禁用 Chrome 扩展系统，消除 "Could not establish connection" 警告
+app.commandLine.appendSwitch("disable-extensions");
 // Disable Autofill features to prevent DevTools errors
 app.commandLine.appendSwitch(
 	"disable-features",
@@ -445,7 +447,9 @@ app.whenReady().then(async () => {
 	internalMcpService
 		.initialize()
 		.then(() => {
-			mcpService.registerInternalServers(internalMcpService.getAllServerConfigs());
+			mcpService.registerInternalServers(
+				internalMcpService.getAllServerConfigs(),
+			);
 			logger.info("Internal MCP servers registered");
 		})
 		.catch((error) => {

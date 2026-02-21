@@ -37,7 +37,7 @@ interface MessageState {
 
 interface MessageActions {
 	// 书签管理
-	addBookmark: (bookmark: Omit<BookmarkedMessage, "id" >) => void;
+	addBookmark: (bookmark: Omit<BookmarkedMessage, "id">) => void;
 	removeBookmark: (id: string) => void;
 	updateBookmark: (id: string, updates: Partial<BookmarkedMessage>) => void;
 	isBookmarked: (messageId: string) => boolean;
@@ -59,7 +59,7 @@ interface MessageActions {
 	exportMessages: (
 		messages: Message[],
 		format: ExportFormat,
-		filename?: string
+		filename?: string,
 	) => Promise<string>;
 
 	// 搜索功能
@@ -70,7 +70,7 @@ interface MessageActions {
 			caseSensitive?: boolean;
 			wholeWord?: boolean;
 			role?: "user" | "assistant" | "all";
-		}
+		},
 	) => Message[];
 }
 
@@ -117,7 +117,7 @@ export const useMessageStore = create<MessageState & MessageActions>()(
 			updateBookmark: (id, updates) => {
 				set((state) => ({
 					bookmarks: state.bookmarks.map((b) =>
-						b.id === id ? { ...b, ...updates } : b
+						b.id === id ? { ...b, ...updates } : b,
 					),
 				}));
 			},
@@ -135,7 +135,11 @@ export const useMessageStore = create<MessageState & MessageActions>()(
 				const newTag: MessageTag = {
 					...tag,
 					id: generateId(),
-					color: tag.color || DEFAULT_TAG_COLORS[Math.floor(Math.random() * DEFAULT_TAG_COLORS.length)],
+					color:
+						tag.color ||
+						DEFAULT_TAG_COLORS[
+							Math.floor(Math.random() * DEFAULT_TAG_COLORS.length)
+						],
 				};
 				set((state) => ({
 					tags: [...state.tags, newTag],
@@ -223,7 +227,11 @@ export const useMessageStore = create<MessageState & MessageActions>()(
 			searchMessages: (messages, query, options = {}) => {
 				if (!query.trim()) return messages;
 
-				const { caseSensitive = false, wholeWord = false, role = "all" } = options;
+				const {
+					caseSensitive = false,
+					wholeWord = false,
+					role = "all",
+				} = options;
 
 				let searchRegex: RegExp;
 				const flags = caseSensitive ? "g" : "gi";
@@ -253,8 +261,8 @@ export const useMessageStore = create<MessageState & MessageActions>()(
 				searchHistory: state.searchHistory,
 				lastExportPath: state.lastExportPath,
 			}),
-		}
-	)
+		},
+	),
 );
 
 // 转义正则表达式特殊字符

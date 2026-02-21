@@ -100,7 +100,10 @@ export function registerMcpHandlers(): void {
 	// 更新服务器配置
 	ipcMain.handle(
 		MCP_CHANNELS.UPDATE_SERVER,
-		(_event: IpcMainInvokeEvent, { id, config }: { id: string; config: Partial<McpServerConfig> }) => {
+		(
+			_event: IpcMainInvokeEvent,
+			{ id, config }: { id: string; config: Partial<McpServerConfig> },
+		) => {
 			try {
 				mcpService.updateServer(id, config);
 				return { success: true };
@@ -147,10 +150,16 @@ export function registerMcpHandlers(): void {
 		"mcp:builtin:create-config",
 		(
 			_event: IpcMainInvokeEvent,
-			{ definitionId, config }: { definitionId: string; config?: Record<string, unknown> },
+			{
+				definitionId,
+				config,
+			}: { definitionId: string; config?: Record<string, unknown> },
 		) => {
 			try {
-				const serverConfig = builtinMcpService.createServerConfig(definitionId, config);
+				const serverConfig = builtinMcpService.createServerConfig(
+					definitionId,
+					config,
+				);
 				if (!serverConfig) {
 					return { success: false, error: "Definition not found" };
 				}
@@ -216,7 +225,10 @@ export function registerMcpHandlers(): void {
 			},
 		) => {
 			try {
-				const result = await thirdPartyMcpService.proxyRequest(serverId, request);
+				const result = await thirdPartyMcpService.proxyRequest(
+					serverId,
+					request,
+				);
 				return { success: true, data: result };
 			} catch (error: any) {
 				return { success: false, error: error.message };
@@ -240,44 +252,56 @@ export function registerMcpHandlers(): void {
 	);
 
 	// 获取热门 MCP
-	ipcMain.handle("mcp:market:popular", async (_event: IpcMainInvokeEvent, limit?: number) => {
-		try {
-			const items = await mcpMarketService.getPopular(limit);
-			return { success: true, data: items };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
-	});
+	ipcMain.handle(
+		"mcp:market:popular",
+		async (_event: IpcMainInvokeEvent, limit?: number) => {
+			try {
+				const items = await mcpMarketService.getPopular(limit);
+				return { success: true, data: items };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 获取高评分 MCP
-	ipcMain.handle("mcp:market:top-rated", async (_event: IpcMainInvokeEvent, limit?: number) => {
-		try {
-			const items = await mcpMarketService.getTopRated(limit);
-			return { success: true, data: items };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
-	});
+	ipcMain.handle(
+		"mcp:market:top-rated",
+		async (_event: IpcMainInvokeEvent, limit?: number) => {
+			try {
+				const items = await mcpMarketService.getTopRated(limit);
+				return { success: true, data: items };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 获取最新 MCP
-	ipcMain.handle("mcp:market:newest", async (_event: IpcMainInvokeEvent, limit?: number) => {
-		try {
-			const items = await mcpMarketService.getNewest(limit);
-			return { success: true, data: items };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
-	});
+	ipcMain.handle(
+		"mcp:market:newest",
+		async (_event: IpcMainInvokeEvent, limit?: number) => {
+			try {
+				const items = await mcpMarketService.getNewest(limit);
+				return { success: true, data: items };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 获取 MCP 详情
-	ipcMain.handle("mcp:market:get-detail", async (_event: IpcMainInvokeEvent, id: string) => {
-		try {
-			const item = await mcpMarketService.getDetail(id);
-			return { success: true, data: item };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
-	});
+	ipcMain.handle(
+		"mcp:market:get-detail",
+		async (_event: IpcMainInvokeEvent, id: string) => {
+			try {
+				const item = await mcpMarketService.getDetail(id);
+				return { success: true, data: item };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 获取所有标签
 	ipcMain.handle("mcp:market:get-tags", async () => {
@@ -299,7 +323,11 @@ export function registerMcpHandlers(): void {
 				customConfig,
 			}: {
 				marketItem: McpMarketItem;
-				customConfig?: { name?: string; env?: Record<string, string>; url?: string };
+				customConfig?: {
+					name?: string;
+					env?: Record<string, string>;
+					url?: string;
+				};
 			},
 		) => {
 			try {
@@ -314,19 +342,25 @@ export function registerMcpHandlers(): void {
 	);
 
 	// 获取 README
-	ipcMain.handle("mcp:market:get-readme", async (_event: IpcMainInvokeEvent, marketItem: McpMarketItem) => {
-		try {
-			const readme = await mcpMarketService.getReadme(marketItem);
-			return { success: true, data: readme };
-		} catch (error: any) {
-			return { success: false, error: error.message };
-		}
-	});
+	ipcMain.handle(
+		"mcp:market:get-readme",
+		async (_event: IpcMainInvokeEvent, marketItem: McpMarketItem) => {
+			try {
+				const readme = await mcpMarketService.getReadme(marketItem);
+				return { success: true, data: readme };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
 
 	// 设置市场 API URL（当前使用 npm 注册表，此接口保留兼容性）
-	ipcMain.handle("mcp:market:set-api-url", (_event: IpcMainInvokeEvent, _url: string) => {
-		return { success: true };
-	});
+	ipcMain.handle(
+		"mcp:market:set-api-url",
+		(_event: IpcMainInvokeEvent, _url: string) => {
+			return { success: true };
+		},
+	);
 
 	// 启动时从持久化存储加载已安装的 MCP 服务器
 	mcpService.loadPersistedServers();

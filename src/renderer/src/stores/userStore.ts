@@ -86,7 +86,10 @@ export const useUserStore = create<UserState>()(
 		}),
 		{
 			name: "user-storage",
-			partialize: (state) => ({ user: state.user, isLoggedIn: state.isLoggedIn }),
+			partialize: (state) => ({
+				user: state.user,
+				isLoggedIn: state.isLoggedIn,
+			}),
 		},
 	),
 );

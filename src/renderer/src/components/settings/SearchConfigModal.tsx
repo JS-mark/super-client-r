@@ -6,16 +6,7 @@ import {
 	SaveOutlined,
 	SearchOutlined,
 } from "@ant-design/icons";
-import {
-	App,
-	Button,
-	Form,
-	Input,
-	Modal,
-	Select,
-	Switch,
-	theme,
-} from "antd";
+import { App, Button, Form, Input, Modal, Select, Switch, theme } from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { searchService } from "../../services/search/searchService";
@@ -70,9 +61,7 @@ export function SearchConfigModal({
 	const handleValidateConfig = useCallback(async () => {
 		const values = form.getFieldsValue();
 		if (!values.provider) {
-			message.warning(
-				t("search.selectProviderFirst", { ns: "settings" }),
-			);
+			message.warning(t("search.selectProviderFirst", { ns: "settings" }));
 			return;
 		}
 
@@ -90,9 +79,7 @@ export function SearchConfigModal({
 
 			const result = await searchService.validateConfig(config);
 			if (result.success && result.data?.valid) {
-				message.success(
-					t("search.validateSuccess", { ns: "settings" }),
-				);
+				message.success(t("search.validateSuccess", { ns: "settings" }));
 			} else {
 				message.error(
 					result.data?.error ||
@@ -126,9 +113,7 @@ export function SearchConfigModal({
 
 				const result = await searchService.saveConfig(config);
 				if (result.success) {
-					message.success(
-						t("search.saveSuccess", { ns: "settings" }),
-					);
+					message.success(t("search.saveSuccess", { ns: "settings" }));
 					onClose();
 					onSaved();
 				} else {
@@ -159,7 +144,7 @@ export function SearchConfigModal({
 			onCancel={onClose}
 			footer={null}
 			width={560}
-			destroyOnClose
+      destroyOnHidden
 			afterOpenChange={(visible) => {
 				if (visible && editingConfig) {
 					form.setFieldsValue({
@@ -216,7 +201,10 @@ export function SearchConfigModal({
 									value: p.id,
 									label: (
 										<div className="flex items-center gap-2">
-											<span style={{ color: token.colorPrimary }} className="font-bold">
+											<span
+												style={{ color: token.colorPrimary }}
+												className="font-bold"
+											>
 												{p.icon}
 											</span>
 											<span>{p.name}</span>

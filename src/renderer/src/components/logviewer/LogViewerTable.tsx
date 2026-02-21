@@ -59,9 +59,14 @@ export const LogViewerTable: React.FC = () => {
 				key: "timestamp",
 				width: 170,
 				render: (timestamp: string) => (
-					<span className="font-mono text-xs whitespace-nowrap" style={{ color: token.colorTextSecondary }}>
+					<span
+						className="font-mono text-xs whitespace-nowrap"
+						style={{ color: token.colorTextSecondary }}
+					>
 						<span style={{ opacity: 0.5 }}>{formatDate(timestamp)}</span>{" "}
-						<span style={{ color: token.colorText }}>{formatTime(timestamp)}</span>
+						<span style={{ color: token.colorText }}>
+							{formatTime(timestamp)}
+						</span>
 					</span>
 				),
 			},
@@ -158,7 +163,11 @@ export const LogViewerTable: React.FC = () => {
 				locale={{
 					emptyText: (
 						<Empty
-							image={<FileSearchOutlined style={{ fontSize: 48, color: token.colorTextQuaternary }} />}
+							image={
+								<FileSearchOutlined
+									style={{ fontSize: 48, color: token.colorTextQuaternary }}
+								/>
+							}
 							description={
 								<span style={{ color: token.colorTextTertiary }}>
 									{t("noLogs")}
@@ -174,8 +183,12 @@ export const LogViewerTable: React.FC = () => {
 					total,
 					showSizeChanger: true,
 					showTotal: (total) => (
-						<span style={{ color: token.colorTextTertiary }} className="text-xs">
-							{total.toLocaleString()} {t("stats.total", { defaultValue: "total" })}
+						<span
+							style={{ color: token.colorTextTertiary }}
+							className="text-xs"
+						>
+							{total.toLocaleString()}{" "}
+							{t("stats.total", { defaultValue: "total" })}
 						</span>
 					),
 					pageSizeOptions: [20, 50, 100],

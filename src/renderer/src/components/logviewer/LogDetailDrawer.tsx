@@ -81,8 +81,10 @@ export const LogDetailDrawer: React.FC = () => {
 			}
 			open={detailOpen}
 			onClose={handleClose}
-			width={540}
-			styles={{ wrapper: { WebkitAppRegion: "no-drag" } as React.CSSProperties }}
+			size={540}
+			styles={{
+				wrapper: { WebkitAppRegion: "no-drag" } as React.CSSProperties,
+			}}
 			extra={
 				<Button
 					icon={<CopyOutlined />}

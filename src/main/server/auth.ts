@@ -208,10 +208,8 @@ export function generateToken(apiKey: ApiKey): string {
 		aud: JWT_CONFIG.audience,
 	};
 
-	const headerB64 = Buffer.from(JSON.stringify(header))
-		.toString("base64url");
-	const payloadB64 = Buffer.from(JSON.stringify(payload))
-		.toString("base64url");
+	const headerB64 = Buffer.from(JSON.stringify(header)).toString("base64url");
+	const payloadB64 = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
 	const signature = crypto
 		.createHmac("sha256", JWT_CONFIG.secret)
@@ -255,7 +253,10 @@ export function verifyToken(token: string): JwtPayload | null {
 		}
 
 		// Check issuer and audience
-		if (payload.iss !== JWT_CONFIG.issuer || payload.aud !== JWT_CONFIG.audience) {
+		if (
+			payload.iss !== JWT_CONFIG.issuer ||
+			payload.aud !== JWT_CONFIG.audience
+		) {
 			return null;
 		}
 
@@ -318,7 +319,8 @@ export async function jwtMiddleware(ctx: Context, next: Next) {
 			name: apiKey.name,
 			permissions: apiKey.permissions,
 			iat: Math.floor(Date.now() / 1000),
-			exp: Math.floor(Date.now() / 1000) + Math.floor(JWT_CONFIG.expiresIn / 1000),
+			exp:
+				Math.floor(Date.now() / 1000) + Math.floor(JWT_CONFIG.expiresIn / 1000),
 			iss: JWT_CONFIG.issuer,
 			aud: JWT_CONFIG.audience,
 		};

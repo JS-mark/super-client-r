@@ -31,7 +31,10 @@ export const ThemeSettings: React.FC = () => {
 
 	return (
 		<div className="flex items-center justify-between py-2">
-			<div className="flex items-center gap-2" style={{ color: token.colorText }}>
+			<div
+				className="flex items-center gap-2"
+				style={{ color: token.colorText }}
+			>
 				{isDark ? (
 					<MoonOutlined className="text-sm" />
 				) : (

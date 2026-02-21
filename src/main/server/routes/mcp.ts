@@ -4,7 +4,14 @@
  */
 
 import { SwaggerRouter } from "koa-swagger-decorator";
-import { body, path, query, request, summary, tags } from "koa-swagger-decorator";
+import {
+	body,
+	path,
+	query,
+	request,
+	summary,
+	tags,
+} from "koa-swagger-decorator";
 import { Context } from "koa";
 import { mcpService } from "../../services/mcp/McpService";
 import { thirdPartyMcpService } from "../../services/mcp/ThirdPartyMcpService";
@@ -25,7 +32,12 @@ interface ApiResponse<T = unknown> {
 	timestamp: number;
 }
 
-function createResponse<T>(ctx: Context, code: number, message: string, data?: T): ApiResponse<T> {
+function createResponse<T>(
+	ctx: Context,
+	code: number,
+	message: string,
+	data?: T,
+): ApiResponse<T> {
 	ctx.status = code;
 	return {
 		code,
@@ -85,15 +97,45 @@ export class McpController {
 	@summary("添加 MCP 服务器")
 	@tag
 	@body({
-		id: { type: "string", required: false, description: "服务器 ID（可选，自动生成）" },
+		id: {
+			type: "string",
+			required: false,
+			description: "服务器 ID（可选，自动生成）",
+		},
 		name: { type: "string", required: true, description: "服务器名称" },
-		type: { type: "string", required: true, enum: ["builtin", "third-party", "market"], description: "服务器类型" },
-		transport: { type: "string", required: true, enum: ["stdio", "sse", "http"], description: "传输类型" },
-		command: { type: "string", required: false, description: "命令（stdio 类型需要）" },
-		args: { type: "array", required: false, description: "参数（stdio 类型需要）" },
+		type: {
+			type: "string",
+			required: true,
+			enum: ["builtin", "third-party", "market"],
+			description: "服务器类型",
+		},
+		transport: {
+			type: "string",
+			required: true,
+			enum: ["stdio", "sse", "http"],
+			description: "传输类型",
+		},
+		command: {
+			type: "string",
+			required: false,
+			description: "命令（stdio 类型需要）",
+		},
+		args: {
+			type: "array",
+			required: false,
+			description: "参数（stdio 类型需要）",
+		},
 		env: { type: "object", required: false, description: "环境变量" },
-		url: { type: "string", required: false, description: "URL（sse/http 类型需要）" },
-		headers: { type: "object", required: false, description: "请求头（sse/http 类型需要）" },
+		url: {
+			type: "string",
+			required: false,
+			description: "URL（sse/http 类型需要）",
+		},
+		headers: {
+			type: "object",
+			required: false,
+			description: "请求头（sse/http 类型需要）",
+		},
 	})
 	async addServer(ctx: Context) {
 		try {
@@ -223,13 +265,19 @@ export class McpController {
 	})
 	async callTool(ctx: Context) {
 		try {
-			const { serverId, toolName, args } = ctx.request.body as McpToolCallRequest;
+			const { serverId, toolName, args } = ctx.request
+				.body as McpToolCallRequest;
 			const result = await mcpService.callTool(serverId, toolName, args);
 
 			if (result.success) {
 				ctx.body = createResponse(ctx, 200, "Tool called successfully", result);
 			} else {
-				ctx.body = createResponse(ctx, 400, result.error || "Tool call failed", result);
+				ctx.body = createResponse(
+					ctx,
+					400,
+					result.error || "Tool call failed",
+					result,
+				);
 			}
 		} catch (error) {
 			ctx.body = createResponse(
@@ -260,7 +308,13 @@ export class McpController {
 	})
 	async callToolsBatch(ctx: Context) {
 		try {
-			const { requests } = ctx.request.body as { requests: Array<{ serverId: string; toolName: string; args: Record<string, unknown> }> };
+			const { requests } = ctx.request.body as {
+				requests: Array<{
+					serverId: string;
+					toolName: string;
+					args: Record<string, unknown>;
+				}>;
+			};
 			const results = await mcpService.callToolsBatch(requests);
 			ctx.body = createResponse(ctx, 200, "Batch call completed", results);
 		} catch (error) {
@@ -278,7 +332,11 @@ export class McpController {
 	@summary("代理请求到第三方 MCP 服务器")
 	@tag
 	@path({
-		serverId: { type: "string", required: true, description: "第三方服务器 ID" },
+		serverId: {
+			type: "string",
+			required: true,
+			description: "第三方服务器 ID",
+		},
 		path: { type: "string", required: true, description: "目标路径" },
 	})
 	async proxyRequest(ctx: Context) {
@@ -287,19 +345,29 @@ export class McpController {
 			const method = ctx.method as "GET" | "POST" | "PUT" | "DELETE";
 
 			// 将 path 数组或字符串拼接成完整路径
-			const fullPath = Array.isArray(path) ? path.join('/') : (path || '');
+			const fullPath = Array.isArray(path) ? path.join("/") : path || "";
 
 			const result = await thirdPartyMcpService.proxyRequest(serverId, {
-				endpoint: fullPath ? `/${fullPath}` : '/',
+				endpoint: fullPath ? `/${fullPath}` : "/",
 				method,
 				body: ctx.request.body,
 				headers: ctx.headers as Record<string, string>,
 			});
 
 			if (result.success) {
-				ctx.body = createResponse(ctx, 200, "Proxy request successful", result.data);
+				ctx.body = createResponse(
+					ctx,
+					200,
+					"Proxy request successful",
+					result.data,
+				);
 			} else {
-				ctx.body = createResponse(ctx, result.statusCode || 500, result.error || "Proxy request failed", result);
+				ctx.body = createResponse(
+					ctx,
+					result.statusCode || 500,
+					result.error || "Proxy request failed",
+					result,
+				);
 			}
 		} catch (error) {
 			ctx.body = createResponse(
@@ -318,7 +386,12 @@ export class McpController {
 	@query({
 		q: { type: "string", required: false, description: "搜索关键词" },
 		tags: { type: "string", required: false, description: "标签（逗号分隔）" },
-		sortBy: { type: "string", required: false, enum: ["downloads", "rating", "newest"], description: "排序方式" },
+		sortBy: {
+			type: "string",
+			required: false,
+			enum: ["downloads", "rating", "newest"],
+			description: "排序方式",
+		},
 		page: { type: "number", required: false, description: "页码" },
 		limit: { type: "number", required: false, description: "每页数量" },
 	})
@@ -353,7 +426,9 @@ export class McpController {
 	})
 	async getPopular(ctx: Context) {
 		try {
-			const limit = ctx.query.limit ? parseInt(ctx.query.limit as string, 10) : 10;
+			const limit = ctx.query.limit
+				? parseInt(ctx.query.limit as string, 10)
+				: 10;
 			const items = await mcpMarketService.getPopular(limit);
 			ctx.body = createResponse(ctx, 200, "Success", items);
 		} catch (error) {
@@ -373,14 +448,18 @@ export class McpController {
 	})
 	async getTopRated(ctx: Context) {
 		try {
-			const limit = ctx.query.limit ? parseInt(ctx.query.limit as string, 10) : 10;
+			const limit = ctx.query.limit
+				? parseInt(ctx.query.limit as string, 10)
+				: 10;
 			const items = await mcpMarketService.getTopRated(limit);
 			ctx.body = createResponse(ctx, 200, "Success", items);
 		} catch (error) {
 			ctx.body = createResponse(
 				ctx,
 				500,
-				error instanceof Error ? error.message : "Failed to get top rated items",
+				error instanceof Error
+					? error.message
+					: "Failed to get top rated items",
 			);
 		}
 	}
@@ -393,7 +472,9 @@ export class McpController {
 	})
 	async getNewest(ctx: Context) {
 		try {
-			const limit = ctx.query.limit ? parseInt(ctx.query.limit as string, 10) : 10;
+			const limit = ctx.query.limit
+				? parseInt(ctx.query.limit as string, 10)
+				: 10;
 			const items = await mcpMarketService.getNewest(limit);
 			ctx.body = createResponse(ctx, 200, "Success", items);
 		} catch (error) {
@@ -452,7 +533,11 @@ export class McpController {
 	@tag
 	@body({
 		marketItem: { type: "object", required: true, description: "市场项目" },
-		customConfig: { type: "object", required: false, description: "自定义配置" },
+		customConfig: {
+			type: "object",
+			required: false,
+			description: "自定义配置",
+		},
 	})
 	async installMcp(ctx: Context) {
 		try {
@@ -512,7 +597,9 @@ export class McpController {
 			const statuses = mcpService.getAllServerStatus();
 
 			const connected = statuses.filter((s) => s.status === "connected").length;
-			const disconnected = statuses.filter((s) => s.status === "disconnected").length;
+			const disconnected = statuses.filter(
+				(s) => s.status === "disconnected",
+			).length;
 			const error = statuses.filter((s) => s.status === "error").length;
 
 			ctx.body = createResponse(ctx, 200, "Success", {

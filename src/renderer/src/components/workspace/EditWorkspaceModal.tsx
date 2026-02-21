@@ -2,10 +2,7 @@ import { Form, Input, Modal, Radio } from "antd";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
-import {
-	WORKSPACE_COLORS,
-	type Workspace,
-} from "../../stores/workspaceStore";
+import { WORKSPACE_COLORS, type Workspace } from "../../stores/workspaceStore";
 import { WORKSPACE_TYPE_OPTIONS } from "./WorkspaceCard";
 
 export function EditWorkspaceModal({
@@ -69,7 +66,7 @@ export function EditWorkspaceModal({
 					<Input.TextArea rows={3} />
 				</Form.Item>
 
-				<Form.Item name="type" label={t("workspaces.type.label", "类型", { ns: "workspaces" })}>
+				<Form.Item name="type" label={t("type.label", { ns: "workspaces" })}>
 					<Radio.Group>
 						<div className="grid grid-cols-2 gap-2">
 							{WORKSPACE_TYPE_OPTIONS.map((type) => (
@@ -80,7 +77,7 @@ export function EditWorkspaceModal({
 								>
 									<div className="flex items-center gap-2 py-1">
 										<span>{type.icon}</span>
-										<span>{t(type.label)}</span>
+										<span>{t(type.label, { ns: "workspaces" })}</span>
 									</div>
 								</Radio.Button>
 							))}

@@ -40,37 +40,31 @@ export function registerLogHandlers(): void {
 	);
 
 	// Get log stats
-	ipcMain.handle(
-		LOG_CHANNELS.GET_STATS,
-		async (): Promise<LogStats> => {
-			try {
-				return logDatabaseService.getStats();
-			} catch (error) {
-				console.error("Failed to get log stats:", error);
-				return {
-					totalCount: 0,
-					countByLevel: {},
-					countByModule: {},
-					countByProcess: {},
-					recentErrorCount: 0,
-					timeHistogram: [],
-				};
-			}
-		},
-	);
+	ipcMain.handle(LOG_CHANNELS.GET_STATS, async (): Promise<LogStats> => {
+		try {
+			return logDatabaseService.getStats();
+		} catch (error) {
+			console.error("Failed to get log stats:", error);
+			return {
+				totalCount: 0,
+				countByLevel: {},
+				countByModule: {},
+				countByProcess: {},
+				recentErrorCount: 0,
+				timeHistogram: [],
+			};
+		}
+	});
 
 	// Get distinct modules
-	ipcMain.handle(
-		LOG_CHANNELS.GET_MODULES,
-		async (): Promise<string[]> => {
-			try {
-				return logDatabaseService.getModules();
-			} catch (error) {
-				console.error("Failed to get modules:", error);
-				return [];
-			}
-		},
-	);
+	ipcMain.handle(LOG_CHANNELS.GET_MODULES, async (): Promise<string[]> => {
+		try {
+			return logDatabaseService.getModules();
+		} catch (error) {
+			console.error("Failed to get modules:", error);
+			return [];
+		}
+	});
 
 	// Receive log entries from renderer process
 	ipcMain.handle(
@@ -112,7 +106,10 @@ export function registerLogHandlers(): void {
 	// Export logs to JSON file
 	ipcMain.handle(
 		LOG_CHANNELS.EXPORT,
-		async (_event, params: LogQueryParams): Promise<{ success: boolean; count?: number; filePath?: string }> => {
+		async (
+			_event,
+			params: LogQueryParams,
+		): Promise<{ success: boolean; count?: number; filePath?: string }> => {
 			try {
 				const result = await dialog.showSaveDialog({
 					title: "导出日志",

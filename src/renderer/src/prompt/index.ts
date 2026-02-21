@@ -48,6 +48,8 @@ export interface EnvInfo {
 	cwd: string;
 	appVersion: string;
 	locale: string;
+	/** Per-conversation file workspace directory */
+	workspaceDir?: string;
 }
 
 /**
@@ -70,7 +72,7 @@ OS: ${envInfo.os} (${envInfo.platform}/${envInfo.arch})
 Runtime: Node.js ${envInfo.nodeVersion}, Electron ${envInfo.electronVersion}
 App Version: ${envInfo.appVersion}
 User Home: ${envInfo.homedir}
-Working Directory: ${envInfo.cwd}
+Working Directory: ${envInfo.workspaceDir || envInfo.cwd}
 Current Time: ${timeStr}
 Locale: ${envInfo.locale}`;
 }
@@ -85,7 +87,10 @@ Locale: ${envInfo.locale}`;
  * @param envInfo - 本地环境信息（可选）
  * @returns 拼接后的完整系统提示词
  */
-export function buildSystemPrompt(modelSystemPrompt?: string, envInfo?: EnvInfo): string {
+export function buildSystemPrompt(
+	modelSystemPrompt?: string,
+	envInfo?: EnvInfo,
+): string {
 	const parts: string[] = [DEFAULT_SYSTEM_PROMPT];
 
 	if (envInfo) {

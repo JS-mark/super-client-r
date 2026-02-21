@@ -151,8 +151,7 @@ export const useModelStore = create<ModelState>()(
 
 			getAllEnabledModels: () => {
 				const { providers } = get();
-				const result: { provider: ModelProvider; model: ProviderModel }[] =
-					[];
+				const result: { provider: ModelProvider; model: ProviderModel }[] = [];
 				for (const provider of providers) {
 					if (!provider.enabled) continue;
 					for (const model of provider.models) {

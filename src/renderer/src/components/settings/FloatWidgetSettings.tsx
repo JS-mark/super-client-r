@@ -54,7 +54,10 @@ export const FloatWidgetSettings: React.FC = () => {
 					<p className="font-medium" style={{ color: token.colorText }}>
 						{t("enableFloatWidget", "Enable Float Widget", { ns: "settings" })}
 					</p>
-					<p className="text-xs mt-1" style={{ color: token.colorTextSecondary }}>
+					<p
+						className="text-xs mt-1"
+						style={{ color: token.colorTextSecondary }}
+					>
 						{t("floatWidgetHint", "Show a floating widget on desktop", {
 							ns: "settings",
 						})}

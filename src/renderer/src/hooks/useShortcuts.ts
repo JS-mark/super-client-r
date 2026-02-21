@@ -43,8 +43,13 @@ export function useGlobalShortcuts(
 	handlers: ShortcutHandlers,
 	activeScope: ShortcutScope = "global",
 ) {
-	const { shortcuts, globalEnabled, isRecording, recordingShortcutId, stopRecording } =
-		useShortcutStore();
+	const {
+		shortcuts,
+		globalEnabled,
+		isRecording,
+		recordingShortcutId,
+		stopRecording,
+	} = useShortcutStore();
 	const handlersRef = useRef(handlers);
 
 	// 保持处理器引用最新
@@ -105,7 +110,8 @@ export function useGlobalShortcuts(
 			const shortcutScope = matchedShortcut.scope;
 
 			// global 和 navigation 快捷键总是生效（不受 activeScope 限制）
-			const alwaysActive = shortcutScope === "global" || shortcutScope === "navigation";
+			const alwaysActive =
+				shortcutScope === "global" || shortcutScope === "navigation";
 
 			// 其他作用域（chat、input）需要与 activeScope 匹配
 			const scopeMatches = alwaysActive || shortcutScope === activeScope;
@@ -126,7 +132,14 @@ export function useGlobalShortcuts(
 				}
 			}
 		},
-		[shortcuts, globalEnabled, isRecording, recordingShortcutId, stopRecording, activeScope],
+		[
+			shortcuts,
+			globalEnabled,
+			isRecording,
+			recordingShortcutId,
+			stopRecording,
+			activeScope,
+		],
 	);
 
 	useEffect(() => {

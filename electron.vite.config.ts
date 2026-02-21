@@ -37,8 +37,8 @@ export default defineConfig({
 			react(),
 			tailwindcss(),
 			codeInspectorPlugin({
-				bundler: 'vite',
-			})
+				bundler: "vite",
+			}),
 		],
 		build: {
 			minify: false,

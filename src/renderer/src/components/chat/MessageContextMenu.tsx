@@ -55,7 +55,9 @@ export function MessageContextMenu({
 			const bm = getBookmarkByMessageId(message.id);
 			if (bm) {
 				removeBookmark(bm.id);
-				antdMessage.success(t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }));
+				antdMessage.success(
+					t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }),
+				);
 			}
 		} else {
 			// Only allow bookmarking user or assistant messages
@@ -67,7 +69,9 @@ export function MessageContextMenu({
 					role: message.role,
 					timestamp: message.timestamp,
 				});
-				antdMessage.success(t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }));
+				antdMessage.success(
+					t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }),
+				);
 			}
 		}
 	};
@@ -96,7 +100,9 @@ export function MessageContextMenu({
 		a.click();
 		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
-		antdMessage.success(t("chat.messageExported", "消息已导出", { ns: "chat" }));
+		antdMessage.success(
+			t("chat.messageExported", "消息已导出", { ns: "chat" }),
+		);
 	};
 
 	const menuItems: MenuItem[] = [
@@ -108,8 +114,14 @@ export function MessageContextMenu({
 		},
 		{
 			key: "bookmark",
-			icon: bookmarked ? <StarFilled className="text-yellow-500" /> : <StarOutlined />,
-			label: bookmarked ? t("chat.removeBookmark", "取消收藏") : t("chat.addBookmark", "收藏消息", { ns: "chat" }),
+			icon: bookmarked ? (
+				<StarFilled className="text-yellow-500" />
+			) : (
+				<StarOutlined />
+			),
+			label: bookmarked
+				? t("chat.removeBookmark", "取消收藏")
+				: t("chat.addBookmark", "收藏消息", { ns: "chat" }),
 			onClick: handleBookmark,
 		},
 		...(bookmarked
@@ -143,7 +155,11 @@ export function MessageContextMenu({
 					{
 						key: "delete",
 						icon: <DeleteOutlined className="text-red-500" />,
-						label: <span className="text-red-500">{t("chat.deleteMessage", "删除消息", { ns: "chat" })}</span>,
+						label: (
+							<span className="text-red-500">
+								{t("chat.deleteMessage", "删除消息", { ns: "chat" })}
+							</span>
+						),
 						onClick: onDelete,
 					},
 				]

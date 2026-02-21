@@ -44,7 +44,9 @@ export function ShortcutSettings() {
 	} = useShortcutStore();
 
 	const [searchQuery, setSearchQuery] = useState("");
-	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">("all");
+	const [selectedScope, setSelectedScope] = useState<ShortcutScope | "all">(
+		"all",
+	);
 	const [conflict, setConflict] = useState<Shortcut | null>(null);
 
 	useEffect(() => {
@@ -58,7 +60,10 @@ export function ShortcutSettings() {
 			message.warning(
 				t("conflictWarning", {
 					ns: "shortcuts",
-					name: t(conflictWith.nameKey, { ns: "shortcuts", defaultValue: conflictWith.name }),
+					name: t(conflictWith.nameKey, {
+						ns: "shortcuts",
+						defaultValue: conflictWith.name,
+					}),
 				}),
 			);
 		};
@@ -124,25 +129,31 @@ export function ShortcutSettings() {
 	}, [filteredShortcuts]);
 
 	// Stats
-	const stats = useMemo(() => ({
-		total: shortcuts.length,
-		enabled: shortcuts.filter((s) => s.enabled).length,
-		modified: shortcuts.filter((s) => s.currentKey !== s.defaultKey).length,
-	}), [shortcuts]);
+	const stats = useMemo(
+		() => ({
+			total: shortcuts.length,
+			enabled: shortcuts.filter((s) => s.enabled).length,
+			modified: shortcuts.filter((s) => s.currentKey !== s.defaultKey).length,
+		}),
+		[shortcuts],
+	);
 
 	// Scope segmented options
-	const scopeOptions = useMemo(() => [
-		{ label: t("allScopes", { ns: "shortcuts" }), value: "all" },
-		...SCOPES.map((scope) => ({
-			label: (
-				<span className="flex items-center gap-1.5">
-					{SCOPE_CONFIG[scope].icon}
-					{t(SCOPE_CONFIG[scope].labelKey, { ns: "shortcuts" })}
-				</span>
-			),
-			value: scope,
-		})),
-	], [t]);
+	const scopeOptions = useMemo(
+		() => [
+			{ label: t("allScopes", { ns: "shortcuts" }), value: "all" },
+			...SCOPES.map((scope) => ({
+				label: (
+					<span className="flex items-center gap-1.5">
+						{SCOPE_CONFIG[scope].icon}
+						{t(SCOPE_CONFIG[scope].labelKey, { ns: "shortcuts" })}
+					</span>
+				),
+				value: scope,
+			})),
+		],
+		[t],
+	);
 
 	return (
 		<div className="space-y-5">
@@ -154,17 +165,20 @@ export function ShortcutSettings() {
 				}}
 			>
 				<div className="flex-1">
-					<div className="text-sm font-medium" style={{ color: token.colorText }}>
+					<div
+						className="text-sm font-medium"
+						style={{ color: token.colorText }}
+					>
 						{t("globalEnabled", { ns: "shortcuts" })}
 					</div>
-					<div className="text-xs mt-0.5" style={{ color: token.colorTextDescription }}>
+					<div
+						className="text-xs mt-0.5"
+						style={{ color: token.colorTextDescription }}
+					>
 						{t("globalEnabledDesc", { ns: "shortcuts" })}
 					</div>
 				</div>
-				<Switch
-					checked={globalEnabled}
-					onChange={toggleGlobalEnabled}
-				/>
+				<Switch checked={globalEnabled} onChange={toggleGlobalEnabled} />
 			</div>
 
 			{/* Search + scope filter */}
@@ -173,7 +187,9 @@ export function ShortcutSettings() {
 					placeholder={t("search", { ns: "shortcuts" })}
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+					prefix={
+						<SearchOutlined style={{ color: token.colorTextQuaternary }} />
+					}
 					allowClear
 					className="flex-1"
 					disabled={!globalEnabled}
@@ -258,16 +274,21 @@ export function ShortcutSettings() {
 			>
 				<div className="text-xs" style={{ color: token.colorTextQuaternary }}>
 					{isRecording ? (
-						<span className="flex items-center gap-1.5" style={{ color: token.colorPrimary }}>
+						<span
+							className="flex items-center gap-1.5"
+							style={{ color: token.colorPrimary }}
+						>
 							<WarningOutlined className="animate-pulse" />
 							{t("recordingHint", { ns: "shortcuts" })}
 						</span>
 					) : (
 						<span>
-							{t("stats.enabled", { ns: "shortcuts" })}: {stats.enabled}/{stats.total}
+							{t("stats.enabled", { ns: "shortcuts" })}: {stats.enabled}/
+							{stats.total}
 							{stats.modified > 0 && (
 								<span style={{ color: token.colorWarning }}>
-									{" · "}{t("stats.modified", { ns: "shortcuts" })}: {stats.modified}
+									{" · "}
+									{t("stats.modified", { ns: "shortcuts" })}: {stats.modified}
 								</span>
 							)}
 						</span>

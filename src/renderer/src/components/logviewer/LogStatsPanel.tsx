@@ -48,10 +48,17 @@ export const LogStatsPanel: React.FC = () => {
 			<div
 				className="flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors"
 				onClick={handleToggle}
-				style={{ borderBottom: statsExpanded ? `1px solid ${token.colorBorderSecondary}` : "none" }}
+				style={{
+					borderBottom: statsExpanded
+						? `1px solid ${token.colorBorderSecondary}`
+						: "none",
+				}}
 			>
 				<div className="flex items-center gap-3">
-					<span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: token.colorText }}>
+					<span
+						className="flex items-center gap-1.5 text-sm font-semibold"
+						style={{ color: token.colorText }}
+					>
 						<BarChartOutlined style={{ color: token.colorPrimary }} />
 						{t("stats.title")}
 					</span>
@@ -131,7 +138,10 @@ export const LogStatsPanel: React.FC = () => {
 												color: token.colorTextSecondary,
 											}}
 										>
-											{mod} <span style={{ color: token.colorTextTertiary }}>{count}</span>
+											{mod}{" "}
+											<span style={{ color: token.colorTextTertiary }}>
+												{count}
+											</span>
 										</span>
 									))}
 							</div>
@@ -148,13 +158,16 @@ export const LogStatsPanel: React.FC = () => {
 								{t("stats.byProcess")}
 							</span>
 							<div className="flex flex-wrap gap-1">
-								{Object.entries(stats.countByProcess).map(
-									([proc, count]) => (
-										<Tag key={proc} color="cyan" className="!text-xs !rounded-full !px-2 !m-0" bordered={false}>
-											{proc} {count}
-										</Tag>
-									),
-								)}
+								{Object.entries(stats.countByProcess).map(([proc, count]) => (
+									<Tag
+										key={proc}
+										color="cyan"
+										className="!text-xs !rounded-full !px-2 !m-0"
+										bordered={false}
+									>
+										{proc} {count}
+									</Tag>
+								))}
 							</div>
 						</div>
 					)}
@@ -185,10 +198,14 @@ export const LogStatsPanel: React.FC = () => {
 													height: `${Math.max(3, (h.count / maxCount) * 40)}px`,
 													minWidth: 2,
 													maxWidth: 10,
-													background: h.count > 0
-														? token.colorPrimary
-														: token.colorFillQuaternary,
-													opacity: h.count > 0 ? 0.7 + (h.count / maxCount) * 0.3 : 0.3,
+													background:
+														h.count > 0
+															? token.colorPrimary
+															: token.colorFillQuaternary,
+													opacity:
+														h.count > 0
+															? 0.7 + (h.count / maxCount) * 0.3
+															: 0.3,
 												}}
 											/>
 										</Tooltip>

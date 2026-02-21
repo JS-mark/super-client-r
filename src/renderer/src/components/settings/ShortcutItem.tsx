@@ -80,9 +80,7 @@ export function ShortcutItem({
 		<div
 			className="flex items-center justify-between py-3 px-4 rounded-lg transition-colors"
 			style={{
-				backgroundColor: isThisRecording
-					? token.colorPrimaryBg
-					: "transparent",
+				backgroundColor: isThisRecording ? token.colorPrimaryBg : "transparent",
 				opacity: dimmed ? 0.5 : 1,
 			}}
 		>
@@ -92,13 +90,19 @@ export function ShortcutItem({
 					className="text-sm font-medium leading-snug"
 					style={{ color: token.colorText }}
 				>
-					{t(shortcut.nameKey, { ns: "shortcuts", defaultValue: shortcut.name })}
+					{t(shortcut.nameKey, {
+						ns: "shortcuts",
+						defaultValue: shortcut.name,
+					})}
 				</div>
 				<div
 					className="text-xs leading-snug mt-0.5"
 					style={{ color: token.colorTextDescription }}
 				>
-					{t(shortcut.descriptionKey, { ns: "shortcuts", defaultValue: shortcut.description })}
+					{t(shortcut.descriptionKey, {
+						ns: "shortcuts",
+						defaultValue: shortcut.description,
+					})}
 				</div>
 			</div>
 
@@ -110,7 +114,9 @@ export function ShortcutItem({
 						<div
 							className="h-7 px-3 flex items-center rounded-md text-xs font-medium animate-pulse"
 							style={{
-								backgroundColor: hasConflict ? token.colorErrorBg : token.colorPrimaryBg,
+								backgroundColor: hasConflict
+									? token.colorErrorBg
+									: token.colorPrimaryBg,
 								color: hasConflict ? token.colorError : token.colorPrimary,
 								border: `1px solid ${hasConflict ? token.colorError : token.colorPrimary}`,
 							}}

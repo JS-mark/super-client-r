@@ -128,7 +128,9 @@ export const LogViewerToolbar: React.FC = () => {
 			{/* Row 1: Search + Filters */}
 			<div className="flex items-center gap-2">
 				<Input
-					prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+					prefix={
+						<SearchOutlined style={{ color: token.colorTextQuaternary }} />
+					}
 					placeholder={t("keywordPlaceholder")}
 					allowClear
 					onChange={handleKeywordChange}

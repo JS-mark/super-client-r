@@ -84,7 +84,10 @@ const Models: React.FC = () => {
 					>
 						{activeKey === "1"
 							? t("addProvider", { ns: "models" })
-							: t("goToMcpMarket", { ns: "settings", defaultValue: "MCP Market" })}
+							: t("goToMcpMarket", {
+									ns: "settings",
+									defaultValue: "MCP Market",
+								})}
 					</Button>
 				}
 				className="p-6!"

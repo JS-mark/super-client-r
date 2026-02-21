@@ -1,7 +1,4 @@
-import {
-	ReloadOutlined,
-	SettingOutlined,
-} from "@ant-design/icons";
+import { ReloadOutlined, SettingOutlined } from "@ant-design/icons";
 import { Popconfirm, Tooltip, theme } from "antd";
 import type React from "react";
 import { useCallback, useState } from "react";
@@ -83,9 +80,7 @@ export const MenuSettings: React.FC<{
 			newItems.splice(insertAt, 0, removed);
 
 			const settingsItem = menuItems.find((item) => item.id === "settings");
-			const finalItems = settingsItem
-				? [...newItems, settingsItem]
-				: newItems;
+			const finalItems = settingsItem ? [...newItems, settingsItem] : newItems;
 			setConfig({ items: finalItems });
 		}
 
@@ -154,10 +149,7 @@ export const MenuSettings: React.FC<{
 			</div>
 
 			{/* Menu items list */}
-			<div
-				className="space-y-0.5"
-				onDragOver={(e) => e.preventDefault()}
-			>
+			<div className="space-y-0.5" onDragOver={(e) => e.preventDefault()}>
 				{configurableItems.map((item, index) => (
 					<MenuRow
 						key={item.id}

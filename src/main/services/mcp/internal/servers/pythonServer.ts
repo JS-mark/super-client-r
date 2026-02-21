@@ -32,13 +32,17 @@ async function getPyodide(): Promise<any> {
 			const { loadPyodide } = await import("pyodide");
 			// Pyodide WASM 文件在 node_modules/pyodide/ 或打包后的 resources/pyodide/
 			const indexURL = app.isPackaged
-				? join(process.resourcesPath, "pyodide")
-				: join(app.getAppPath(), "node_modules", "pyodide");
+				? join(process.resourcesPath, "pyodide") + "/"
+				: join(app.getAppPath(), "node_modules", "pyodide") + "/";
 			log.info("Pyodide indexURL", { indexURL });
 			pyodideInstance = await loadPyodide({ indexURL });
 			log.info("Pyodide loaded successfully");
 			return pyodideInstance;
 		} catch (error) {
+			log.error(
+				"Pyodide loading failed",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			pyodideLoading = null;
 			throw error;
 		}
@@ -46,7 +50,10 @@ async function getPyodide(): Promise<any> {
 
 	// 添加初始化超时
 	const timeout = new Promise<never>((_, reject) =>
-		setTimeout(() => reject(new Error("Pyodide initialization timed out")), INIT_TIMEOUT),
+		setTimeout(
+			() => reject(new Error("Pyodide initialization timed out")),
+			INIT_TIMEOUT,
+		),
 	);
 
 	return Promise.race([pyodideLoading, timeout]);
@@ -80,7 +87,10 @@ sys.stderr = _scp_stderr
 		})();
 
 		const timeoutPromise = new Promise<never>((_, reject) =>
-			setTimeout(() => reject(new Error(`Execution timed out after ${timeout}ms`)), timeout),
+			setTimeout(
+				() => reject(new Error(`Execution timed out after ${timeout}ms`)),
+				timeout,
+			),
 		);
 
 		await Promise.race([execPromise, timeoutPromise]);
@@ -107,8 +117,30 @@ sys.stderr = sys.__stderr__
 
 		return textResult(parts.length > 0 ? parts.join("\n\n") : "(no output)");
 	} catch (error) {
+		// Try to recover stderr from the redirected buffer for full traceback
+		const parts: string[] = [];
+		try {
+			const pyodide = await getPyodide();
+			const stderr = pyodide.runPython(
+				"_scp_stderr.getvalue() if '_scp_stderr' in dir() else ''",
+			);
+			const stdout = pyodide.runPython(
+				"_scp_stdout.getvalue() if '_scp_stdout' in dir() else ''",
+			);
+			// Restore stdout/stderr to avoid broken state
+			pyodide.runPython(`
+import sys
+sys.stdout = sys.__stdout__
+sys.stderr = sys.__stderr__
+`);
+			if (stdout) parts.push(`stdout:\n${stdout}`);
+			if (stderr) parts.push(`stderr:\n${stderr}`);
+		} catch {
+			// Pyodide may not be available if init failed — ignore
+		}
 		const msg = error instanceof Error ? error.message : String(error);
-		return textResult(`Python execution error: ${msg}`, true);
+		parts.push(`Error: ${msg}`);
+		return textResult(parts.join("\n\n"), true);
 	}
 };
 
@@ -121,18 +153,23 @@ const installPackageHandler: InternalToolHandler = async (args) => {
 
 	try {
 		const pyodide = await getPyodide();
-		await pyodide.loadPackagesFromImports(`import ${packageName}`).catch(async () => {
-			// 尝试 micropip 安装
-			await pyodide.runPythonAsync(`
+		await pyodide
+			.loadPackagesFromImports(`import ${packageName}`)
+			.catch(async () => {
+				// 尝试 micropip 安装
+				await pyodide.runPythonAsync(`
 import micropip
 await micropip.install("${packageName.replace(/"/g, '\\"')}")
 `);
-		});
+			});
 
 		return textResult(`Package "${packageName}" installed successfully`);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
-		return textResult(`Failed to install package "${packageName}": ${msg}`, true);
+		return textResult(
+			`Failed to install package "${packageName}": ${msg}`,
+			true,
+		);
 	}
 };
 
@@ -144,19 +181,22 @@ export function createPythonServer(): InternalMcpServer {
 	return {
 		id: "@scp/python",
 		name: "@scp/python",
-		description: "Execute Python code in a Pyodide WASM sandbox with package installation support",
+		description:
+			"Execute Python code in a Pyodide WASM sandbox with package installation support",
 		version: "1.0.0",
 		tools: [
 			{
 				name: "execute_python",
-				description: "Execute Python code and return stdout, stderr, and the result. The Python runtime runs in a WASM sandbox with access to many scientific packages.",
+				description:
+					"Execute Python code and return stdout, stderr, and the result. The Python runtime runs in a WASM sandbox with access to many scientific packages.",
 				inputSchema: {
 					type: "object",
 					properties: {
 						code: { type: "string", description: "Python code to execute" },
 						timeout: {
 							type: "number",
-							description: "Execution timeout in milliseconds (default: 30000, max: 60000)",
+							description:
+								"Execution timeout in milliseconds (default: 30000, max: 60000)",
 						},
 					},
 					required: ["code"],
@@ -164,11 +204,16 @@ export function createPythonServer(): InternalMcpServer {
 			},
 			{
 				name: "install_package",
-				description: "Install a Python package using micropip (for pure Python packages available on PyPI)",
+				description:
+					"Install a Python package using micropip (for pure Python packages available on PyPI)",
 				inputSchema: {
 					type: "object",
 					properties: {
-						package: { type: "string", description: "Package name to install (e.g., 'requests', 'pandas')" },
+						package: {
+							type: "string",
+							description:
+								"Package name to install (e.g., 'requests', 'pandas')",
+						},
 					},
 					required: ["package"],
 				},

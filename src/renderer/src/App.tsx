@@ -17,13 +17,30 @@ const ANTD_LOCALES: Record<string, typeof zhCN> = {
 
 const { darkAlgorithm, compactAlgorithm, defaultAlgorithm } = theme;
 
+/**
+ * Renders the active markdown theme CSS as an inline <style> tag.
+ * This approach is more reliable than Electron's insertCSS since it
+ * survives Vite HMR re-injections and page navigations.
+ */
+function MarkdownThemeStyle() {
+	const css = useSkinStore((state) => state.markdownThemeCSS);
+	if (!css) return null;
+	// biome-ignore lint/security/noDangerouslySetInnerHtml: CSS from trusted plugin source
+	return <style dangerouslySetInnerHTML={{ __html: css }} />;
+}
+
 function App() {
 	// 从 store 获取实际主题
 	const actualTheme = useThemeStore((state) => state.actualTheme);
 	const { i18n } = useTranslation();
 	const antdTokenOverrides = useSkinStore((state) => state.antdTokenOverrides);
 	const initSkin = useSkinStore((state) => state.initialize);
-	const setAntdTokenOverrides = useSkinStore((state) => state.setAntdTokenOverrides);
+	const setAntdTokenOverrides = useSkinStore(
+		(state) => state.setAntdTokenOverrides,
+	);
+	const setMarkdownThemeCSS = useSkinStore(
+		(state) => state.setMarkdownThemeCSS,
+	);
 	const antdLocale = useMemo(
 		() => ANTD_LOCALES[i18n.language] || zhCN,
 		[i18n.language],
@@ -36,11 +53,19 @@ function App() {
 	// 初始化皮肤
 	useEffect(() => {
 		initSkin();
-		const unsubscribe = window.electron.skin.onTokensChanged((tokens) => {
+		const unsubscribeSkin = window.electron.skin.onTokensChanged((tokens) => {
 			setAntdTokenOverrides(tokens);
 		});
-		return unsubscribe;
-	}, [initSkin, setAntdTokenOverrides]);
+		const unsubscribeMarkdown = window.electron.markdownTheme.onCSSChanged(
+			(css) => {
+				setMarkdownThemeCSS(css);
+			},
+		);
+		return () => {
+			unsubscribeSkin();
+			unsubscribeMarkdown();
+		};
+	}, [initSkin, setAntdTokenOverrides, setMarkdownThemeCSS]);
 
 	useEffect(() => {
 		// Global navigation handler from main process
@@ -68,7 +93,9 @@ function App() {
 		if (!data) return { token: undefined, components: undefined };
 		// New format: { light: { token, components }, dark: { token, components } }
 		if (data.light || data.dark) {
-			const modeData = (actualTheme === "dark" ? data.dark : data.light) as Record<string, unknown> | undefined;
+			const modeData = (actualTheme === "dark" ? data.dark : data.light) as
+				| Record<string, unknown>
+				| undefined;
 			return {
 				token: modeData?.token as Record<string, unknown> | undefined,
 				components: modeData?.components as Record<string, unknown> | undefined,
@@ -183,6 +210,7 @@ function App() {
 			// 禁用动画以提高性能
 			wave={{ disabled: true }}
 		>
+			<MarkdownThemeStyle />
 			<TitleProvider>
 				<AntdApp className="h-full w-full">
 					<ErrorBoundary>

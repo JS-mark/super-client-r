@@ -1,38 +1,38 @@
 {
-  "type": {
-    "all": "全部",
-    "image": "图片",
-    "document": "文档",
-    "code": "代码",
-    "audio": "音频",
-    "video": "视频",
-    "archive": "压缩包",
-    "other": "其他"
-  },
-  "upload": {
-    "title": "上传文件",
-    "dragOrClick": "点击或拖拽文件到此处上传",
-    "maxSize": "最大 {{size}}",
-    "maxCountError": "一次最多上传 {{count}} 个文件",
-    "sizeError": "{{name}} 超过最大限制 {{size}}",
-    "success": "成功上传 {{count}} 个文件"
-  },
-  "delete": {
-    "success": "附件已删除",
-    "error": "删除失败",
-    "confirm": "确定要删除这个附件吗？"
-  },
-  "download": {
-    "success": "下载已开始"
-  },
-  "search": {
-    "placeholder": "搜索附件..."
-  },
-  "filter": {
-    "label": "筛选"
-  },
-  "empty": {
-    "description": "暂无附件"
-  },
-  "selected": "已选择 {{count}} 个"
+	"type": {
+		"all": "全部",
+		"image": "图片",
+		"document": "文档",
+		"code": "代码",
+		"audio": "音频",
+		"video": "视频",
+		"archive": "压缩包",
+		"other": "其他"
+	},
+	"upload": {
+		"title": "上传文件",
+		"dragOrClick": "点击或拖拽文件到此处上传",
+		"maxSize": "最大 {{size}}",
+		"maxCountError": "一次最多上传 {{count}} 个文件",
+		"sizeError": "{{name}} 超过最大限制 {{size}}",
+		"success": "成功上传 {{count}} 个文件"
+	},
+	"delete": {
+		"success": "附件已删除",
+		"error": "删除失败",
+		"confirm": "确定要删除这个附件吗？"
+	},
+	"download": {
+		"success": "下载已开始"
+	},
+	"search": {
+		"placeholder": "搜索附件..."
+	},
+	"filter": {
+		"label": "筛选"
+	},
+	"empty": {
+		"description": "暂无附件"
+	},
+	"selected": "已选择 {{count}} 个"
 }

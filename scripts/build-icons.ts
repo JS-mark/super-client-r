@@ -17,9 +17,6 @@ const ICNS_SIZES = [16, 32, 64, 128, 256, 512, 1024];
 // 需要生成的 PNG 尺寸（用于不同场景）
 const PNG_SIZES = [16, 32, 64, 128, 256, 512, 1024];
 
-// macOS 托盘图标尺寸 (彩色，非 template)
-const TRAY_ICON_SIZE = 20;
-
 async function convertSvgToPng(size: number): Promise<Buffer> {
 	const svgBuffer = await sharp(SVG_PATH)
 		.resize(size, size, {
@@ -68,13 +65,20 @@ async function generateIcns(): Promise<void> {
 
 		// 确定 OS 类型标识
 		let osType: string;
-		if (size === 16) osType = "icp4"; // 16x16
-		else if (size === 32) osType = "icp5"; // 32x32
-		else if (size === 64) osType = "icp6"; // 64x64
-		else if (size === 128) osType = "ic07"; // 128x128
-		else if (size === 256) osType = "ic08"; // 256x256
-		else if (size === 512) osType = "ic09"; // 512x512
-		else if (size === 1024) osType = "ic10"; // 1024x1024 (512@2x)
+		if (size === 16)
+			osType = "icp4"; // 16x16
+		else if (size === 32)
+			osType = "icp5"; // 32x32
+		else if (size === 64)
+			osType = "icp6"; // 64x64
+		else if (size === 128)
+			osType = "ic07"; // 128x128
+		else if (size === 256)
+			osType = "ic08"; // 256x256
+		else if (size === 512)
+			osType = "ic09"; // 512x512
+		else if (size === 1024)
+			osType = "ic10"; // 1024x1024 (512@2x)
 		else continue;
 
 		// 图像条目: 4字节类型 + 4字节大小 + 数据

@@ -46,4 +46,4 @@ main
 - **Use index-based clicking**: \`click({ index: 0 })\` is more reliable than selectors
 - **Use combo tools**: \`click_and_inspect\` instead of click → inspect
 - **No need for explicit wait** after most actions — they wait internally
-`
+`;

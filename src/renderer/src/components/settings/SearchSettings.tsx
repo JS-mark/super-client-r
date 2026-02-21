@@ -48,8 +48,7 @@ export function SearchSettings() {
 				setDefaultProvider(result.data.defaultProvider);
 			} else {
 				message.error(
-					result.error ||
-						t("search.loadError", { ns: "settings" }),
+					result.error || t("search.loadError", { ns: "settings" }),
 				);
 			}
 		} catch {
@@ -125,7 +124,9 @@ export function SearchSettings() {
 				if (result.success) {
 					loadConfigs();
 				} else {
-					message.error(result.error || t("search.saveError", { ns: "settings" }));
+					message.error(
+						result.error || t("search.saveError", { ns: "settings" }),
+					);
 				}
 			} catch {
 				message.error(t("search.saveError", { ns: "settings" }));
@@ -137,10 +138,7 @@ export function SearchSettings() {
 	if (loading && configs.length === 0) {
 		return (
 			<div className="flex items-center justify-center py-16">
-				<div
-					className="text-sm"
-					style={{ color: token.colorTextSecondary }}
-				>
+				<div className="text-sm" style={{ color: token.colorTextSecondary }}>
 					Loading...
 				</div>
 			</div>
@@ -152,11 +150,7 @@ export function SearchSettings() {
 			{/* Header */}
 			<div className="flex items-center justify-between mb-6">
 				<div>
-					<Text
-						strong
-						className="text-base"
-						style={{ color: token.colorText }}
-					>
+					<Text strong className="text-base" style={{ color: token.colorText }}>
 						{t("search.title", { ns: "settings" })}
 					</Text>
 					<div
@@ -215,8 +209,7 @@ export function SearchSettings() {
 								}}
 								onMouseEnter={(e) => {
 									if (!isDefault) {
-										e.currentTarget.style.borderColor =
-											token.colorBorder;
+										e.currentTarget.style.borderColor = token.colorBorder;
 									}
 								}}
 								onMouseLeave={(e) => {
@@ -313,9 +306,7 @@ export function SearchSettings() {
 												size="small"
 												icon={
 													isDefault ? (
-														<StarFilled
-															style={{ color: "#faad14" }}
-														/>
+														<StarFilled style={{ color: "#faad14" }} />
 													) : (
 														<StarOutlined
 															style={{
@@ -325,9 +316,7 @@ export function SearchSettings() {
 													)
 												}
 												onClick={() =>
-													handleSetDefault(
-														isDefault ? null : config.provider,
-													)
+													handleSetDefault(isDefault ? null : config.provider)
 												}
 											/>
 										</Tooltip>

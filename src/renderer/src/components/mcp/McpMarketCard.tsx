@@ -28,24 +28,33 @@ export const McpMarketCard: React.FC<{
 
 	const installedServer = servers.find((s) => s.name === item.name);
 
-	const handleUninstall = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (installedServer) {
-			removeServer(installedServer.id);
-		}
-	}, [installedServer, removeServer]);
+	const handleUninstall = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			if (installedServer) {
+				removeServer(installedServer.id);
+			}
+		},
+		[installedServer, removeServer],
+	);
 
-	const handleInstall = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		onInstall();
-	}, [onInstall]);
+	const handleInstall = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onInstall();
+		},
+		[onInstall],
+	);
 
-	const handleConfigure = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (installedServer && onConfigure) {
-			onConfigure(installedServer);
-		}
-	}, [installedServer, onConfigure]);
+	const handleConfigure = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			if (installedServer && onConfigure) {
+				onConfigure(installedServer);
+			}
+		},
+		[installedServer, onConfigure],
+	);
 
 	return (
 		<div
@@ -82,7 +91,9 @@ export const McpMarketCard: React.FC<{
 							{item.name}
 						</span>
 						{isInstalled && (
-							<CheckCircleFilled style={{ color: token.colorSuccess, fontSize: 14 }} />
+							<CheckCircleFilled
+								style={{ color: token.colorSuccess, fontSize: 14 }}
+							/>
 						)}
 					</div>
 					<div className="flex items-center gap-1.5 mt-1">
@@ -136,7 +147,10 @@ export const McpMarketCard: React.FC<{
 				</div>
 
 				{/* Action buttons */}
-				<div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+				<div
+					className="flex items-center gap-1"
+					onClick={(e) => e.stopPropagation()}
+				>
 					{isInstalled ? (
 						<>
 							<Tooltip title={t("actions.settings", { ns: "mcp" })}>

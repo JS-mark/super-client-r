@@ -5,6 +5,7 @@ import type { Skill } from "../types/skills";
 const MOCK_MARKET_SKILLS: Skill[] = [];
 
 let serverPort: number | null = null;
+let apiKey: string | null = null;
 
 const getProxyUrl = async (path: string) => {
 	if (!serverPort) {
@@ -18,6 +19,17 @@ const getProxyUrl = async (path: string) => {
 		}
 	}
 	return `http://localhost:${serverPort}${path}`;
+};
+
+const getApiKey = async (): Promise<string | null> => {
+	if (apiKey) return apiKey;
+	try {
+		apiKey = (await window.electron.ipc.invoke("api:get-api-key")) as string;
+		return apiKey;
+	} catch (e) {
+		console.error("Failed to get API key", e);
+		return null;
+	}
 };
 
 export const skillService = {
@@ -37,16 +49,20 @@ export const skillService = {
 			});
 
 			// 如果有搜索关键词，使用搜索端点
-			const endpoint = search ? `/api/skills/search?q=${encodeURIComponent(search)}` : `/api/skills?${params.toString()}`;
+			const endpoint = search
+				? `/api/skills/search?q=${encodeURIComponent(search)}`
+				: `/api/skills?${params.toString()}`;
 			const url = await getProxyUrl(endpoint);
 			if (!url) throw new Error("Proxy URL not available");
 
+			const key = await getApiKey();
 			console.log("[SkillService] Fetching:", url);
 
 			const response = await fetch(url, {
 				headers: {
 					accept: "*/*",
 					"accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+					...(key ? { authorization: `Bearer ${key}` } : {}),
 				},
 			});
 

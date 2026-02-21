@@ -1,14 +1,6 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import {
-	Button,
-	Input,
-	Empty,
-	Dropdown,
-	message,
-	Badge,
-	theme,
-} from "antd";
+import { Button, Input, Empty, Dropdown, message, Badge, theme } from "antd";
 import {
 	SearchOutlined,
 	DeleteOutlined,
@@ -27,7 +19,11 @@ import {
 import { FileIcon, formatFileSize } from "./FileIcon";
 import { ImageGallery } from "./ImageGallery";
 
-const ATTACHMENT_TYPES: { type: AttachmentType | "all"; label: string; icon: string }[] = [
+const ATTACHMENT_TYPES: {
+	type: AttachmentType | "all";
+	label: string;
+	icon: string;
+}[] = [
 	{ type: "all", label: "all", icon: "📎" },
 	{ type: "image", label: "image", icon: "🖼️" },
 	{ type: "document", label: "document", icon: "📄" },
@@ -74,7 +70,8 @@ export function AttachmentManager({
 	const filteredAttachments = useMemo(() => {
 		return attachments.filter((attachment) => {
 			// Filter by conversation/message if specified
-			if (conversationId && attachment.conversationId !== conversationId) return false;
+			if (conversationId && attachment.conversationId !== conversationId)
+				return false;
 			if (messageId && attachment.messageId !== messageId) return false;
 
 			// Filter by type
@@ -96,7 +93,7 @@ export function AttachmentManager({
 	// Get image attachments for gallery
 	const imageAttachments = useMemo(
 		() => filteredAttachments.filter((a) => a.type === "image"),
-		[filteredAttachments]
+		[filteredAttachments],
 	);
 
 	const handleOpenGallery = (index: number) => {
@@ -138,7 +135,9 @@ export function AttachmentManager({
 	};
 
 	const handleConfirmSelection = () => {
-		const selected = attachments.filter((a) => selectedAttachments.includes(a.id));
+		const selected = attachments.filter((a) =>
+			selectedAttachments.includes(a.id),
+		);
 		onSelect?.(selected);
 	};
 
@@ -155,7 +154,9 @@ export function AttachmentManager({
 				<div className="flex-1 relative">
 					<Input
 						prefix={<SearchOutlined className="text-slate-400" />}
-						placeholder={t("attachment.search.placeholder", { ns: "attachment" })}
+						placeholder={t("attachment.search.placeholder", {
+							ns: "attachment",
+						})}
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						allowClear
@@ -188,7 +189,7 @@ export function AttachmentManager({
 							"px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors",
 							activeType === type.type
 								? "bg-blue-100 text-blue-700  "
-								: "text-slate-600  hover:bg-slate-100 "
+								: "text-slate-600  hover:bg-slate-100 ",
 						)}
 					>
 						<span className="mr-1">{type.icon}</span>
@@ -210,7 +211,9 @@ export function AttachmentManager({
 								<PaperClipOutlined />
 							</div>
 						}
-						description={t("attachment.empty.description", "暂无附件", { ns: "attachment" })}
+						description={t("attachment.empty.description", "暂无附件", {
+							ns: "attachment",
+						})}
 						className="mt-12"
 					/>
 				) : (
@@ -225,7 +228,9 @@ export function AttachmentManager({
 								onOpen={() =>
 									attachment.type === "image"
 										? handleOpenGallery(
-												imageAttachments.findIndex((a) => a.id === attachment.id)
+												imageAttachments.findIndex(
+													(a) => a.id === attachment.id,
+												),
 											)
 										: openAttachment(attachment.id)
 								}
@@ -324,7 +329,7 @@ function AttachmentItem({
 				isSelected
 					? "border-blue-500 bg-blue-50 "
 					: "border-slate-200  hover:border-slate-300 ",
-				selectable && "cursor-pointer"
+				selectable && "cursor-pointer",
 			)}
 			onClick={selectable ? onSelect : undefined}
 		>
@@ -338,16 +343,14 @@ function AttachmentItem({
 					/>
 				</div>
 			) : (
-				<FileIcon
-					type={attachment.type}
-					extension={extension}
-					size="md"
-				/>
+				<FileIcon type={attachment.type} extension={extension} size="md" />
 			)}
 
 			{/* Info */}
 			<div className="flex-1 min-w-0">
-				<p className="font-medium text-sm truncate">{attachment.originalName}</p>
+				<p className="font-medium text-sm truncate">
+					{attachment.originalName}
+				</p>
 				<div className="flex items-center gap-2 text-xs text-slate-500">
 					<span>{formatFileSize(attachment.size)}</span>
 					<span>•</span>

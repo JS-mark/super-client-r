@@ -12,15 +12,6 @@ const LOCALES_DIR = path.resolve(
 );
 const BASE_LANG = "zh";
 
-function getFiles(dir: string): string[] {
-	const dirents = fs.readdirSync(dir, { withFileTypes: true });
-	const files = dirents.map((dirent) => {
-		const res = path.resolve(dir, dirent.name);
-		return dirent.isDirectory() ? getFiles(res) : res;
-	});
-	return Array.prototype.concat(...files);
-}
-
 function loadJson(filePath: string): any {
 	return JSON.parse(fs.readFileSync(filePath, "utf-8"));
 }

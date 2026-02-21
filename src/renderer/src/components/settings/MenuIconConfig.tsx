@@ -26,7 +26,10 @@ const { useToken } = theme;
 /**
  * Ant Design icon map for rendering "default" type icons
  */
-export const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+export const ICON_MAP: Record<
+	string,
+	React.ComponentType<{ className?: string }>
+> = {
 	MessageOutlined,
 	AppstoreOutlined,
 	RocketOutlined,
@@ -150,11 +153,12 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 				<div
 					className={cn(
 						"w-14 h-14 rounded-2xl overflow-hidden flex items-center justify-center",
-						!previewUrl &&
-						!value &&
-						"border-2 border-dashed",
+						!previewUrl && !value && "border-2 border-dashed",
 					)}
-					style={{ backgroundColor: token.colorBgContainer, borderColor: !previewUrl && !value ? token.colorBorder : undefined }}
+					style={{
+						backgroundColor: token.colorBgContainer,
+						borderColor: !previewUrl && !value ? token.colorBorder : undefined,
+					}}
 				>
 					{previewUrl || value ? (
 						<img
@@ -200,9 +204,15 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 						"hover:scale-105 hover:shadow-md",
 					)}
 					style={{
-						backgroundColor: value === icon.value ? token.colorPrimary : token.colorBgContainer,
+						backgroundColor:
+							value === icon.value
+								? token.colorPrimary
+								: token.colorBgContainer,
 						color: value === icon.value ? "#fff" : token.colorText,
-						boxShadow: value === icon.value ? `0 0 0 2px ${token.colorPrimary}40` : undefined,
+						boxShadow:
+							value === icon.value
+								? `0 0 0 2px ${token.colorPrimary}40`
+								: undefined,
 					}}
 					onMouseEnter={(e) => {
 						if (value !== icon.value) {

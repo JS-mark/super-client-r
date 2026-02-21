@@ -276,11 +276,11 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 								>
 									{editingItem.enabled
 										? t("menuItemVisible", "在侧边栏中显示", {
-											ns: "settings",
-										})
+												ns: "settings",
+											})
 										: t("menuItemHidden", "已从侧边栏中隐藏", {
-											ns: "settings",
-										})}
+												ns: "settings",
+											})}
 								</div>
 							</div>
 						</div>

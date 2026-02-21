@@ -259,9 +259,16 @@ export function formatShortcut(key: string, isMac: boolean): string {
 
 // 检查是否为修饰键
 export function isModifierKey(key: string): boolean {
-	return ["mod", "alt", "shift", "ctrl", "cmd", "command", "option", "opt"].includes(
-		key.toLowerCase()
-	);
+	return [
+		"mod",
+		"alt",
+		"shift",
+		"ctrl",
+		"cmd",
+		"command",
+		"option",
+		"opt",
+	].includes(key.toLowerCase());
 }
 
 // 从键盘事件获取快捷键字符串
@@ -303,7 +310,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 				const normalizedKey = normalizeShortcut(key);
 				set((state) => ({
 					shortcuts: state.shortcuts.map((s) =>
-						s.id === id ? { ...s, currentKey: normalizedKey } : s
+						s.id === id ? { ...s, currentKey: normalizedKey } : s,
 					),
 				}));
 			},
@@ -311,7 +318,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			resetShortcut: (id) => {
 				set((state) => ({
 					shortcuts: state.shortcuts.map((s) =>
-						s.id === id ? { ...s, currentKey: s.defaultKey } : s
+						s.id === id ? { ...s, currentKey: s.defaultKey } : s,
 					),
 				}));
 			},
@@ -333,7 +340,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			toggleShortcut: (id) => {
 				set((state) => ({
 					shortcuts: state.shortcuts.map((s) =>
-						s.id === id ? { ...s, enabled: !s.enabled } : s
+						s.id === id ? { ...s, enabled: !s.enabled } : s,
 					),
 				}));
 			},
@@ -344,7 +351,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 					(s) =>
 						s.id !== excludeId &&
 						s.enabled &&
-						normalizeShortcut(s.currentKey) === normalizedKey
+						normalizeShortcut(s.currentKey) === normalizedKey,
 				);
 			},
 
@@ -366,7 +373,10 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 		}),
 		{
 			name: "shortcut-storage",
-			partialize: (state) => ({ shortcuts: state.shortcuts, globalEnabled: state.globalEnabled }),
+			partialize: (state) => ({
+				shortcuts: state.shortcuts,
+				globalEnabled: state.globalEnabled,
+			}),
 			onRehydrateStorage: () => (state) => {
 				if (!state) return;
 
@@ -375,9 +385,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 					state.initDefaultShortcuts();
 				} else {
 					// Build a map of defaults keyed by id for quick lookup
-					const defaultsById = new Map(
-						DEFAULT_SHORTCUTS.map((d) => [d.id, d]),
-					);
+					const defaultsById = new Map(DEFAULT_SHORTCUTS.map((d) => [d.id, d]));
 
 					// Migrate persisted shortcuts: sync nameKey/descriptionKey
 					// from defaults and strip legacy "shortcuts." prefix
@@ -409,6 +417,6 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 					});
 				}
 			},
-		}
-	)
+		},
+	),
 );

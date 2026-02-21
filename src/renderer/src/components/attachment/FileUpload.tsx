@@ -1,9 +1,16 @@
-import { useState, useRef, useCallback } from "react";
-import { useTranslation } from "react-i18next";
+import {
+	CloseOutlined,
+	PaperClipOutlined,
+	UploadOutlined,
+} from "@ant-design/icons";
 import { Button, message, Progress } from "antd";
-import { UploadOutlined, PaperClipOutlined, CloseOutlined } from "@ant-design/icons";
+import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
-import { useAttachmentStore, type Attachment } from "../../stores/attachmentStore";
+import {
+	type Attachment,
+	useAttachmentStore,
+} from "../../stores/attachmentStore";
 import { FileIcon, formatFileSize } from "./FileIcon";
 
 interface FileUploadProps {
@@ -45,127 +52,143 @@ export function FileUpload({
 	const [isDragging, setIsDragging] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
-	const handleFileSelect = useCallback(async (files: FileList | null) => {
-		if (!files || files.length === 0) return;
+	const handleFileSelect = useCallback(
+		async (files: FileList | null) => {
+			if (!files || files.length === 0) return;
 
-		if (files.length > maxCount) {
-			message.error(t("attachment.upload.maxCountError", { count: maxCount }));
-			return;
-		}
-
-		const newUploadingFiles: UploadingFile[] = [];
-		const fileArray = Array.from(files);
-
-		// Validate files
-		for (const file of fileArray) {
-			if (file.size > maxSize) {
+			if (files.length > maxCount) {
 				message.error(
-					t("attachment.upload.sizeError", {
-						name: file.name,
-						size: formatFileSize(maxSize),
-					})
+					t("attachment.upload.maxCountError", { count: maxCount }),
 				);
 				return;
 			}
 
-			newUploadingFiles.push({
-				id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-				name: file.name,
-				size: file.size,
-				progress: 0,
-				status: "uploading",
-			});
-		}
+			const newUploadingFiles: UploadingFile[] = [];
+			const fileArray = Array.from(files);
 
-		setUploadingFiles((prev) => [...prev, ...newUploadingFiles]);
+			// Validate files
+			for (const file of fileArray) {
+				if (file.size > maxSize) {
+					message.error(
+						t("attachment.upload.sizeError", {
+							name: file.name,
+							size: formatFileSize(maxSize),
+						}),
+					);
+					return;
+				}
 
-		const completedAttachments: Attachment[] = [];
+				newUploadingFiles.push({
+					id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+					name: file.name,
+					size: file.size,
+					progress: 0,
+					status: "uploading",
+				});
+			}
 
-		// Upload files
-		for (let i = 0; i < fileArray.length; i++) {
-			const file = fileArray[i];
-			const uploadingFile = newUploadingFiles[i];
+			setUploadingFiles((prev) => [...prev, ...newUploadingFiles]);
 
-			try {
-				// Create a temporary URL for the file
-				const tempUrl = URL.createObjectURL(file);
+			const completedAttachments: Attachment[] = [];
 
-				// Update progress simulation
-				const progressInterval = setInterval(() => {
+			// Upload files
+			for (let i = 0; i < fileArray.length; i++) {
+				const file = fileArray[i];
+				const uploadingFile = newUploadingFiles[i];
+
+				try {
+					// Create a temporary URL for the file
+					const tempUrl = URL.createObjectURL(file);
+
+					// Update progress simulation
+					const progressInterval = setInterval(() => {
+						setUploadingFiles((prev) =>
+							prev.map((f) =>
+								f.id === uploadingFile.id
+									? { ...f, progress: Math.min(f.progress + 10, 90) }
+									: f,
+							),
+						);
+					}, 100);
+
+					// In a real app, you would upload to server here
+					// For now, we'll create a data URL for the file
+					const reader = new FileReader();
+					const fileContent = await new Promise<string>((resolve) => {
+						reader.onloadend = () => resolve(reader.result as string);
+						reader.readAsDataURL(file);
+					});
+
+					clearInterval(progressInterval);
+
+					// Create attachment object
+					const ext = file.name.split(".").pop() || "";
+					const attachment: Attachment = {
+						id: uploadingFile.id,
+						name: file.name,
+						originalName: file.name,
+						path: tempUrl,
+						size: file.size,
+						mimeType: file.type || "application/octet-stream",
+						type: getFileType(file.type, ext),
+						createdAt: new Date().toISOString(),
+						conversationId,
+						messageId,
+						url: fileContent,
+					};
+
+					completedAttachments.push(attachment);
+
 					setUploadingFiles((prev) =>
 						prev.map((f) =>
 							f.id === uploadingFile.id
-								? { ...f, progress: Math.min(f.progress + 10, 90) }
-								: f
-						)
+								? { ...f, progress: 100, status: "done" }
+								: f,
+						),
 					);
-				}, 100);
 
-				// In a real app, you would upload to server here
-				// For now, we'll create a data URL for the file
-				const reader = new FileReader();
-				const fileContent = await new Promise<string>((resolve) => {
-					reader.onloadend = () => resolve(reader.result as string);
-					reader.readAsDataURL(file);
-				});
-
-				clearInterval(progressInterval);
-
-				// Create attachment object
-				const ext = file.name.split(".").pop() || "";
-				const attachment: Attachment = {
-					id: uploadingFile.id,
-					name: file.name,
-					originalName: file.name,
-					path: tempUrl,
-					size: file.size,
-					mimeType: file.type || "application/octet-stream",
-					type: getFileType(file.type, ext),
-					createdAt: new Date().toISOString(),
-					conversationId,
-					messageId,
-					url: fileContent,
-				};
-
-				completedAttachments.push(attachment);
-
-				setUploadingFiles((prev) =>
-					prev.map((f) =>
-						f.id === uploadingFile.id
-							? { ...f, progress: 100, status: "done" }
-							: f
-					)
-				);
-
-				// Add to store
-				useAttachmentStore.getState().addAttachment(attachment);
-			} catch (error) {
-				const errorMsg = String(error);
-				setUploadingFiles((prev) =>
-					prev.map((f) =>
-						f.id === uploadingFile.id
-							? { ...f, status: "error", error: errorMsg }
-							: f
-					)
-				);
-				onUploadError?.(errorMsg);
+					// Add to store
+					useAttachmentStore.getState().addAttachment(attachment);
+				} catch (error) {
+					const errorMsg = String(error);
+					setUploadingFiles((prev) =>
+						prev.map((f) =>
+							f.id === uploadingFile.id
+								? { ...f, status: "error", error: errorMsg }
+								: f,
+						),
+					);
+					onUploadError?.(errorMsg);
+				}
 			}
-		}
 
-		if (completedAttachments.length > 0) {
-			onUploadComplete?.(completedAttachments);
-			message.success(
-				t("attachment.upload.success", { count: completedAttachments.length })
-			);
-		}
+			if (completedAttachments.length > 0) {
+				onUploadComplete?.(completedAttachments);
+				message.success(
+					t("attachment.upload.success", {
+						count: completedAttachments.length,
+					}),
+				);
+			}
 
-		// Clear completed uploads after a delay
-		setTimeout(() => {
-			setUploadingFiles((prev) =>
-				prev.filter((f) => f.status === "uploading" || f.status === "error")
-			);
-		}, 3000);
-	}, [multiple, maxSize, maxCount, conversationId, messageId, onUploadComplete, onUploadError, t]);
+			// Clear completed uploads after a delay
+			setTimeout(() => {
+				setUploadingFiles((prev) =>
+					prev.filter((f) => f.status === "uploading" || f.status === "error"),
+				);
+			}, 3000);
+		},
+		[
+			multiple,
+			maxSize,
+			maxCount,
+			conversationId,
+			messageId,
+			onUploadComplete,
+			onUploadError,
+			t,
+		],
+	);
 
 	const handleDrop = useCallback(
 		(e: React.DragEvent) => {
@@ -173,7 +196,7 @@ export function FileUpload({
 			setIsDragging(false);
 			handleFileSelect(e.dataTransfer.files);
 		},
-		[handleFileSelect]
+		[handleFileSelect],
 	);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -201,7 +224,7 @@ export function FileUpload({
 					"border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer",
 					isDragging
 						? "border-blue-500 bg-blue-50"
-						: "border-slate-300 hover:border-blue-400"
+						: "border-slate-300 hover:border-blue-400",
 				)}
 				onClick={() => fileInputRef.current?.click()}
 			>
@@ -218,10 +241,16 @@ export function FileUpload({
 						<>
 							<UploadOutlined className="text-2xl" />
 							<span className="text-sm">
-								{t("attachment.upload.dragOrClick", "点击或拖拽文件到此处上传", { ns: "attachment" })}
+								{t(
+									"attachment.upload.dragOrClick",
+									"点击或拖拽文件到此处上传",
+									{ ns: "attachment" },
+								)}
 							</span>
 							<span className="text-xs text-slate-400">
-								{t("attachment.upload.maxSize", "最大 {{size}}", { size: formatFileSize(maxSize) })}
+								{t("attachment.upload.maxSize", "最大 {{size}}", {
+									size: formatFileSize(maxSize),
+								})}
 							</span>
 						</>
 					)}
@@ -243,7 +272,9 @@ export function FileUpload({
 							/>
 							<div className="flex-1 min-w-0">
 								<p className="text-sm truncate">{file.name}</p>
-								<p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
+								<p className="text-xs text-slate-500">
+									{formatFileSize(file.size)}
+								</p>
 								{file.status === "uploading" && (
 									<Progress
 										percent={file.progress}
@@ -276,9 +307,24 @@ function getFileType(mimeType: string, extension: string): Attachment["type"] {
 	if (mimeType.startsWith("image/")) return "image";
 	if (mimeType.startsWith("video/")) return "video";
 	if (mimeType.startsWith("audio/")) return "audio";
-	if (mimeType.includes("pdf") || mimeType.includes("word") || mimeType.includes("excel")) return "document";
-	if (mimeType.includes("zip") || mimeType.includes("rar") || mimeType.includes("7z")) return "archive";
-	if (mimeType.includes("javascript") || mimeType.includes("typescript") || mimeType.includes("json")) return "code";
+	if (
+		mimeType.includes("pdf") ||
+		mimeType.includes("word") ||
+		mimeType.includes("excel")
+	)
+		return "document";
+	if (
+		mimeType.includes("zip") ||
+		mimeType.includes("rar") ||
+		mimeType.includes("7z")
+	)
+		return "archive";
+	if (
+		mimeType.includes("javascript") ||
+		mimeType.includes("typescript") ||
+		mimeType.includes("json")
+	)
+		return "code";
 	return getFileTypeFromName(extension);
 }
 
@@ -286,8 +332,29 @@ function getFileTypeFromName(filename: string): Attachment["type"] {
 	const ext = filename.split(".").pop()?.toLowerCase() || "";
 
 	const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
-	const docExts = ["pdf", "doc", "docx", "txt", "md", "xls", "xlsx", "ppt", "pptx"];
-	const codeExts = ["js", "ts", "jsx", "tsx", "json", "html", "css", "py", "java", "cpp"];
+	const docExts = [
+		"pdf",
+		"doc",
+		"docx",
+		"txt",
+		"md",
+		"xls",
+		"xlsx",
+		"ppt",
+		"pptx",
+	];
+	const codeExts = [
+		"js",
+		"ts",
+		"jsx",
+		"tsx",
+		"json",
+		"html",
+		"css",
+		"py",
+		"java",
+		"cpp",
+	];
 	const audioExts = ["mp3", "wav", "flac", "aac", "ogg"];
 	const videoExts = ["mp4", "avi", "mov", "wmv", "flv"];
 	const archiveExts = ["zip", "rar", "7z", "tar", "gz"];

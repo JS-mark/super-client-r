@@ -8,7 +8,9 @@ export const swaggerConfig: SwaggerRouterOptions = {
 	description: "Super Client R HTTP API 文档",
 	version: "1.0.0",
 	swaggerJsonEndpoint: "/swagger.json",
-	swaggerHtmlEndpoint: "/api-docs",
+	// HTML 端点由 app.ts 的 swaggerUiMiddleware 提供（本地 swagger-ui-dist）
+	// 设为空字符串以禁用 koa-swagger-decorator 的 CDN 版本
+	swaggerHtmlEndpoint: "",
 	prefix: "",
 	swaggerOptions: {
 		securityDefinitions: {

@@ -102,12 +102,7 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 						e.currentTarget.style.color = token.colorTextDisabled;
 					}}
 				>
-					<svg
-						width="14"
-						height="14"
-						viewBox="0 0 24 24"
-						fill="currentColor"
-					>
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
 						<circle cx="8" cy="6" r="2" />
 						<circle cx="8" cy="12" r="2" />
 						<circle cx="8" cy="18" r="2" />
@@ -132,9 +127,7 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 
 				{/* Label */}
 				<span
-					className={cn(
-						"flex-1 text-sm font-medium select-none",
-					)}
+					className={cn("flex-1 text-sm font-medium select-none")}
 					style={{
 						color: item.enabled ? token.colorText : token.colorTextDisabled,
 					}}

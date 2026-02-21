@@ -15,9 +15,7 @@ import type {
 import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
 import { builtinMcpService } from "./BuiltinMcpService";
-import {
-	thirdPartyMcpService,
-} from "./ThirdPartyMcpService";
+import { thirdPartyMcpService } from "./ThirdPartyMcpService";
 import { mcpMarketService } from "./McpMarketService";
 import { internalMcpService } from "./internal";
 
@@ -63,7 +61,11 @@ export class McpService extends EventEmitter {
 			this.emit("server-disconnected", id);
 		});
 		thirdPartyMcpService.on("error", ({ id, error }) => {
-			log.error("Third-party server error", error instanceof Error ? error : new Error(String(error)), { serverId: id });
+			log.error(
+				"Third-party server error",
+				error instanceof Error ? error : new Error(String(error)),
+				{ serverId: id },
+			);
 			this.emit("server-error", { id, error });
 		});
 		thirdPartyMcpService.on("tool-called", (data) => {
@@ -207,7 +209,10 @@ export class McpService extends EventEmitter {
 		let loaded = 0;
 		for (const config of persisted) {
 			if (this.servers.has(config.id)) {
-				log.debug("Skipping already registered server", { id: config.id, name: config.name });
+				log.debug("Skipping already registered server", {
+					id: config.id,
+					name: config.name,
+				});
 				continue;
 			}
 
@@ -290,7 +295,12 @@ export class McpService extends EventEmitter {
 			throw new Error(`Server ${id} not found`);
 		}
 
-		log.info("Connecting to server", { id, name: config.name, type: config.type, transport: config.transport });
+		log.info("Connecting to server", {
+			id,
+			name: config.name,
+			type: config.type,
+			transport: config.transport,
+		});
 
 		// 根据类型选择连接方式
 		switch (config.type) {
@@ -305,7 +315,10 @@ export class McpService extends EventEmitter {
 				return status;
 			}
 			default:
-				log.error("Connect failed: unknown server type", undefined, { id, type: config.type });
+				log.error("Connect failed: unknown server type", undefined, {
+					id,
+					type: config.type,
+				});
 				throw new Error(`Unknown server type: ${config.type}`);
 		}
 	}
@@ -317,7 +330,11 @@ export class McpService extends EventEmitter {
 		const config = this.servers.get(id);
 		if (!config) return;
 
-		log.info("Disconnecting server", { id, name: config.name, type: config.type });
+		log.info("Disconnecting server", {
+			id,
+			name: config.name,
+			type: config.type,
+		});
 
 		switch (config.type) {
 			case "builtin":
@@ -377,7 +394,8 @@ export class McpService extends EventEmitter {
 						error: unifiedResult.error?.message,
 						serverType: "third-party",
 						timestamp: startTime,
-						duration: unifiedResult.metadata?.duration || Date.now() - startTime,
+						duration:
+							unifiedResult.metadata?.duration || Date.now() - startTime,
 					};
 				case "internal": {
 					const internalResult = await internalMcpService.callTool(
@@ -387,9 +405,23 @@ export class McpService extends EventEmitter {
 					);
 					const duration = Date.now() - startTime;
 					this.emit("tool-called", { serverId, toolName, args, duration });
+
+					let errorText: string | undefined;
+					if (internalResult.isError) {
+						errorText =
+							internalResult.content
+								.filter(
+									(c: { type: string }): c is { type: "text"; text: string } =>
+										c.type === "text",
+								)
+								.map((c: { text: string }) => c.text)
+								.join("\n") || "Internal tool call failed";
+					}
+
 					return {
 						success: !internalResult.isError,
 						data: internalResult,
+						error: errorText,
 						serverType: "internal" as McpServerType,
 						timestamp: startTime,
 						duration,
@@ -400,7 +432,11 @@ export class McpService extends EventEmitter {
 			}
 
 			const duration = Date.now() - startTime;
-			log.debug("Tool call completed", { serverId, toolName, durationMs: duration });
+			log.debug("Tool call completed", {
+				serverId,
+				toolName,
+				durationMs: duration,
+			});
 			this.emit("tool-called", { serverId, toolName, args, duration });
 
 			return {
@@ -412,7 +448,11 @@ export class McpService extends EventEmitter {
 			};
 		} catch (error) {
 			const duration = Date.now() - startTime;
-			log.error("Tool call failed", error instanceof Error ? error : new Error(String(error)), { serverId, toolName, durationMs: duration });
+			log.error(
+				"Tool call failed",
+				error instanceof Error ? error : new Error(String(error)),
+				{ serverId, toolName, durationMs: duration },
+			);
 			this.emit("tool-error", { serverId, toolName, error, duration });
 
 			return {
@@ -508,10 +548,16 @@ export class McpService extends EventEmitter {
 	 * 批量调用工具（用于 Agent）
 	 */
 	async callToolsBatch(
-		requests: Array<{ serverId: string; toolName: string; args: Record<string, unknown> }>,
+		requests: Array<{
+			serverId: string;
+			toolName: string;
+			args: Record<string, unknown>;
+		}>,
 	): Promise<UnifiedToolCallResult[]> {
 		return Promise.all(
-			requests.map((req) => this.callTool(req.serverId, req.toolName, req.args)),
+			requests.map((req) =>
+				this.callTool(req.serverId, req.toolName, req.args),
+			),
 		);
 	}
 
@@ -586,12 +632,16 @@ export class McpService extends EventEmitter {
 			status.error = error instanceof Error ? error.message : "Unknown error";
 			this.serverStatus.set(id, status);
 
-			log.error("Stdio connection failed", error instanceof Error ? error : new Error(String(error)), {
-				id,
-				name: config.name,
-				command: config.command,
-				args: config.args,
-			});
+			log.error(
+				"Stdio connection failed",
+				error instanceof Error ? error : new Error(String(error)),
+				{
+					id,
+					name: config.name,
+					command: config.command,
+					args: config.args,
+				},
+			);
 
 			this.emit("server-error", { id, error });
 			throw error;
@@ -607,9 +657,16 @@ export class McpService extends EventEmitter {
 			try {
 				await connection.client.close();
 				await connection.transport.close();
-				log.info("Stdio server disconnected", { id, name: connection.config.name });
+				log.info("Stdio server disconnected", {
+					id,
+					name: connection.config.name,
+				});
 			} catch (error) {
-				log.error("Error during stdio disconnect", error instanceof Error ? error : new Error(String(error)), { id });
+				log.error(
+					"Error during stdio disconnect",
+					error instanceof Error ? error : new Error(String(error)),
+					{ id },
+				);
 			}
 			this.stdioConnections.delete(id);
 		}

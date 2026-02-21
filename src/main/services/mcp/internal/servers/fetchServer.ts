@@ -58,7 +58,8 @@ const fetchHandler: InternalToolHandler = async (args) => {
 		} else {
 			responseBody = await response.text();
 			if (responseBody.length > MAX_BODY_SIZE) {
-				responseBody = responseBody.slice(0, MAX_BODY_SIZE) + "\n...(truncated)";
+				responseBody =
+					responseBody.slice(0, MAX_BODY_SIZE) + "\n...(truncated)";
 			}
 		}
 
@@ -112,11 +113,14 @@ const fetchHtmlHandler: InternalToolHandler = async (args) => {
 			.replace(/\s+/g, " ")
 			.trim();
 
-		const truncated = text.length > 100_000
-			? text.slice(0, 100_000) + "\n...(truncated)"
-			: text;
+		const truncated =
+			text.length > 100_000
+				? text.slice(0, 100_000) + "\n...(truncated)"
+				: text;
 
-		return textResult(`URL: ${url}\nStatus: ${response.status}\n\n${truncated}`);
+		return textResult(
+			`URL: ${url}\nStatus: ${response.status}\n\n${truncated}`,
+		);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
 		return textResult(`Fetch HTML error: ${msg}`, true);
@@ -171,12 +175,14 @@ export function createFetchServer(): InternalMcpServer {
 	return {
 		id: "@scp/fetch",
 		name: "@scp/fetch",
-		description: "HTTP request tools for fetching web content, JSON APIs, and HTML pages",
+		description:
+			"HTTP request tools for fetching web content, JSON APIs, and HTML pages",
 		version: "1.0.0",
 		tools: [
 			{
 				name: "fetch",
-				description: "Make an HTTP request to any URL. Supports all HTTP methods, custom headers, and request body.",
+				description:
+					"Make an HTTP request to any URL. Supports all HTTP methods, custom headers, and request body.",
 				inputSchema: {
 					type: "object",
 					properties: {
@@ -191,10 +197,14 @@ export function createFetchServer(): InternalMcpServer {
 							description: "Custom request headers",
 							additionalProperties: { type: "string" },
 						},
-						body: { type: "string", description: "Request body (for POST/PUT/PATCH)" },
+						body: {
+							type: "string",
+							description: "Request body (for POST/PUT/PATCH)",
+						},
 						timeout: {
 							type: "number",
-							description: "Timeout in milliseconds (default: 30000, max: 60000)",
+							description:
+								"Timeout in milliseconds (default: 30000, max: 60000)",
 						},
 					},
 					required: ["url"],
@@ -202,14 +212,16 @@ export function createFetchServer(): InternalMcpServer {
 			},
 			{
 				name: "fetch_html",
-				description: "Fetch a web page and extract its text content (HTML tags stripped).",
+				description:
+					"Fetch a web page and extract its text content (HTML tags stripped).",
 				inputSchema: {
 					type: "object",
 					properties: {
 						url: { type: "string", description: "The URL to fetch" },
 						timeout: {
 							type: "number",
-							description: "Timeout in milliseconds (default: 30000, max: 60000)",
+							description:
+								"Timeout in milliseconds (default: 30000, max: 60000)",
 						},
 					},
 					required: ["url"],
@@ -232,7 +244,10 @@ export function createFetchServer(): InternalMcpServer {
 							description: "Custom request headers",
 							additionalProperties: { type: "string" },
 						},
-						body: { type: "string", description: "Request body as JSON string" },
+						body: {
+							type: "string",
+							description: "Request body as JSON string",
+						},
 					},
 					required: ["url"],
 				},

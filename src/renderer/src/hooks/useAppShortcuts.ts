@@ -18,7 +18,10 @@ export function useAppShortcuts() {
 
 	// Determine active scope from current pathname
 	const activeScope: ShortcutScope = useMemo(() => {
-		if (location.pathname === "/chat" || location.pathname.startsWith("/chat/")) {
+		if (
+			location.pathname === "/chat" ||
+			location.pathname.startsWith("/chat/")
+		) {
 			return "chat";
 		}
 		return "global";

@@ -11,4 +11,4 @@ export const USER_CONFIG_INSTRUCTIONS = `
 When a tool returns an error that indicates missing or invalid configuration (for example EXCHANGE_EMAIL_CONFIG_ERROR or similar codes that ask the user to set up or sign in), call the \`request_user_config\` tool with that \`errorCode\` (and optionally \`serverId\` and \`toolName\` from the failing tool). The user will be prompted to configure or authenticate; the tool returns \`{ configured: true }\`, \`{ cancelled: true }\`, or \`{ timeout: true }\`.
 
 **Important:** If you retry the original tool after \`{ configured: true }\` and it still returns the same error code (e.g. credentials were wrong), you MUST call \`request_user_config\` again with that \`errorCode\` so the user can reconfigure. Repeat this until the original tool succeeds, or the user cancels, or the request times out. Do not only output text asking the user to reconfigure—you must call \`request_user_config\` again to show the configuration UI.
-`.trim()
+`.trim();

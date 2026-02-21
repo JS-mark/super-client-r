@@ -73,8 +73,29 @@ function inferIcon(name: string, keywords: string[]): string {
 	const rules: [string[], string][] = [
 		[["filesystem", "file", "fs"], "📁"],
 		[["github", "gitlab", "git"], "🐙"],
-		[["sqlite", "database", "postgres", "mysql", "mongo", "supabase", "prisma"], "🗄️"],
-		[["browser", "playwright", "puppeteer", "chrome", "selenium", "web-browse"], "🌐"],
+		[
+			[
+				"sqlite",
+				"database",
+				"postgres",
+				"mysql",
+				"mongo",
+				"supabase",
+				"prisma",
+			],
+			"🗄️",
+		],
+		[
+			[
+				"browser",
+				"playwright",
+				"puppeteer",
+				"chrome",
+				"selenium",
+				"web-browse",
+			],
+			"🌐",
+		],
 		[["python", "pyodide", "pydantic"], "🐍"],
 		[["memory", "knowledge", "graph"], "🧠"],
 		[["search", "brave", "tavily", "exa", "serp", "google-search"], "🔍"],
@@ -86,7 +107,10 @@ function inferIcon(name: string, keywords: string[]): string {
 		[["redis", "cache", "memcached"], "🔴"],
 		[["think", "reason", "sequential"], "💭"],
 		[["mail", "email", "smtp", "imap"], "📧"],
-		[["image", "vision", "screenshot", "ocr", "dalle", "stable-diffusion"], "🖼️"],
+		[
+			["image", "vision", "screenshot", "ocr", "dalle", "stable-diffusion"],
+			"🖼️",
+		],
 		[["map", "geo", "location", "openstreetmap"], "🗺️"],
 		[["weather", "climate"], "🌤️"],
 		[["security", "auth", "encrypt", "vault"], "🔒"],
@@ -111,10 +135,16 @@ function isMcpPackage(obj: NpmSearchObject): boolean {
 	const desc = (obj.package.description || "").toLowerCase();
 	const kws = (obj.package.keywords || []).map((k) => k.toLowerCase());
 
-	if (name.includes("mcp") || name.includes("model-context-protocol")) return true;
-	if (kws.some((k) => ["mcp", "mcp-server", "model-context-protocol", "mcp-tool"].includes(k)))
+	if (name.includes("mcp") || name.includes("model-context-protocol"))
 		return true;
-	if (desc.includes("model context protocol") || desc.includes("mcp server")) return true;
+	if (
+		kws.some((k) =>
+			["mcp", "mcp-server", "model-context-protocol", "mcp-tool"].includes(k),
+		)
+	)
+		return true;
+	if (desc.includes("model context protocol") || desc.includes("mcp server"))
+		return true;
 	return false;
 }
 
@@ -171,14 +201,19 @@ export class McpMarketService extends EventEmitter {
 	/**
 	 * 从 npm 注册表搜索 MCP 相关包
 	 */
-	private async fetchNpmSearch(query: string, size = 100): Promise<NpmSearchObject[]> {
+	private async fetchNpmSearch(
+		query: string,
+		size = 100,
+	): Promise<NpmSearchObject[]> {
 		const url = `${NPM_REGISTRY_URL}?text=${encodeURIComponent(query)}&size=${size}`;
 		const response = await fetch(url, {
 			headers: { Accept: "application/json" },
 			signal: AbortSignal.timeout(FETCH_TIMEOUT),
 		});
 		if (!response.ok) {
-			throw new Error(`npm search failed: ${response.status} ${response.statusText}`);
+			throw new Error(
+				`npm search failed: ${response.status} ${response.statusText}`,
+			);
 		}
 		const data = (await response.json()) as NpmSearchResponse;
 		return data.objects;
@@ -197,7 +232,9 @@ export class McpMarketService extends EventEmitter {
 
 		const seen = new Map<string, McpMarketItem>();
 
-		const results = await Promise.allSettled(queries.map((q) => this.fetchNpmSearch(q)));
+		const results = await Promise.allSettled(
+			queries.map((q) => this.fetchNpmSearch(q)),
+		);
 
 		for (const result of results) {
 			if (result.status !== "fulfilled") continue;
@@ -244,7 +281,9 @@ export class McpMarketService extends EventEmitter {
 	/**
 	 * 搜索市场 MCP
 	 */
-	async search(params: McpMarketSearchParams = {}): Promise<McpMarketSearchResult> {
+	async search(
+		params: McpMarketSearchParams = {},
+	): Promise<McpMarketSearchResult> {
 		const { query, tags, sortBy = "downloads", page = 1, limit = 20 } = params;
 
 		try {
@@ -389,7 +428,10 @@ export class McpMarketService extends EventEmitter {
 				if (isFilesystemPackage(marketItem.name, marketItem.tags || [])) {
 					config.args.push(os.homedir());
 				}
-			} else if (marketItem.transport === "http" || marketItem.transport === "sse") {
+			} else if (
+				marketItem.transport === "http" ||
+				marketItem.transport === "sse"
+			) {
 				config.url = customConfig?.url || marketItem.url;
 				config.headers = marketItem.headers;
 			}
@@ -434,12 +476,17 @@ export class McpMarketService extends EventEmitter {
 		}
 
 		// 尝试 npm 包的 readme
-		const pkgName = marketItem.id.startsWith("npm:") ? marketItem.id.slice(4) : marketItem.name;
+		const pkgName = marketItem.id.startsWith("npm:")
+			? marketItem.id.slice(4)
+			: marketItem.name;
 		try {
-			const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(pkgName)}`, {
-				headers: { Accept: "application/json" },
-				signal: AbortSignal.timeout(10_000),
-			});
+			const response = await fetch(
+				`https://registry.npmjs.org/${encodeURIComponent(pkgName)}`,
+				{
+					headers: { Accept: "application/json" },
+					signal: AbortSignal.timeout(10_000),
+				},
+			);
 			if (response.ok) {
 				const data = (await response.json()) as { readme?: string };
 				if (data.readme && data.readme.length > 10) {

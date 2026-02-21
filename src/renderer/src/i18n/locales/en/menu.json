@@ -1,13 +1,13 @@
 {
-  "chat": "Chat",
-  "models": "Models",
-  "skills": "Skills",
-  "mcp": "MCP",
-  "plugins": "Plugins",
-  "bookmarks": "Bookmarks",
-  "workspaces": "Workspaces",
-  "settings": "Settings",
-  "home": "Home",
-  "help": "Help",
-  "about": "About"
+	"chat": "Chat",
+	"models": "Models",
+	"skills": "Skills",
+	"mcp": "MCP",
+	"plugins": "Plugins",
+	"bookmarks": "Bookmarks",
+	"workspaces": "Workspaces",
+	"settings": "Settings",
+	"home": "Home",
+	"help": "Help",
+	"about": "About"
 }

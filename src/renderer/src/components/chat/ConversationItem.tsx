@@ -22,7 +22,11 @@ interface ConversationItemProps {
 
 function formatRelativeTime(
 	timestamp: number,
-	t: (key: string, defaultValue: string, options?: Record<string, unknown>) => string,
+	t: (
+		key: string,
+		defaultValue: string,
+		options?: Record<string, unknown>,
+	) => string,
 ): string {
 	const now = Date.now();
 	const diff = now - timestamp;
@@ -30,7 +34,8 @@ function formatRelativeTime(
 	const hours = Math.floor(diff / 3600000);
 
 	if (minutes < 1) return t("sidebar.justNow", "just now");
-	if (minutes < 60) return t("sidebar.minutesAgo", "{{count}}m", { count: minutes });
+	if (minutes < 60)
+		return t("sidebar.minutesAgo", "{{count}}m", { count: minutes });
 	if (hours < 24) return t("sidebar.hoursAgo", "{{count}}h", { count: hours });
 	const days = Math.floor(hours / 24);
 	if (days < 7) return t("sidebar.daysAgo", "{{count}}d", { count: days });

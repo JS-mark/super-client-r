@@ -185,10 +185,7 @@ const Settings: React.FC = () => {
 							return result;
 						}}
 						onOpenGitHub={() =>
-							window.open(
-								"https://github.com/example/super-client",
-								"_blank",
-							)
+							window.open("https://github.com/example/super-client", "_blank")
 						}
 						onReportBug={() =>
 							window.open(
@@ -258,9 +255,7 @@ const Settings: React.FC = () => {
 				</nav>
 
 				{/* 右侧内容区 - 独立滚动 */}
-				<div className="flex-1 overflow-y-auto p-6">
-					{activeContent}
-				</div>
+				<div className="flex-1 overflow-y-auto p-6">{activeContent}</div>
 			</div>
 
 			<AboutModal

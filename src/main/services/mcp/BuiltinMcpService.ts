@@ -145,7 +145,8 @@ const BUILTIN_MCP_DEFINITIONS: BuiltinMcpDefinition[] = [
 	{
 		id: "builtin-python-sandbox",
 		name: "Python 沙箱",
-		description: "在 WebAssembly 沙箱中安全执行 Python 代码，无需本地 Python 环境",
+		description:
+			"在 WebAssembly 沙箱中安全执行 Python 代码，无需本地 Python 环境",
 		version: "1.0.0",
 		icon: "🐍",
 		tags: ["official", "python", "sandbox", "code-execution"],

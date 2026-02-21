@@ -131,7 +131,7 @@ export function ModelConfigPanel({
 			title={t("modelConfig.title", { ns: "models" })}
 			open={open}
 			onClose={onClose}
-			width={520}
+			size={520}
 			extra={
 				<Button type="primary" onClick={() => form.submit()}>
 					{t("modelConfig.save", { ns: "models" })}

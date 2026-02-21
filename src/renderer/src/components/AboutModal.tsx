@@ -76,8 +76,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 			closable={false}
 			styles={{
 				mask: {
-					backgroundColor: "rgba(0, 0, 0, 0.6)"
-				}
+					backgroundColor: "rgba(0, 0, 0, 0.6)",
+				},
 			}}
 		>
 			<div className="flex flex-col items-center py-4">
@@ -92,7 +92,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 							(e.target as HTMLImageElement).style.display = "none";
 							const parent = (e.target as HTMLImageElement).parentElement;
 							if (parent) {
-								parent.innerHTML = '<span class="text-2xl">🚀</span>';
+								parent.innerHTML = '<span className="text-2xl">🚀</span>';
 							}
 						}}
 					/>
@@ -126,17 +126,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
 				{/* Buttons */}
 				<div className="flex items-center gap-3">
-					<Button
-						type="primary"
-						onClick={onClose}
-						icon={<CheckOutlined />}
-					>
+					<Button type="primary" onClick={onClose} icon={<CheckOutlined />}>
 						{t("confirm", "确定", { ns: "common" })}
 					</Button>
-					<Button
-						onClick={handleCopy}
-						icon={<CopyOutlined />}
-					>
+					<Button onClick={handleCopy} icon={<CopyOutlined />}>
 						{t("copy", "复制", { ns: "common" })}
 					</Button>
 				</div>

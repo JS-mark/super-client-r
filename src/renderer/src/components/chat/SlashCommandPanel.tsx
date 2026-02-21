@@ -42,7 +42,9 @@ export function SlashCommandPanel({
 
 	// Scroll highlighted item into view
 	useEffect(() => {
-		const el = panelRef.current?.querySelector(`[data-index="${highlightIndex}"]`);
+		const el = panelRef.current?.querySelector(
+			`[data-index="${highlightIndex}"]`,
+		);
 		el?.scrollIntoView({ block: "nearest" });
 	}, [highlightIndex]);
 
@@ -79,8 +81,13 @@ export function SlashCommandPanel({
 						<Empty
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
 							description={
-								<span className="text-xs" style={{ color: token.colorTextQuaternary }}>
-									{t("slashCommand.noResults", "未找到匹配的技能", { ns: "chat" })}
+								<span
+									className="text-xs"
+									style={{ color: token.colorTextQuaternary }}
+								>
+									{t("slashCommand.noResults", "未找到匹配的技能", {
+										ns: "chat",
+									})}
 								</span>
 							}
 						/>

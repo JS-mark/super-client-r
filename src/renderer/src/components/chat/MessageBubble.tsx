@@ -16,7 +16,14 @@ export const MessageBubble: React.FC<{
 	streamingContent: string;
 	conversationId: string;
 	onDelete?: (msgId: string) => void;
-}> = ({ msg, isStreaming, isLast, streamingContent, conversationId, onDelete }) => {
+}> = ({
+	msg,
+	isStreaming,
+	isLast,
+	streamingContent,
+	conversationId,
+	onDelete,
+}) => {
 	const isUser = msg.role === "user";
 	const isTool = msg.role === "tool";
 	const isAssistant = msg.role === "assistant";
@@ -89,8 +96,7 @@ export const MessageBubble: React.FC<{
 			styles={{
 				content: isUser
 					? {
-							background:
-								"linear-gradient(135deg, #3b82f6, #8b5cf6)",
+							background: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
 							color: "#fff",
 						}
 					: undefined,

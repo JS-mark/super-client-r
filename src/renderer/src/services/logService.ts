@@ -59,7 +59,10 @@ export interface LogStats {
  *   const subLog = log.child('MessageList');
  *   subLog.debug('Rendering');  // module: 'ChatPage:MessageList'
  */
-export function createLogger(module: string, baseMeta?: Record<string, unknown>) {
+export function createLogger(
+	module: string,
+	baseMeta?: Record<string, unknown>,
+) {
 	const mergeMeta = (meta?: unknown): unknown => {
 		if (!baseMeta) return meta;
 		if (meta === undefined || meta === null) return baseMeta;
@@ -69,7 +72,12 @@ export function createLogger(module: string, baseMeta?: Record<string, unknown>)
 		return meta;
 	};
 
-	const send = (level: string, message: string, meta?: unknown, error?: Error) => {
+	const send = (
+		level: string,
+		message: string,
+		meta?: unknown,
+		error?: Error,
+	) => {
 		window.electron.log.rendererLog({
 			level,
 			message,
@@ -84,12 +92,11 @@ export function createLogger(module: string, baseMeta?: Record<string, unknown>)
 		debug: (message: string, meta?: unknown) => send("DEBUG", message, meta),
 		info: (message: string, meta?: unknown) => send("INFO", message, meta),
 		warn: (message: string, meta?: unknown) => send("WARN", message, meta),
-		error: (message: string, error?: Error, meta?: unknown) => send("ERROR", message, meta, error),
+		error: (message: string, error?: Error, meta?: unknown) =>
+			send("ERROR", message, meta, error),
 		child: (subModule: string, extraMeta?: Record<string, unknown>) => {
 			const childModule = `${module}:${subModule}`;
-			const childMeta = extraMeta
-				? { ...baseMeta, ...extraMeta }
-				: baseMeta;
+			const childMeta = extraMeta ? { ...baseMeta, ...extraMeta } : baseMeta;
 			return createLogger(childModule, childMeta);
 		},
 	};
@@ -101,11 +108,9 @@ export const logService = {
 	query: (params: LogQueryParams): Promise<LogQueryResult> =>
 		window.electron.log.query(params),
 
-	getStats: (): Promise<LogStats> =>
-		window.electron.log.getStats(),
+	getStats: (): Promise<LogStats> => window.electron.log.getStats(),
 
-	getModules: (): Promise<string[]> =>
-		window.electron.log.getModules(),
+	getModules: (): Promise<string[]> => window.electron.log.getModules(),
 
 	rendererLog: (
 		level: string,
@@ -123,8 +128,7 @@ export const logService = {
 			error_stack: error?.stack,
 		}),
 
-	clearDb: (): Promise<{ success: boolean }> =>
-		window.electron.log.clearDb(),
+	clearDb: (): Promise<{ success: boolean }> => window.electron.log.clearDb(),
 
 	exportLogs: (
 		params: LogQueryParams,

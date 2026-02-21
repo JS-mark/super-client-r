@@ -1,7 +1,4 @@
-import {
-	PlusOutlined,
-	SearchOutlined,
-} from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { Button, Drawer, Input, theme } from "antd";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
@@ -12,9 +9,16 @@ import { ConversationItem } from "./ConversationItem";
 
 const { useToken } = theme;
 
-function getDateGroup(timestamp: number, t: (key: string, defaultValue: string) => string): string {
+function getDateGroup(
+	timestamp: number,
+	t: (key: string, defaultValue: string) => string,
+): string {
 	const now = new Date();
-	const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+	const todayStart = new Date(
+		now.getFullYear(),
+		now.getMonth(),
+		now.getDate(),
+	).getTime();
 	const yesterdayStart = todayStart - 86400000;
 	const last7Start = todayStart - 86400000 * 7;
 	const last30Start = todayStart - 86400000 * 30;
@@ -114,32 +118,33 @@ export function ChatSidebar({ open, onClose, onNewChat }: ChatSidebarProps) {
 			closable={false}
 			styles={{
 				wrapper: { WebkitAppRegion: "no-drag" } as React.CSSProperties,
-				body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" },
+				body: {
+					padding: 0,
+					display: "flex",
+					flexDirection: "column",
+					height: "100%",
+				},
 				header: { display: "none" },
 			}}
 		>
 			<div className="flex flex-col h-full">
-				{/* Header */}
+				{/* Search + New Chat */}
 				<div className="flex items-center gap-2 px-3 py-3 shrink-0">
-					<Button
-						type="primary"
-						icon={<PlusOutlined />}
-						onClick={handleNewChat}
-						className="flex-1"
-					>
-						{t("sidebar.newChat", "New Chat")}
-					</Button>
-				</div>
-
-				{/* Search */}
-				<div className="px-3 pb-2 shrink-0">
 					<Input
-						size="small"
-						prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+						size="middle"
+						prefix={
+							<SearchOutlined style={{ color: token.colorTextQuaternary }} />
+						}
 						placeholder={t("sidebar.searchConversations", "Search...")}
 						value={searchText}
 						onChange={(e) => setSearchText(e.target.value)}
 						allowClear
+						className="flex-1"
+					/>
+					<Button
+						type="primary"
+						icon={<PlusOutlined />}
+						onClick={handleNewChat}
 					/>
 				</div>
 

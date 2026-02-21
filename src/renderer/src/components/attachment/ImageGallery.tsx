@@ -233,7 +233,7 @@ export function ImageThumbnailGrid({
 						className={cn(
 							"w-20 h-20 rounded-lg overflow-hidden cursor-pointer",
 							"border border-slate-200",
-							"hover:border-blue-500 transition-colors"
+							"hover:border-blue-500 transition-colors",
 						)}
 					>
 						<img
@@ -243,7 +243,9 @@ export function ImageThumbnailGrid({
 						/>
 						{index === maxDisplay - 1 && remainingCount > 0 && (
 							<div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-								<span className="text-white font-medium">+{remainingCount}</span>
+								<span className="text-white font-medium">
+									+{remainingCount}
+								</span>
 							</div>
 						)}
 					</div>

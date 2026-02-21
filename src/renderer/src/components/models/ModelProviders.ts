@@ -202,6 +202,8 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 	},
 ];
 
-export function getPresetProvider(id: ModelProviderPreset): PresetProviderInfo | undefined {
+export function getPresetProvider(
+	id: ModelProviderPreset,
+): PresetProviderInfo | undefined {
 	return PRESET_PROVIDERS.find((p) => p.id === id);
 }

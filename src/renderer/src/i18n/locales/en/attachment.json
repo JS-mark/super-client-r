@@ -1,38 +1,38 @@
 {
-  "type": {
-    "all": "All",
-    "image": "Images",
-    "document": "Documents",
-    "code": "Code",
-    "audio": "Audio",
-    "video": "Video",
-    "archive": "Archives",
-    "other": "Other"
-  },
-  "upload": {
-    "title": "Upload File",
-    "dragOrClick": "Click or drag files here to upload",
-    "maxSize": "Max {{size}}",
-    "maxCountError": "Maximum {{count}} files at a time",
-    "sizeError": "{{name}} exceeds maximum size {{size}}",
-    "success": "Uploaded {{count}} files successfully"
-  },
-  "delete": {
-    "success": "Attachment deleted",
-    "error": "Delete failed",
-    "confirm": "Are you sure you want to delete this attachment?"
-  },
-  "download": {
-    "success": "Download started"
-  },
-  "search": {
-    "placeholder": "Search attachments..."
-  },
-  "filter": {
-    "label": "Filter"
-  },
-  "empty": {
-    "description": "No attachments"
-  },
-  "selected": "{{count}} selected"
+	"type": {
+		"all": "All",
+		"image": "Images",
+		"document": "Documents",
+		"code": "Code",
+		"audio": "Audio",
+		"video": "Video",
+		"archive": "Archives",
+		"other": "Other"
+	},
+	"upload": {
+		"title": "Upload File",
+		"dragOrClick": "Click or drag files here to upload",
+		"maxSize": "Max {{size}}",
+		"maxCountError": "Maximum {{count}} files at a time",
+		"sizeError": "{{name}} exceeds maximum size {{size}}",
+		"success": "Uploaded {{count}} files successfully"
+	},
+	"delete": {
+		"success": "Attachment deleted",
+		"error": "Delete failed",
+		"confirm": "Are you sure you want to delete this attachment?"
+	},
+	"download": {
+		"success": "Download started"
+	},
+	"search": {
+		"placeholder": "Search attachments..."
+	},
+	"filter": {
+		"label": "Filter"
+	},
+	"empty": {
+		"description": "No attachments"
+	},
+	"selected": "{{count}} selected"
 }

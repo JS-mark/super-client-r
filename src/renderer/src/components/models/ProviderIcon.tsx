@@ -84,7 +84,9 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
 				style={{ flexShrink: 0 }}
 			>
 				<rect width={size} height={size} rx={radius} fill={config.bg} />
-				<g transform={`translate(${offset}, ${offset}) scale(${iconSize / 24})`}>
+				<g
+					transform={`translate(${offset}, ${offset}) scale(${iconSize / 24})`}
+				>
 					<path d={svgPath} fill={config.fg} />
 				</g>
 			</svg>

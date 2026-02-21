@@ -162,7 +162,10 @@ export class Logger {
 	 *   const log2 = logger.withContext('MCP', { serverId: 'abc' });
 	 *   log2.info('Connected');                // module: 'MCP', meta merged with { serverId: 'abc' }
 	 */
-	withContext(module: string, baseMeta?: Record<string, unknown>): ScopedLogger {
+	withContext(
+		module: string,
+		baseMeta?: Record<string, unknown>,
+	): ScopedLogger {
 		return new ScopedLogger(this, module, baseMeta);
 	}
 }
@@ -176,7 +179,11 @@ export class ScopedLogger {
 	private module: string;
 	private baseMeta?: Record<string, unknown>;
 
-	constructor(logger: Logger, module: string, baseMeta?: Record<string, unknown>) {
+	constructor(
+		logger: Logger,
+		module: string,
+		baseMeta?: Record<string, unknown>,
+	) {
 		this.logger = logger;
 		this.module = module;
 		this.baseMeta = baseMeta;
@@ -210,7 +217,10 @@ export class ScopedLogger {
 	/**
 	 * Create a child scoped logger that inherits this context and adds more.
 	 */
-	withContext(subModule: string, extraMeta?: Record<string, unknown>): ScopedLogger {
+	withContext(
+		subModule: string,
+		extraMeta?: Record<string, unknown>,
+	): ScopedLogger {
 		const childModule = `${this.module}:${subModule}`;
 		const childMeta = extraMeta
 			? { ...this.baseMeta, ...extraMeta }
@@ -220,4 +230,7 @@ export class ScopedLogger {
 }
 
 // Create singleton instance with debug level and default module "App"
-export const logger = new Logger({ level: LogLevel.DEBUG, defaultModule: "App" });
+export const logger = new Logger({
+	level: LogLevel.DEBUG,
+	defaultModule: "App",
+});

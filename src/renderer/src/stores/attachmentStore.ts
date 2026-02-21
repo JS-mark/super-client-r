@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type AttachmentType = "image" | "document" | "code" | "audio" | "video" | "archive" | "other";
+export type AttachmentType =
+	| "image"
+	| "document"
+	| "code"
+	| "audio"
+	| "video"
+	| "archive"
+	| "other";
 
 export interface Attachment {
 	id: string;
@@ -38,8 +45,19 @@ export interface AttachmentState {
 	clearUploadProgress: (id: string) => void;
 
 	// Async actions
-	loadAttachments: (filter?: { conversationId?: string; messageId?: string; type?: string }) => Promise<void>;
-	uploadFile: (filePath: string, metadata?: { conversationId?: string; messageId?: string; customName?: string }) => Promise<Attachment | null>;
+	loadAttachments: (filter?: {
+		conversationId?: string;
+		messageId?: string;
+		type?: string;
+	}) => Promise<void>;
+	uploadFile: (
+		filePath: string,
+		metadata?: {
+			conversationId?: string;
+			messageId?: string;
+			customName?: string;
+		},
+	) => Promise<Attachment | null>;
 	deleteAttachment: (id: string) => Promise<boolean>;
 	openAttachment: (id: string) => Promise<boolean>;
 	readFileContent: (id: string) => Promise<string | null>;
@@ -72,13 +90,15 @@ export const useAttachmentStore = create<AttachmentState>()(
 			removeAttachment: (id) =>
 				set((state) => ({
 					attachments: state.attachments.filter((a) => a.id !== id),
-					selectedAttachments: state.selectedAttachments.filter((sid) => sid !== id),
+					selectedAttachments: state.selectedAttachments.filter(
+						(sid) => sid !== id,
+					),
 				})),
 
 			updateAttachment: (id, updates) =>
 				set((state) => ({
 					attachments: state.attachments.map((a) =>
-						a.id === id ? { ...a, ...updates } : a
+						a.id === id ? { ...a, ...updates } : a,
 					),
 				})),
 
@@ -91,7 +111,9 @@ export const useAttachmentStore = create<AttachmentState>()(
 
 			deselectAttachment: (id) =>
 				set((state) => ({
-					selectedAttachments: state.selectedAttachments.filter((sid) => sid !== id),
+					selectedAttachments: state.selectedAttachments.filter(
+						(sid) => sid !== id,
+					),
 				})),
 
 			clearSelection: () => set({ selectedAttachments: [] }),
@@ -138,7 +160,10 @@ export const useAttachmentStore = create<AttachmentState>()(
 							const current = state.uploadProgress.get(tempId) || 0;
 							if (current < 90) {
 								return {
-									uploadProgress: new Map(state.uploadProgress).set(tempId, current + 10),
+									uploadProgress: new Map(state.uploadProgress).set(
+										tempId,
+										current + 10,
+									),
 								};
 							}
 							return state;
@@ -179,7 +204,9 @@ export const useAttachmentStore = create<AttachmentState>()(
 				if (!attachment) return false;
 
 				try {
-					const result = await window.electron.file.deleteAttachment(attachment.path);
+					const result = await window.electron.file.deleteAttachment(
+						attachment.path,
+					);
 					if (result.success) {
 						get().removeAttachment(id);
 						return true;
@@ -196,7 +223,9 @@ export const useAttachmentStore = create<AttachmentState>()(
 				if (!attachment) return false;
 
 				try {
-					const result = await window.electron.file.openAttachment(attachment.path);
+					const result = await window.electron.file.openAttachment(
+						attachment.path,
+					);
 					return result.success;
 				} catch (error) {
 					console.error("Failed to open attachment:", error);
@@ -222,7 +251,9 @@ export const useAttachmentStore = create<AttachmentState>()(
 
 			// Getters
 			getAttachmentsByConversation: (conversationId) => {
-				return get().attachments.filter((a) => a.conversationId === conversationId);
+				return get().attachments.filter(
+					(a) => a.conversationId === conversationId,
+				);
 			},
 
 			getAttachmentsByMessage: (messageId) => {
@@ -247,6 +278,6 @@ export const useAttachmentStore = create<AttachmentState>()(
 			partialize: (state) => ({
 				attachments: state.attachments,
 			}),
-		}
-	)
+		},
+	),
 );

@@ -1,7 +1,7 @@
 export {
-  BaiduIcon,
-  BingIcon,
-  GenericSearchIcon,
-  GoogleIcon,
-  SogouIcon,
+	BaiduIcon,
+	BingIcon,
+	GenericSearchIcon,
+	GoogleIcon,
+	SogouIcon,
 } from "./SearchEngineIcons";

@@ -32,11 +32,11 @@ const WORKSPACE_TYPE_OPTIONS: {
 	label: string;
 	icon: string;
 }[] = [
-		{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
-		{ value: "work", label: "workspaces.type.work", icon: "💼" },
-		{ value: "project", label: "workspaces.type.project", icon: "📁" },
-		{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
-	];
+	{ value: "personal", label: "type.personal", icon: "🏠" },
+	{ value: "work", label: "type.work", icon: "💼" },
+	{ value: "project", label: "type.project", icon: "📁" },
+	{ value: "temp", label: "type.temp", icon: "⏱️" },
+];
 
 interface WorkspaceFormData {
 	name: string;
@@ -151,7 +151,7 @@ function CreateWorkspaceModal({
 
 				<Form.Item
 					name="type"
-					label={t("workspaces.type.label", "类型", { ns: "workspaces" })}
+					label={t("type.label", { ns: "workspaces" })}
 					initialValue="personal"
 				>
 					<Radio.Group>
@@ -164,7 +164,7 @@ function CreateWorkspaceModal({
 								>
 									<div className="flex items-center gap-2 py-1">
 										<span>{type.icon}</span>
-										<span>{t(type.label)}</span>
+										<span>{t(type.label, { ns: "workspaces" })}</span>
 									</div>
 								</Radio.Button>
 							))}

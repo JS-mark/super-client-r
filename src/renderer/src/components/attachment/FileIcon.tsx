@@ -108,7 +108,12 @@ const FileTypeIcons: Record<AttachmentType, React.ReactNode> = {
 	),
 };
 
-export function FileIcon({ type, extension, size = "md", className }: FileIconProps) {
+export function FileIcon({
+	type,
+	extension,
+	size = "md",
+	className,
+}: FileIconProps) {
 	const { t } = useTranslation();
 	const colors = useTypeColors(type);
 
@@ -117,12 +122,14 @@ export function FileIcon({ type, extension, size = "md", className }: FileIconPr
 			className={cn(
 				"rounded-lg flex items-center justify-center shrink-0",
 				SIZE_MAP[size],
-				className
+				className,
 			)}
 			style={{ backgroundColor: colors.bg, color: colors.fg }}
 			title={t(`attachment.type.${type}`, type)}
 		>
-			<div className={cn("flex items-center justify-center", ICON_SIZE_MAP[size])}>
+			<div
+				className={cn("flex items-center justify-center", ICON_SIZE_MAP[size])}
+			>
 				{FileTypeIcons[type]}
 			</div>
 			{extension && size === "xl" && (
@@ -138,9 +145,57 @@ export function FileIcon({ type, extension, size = "md", className }: FileIconPr
 export function getFileTypeFromExtension(ext: string): AttachmentType {
 	const extension = ext.toLowerCase().replace(".", "");
 
-	const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "ico", "tiff"];
-	const documentExts = ["pdf", "doc", "docx", "txt", "md", "rtf", "odt", "xls", "xlsx", "ppt", "pptx"];
-	const codeExts = ["js", "ts", "jsx", "tsx", "json", "html", "css", "scss", "less", "py", "java", "cpp", "c", "go", "rs", "php", "rb", "swift", "kt", "sql", "xml", "yaml", "yml", "sh", "bash"];
+	const imageExts = [
+		"jpg",
+		"jpeg",
+		"png",
+		"gif",
+		"webp",
+		"bmp",
+		"svg",
+		"ico",
+		"tiff",
+	];
+	const documentExts = [
+		"pdf",
+		"doc",
+		"docx",
+		"txt",
+		"md",
+		"rtf",
+		"odt",
+		"xls",
+		"xlsx",
+		"ppt",
+		"pptx",
+	];
+	const codeExts = [
+		"js",
+		"ts",
+		"jsx",
+		"tsx",
+		"json",
+		"html",
+		"css",
+		"scss",
+		"less",
+		"py",
+		"java",
+		"cpp",
+		"c",
+		"go",
+		"rs",
+		"php",
+		"rb",
+		"swift",
+		"kt",
+		"sql",
+		"xml",
+		"yaml",
+		"yml",
+		"sh",
+		"bash",
+	];
 	const audioExts = ["mp3", "wav", "flac", "aac", "ogg", "m4a", "wma"];
 	const videoExts = ["mp4", "avi", "mov", "wmv", "flv", "webm", "mkv", "m4v"];
 	const archiveExts = ["zip", "rar", "7z", "tar", "gz", "bz2", "xz"];

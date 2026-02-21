@@ -1,4 +1,12 @@
-import type { SearchConfig, SearchProviderType, SearchConfigsResponse, ValidateConfigResponse, SearchExecuteRequest, SearchExecuteResponse, IPCResponse } from "../../types/search";
+import type {
+	SearchConfig,
+	SearchProviderType,
+	SearchConfigsResponse,
+	ValidateConfigResponse,
+	SearchExecuteRequest,
+	SearchExecuteResponse,
+	IPCResponse,
+} from "../../types/search";
 
 export const searchService = {
 	/**
@@ -39,14 +47,18 @@ export const searchService = {
 	/**
 	 * 验证搜索配置
 	 */
-	async validateConfig(config: SearchConfig): Promise<IPCResponse<ValidateConfigResponse>> {
+	async validateConfig(
+		config: SearchConfig,
+	): Promise<IPCResponse<ValidateConfigResponse>> {
 		return (window as any).electron.search.validateConfig(config);
 	},
 
 	/**
 	 * 执行搜索
 	 */
-	async execute(request: SearchExecuteRequest): Promise<IPCResponse<SearchExecuteResponse>> {
+	async execute(
+		request: SearchExecuteRequest,
+	): Promise<IPCResponse<SearchExecuteResponse>> {
 		return (window as any).electron.search.execute(request);
 	},
 };

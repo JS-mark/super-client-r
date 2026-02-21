@@ -265,10 +265,7 @@ export function ModelManageModal({
 								: t("modelManage.sortByGroup", { ns: "models" })
 						}
 					>
-						<Button
-							icon={<SortAscendingOutlined />}
-							onClick={toggleSort}
-						/>
+						<Button icon={<SortAscendingOutlined />} onClick={toggleSort} />
 					</Tooltip>
 					<Tooltip title={t("modelManage.refresh", { ns: "models" })}>
 						<Button
@@ -390,7 +387,10 @@ export function ModelManageModal({
 													/>
 
 													{/* Actions */}
-													<Space size={4} className="opacity-0 group-hover:opacity-100 transition-opacity">
+													<Space
+														size={4}
+														className="opacity-0 group-hover:opacity-100 transition-opacity"
+													>
 														<Tooltip
 															title={t("modelManage.configureModel", {
 																ns: "models",
@@ -419,9 +419,7 @@ export function ModelManageModal({
 																size="small"
 																danger={model.enabled}
 																icon={<MinusCircleOutlined />}
-																onClick={() =>
-																	handleToggleModel(model.id)
-																}
+																onClick={() => handleToggleModel(model.id)}
 															/>
 														</Tooltip>
 													</Space>

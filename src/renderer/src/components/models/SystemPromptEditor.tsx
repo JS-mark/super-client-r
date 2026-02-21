@@ -27,8 +27,7 @@ export function SystemPromptEditor({
 	valueRef.current = value;
 
 	const placeholderText =
-		placeholder ||
-		t("modelConfig.systemPromptPlaceholder", { ns: "models" });
+		placeholder || t("modelConfig.systemPromptPlaceholder", { ns: "models" });
 
 	// Initialize Crepe editor
 	useEffect(() => {

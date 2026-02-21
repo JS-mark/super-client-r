@@ -121,8 +121,7 @@ export const SEARCH_PROVIDERS: SearchProvider[] = [
 		requiresApiUrl: false,
 		apiKeyLabel: "API Key",
 		apiKeyPlaceholder: "请输入 Bing API Key",
-		helpUrl:
-			"https://www.microsoft.com/en-us/bing/apis/bing-web-search-api",
+		helpUrl: "https://www.microsoft.com/en-us/bing/apis/bing-web-search-api",
 		isApiSearch: false,
 	},
 	{

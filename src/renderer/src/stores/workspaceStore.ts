@@ -60,7 +60,9 @@ interface WorkspaceActions {
 	// 初始化默认工作区
 	initDefaultWorkspace: () => void;
 	// 创建工作区
-	createWorkspace: (data: Partial<Omit<Workspace, "id" | "createdAt" | "updatedAt">>) => string;
+	createWorkspace: (
+		data: Partial<Omit<Workspace, "id" | "createdAt" | "updatedAt">>,
+	) => string;
 	// 更新工作区
 	updateWorkspace: (id: string, data: Partial<Workspace>) => void;
 	// 删除工作区
@@ -215,9 +217,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
 			updateWorkspace: (id, data) => {
 				set((state) => ({
 					workspaces: state.workspaces.map((ws) =>
-						ws.id === id
-							? { ...ws, ...data, updatedAt: Date.now() }
-							: ws
+						ws.id === id ? { ...ws, ...data, updatedAt: Date.now() } : ws,
 					),
 				}));
 			},
@@ -264,7 +264,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
 									sessionIds: [...ws.sessionIds, sessionId],
 									updatedAt: Date.now(),
 								}
-							: ws
+							: ws,
 					),
 				}));
 			},
@@ -282,7 +282,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
 											: ws.activeSessionId,
 									updatedAt: Date.now(),
 								}
-							: ws
+							: ws,
 					),
 				}));
 			},
@@ -292,7 +292,7 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
 					workspaces: state.workspaces.map((ws) =>
 						ws.id === workspaceId
 							? { ...ws, activeSessionId: sessionId, updatedAt: Date.now() }
-							: ws
+							: ws,
 					),
 				}));
 			},
@@ -412,6 +412,6 @@ export const useWorkspaceStore = create<WorkspaceState & WorkspaceActions>()(
 				defaultWorkspaceId: state.defaultWorkspaceId,
 				initialized: state.initialized,
 			}),
-		}
-	)
+		},
+	),
 );

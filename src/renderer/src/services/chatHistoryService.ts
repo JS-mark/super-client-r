@@ -8,22 +8,35 @@ export const chatHistoryService = {
 	listConversations: (): Promise<IPCResponse<ConversationSummary[]>> =>
 		window.electron.chat.listConversations(),
 
-	createConversation: (name: string): Promise<IPCResponse<ConversationSummary>> =>
+	createConversation: (
+		name: string,
+	): Promise<IPCResponse<ConversationSummary>> =>
 		window.electron.chat.createConversation(name),
 
 	deleteConversation: (id: string): Promise<IPCResponse> =>
 		window.electron.chat.deleteConversation(id),
 
-	renameConversation: (conversationId: string, name: string): Promise<IPCResponse> =>
+	renameConversation: (
+		conversationId: string,
+		name: string,
+	): Promise<IPCResponse> =>
 		window.electron.chat.renameConversation(conversationId, name),
 
-	getMessages: (conversationId: string): Promise<IPCResponse<ChatMessagePersist[]>> =>
+	getMessages: (
+		conversationId: string,
+	): Promise<IPCResponse<ChatMessagePersist[]>> =>
 		window.electron.chat.getMessages(conversationId),
 
-	saveMessages: (conversationId: string, messages: ChatMessagePersist[]): Promise<IPCResponse> =>
+	saveMessages: (
+		conversationId: string,
+		messages: ChatMessagePersist[],
+	): Promise<IPCResponse> =>
 		window.electron.chat.saveMessages(conversationId, messages),
 
-	appendMessage: (conversationId: string, message: ChatMessagePersist): Promise<IPCResponse> =>
+	appendMessage: (
+		conversationId: string,
+		message: ChatMessagePersist,
+	): Promise<IPCResponse> =>
 		window.electron.chat.appendMessage(conversationId, message),
 
 	updateMessage: (

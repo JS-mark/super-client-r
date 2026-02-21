@@ -70,7 +70,7 @@ function flatten(obj: any, prefix = ""): Record<string, string> {
 	return result;
 }
 
-async function translateText(
+async function _translateText(
 	text: string,
 	targetLang: string,
 ): Promise<string> {

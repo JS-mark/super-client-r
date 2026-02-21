@@ -1,68 +1,68 @@
 {
-  "title": "Workspace Management",
-  "subtitle": "Manage workspaces and conversations",
-  "name": "Name",
-  "namePlaceholder": "My Workspace",
-  "description": "Description",
-  "descriptionPlaceholder": "Workspace description...",
-  "color": "Color",
-  "search": "Search workspaces...",
-  "default": "Default",
-  "current": "Current",
-  "manage": "Manage Workspaces",
-  "import": "Import",
-  "empty": "No workspaces yet, create one",
-  "noResults": "No matching workspaces found",
-  "create": {
-    "title": "Create Workspace",
-    "success": "Workspace created successfully"
-  },
-  "edit": {
-    "title": "Edit Workspace",
-    "success": "Workspace updated successfully"
-  },
-  "delete": {
-    "confirmTitle": "Delete Workspace",
-    "confirmContent": "Are you sure you want to delete workspace \"{{name}}\"?",
-    "success": "Workspace deleted",
-    "cannotDeleteDefault": "Cannot delete default workspace"
-  },
-  "duplicate": {
-    "success": "Workspace duplicated"
-  },
-  "export": {
-    "success": "Workspace exported",
-    "error": "Export failed"
-  },
-  "import": {
-    "success": "Workspace imported successfully",
-    "error": "Import failed",
-    "invalidFormat": "Invalid workspace file format"
-  },
-  "setDefault": {
-    "success": "Set as default workspace"
-  },
-  "type": {
-    "label": "Type",
-    "personal": "Personal",
-    "work": "Work",
-    "project": "Project",
-    "temp": "Temporary"
-  },
-  "stats": {
-    "total": "Total Workspaces",
-    "personal": "Personal",
-    "work": "Work",
-    "project": "Project",
-    "sessions": "sessions"
-  },
-  "actions": {
-    "switch": "Switch to this workspace",
-    "duplicate": "Duplicate",
-    "export": "Export",
-    "setDefault": "Set as Default"
-  },
-  "switch": {
-    "title": "Switch Workspace"
-  }
+	"title": "Workspace Management",
+	"subtitle": "Manage workspaces and conversations",
+	"name": "Name",
+	"namePlaceholder": "My Workspace",
+	"description": "Description",
+	"descriptionPlaceholder": "Workspace description...",
+	"color": "Color",
+	"search": "Search workspaces...",
+	"default": "Default",
+	"current": "Current",
+	"manage": "Manage Workspaces",
+	"import": "Import",
+	"empty": "No workspaces yet, create one",
+	"noResults": "No matching workspaces found",
+	"create": {
+		"title": "Create Workspace",
+		"success": "Workspace created successfully"
+	},
+	"edit": {
+		"title": "Edit Workspace",
+		"success": "Workspace updated successfully"
+	},
+	"delete": {
+		"confirmTitle": "Delete Workspace",
+		"confirmContent": "Are you sure you want to delete workspace \"{{name}}\"?",
+		"success": "Workspace deleted",
+		"cannotDeleteDefault": "Cannot delete default workspace"
+	},
+	"duplicate": {
+		"success": "Workspace duplicated"
+	},
+	"export": {
+		"success": "Workspace exported",
+		"error": "Export failed"
+	},
+	"import": {
+		"success": "Workspace imported successfully",
+		"error": "Import failed",
+		"invalidFormat": "Invalid workspace file format"
+	},
+	"setDefault": {
+		"success": "Set as default workspace"
+	},
+	"type": {
+		"label": "Type",
+		"personal": "Personal",
+		"work": "Work",
+		"project": "Project",
+		"temp": "Temporary"
+	},
+	"stats": {
+		"total": "Total Workspaces",
+		"personal": "Personal",
+		"work": "Work",
+		"project": "Project",
+		"sessions": "sessions"
+	},
+	"actions": {
+		"switch": "Switch to this workspace",
+		"duplicate": "Duplicate",
+		"export": "Export",
+		"setDefault": "Set as Default"
+	},
+	"switch": {
+		"title": "Switch Workspace"
+	}
 }

@@ -69,7 +69,11 @@ function renderMenuItemIcon(item: MenuItemConfig): React.ReactNode {
 
 // --- Sub-components ---
 
-const springTransition = { type: "spring" as const, stiffness: 400, damping: 17 };
+const springTransition = {
+	type: "spring" as const,
+	stiffness: 400,
+	damping: 17,
+};
 
 interface UserAvatarProps {
 	user: { name: string } | null;
@@ -249,9 +253,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 						>
 							<div>
 								<Tooltip
-									title={
-										user?.name || t("name", "Super Client", { ns: "app" })
-									}
+									title={user?.name || t("name", "Super Client", { ns: "app" })}
 									placement="right"
 									mouseEnterDelay={0.5}
 								>

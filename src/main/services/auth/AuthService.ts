@@ -72,20 +72,17 @@ export class AuthService {
 		const code = await this.openAuthWindow(authUrl, state);
 
 		// Exchange code for tokens
-		const tokenResponse = await fetch(
-			"https://oauth2.googleapis.com/token",
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/x-www-form-urlencoded" },
-				body: new URLSearchParams({
-					client_id: clientId,
-					code,
-					code_verifier: codeVerifier,
-					grant_type: "authorization_code",
-					redirect_uri: REDIRECT_URI,
-				}),
-			},
-		);
+		const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+			method: "POST",
+			headers: { "Content-Type": "application/x-www-form-urlencoded" },
+			body: new URLSearchParams({
+				client_id: clientId,
+				code,
+				code_verifier: codeVerifier,
+				grant_type: "authorization_code",
+				redirect_uri: REDIRECT_URI,
+			}),
+		});
 
 		if (!tokenResponse.ok) {
 			const err = await tokenResponse.text();

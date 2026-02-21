@@ -98,7 +98,9 @@ export const McpDetailModal: React.FC<McpDetailModalProps> = ({
 			}
 			width={600}
 			destroyOnHidden={true}
-			maskClosable={false}
+      mask={{
+        closable: false
+      }}
 		>
 			<div className="space-y-4">
 				<div className="flex items-center gap-2 flex-wrap">

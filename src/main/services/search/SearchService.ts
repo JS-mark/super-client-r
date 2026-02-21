@@ -1,4 +1,8 @@
-import type { SearchExecuteRequest, SearchExecuteResponse, SearchResult } from "../../ipc/types";
+import type {
+	SearchExecuteRequest,
+	SearchExecuteResponse,
+	SearchResult,
+} from "../../ipc/types";
 import { mcpService } from "../mcp/McpService";
 
 class SearchService {
@@ -141,13 +145,13 @@ class SearchService {
 			throw new Error(`SearXNG API error ${resp.status}: ${text}`);
 		}
 		const data: any = await resp.json();
-		return (data.results ?? []).slice(0, maxResults).map(
-			(r: { title?: string; url?: string; content?: string }) => ({
+		return (data.results ?? [])
+			.slice(0, maxResults)
+			.map((r: { title?: string; url?: string; content?: string }) => ({
 				title: r.title ?? "",
 				url: r.url ?? "",
 				snippet: r.content ?? "",
-			}),
-		);
+			}));
 	}
 
 	// ============ Google Custom Search ============
@@ -226,21 +230,18 @@ class SearchService {
 		request: SearchExecuteRequest,
 		maxResults: number,
 	): Promise<SearchResult[]> {
-		const resp = await fetch(
-			"https://open.bigmodel.cn/api/paas/v4/tools",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${request.apiKey}`,
-				},
-				body: JSON.stringify({
-					tool: "web-search-pro",
-					messages: [{ role: "user", content: request.query }],
-					stream: false,
-				}),
+		const resp = await fetch("https://open.bigmodel.cn/api/paas/v4/tools", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${request.apiKey}`,
 			},
-		);
+			body: JSON.stringify({
+				tool: "web-search-pro",
+				messages: [{ role: "user", content: request.query }],
+				stream: false,
+			}),
+		});
 		if (!resp.ok) {
 			const text = await resp.text().catch(() => "");
 			throw new Error(`ZhiPu API error ${resp.status}: ${text}`);
@@ -305,10 +306,14 @@ class SearchService {
 		maxResults: number,
 	): Promise<SearchResult[]> {
 		// Find a connected MCP server whose name/id contains "exa"
-		const serverId = (request.config?.mcpServerId as string) || this.findMcpServerByKeyword("exa");
+		const serverId =
+			(request.config?.mcpServerId as string) ||
+			this.findMcpServerByKeyword("exa");
 		if (!serverId) {
 			// Fallback to direct Exa REST API if no MCP server found
-			console.warn("[SearchService] No MCP server found for Exa, falling back to REST API");
+			console.warn(
+				"[SearchService] No MCP server found for Exa, falling back to REST API",
+			);
 			return this.searchExa(request, maxResults);
 		}
 		return this.searchViaMcp(serverId, request, maxResults);
@@ -323,7 +328,9 @@ class SearchService {
 	): Promise<SearchResult[]> {
 		const status = mcpService.getServerStatus(serverId);
 		if (!status || status.status !== "connected") {
-			throw new Error(`MCP server "${serverId}" is not connected. Please connect it first.`);
+			throw new Error(
+				`MCP server "${serverId}" is not connected. Please connect it first.`,
+			);
 		}
 
 		// Find a search-capable tool on this server
@@ -341,7 +348,9 @@ class SearchService {
 			);
 		}
 
-		console.log(`[SearchService] Calling MCP tool: server=${serverId}, tool=${searchTool.name}`);
+		console.log(
+			`[SearchService] Calling MCP tool: server=${serverId}, tool=${searchTool.name}`,
+		);
 
 		// Build args based on the tool's input schema
 		const args = this.buildMcpSearchArgs(searchTool, request.query, maxResults);
@@ -363,11 +372,21 @@ class SearchService {
 		maxResults: number,
 	): Record<string, unknown> {
 		const schema = tool.inputSchema;
-		const properties = (schema.properties ?? {}) as Record<string, { type?: string }>;
+		const properties = (schema.properties ?? {}) as Record<
+			string,
+			{ type?: string }
+		>;
 		const args: Record<string, unknown> = {};
 
 		// Map query to the appropriate parameter name
-		const queryParamNames = ["query", "q", "search_query", "text", "keywords", "input"];
+		const queryParamNames = [
+			"query",
+			"q",
+			"search_query",
+			"text",
+			"keywords",
+			"input",
+		];
 		for (const name of queryParamNames) {
 			if (name in properties) {
 				args[name] = query;
@@ -385,7 +404,14 @@ class SearchService {
 		}
 
 		// Map maxResults
-		const countParamNames = ["num_results", "count", "limit", "max_results", "maxResults", "top_k"];
+		const countParamNames = [
+			"num_results",
+			"count",
+			"limit",
+			"max_results",
+			"maxResults",
+			"top_k",
+		];
 		for (const name of countParamNames) {
 			if (name in properties) {
 				args[name] = maxResults;
@@ -399,7 +425,10 @@ class SearchService {
 	/**
 	 * Parse MCP tool result into SearchResult array
 	 */
-	private parseMcpSearchResults(data: unknown, maxResults: number): SearchResult[] {
+	private parseMcpSearchResults(
+		data: unknown,
+		maxResults: number,
+	): SearchResult[] {
 		if (!data) return [];
 
 		// Handle array of content blocks (standard MCP format)
@@ -431,38 +460,53 @@ class SearchService {
 		}
 
 		// Last resort: stringify the result
-		return [{ title: "MCP Result", url: "", snippet: JSON.stringify(data).slice(0, 500) }];
+		return [
+			{
+				title: "MCP Result",
+				url: "",
+				snippet: JSON.stringify(data).slice(0, 500),
+			},
+		];
 	}
 
-	private extractResultsFromArray(arr: unknown[], maxResults: number): SearchResult[] {
-		return arr.slice(0, maxResults).map((item: any) => {
-			// MCP content block with type: "text"
-			if (item.type === "text" && typeof item.text === "string") {
-				try {
-					const parsed = JSON.parse(item.text);
-					if (Array.isArray(parsed)) {
-						return parsed.map((r: any) => ({
-							title: r.title ?? r.name ?? "",
-							url: r.url ?? r.link ?? r.href ?? "",
-							snippet: r.snippet ?? r.content ?? r.text ?? r.description ?? "",
-						}));
+	private extractResultsFromArray(
+		arr: unknown[],
+		maxResults: number,
+	): SearchResult[] {
+		return arr
+			.slice(0, maxResults)
+			.map((item: any) => {
+				// MCP content block with type: "text"
+				if (item.type === "text" && typeof item.text === "string") {
+					try {
+						const parsed = JSON.parse(item.text);
+						if (Array.isArray(parsed)) {
+							return parsed.map((r: any) => ({
+								title: r.title ?? r.name ?? "",
+								url: r.url ?? r.link ?? r.href ?? "",
+								snippet:
+									r.snippet ?? r.content ?? r.text ?? r.description ?? "",
+							}));
+						}
+						return {
+							title: parsed.title ?? parsed.name ?? "",
+							url: parsed.url ?? parsed.link ?? "",
+							snippet: parsed.snippet ?? parsed.content ?? parsed.text ?? "",
+						};
+					} catch {
+						return { title: "", url: "", snippet: item.text.slice(0, 500) };
 					}
-					return {
-						title: parsed.title ?? parsed.name ?? "",
-						url: parsed.url ?? parsed.link ?? "",
-						snippet: parsed.snippet ?? parsed.content ?? parsed.text ?? "",
-					};
-				} catch {
-					return { title: "", url: "", snippet: item.text.slice(0, 500) };
 				}
-			}
-			// Direct result object
-			return {
-				title: item.title ?? item.name ?? "",
-				url: item.url ?? item.link ?? item.href ?? "",
-				snippet: item.snippet ?? item.content ?? item.text ?? item.description ?? "",
-			};
-		}).flat().slice(0, maxResults);
+				// Direct result object
+				return {
+					title: item.title ?? item.name ?? "",
+					url: item.url ?? item.link ?? item.href ?? "",
+					snippet:
+						item.snippet ?? item.content ?? item.text ?? item.description ?? "",
+				};
+			})
+			.flat()
+			.slice(0, maxResults);
 	}
 
 	/**

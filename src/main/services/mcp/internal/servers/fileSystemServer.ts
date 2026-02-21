@@ -30,8 +30,7 @@ function isBlockedPath(targetPath: string): boolean {
 	const resolved = path.resolve(targetPath);
 	return BLOCKED_PATHS.some(
 		(blocked) =>
-			resolved === blocked ||
-			resolved.startsWith(blocked + path.sep),
+			resolved === blocked || resolved.startsWith(blocked + path.sep),
 	);
 }
 
@@ -40,7 +39,8 @@ const readFileHandler: InternalToolHandler = async (args) => {
 	const encoding = (args.encoding as BufferEncoding) || "utf-8";
 
 	if (!filePath) return textResult("Error: path is required", true);
-	if (isBlockedPath(filePath)) return textResult("Error: access to system directory is not allowed", true);
+	if (isBlockedPath(filePath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		const content = await fs.readFile(filePath, { encoding });
@@ -56,8 +56,10 @@ const writeFileHandler: InternalToolHandler = async (args) => {
 	const content = args.content as string;
 
 	if (!filePath) return textResult("Error: path is required", true);
-	if (content === undefined || content === null) return textResult("Error: content is required", true);
-	if (isBlockedPath(filePath)) return textResult("Error: access to system directory is not allowed", true);
+	if (content === undefined || content === null)
+		return textResult("Error: content is required", true);
+	if (isBlockedPath(filePath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		// 确保目录存在
@@ -74,7 +76,8 @@ const listDirectoryHandler: InternalToolHandler = async (args) => {
 	const dirPath = args.path as string;
 
 	if (!dirPath) return textResult("Error: path is required", true);
-	if (isBlockedPath(dirPath)) return textResult("Error: access to system directory is not allowed", true);
+	if (isBlockedPath(dirPath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		const entries = await fs.readdir(dirPath, { withFileTypes: true });
@@ -110,7 +113,8 @@ const createDirectoryHandler: InternalToolHandler = async (args) => {
 	const dirPath = args.path as string;
 
 	if (!dirPath) return textResult("Error: path is required", true);
-	if (isBlockedPath(dirPath)) return textResult("Error: access to system directory is not allowed", true);
+	if (isBlockedPath(dirPath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		await fs.mkdir(dirPath, { recursive: true });
@@ -125,7 +129,8 @@ const moveFileHandler: InternalToolHandler = async (args) => {
 	const source = args.source as string;
 	const destination = args.destination as string;
 
-	if (!source || !destination) return textResult("Error: source and destination are required", true);
+	if (!source || !destination)
+		return textResult("Error: source and destination are required", true);
 	if (isBlockedPath(source) || isBlockedPath(destination)) {
 		return textResult("Error: access to system directory is not allowed", true);
 	}
@@ -144,13 +149,18 @@ const fileInfoHandler: InternalToolHandler = async (args) => {
 	const filePath = args.path as string;
 
 	if (!filePath) return textResult("Error: path is required", true);
-	if (isBlockedPath(filePath)) return textResult("Error: access to system directory is not allowed", true);
+	if (isBlockedPath(filePath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		const stats = await fs.stat(filePath);
 		const info = {
 			path: path.resolve(filePath),
-			type: stats.isDirectory() ? "directory" : stats.isFile() ? "file" : "other",
+			type: stats.isDirectory()
+				? "directory"
+				: stats.isFile()
+					? "file"
+					: "other",
 			size: stats.size,
 			created: stats.birthtime.toISOString(),
 			modified: stats.mtime.toISOString(),
@@ -168,8 +178,10 @@ const searchFilesHandler: InternalToolHandler = async (args) => {
 	const dirPath = args.path as string;
 	const pattern = args.pattern as string;
 
-	if (!dirPath || !pattern) return textResult("Error: path and pattern are required", true);
-	if (isBlockedPath(dirPath)) return textResult("Error: access to system directory is not allowed", true);
+	if (!dirPath || !pattern)
+		return textResult("Error: path and pattern are required", true);
+	if (isBlockedPath(dirPath))
+		return textResult("Error: access to system directory is not allowed", true);
 
 	try {
 		const files = await glob([pattern], {
@@ -182,9 +194,10 @@ const searchFilesHandler: InternalToolHandler = async (args) => {
 			return textResult("No files found matching the pattern.");
 		}
 
-		const truncated = files.length > 1000
-			? files.slice(0, 1000).concat([`... and ${files.length - 1000} more`])
-			: files;
+		const truncated =
+			files.length > 1000
+				? files.slice(0, 1000).concat([`... and ${files.length - 1000} more`])
+				: files;
 
 		return textResult(truncated.join("\n"));
 	} catch (error) {
@@ -206,7 +219,8 @@ export function createFileSystemServer(): InternalMcpServer {
 	return {
 		id: "@scp/file-system",
 		name: "@scp/file-system",
-		description: "File system operations: read, write, list, move, search files and directories",
+		description:
+			"File system operations: read, write, list, move, search files and directories",
 		version: "1.0.0",
 		tools: [
 			{
@@ -227,7 +241,8 @@ export function createFileSystemServer(): InternalMcpServer {
 			},
 			{
 				name: "write_file",
-				description: "Write content to a file (creates parent directories if needed)",
+				description:
+					"Write content to a file (creates parent directories if needed)",
 				inputSchema: {
 					type: "object",
 					properties: {
@@ -239,22 +254,30 @@ export function createFileSystemServer(): InternalMcpServer {
 			},
 			{
 				name: "list_directory",
-				description: "List the contents of a directory with file type and size info",
+				description:
+					"List the contents of a directory with file type and size info",
 				inputSchema: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Absolute path to the directory" },
+						path: {
+							type: "string",
+							description: "Absolute path to the directory",
+						},
 					},
 					required: ["path"],
 				},
 			},
 			{
 				name: "create_directory",
-				description: "Create a directory (recursively creates parent directories)",
+				description:
+					"Create a directory (recursively creates parent directories)",
 				inputSchema: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Absolute path to the directory" },
+						path: {
+							type: "string",
+							description: "Absolute path to the directory",
+						},
 					},
 					required: ["path"],
 				},
@@ -273,11 +296,15 @@ export function createFileSystemServer(): InternalMcpServer {
 			},
 			{
 				name: "file_info",
-				description: "Get detailed information about a file or directory (size, dates, permissions)",
+				description:
+					"Get detailed information about a file or directory (size, dates, permissions)",
 				inputSchema: {
 					type: "object",
 					properties: {
-						path: { type: "string", description: "Absolute path to the file or directory" },
+						path: {
+							type: "string",
+							description: "Absolute path to the file or directory",
+						},
 					},
 					required: ["path"],
 				},
@@ -289,7 +316,10 @@ export function createFileSystemServer(): InternalMcpServer {
 					type: "object",
 					properties: {
 						path: { type: "string", description: "Directory to search in" },
-						pattern: { type: "string", description: "Glob pattern (e.g., '**/*.ts', '*.json')" },
+						pattern: {
+							type: "string",
+							description: "Glob pattern (e.g., '**/*.ts', '*.json')",
+						},
 					},
 					required: ["path", "pattern"],
 				},

@@ -17,9 +17,7 @@ export const DefaultModelSettings: React.FC = () => {
 	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
 	const loadProviders = useModelStore((s) => s.loadProviders);
 	const getAllEnabledModels = useModelStore((s) => s.getAllEnabledModels);
-	const getActiveProviderModel = useModelStore(
-		(s) => s.getActiveProviderModel,
-	);
+	const getActiveProviderModel = useModelStore((s) => s.getActiveProviderModel);
 
 	useEffect(() => {
 		loadProviders();
@@ -62,7 +60,14 @@ export const DefaultModelSettings: React.FC = () => {
 
 	// Group models by provider
 	const groupedOptions = enabledModels.reduce<
-		Record<string, { providerName: string; preset: string; models: { label: string; value: string }[] }>
+		Record<
+			string,
+			{
+				providerName: string;
+				preset: string;
+				models: { label: string; value: string }[];
+			}
+		>
 	>((acc, { provider, model }) => {
 		if (!acc[provider.id]) {
 			acc[provider.id] = {
@@ -78,12 +83,10 @@ export const DefaultModelSettings: React.FC = () => {
 		return acc;
 	}, {});
 
-	const selectOptions = Object.entries(groupedOptions).map(
-		([, group]) => ({
-			label: group.providerName,
-			options: group.models,
-		}),
-	);
+	const selectOptions = Object.entries(groupedOptions).map(([, group]) => ({
+		label: group.providerName,
+		options: group.models,
+	}));
 
 	return (
 		<div className="animate-fade-in">
@@ -91,7 +94,10 @@ export const DefaultModelSettings: React.FC = () => {
 			{activeProviderModel && (
 				<div
 					className="mb-6 rounded-xl border p-5"
-					style={{ borderColor: token.colorPrimaryBorder, background: token.colorPrimaryBg }}
+					style={{
+						borderColor: token.colorPrimaryBorder,
+						background: token.colorPrimaryBg,
+					}}
 				>
 					<div className="flex items-center gap-2 mb-3">
 						<ThunderboltOutlined className="text-amber-500" />
@@ -108,7 +114,10 @@ export const DefaultModelSettings: React.FC = () => {
 							<div className="font-medium" style={{ color: token.colorText }}>
 								{activeProviderModel.model.name}
 							</div>
-							<div className="text-xs" style={{ color: token.colorTextSecondary }}>
+							<div
+								className="text-xs"
+								style={{ color: token.colorTextSecondary }}
+							>
 								{activeProviderModel.provider.name}
 							</div>
 						</div>

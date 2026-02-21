@@ -23,11 +23,11 @@ const WORKSPACE_TYPE_OPTIONS: {
 	label: string;
 	icon: string;
 }[] = [
-		{ value: "personal", label: "workspaces.type.personal", icon: "🏠" },
-		{ value: "work", label: "workspaces.type.work", icon: "💼" },
-		{ value: "project", label: "workspaces.type.project", icon: "📁" },
-		{ value: "temp", label: "workspaces.type.temp", icon: "⏱️" },
-	];
+	{ value: "personal", label: "type.personal", icon: "🏠" },
+	{ value: "work", label: "type.work", icon: "💼" },
+	{ value: "project", label: "type.project", icon: "📁" },
+	{ value: "temp", label: "type.temp", icon: "⏱️" },
+];
 
 export { WORKSPACE_TYPE_OPTIONS };
 
@@ -62,7 +62,9 @@ export function WorkspaceCard({
 	const menuItems = [
 		{
 			key: "switch",
-			label: t("workspaces.actions.switch", "切换到此工作区", { ns: "workspaces" }),
+			label: t("workspaces.actions.switch", "切换到此工作区", {
+				ns: "workspaces",
+			}),
 			icon: <CheckOutlined />,
 			onClick: onSwitch,
 			disabled: isCurrent,
@@ -87,7 +89,9 @@ export function WorkspaceCard({
 		},
 		{
 			key: "setDefault",
-			label: t("workspaces.actions.setDefault", "设为默认", { ns: "workspaces" }),
+			label: t("workspaces.actions.setDefault", "设为默认", {
+				ns: "workspaces",
+			}),
 			icon: <StarOutlined />,
 			onClick: onSetDefault,
 			disabled: isDefault,
@@ -141,7 +145,8 @@ export function WorkspaceCard({
 								)}
 							</div>
 							<Tag className="mt-1 text-xs">
-								{typeOption?.icon} {t(typeOption?.label || "")}
+								{typeOption?.icon}{" "}
+								{t(typeOption?.label || "", { ns: "workspaces" })}
 							</Tag>
 						</div>
 					</div>
@@ -162,7 +167,8 @@ export function WorkspaceCard({
 					<div className="flex items-center gap-2 text-sm text-slate-600 ">
 						<MessageOutlined />
 						<span>
-							{stats.totalSessions} {t("workspaces.stats.sessions", "会话", { ns: "workspaces" })}
+							{stats.totalSessions}{" "}
+							{t("workspaces.stats.sessions", "会话", { ns: "workspaces" })}
 						</span>
 					</div>
 					<div className="flex items-center gap-2 text-sm text-slate-600 ">
