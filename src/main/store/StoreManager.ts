@@ -59,6 +59,8 @@ export interface AppConfig {
 	activeSkin?: { pluginId: string; themeId: string };
 	// Active markdown theme (pluginId + themeId)
 	activeMarkdownTheme?: { pluginId: string; themeId: string };
+	// Silicon Flow API
+	siliconFlowApiKey?: string;
 	// OAuth credentials
 	googleClientId?: string;
 	githubClientId?: string;

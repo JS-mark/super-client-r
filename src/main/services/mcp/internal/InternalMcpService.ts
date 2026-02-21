@@ -5,10 +5,7 @@
 
 import type { McpServerConfig, McpTool } from "../../../ipc/types";
 import { logger } from "../../../utils/logger";
-import type {
-	InternalMcpServer,
-	InternalToolResult,
-} from "./types";
+import type { InternalMcpServer, InternalToolResult } from "./types";
 
 const log = logger.withContext("InternalMCP");
 
@@ -38,7 +35,9 @@ export class InternalMcpService {
 		const server = this.servers.get(serverId);
 		if (!server) {
 			return {
-				content: [{ type: "text", text: `Internal server ${serverId} not found` }],
+				content: [
+					{ type: "text", text: `Internal server ${serverId} not found` },
+				],
 				isError: true,
 			};
 		}
@@ -47,7 +46,10 @@ export class InternalMcpService {
 		if (!handler) {
 			return {
 				content: [
-					{ type: "text", text: `Tool ${toolName} not found in server ${serverId}` },
+					{
+						type: "text",
+						text: `Tool ${toolName} not found in server ${serverId}`,
+					},
 				],
 				isError: true,
 			};
@@ -59,10 +61,14 @@ export class InternalMcpService {
 			return await handler(args);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			log.error("Internal tool call failed", error instanceof Error ? error : new Error(message), {
-				serverId,
-				toolName,
-			});
+			log.error(
+				"Internal tool call failed",
+				error instanceof Error ? error : new Error(message),
+				{
+					serverId,
+					toolName,
+				},
+			);
 			return {
 				content: [{ type: "text", text: `Error: ${message}` }],
 				isError: true,
@@ -127,15 +133,23 @@ export class InternalMcpService {
 
 		// 延迟加载各服务器实现，避免循环依赖
 		const { createFetchServer } = await import("./servers/fetchServer");
-		const { createFileSystemServer } = await import("./servers/fileSystemServer");
+		const { createFileSystemServer } = await import(
+			"./servers/fileSystemServer"
+		);
 		const { createPythonServer } = await import("./servers/pythonServer");
+		const { createJavaScriptServer } = await import("./servers/jsServer");
 		const { createBrowserServer } = await import("./servers/browserServer");
+		const { createImageGenServer } = await import("./servers/imageGenServer");
+		const { createNodejsServer } = await import("./servers/nodejsServer");
 
 		const servers = [
 			createFetchServer(),
 			createFileSystemServer(),
 			createPythonServer(),
+			createJavaScriptServer(),
+			createNodejsServer(),
 			createBrowserServer(),
+			createImageGenServer(),
 		];
 
 		for (const server of servers) {
