@@ -112,7 +112,12 @@
       "Bash(/opt/homebrew/bin/gh version)",
       "Bash(/usr/local/bin/gh version)",
       "WebFetch(domain:cdn.jsdelivr.net)",
-      "Bash(npm info:*)"
+      "Bash(npm info:*)",
+      "WebFetch(domain:siliconflow.cn)",
+      "WebFetch(domain:docs.siliconflow.cn)",
+      "WebFetch(domain:api.siliconflow.cn)",
+      "Bash(git -C /Users/mark/myself/code/me/super-client-r diff --stat -- src/renderer/src/pages/Skills.tsx src/renderer/src/components/skill/BuiltinSkillCard.tsx src/renderer/src/stores/chatStore.ts src/renderer/src/pages/Chat.tsx src/renderer/src/i18n/locales/en/skills.json src/renderer/src/i18n/locales/zh/skills.json)",
+      "Bash(git -C /Users/mark/myself/code/me/super-client-r commit -m \"$\\(cat <<''EOF''\nfeat: add built-in skills tab to Skills page\n\nAdd a \"Built-in\" tab as the default view in Skills page to display\nskills bundled with the app. Includes cross-page navigation from\nSkills to Chat with skill pre-selected via pendingSkillId in chatStore.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
