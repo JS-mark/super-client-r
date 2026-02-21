@@ -3,6 +3,45 @@
  * 与主进程类型保持同步
  */
 
+// 插件权限类型
+export type PluginPermission =
+	| "fs.read"
+	| "fs.write"
+	| "fs.readExternal"
+	| "fs.writeExternal"
+	| "network"
+	| "window.notify"
+	| "window.input"
+	| "storage"
+	| "commands"
+	| "events"
+	| "chat.hooks"
+	| "mcp.tools"
+	| "skills.create"
+	| "ui.sidebar"
+	| "ui.settings"
+	| "ui.pages";
+
+// 权限描述映射
+export const PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = {
+	"fs.read": "读取插件目录内的文件",
+	"fs.write": "写入插件目录内的文件",
+	"fs.readExternal": "读取插件目录外的文件",
+	"fs.writeExternal": "写入插件目录外的文件",
+	network: "发送网络请求",
+	"window.notify": "显示通知和消息对话框",
+	"window.input": "显示输入和选择对话框",
+	storage: "持久化存储数据",
+	commands: "注册和执行命令",
+	events: "订阅应用事件",
+	"chat.hooks": "介入 AI 聊天流程",
+	"mcp.tools": "注册 MCP 工具",
+	"skills.create": "创建 Skill 技能",
+	"ui.sidebar": "在侧边栏添加菜单项",
+	"ui.settings": "在设置中添加配置面板",
+	"ui.pages": "注册自定义页面",
+};
+
 // 插件激活时机
 export type ActivationEvent =
 	| "onStartup"
@@ -95,6 +134,7 @@ export interface PluginManifest {
 		"super-client-r": string;
 		node?: string;
 	};
+	permissions?: PluginPermission[];
 	activationEvents?: ActivationEvent[];
 	contributes?: PluginContributions;
 	dependencies?: Record<string, string>;

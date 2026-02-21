@@ -9,7 +9,7 @@ import {
 	BUILTIN_MARKET_PLUGINS,
 	BUILTIN_PLUGIN_SOURCES,
 	type BuiltinMarketPlugin,
-} from "../../services/plugin/builtinPlugins";
+} from "../../services/plugin/builtin";
 import type { PluginInfo } from "../../services/plugin/types";
 import { storeManager } from "../../store/StoreManager";
 
@@ -709,6 +709,206 @@ module.exports = {
 		},
 	);
 
+	// ============ 权限管理 ============
+
+	// 授予权限
+	ipcMain.handle(
+		"plugin:grantPermissions",
+		async (
+			_event,
+			{
+				pluginId,
+				permissions,
+			}: { pluginId: string; permissions: string[] },
+		): Promise<{ success: boolean; error?: string }> => {
+			try {
+				pluginManager.grantPermissions(
+					pluginId,
+					permissions as import("../../services/plugin/types").PluginPermission[],
+				);
+				return { success: true };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 获取权限
+	ipcMain.handle(
+		"plugin:getPermissions",
+		async (
+			_event,
+			{ pluginId }: { pluginId: string },
+		): Promise<{ success: boolean; data?: string[]; error?: string }> => {
+			try {
+				const permissions = pluginManager.getPermissions(pluginId);
+				return { success: true, data: permissions };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// ============ UI 贡献 ============
+
+	// 获取所有 UI 贡献
+	ipcMain.handle(
+		"plugin:getUIContributions",
+		async (): Promise<{
+			success: boolean;
+			data?: unknown;
+			error?: string;
+		}> => {
+			try {
+				const contributions =
+					pluginManager.uiContributionRegistry.getAllContributions();
+				return { success: true, data: contributions };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 获取插件页面 HTML 路径
+	ipcMain.handle(
+		"plugin:getPluginPageHTML",
+		async (
+			_event,
+			{ pluginId, pagePath }: { pluginId: string; pagePath: string },
+		): Promise<{
+			success: boolean;
+			data?: { html: string; title?: string };
+			error?: string;
+		}> => {
+			try {
+				const pages =
+					pluginManager.uiContributionRegistry.getAllPages();
+				// Match by path or by id as fallback
+				const page = pages.find(
+					(p) =>
+						p.pluginId === pluginId &&
+						(p.path === pagePath || p.id === pagePath),
+				);
+				if (!page) {
+					return { success: false, error: "Page not found" };
+				}
+				const pluginInfo = pluginManager.getPlugin(pluginId);
+				if (!pluginInfo) {
+					return { success: false, error: "Plugin not found" };
+				}
+				const htmlPath = path.join(pluginInfo.path, page.htmlFile);
+				const content = await fs.readFile(htmlPath, "utf-8");
+				return {
+					success: true,
+					data: { html: content, title: page.title },
+				};
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// ============ 开发模式 ============
+
+	// 开发模式安装
+	ipcMain.handle(
+		"plugin:installDev",
+		async (
+			_event,
+			{ sourcePath }: { sourcePath: string },
+		): Promise<{
+			success: boolean;
+			data?: PluginInfo;
+			error?: string;
+		}> => {
+			try {
+				const plugin = await pluginManager.installDev(sourcePath);
+				return { success: true, data: plugin };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 重新加载开发模式插件
+	ipcMain.handle(
+		"plugin:reloadDev",
+		async (
+			_event,
+			{ pluginId }: { pluginId: string },
+		): Promise<{ success: boolean; error?: string }> => {
+			try {
+				await pluginManager.reloadDev(pluginId);
+				return { success: true };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// ============ 更新 ============
+
+	// 检查更新
+	ipcMain.handle(
+		"plugin:checkUpdates",
+		async (): Promise<{
+			success: boolean;
+			data?: Array<{
+				pluginId: string;
+				currentVersion: string;
+				newVersion: string;
+			}>;
+			error?: string;
+		}> => {
+			try {
+				const updates = await pluginManager.checkForUpdates();
+				return { success: true, data: updates };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 更新插件
+	ipcMain.handle(
+		"plugin:updatePlugin",
+		async (
+			_event,
+			{ pluginId }: { pluginId: string },
+		): Promise<{ success: boolean; error?: string }> => {
+			try {
+				await pluginManager.updatePlugin(pluginId);
+				return { success: true };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
 	// 获取当前 Markdown 主题 CSS 内容
 	ipcMain.handle(
 		PLUGIN_CHANNELS.GET_MARKDOWN_THEME_CSS,
@@ -736,6 +936,17 @@ module.exports = {
 export async function initializePluginManager(): Promise<void> {
 	const pluginManager = getPluginManager();
 	await pluginManager.initialize();
+
+	// Wire up chat hook registry to LLM service
+	try {
+		const { llmService } = await import("../../services/llm");
+		llmService.setChatHookRegistry(pluginManager.chatHookRegistry);
+	} catch (error) {
+		console.warn(
+			"[PluginHandlers] Failed to wire chat hooks to LLM service:",
+			error,
+		);
+	}
 
 	// Register reload listeners on all existing windows so CSS re-injects on HMR/reload
 	for (const win of BrowserWindow.getAllWindows()) {

@@ -4,6 +4,8 @@ import type { MenuConfig, MenuItemConfig } from "../types/menu";
 import { DEFAULT_MENU_CONFIG } from "../types/menu";
 
 interface MenuState extends MenuConfig {
+	/** 插件贡献的动态菜单项（不持久化） */
+	pluginItems: MenuItemConfig[];
 	/** 更新菜单配置 */
 	setConfig: (config: MenuConfig) => void;
 	/** 更新单个菜单项 */
@@ -14,12 +16,15 @@ interface MenuState extends MenuConfig {
 	toggleEnabled: (itemId: string) => void;
 	/** 重置为默认配置 */
 	resetConfig: () => void;
+	/** 设置插件贡献的菜单项 */
+	setPluginItems: (items: MenuItemConfig[]) => void;
 }
 
 export const useMenuStore = create<MenuState>()(
 	persist(
 		(set, get) => ({
 			items: DEFAULT_MENU_CONFIG.items,
+			pluginItems: [],
 
 			setConfig: (config) => set({ items: config.items }),
 
@@ -47,6 +52,8 @@ export const useMenuStore = create<MenuState>()(
 			},
 
 			resetConfig: () => set({ items: DEFAULT_MENU_CONFIG.items }),
+
+			setPluginItems: (pluginItems) => set({ pluginItems }),
 		}),
 		{
 			name: "menu-config",

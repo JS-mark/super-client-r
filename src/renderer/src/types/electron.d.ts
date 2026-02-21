@@ -790,6 +790,59 @@ export interface ElectronAPI {
 		onCSSChanged: (callback: (css: string | null) => void) => () => void;
 	};
 
+	// 插件扩展 API
+	plugin: {
+		grantPermissions: (
+			pluginId: string,
+			permissions: string[],
+		) => Promise<IPCResponse>;
+		getPermissions: (pluginId: string) => Promise<IPCResponse<string[]>>;
+		getUIContributions: () => Promise<IPCResponse<unknown>>;
+		getPluginPageHTML: (
+			pluginId: string,
+			pagePath: string,
+		) => Promise<IPCResponse<{ html: string; title?: string }>>;
+		installDev: (sourcePath: string) => Promise<IPCResponse>;
+		reloadDev: (pluginId: string) => Promise<IPCResponse>;
+		checkUpdates: () => Promise<
+			IPCResponse<
+				Array<{
+					pluginId: string;
+					currentVersion: string;
+					newVersion: string;
+				}>
+			>
+		>;
+		updatePlugin: (pluginId: string) => Promise<IPCResponse>;
+		onUIContributionsChanged: (
+			callback: (contributions: unknown) => void,
+		) => () => void;
+		onShowMessage: (
+			callback: (data: {
+				type: string;
+				message: string;
+				items: string[];
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+		onShowInputBox: (
+			callback: (data: {
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+		onShowQuickPick: (
+			callback: (data: {
+				items: unknown[];
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+	};
+
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;

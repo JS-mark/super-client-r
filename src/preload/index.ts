@@ -370,6 +370,59 @@ export interface ElectronAPI {
 		onCSSChanged: (callback: (css: string | null) => void) => () => void;
 	};
 
+	// 插件扩展 API
+	plugin: {
+		grantPermissions: (
+			pluginId: string,
+			permissions: string[],
+		) => Promise<IPCResponse>;
+		getPermissions: (pluginId: string) => Promise<IPCResponse<string[]>>;
+		getUIContributions: () => Promise<IPCResponse<unknown>>;
+		getPluginPageHTML: (
+			pluginId: string,
+			pagePath: string,
+		) => Promise<IPCResponse<{ html: string; title?: string }>>;
+		installDev: (sourcePath: string) => Promise<IPCResponse>;
+		reloadDev: (pluginId: string) => Promise<IPCResponse>;
+		checkUpdates: () => Promise<
+			IPCResponse<
+				Array<{
+					pluginId: string;
+					currentVersion: string;
+					newVersion: string;
+				}>
+			>
+		>;
+		updatePlugin: (pluginId: string) => Promise<IPCResponse>;
+		onUIContributionsChanged: (
+			callback: (contributions: unknown) => void,
+		) => () => void;
+		onShowMessage: (
+			callback: (data: {
+				type: string;
+				message: string;
+				items: string[];
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+		onShowInputBox: (
+			callback: (data: {
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+		onShowQuickPick: (
+			callback: (data: {
+				items: unknown[];
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => () => void;
+	};
+
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;
@@ -1161,6 +1214,100 @@ const electronAPI: ElectronAPI = {
 			const listener = (_event: unknown, css: string | null) => callback(css);
 			ipcRenderer.on("markdown-theme:css-changed", listener);
 			return () => ipcRenderer.off("markdown-theme:css-changed", listener);
+		},
+	},
+
+	// 插件扩展 API
+	plugin: {
+		grantPermissions: (pluginId: string, permissions: string[]) =>
+			ipcRenderer.invoke("plugin:grantPermissions", {
+				pluginId,
+				permissions,
+			}),
+		getPermissions: (pluginId: string) =>
+			ipcRenderer.invoke("plugin:getPermissions", { pluginId }),
+		getUIContributions: () =>
+			ipcRenderer.invoke("plugin:getUIContributions"),
+		getPluginPageHTML: (pluginId: string, pagePath: string) =>
+			ipcRenderer.invoke("plugin:getPluginPageHTML", {
+				pluginId,
+				pagePath,
+			}),
+		installDev: (sourcePath: string) =>
+			ipcRenderer.invoke("plugin:installDev", { sourcePath }),
+		reloadDev: (pluginId: string) =>
+			ipcRenderer.invoke("plugin:reloadDev", { pluginId }),
+		checkUpdates: () => ipcRenderer.invoke("plugin:checkUpdates"),
+		updatePlugin: (pluginId: string) =>
+			ipcRenderer.invoke("plugin:updatePlugin", { pluginId }),
+		onUIContributionsChanged: (
+			callback: (contributions: unknown) => void,
+		) => {
+			const listener = (_event: unknown, contributions: unknown) =>
+				callback(contributions);
+			ipcRenderer.on("plugin:ui-contributions-changed", listener);
+			return () =>
+				ipcRenderer.off("plugin:ui-contributions-changed", listener);
+		},
+		onShowMessage: (
+			callback: (data: {
+				type: string;
+				message: string;
+				items: string[];
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => {
+			const listener = (
+				_event: unknown,
+				data: {
+					type: string;
+					message: string;
+					items: string[];
+					pluginId: string;
+					responseChannel: string;
+				},
+			) => callback(data);
+			ipcRenderer.on("plugin:showMessage", listener);
+			return () => ipcRenderer.off("plugin:showMessage", listener);
+		},
+		onShowInputBox: (
+			callback: (data: {
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => {
+			const listener = (
+				_event: unknown,
+				data: {
+					options: unknown;
+					pluginId: string;
+					responseChannel: string;
+				},
+			) => callback(data);
+			ipcRenderer.on("plugin:showInputBox", listener);
+			return () => ipcRenderer.off("plugin:showInputBox", listener);
+		},
+		onShowQuickPick: (
+			callback: (data: {
+				items: unknown[];
+				options: unknown;
+				pluginId: string;
+				responseChannel: string;
+			}) => void,
+		) => {
+			const listener = (
+				_event: unknown,
+				data: {
+					items: unknown[];
+					options: unknown;
+					pluginId: string;
+					responseChannel: string;
+				},
+			) => callback(data);
+			ipcRenderer.on("plugin:showQuickPick", listener);
+			return () => ipcRenderer.off("plugin:showQuickPick", listener);
 		},
 	},
 

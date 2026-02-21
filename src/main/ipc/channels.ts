@@ -280,6 +280,27 @@ export const LLM_CHANNELS = {
 	TOOL_APPROVAL_RESPONSE: "llm:tool-approval-response",
 } as const;
 
+// 插件权限和 UI 通道
+export const PLUGIN_CHANNELS = {
+	// 权限
+	GRANT_PERMISSIONS: "plugin:grantPermissions",
+	GET_PERMISSIONS: "plugin:getPermissions",
+	// 对话框（main → renderer → main）
+	SHOW_MESSAGE: "plugin:showMessage",
+	SHOW_INPUT_BOX: "plugin:showInputBox",
+	SHOW_QUICK_PICK: "plugin:showQuickPick",
+	// UI 贡献
+	GET_UI_CONTRIBUTIONS: "plugin:getUIContributions",
+	UI_CONTRIBUTIONS_CHANGED: "plugin:ui-contributions-changed",
+	GET_PLUGIN_PAGE_HTML: "plugin:getPluginPageHTML",
+	// 开发模式
+	INSTALL_DEV: "plugin:installDev",
+	RELOAD_DEV: "plugin:reloadDev",
+	// 更新
+	CHECK_UPDATES: "plugin:checkUpdates",
+	UPDATE_PLUGIN: "plugin:updatePlugin",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -298,4 +319,5 @@ export type IPCChannel =
 	| (typeof UPDATE_CHANNELS)[keyof typeof UPDATE_CHANNELS]
 	| (typeof MODEL_CHANNELS)[keyof typeof MODEL_CHANNELS]
 	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS]
-	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS];
+	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS]
+	| (typeof PLUGIN_CHANNELS)[keyof typeof PLUGIN_CHANNELS];

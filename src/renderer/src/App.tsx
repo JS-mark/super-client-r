@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { PluginWindowHandler } from "./components/plugin/PluginWindowHandler";
 import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
 import { useSkinStore } from "./stores/skinStore";
@@ -213,6 +214,7 @@ function App() {
 			<MarkdownThemeStyle />
 			<TitleProvider>
 				<AntdApp className="h-full w-full">
+					<PluginWindowHandler />
 					<ErrorBoundary>
 						<RouterProvider router={router} />
 					</ErrorBoundary>

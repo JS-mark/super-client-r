@@ -174,6 +174,8 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	useAppShortcuts();
 
 	const menuItems = useMenuStore((state) => state.items);
+	const pluginItems = useMenuStore((state) => state.pluginItems);
+	const setPluginItems = useMenuStore((state) => state.setPluginItems);
 	const { user, isLoggedIn, logout } = useUserStore();
 	const loadProviders = useModelStore((s) => s.loadProviders);
 	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
@@ -202,6 +204,51 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 			window.electron.ipc.off("show-about-modal", handleShowAboutModal);
 		};
 	}, []);
+
+	// Sync plugin sidebar contributions
+	useEffect(() => {
+		const syncContributions = (contributions: unknown) => {
+			const data = contributions as {
+				sidebars?: Array<{
+					pluginId: string;
+					id: string;
+					label: string;
+					icon: string;
+					iconType: "default" | "emoji";
+					path: string;
+					order?: number;
+				}>;
+			};
+			if (data?.sidebars) {
+				setPluginItems(
+					data.sidebars.map((s) => ({
+						id: `plugin:${s.pluginId}/${s.id}`,
+						label: s.label,
+						path: s.path,
+						iconType: s.iconType,
+						iconContent: s.icon,
+						enabled: true,
+						action: "navigate" as const,
+					})),
+				);
+			}
+		};
+
+		// Load initial contributions
+		window.electron.plugin
+			.getUIContributions()
+			.then((result) => {
+				if (result.success && result.data) {
+					syncContributions(result.data);
+				}
+			})
+			.catch(() => {});
+
+		// Listen for changes
+		const unsubscribe =
+			window.electron.plugin.onUIContributionsChanged(syncContributions);
+		return unsubscribe;
+	}, [setPluginItems]);
 
 	const enabledItems = menuItems.filter(
 		(item) => item.enabled && item.id !== "settings",
@@ -273,6 +320,19 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 									isSelected={selectedKey === item.id}
 									onClick={() => handleMenuClick(item)}
 									label={t(item.label, { ns: "menu" })}
+								/>
+							))}
+							{/* Plugin-contributed sidebar items */}
+							{pluginItems.length > 0 && (
+								<div className="my-1 mx-2 border-t border-slate-700/50" />
+							)}
+							{pluginItems.map((item) => (
+								<SidebarMenuItem
+									key={item.id}
+									item={item}
+									isSelected={location.pathname.startsWith(item.path)}
+									onClick={() => handleMenuClick(item)}
+									label={item.label}
 								/>
 							))}
 						</LayoutGroup>

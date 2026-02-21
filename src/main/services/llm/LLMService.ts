@@ -180,6 +180,18 @@ export class LLMService {
 		string,
 		{ resolve: (approved: boolean) => void }
 	>();
+	// Chat hook registry (injected from PluginManager)
+	private chatHookRegistry: import("../plugin/hooks/ChatHooks").ChatHookRegistry | null =
+		null;
+
+	/**
+	 * Set the chat hook registry for plugin integration
+	 */
+	setChatHookRegistry(
+		registry: import("../plugin/hooks/ChatHooks").ChatHookRegistry,
+	): void {
+		this.chatHookRegistry = registry;
+	}
 
 	/**
 	 * Check tool permission and optionally request user approval.
@@ -293,6 +305,44 @@ export class LLMService {
 		const supportsStreamOptions = !this.noStreamOptionsProviders.has(
 			request.baseUrl,
 		);
+
+		// Run preSend hooks
+		if (this.chatHookRegistry?.hasHooks("preSend")) {
+			const hookCtx: import("../plugin/types").PreSendHookContext = {
+				messages: conversationMessages.map((m) => {
+					const msg = m as unknown as Record<string, unknown>;
+					return {
+						role: String(msg.role),
+						content: String(msg.content ?? ""),
+					};
+				}),
+			};
+			await this.chatHookRegistry.runPreSendHooks(hookCtx);
+			if (hookCtx.cancelled) {
+				this.broadcast({
+					requestId: request.requestId,
+					type: "done",
+				});
+				this.activeStreams.delete(request.requestId);
+				return;
+			}
+		}
+
+		// Run systemPrompt hooks
+		if (this.chatHookRegistry?.hasHooks("systemPrompt")) {
+			const firstMsg = conversationMessages[0];
+			if (
+				firstMsg &&
+				"role" in firstMsg &&
+				firstMsg.role === "system" &&
+				"content" in firstMsg &&
+				typeof firstMsg.content === "string"
+			) {
+				const hookCtx = { systemPrompt: firstMsg.content };
+				await this.chatHookRegistry.runSystemPromptHooks(hookCtx);
+				firstMsg.content = hookCtx.systemPrompt;
+			}
+		}
 
 		// For prompt-based tool calling, inject tool descriptions into the first system message
 		if (isPromptMode && hasTools) {
@@ -673,6 +723,28 @@ export class LLMService {
 				}
 
 				// No tool calls — we're done
+				// Run postResponse hooks
+				if (
+					accumulatedContent &&
+					this.chatHookRegistry?.hasHooks("postResponse")
+				) {
+					const hookCtx = { response: accumulatedContent };
+					await this.chatHookRegistry.runPostResponseHooks(hookCtx);
+					// If response was modified, broadcast the delta
+					if (hookCtx.response !== accumulatedContent) {
+						const delta = hookCtx.response.slice(
+							accumulatedContent.length,
+						);
+						if (delta) {
+							this.broadcast({
+								requestId: request.requestId,
+								type: "chunk",
+								content: delta,
+							});
+						}
+					}
+				}
+
 				if (!controller.signal.aborted) {
 					const totalMs = Date.now() - startTime;
 					this.broadcast({

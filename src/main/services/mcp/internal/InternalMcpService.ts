@@ -125,6 +125,49 @@ export class InternalMcpService {
 		return tools;
 	}
 
+	// Track dynamic server ownership (serverId → pluginId)
+	private dynamicOwners: Map<string, string> = new Map();
+
+	/**
+	 * 插件动态注册 MCP 服务器
+	 */
+	registerDynamic(server: InternalMcpServer, ownerId: string): void {
+		log.info("Registering dynamic server", {
+			id: server.id,
+			name: server.name,
+			ownerId,
+			toolCount: server.tools.length,
+		});
+		this.servers.set(server.id, server);
+		this.dynamicOwners.set(server.id, ownerId);
+	}
+
+	/**
+	 * 插件停用时清理动态注册的服务器
+	 */
+	unregisterDynamic(ownerId: string): void {
+		for (const [serverId, owner] of this.dynamicOwners) {
+			if (owner === ownerId) {
+				const server = this.servers.get(serverId);
+				if (server?.cleanup) {
+					server.cleanup().catch((err) => {
+						log.error(
+							"Failed to cleanup dynamic server",
+							err instanceof Error ? err : new Error(String(err)),
+							{ serverId },
+						);
+					});
+				}
+				this.servers.delete(serverId);
+				this.dynamicOwners.delete(serverId);
+				log.info("Dynamic server unregistered", {
+					serverId,
+					ownerId,
+				});
+			}
+		}
+	}
+
 	/**
 	 * 初始化所有内置服务器
 	 */

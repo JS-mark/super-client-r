@@ -1,5 +1,6 @@
 import {
 	ApiOutlined,
+	AppstoreOutlined,
 	BugOutlined,
 	CloudOutlined,
 	GlobalOutlined,
@@ -28,10 +29,12 @@ import { DebugTools } from "../components/settings/DebugTools";
 import { DefaultModelSettings } from "../components/settings/DefaultModelSettings";
 import { GeneralSettings } from "../components/settings/GeneralSettings";
 import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
+import { PluginConfigPanel } from "../components/settings/PluginConfigPanel";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
 import { useTitle } from "../hooks/useTitle";
 import { type AppInfo, appService } from "../services/appService";
+import { pluginService } from "../services/pluginService";
 
 interface SettingsTab {
 	key: string;
@@ -46,6 +49,24 @@ const Settings: React.FC = () => {
 	const [activeTab, setActiveTab] = useState("general");
 	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 	const [aboutModalOpen, setAboutModalOpen] = useState(false);
+	const [pluginSettingsPanels, setPluginSettingsPanels] = useState<
+		Array<{
+			pluginId: string;
+			id: string;
+			title: string;
+			icon: string;
+			properties: Record<
+				string,
+				{
+					type: string;
+					default?: unknown;
+					description: string;
+					enum?: string[];
+					enumDescriptions?: string[];
+				}
+			>;
+		}>
+	>([]);
 	const { token } = useToken();
 
 	const pageTitle = useMemo(
@@ -89,6 +110,27 @@ const Settings: React.FC = () => {
 			window.electron.ipc.off("navigate-to", handleNavigate);
 			window.electron.ipc.off("show-about-modal", handleAboutModal);
 		};
+	}, []);
+
+	// Load plugin settings panels
+	useEffect(() => {
+		const loadPanels = (contributions: unknown) => {
+			const data = contributions as {
+				settingsPanels?: typeof pluginSettingsPanels;
+			};
+			if (data?.settingsPanels) {
+				setPluginSettingsPanels(data.settingsPanels);
+			}
+		};
+
+		pluginService
+			.getUIContributions()
+			.then((data) => loadPanels(data))
+			.catch(() => {});
+
+		const unsubscribe =
+			window.electron.plugin.onUIContributionsChanged(loadPanels);
+		return unsubscribe;
 	}, []);
 
 	const handleTabClick = useCallback((key: string) => {
@@ -207,7 +249,34 @@ const Settings: React.FC = () => {
 		[t, appInfo],
 	);
 
-	const activeContent = tabs.find((tab) => tab.key === activeTab)?.content;
+	// Append plugin-contributed settings tabs
+	const allTabs = useMemo(() => {
+		if (pluginSettingsPanels.length === 0) return tabs;
+
+		const pluginTabs: SettingsTab[] = pluginSettingsPanels.map((panel) => ({
+			key: `plugin:${panel.pluginId}/${panel.id}`,
+			icon: <AppstoreOutlined />,
+			label: panel.title,
+			content: (
+				<PluginConfigPanel
+					pluginId={panel.pluginId}
+					title={panel.title}
+					properties={panel.properties}
+				/>
+			),
+		}));
+
+		// Insert plugin tabs before the "about" tab
+		const aboutIndex = tabs.findIndex((tab) => tab.key === "about");
+		if (aboutIndex >= 0) {
+			const result = [...tabs];
+			result.splice(aboutIndex, 0, ...pluginTabs);
+			return result;
+		}
+		return [...tabs, ...pluginTabs];
+	}, [tabs, pluginSettingsPanels]);
+
+	const activeContent = allTabs.find((tab) => tab.key === activeTab)?.content;
 
 	return (
 		<MainLayout>
@@ -218,7 +287,7 @@ const Settings: React.FC = () => {
 					style={{ borderColor: token.colorBorderSecondary }}
 				>
 					<div className="flex flex-col gap-1">
-						{tabs.map((tab) => (
+						{allTabs.map((tab) => (
 							<button
 								key={tab.key}
 								type="button"

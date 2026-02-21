@@ -292,4 +292,118 @@ export const pluginService = {
 			throw new Error(result.error);
 		}
 	},
+
+	// ============ 权限 ============
+
+	/**
+	 * 授予插件权限
+	 */
+	async grantPermissions(
+		pluginId: string,
+		permissions: string[],
+	): Promise<void> {
+		const result = await window.electron.plugin.grantPermissions(
+			pluginId,
+			permissions,
+		);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+	},
+
+	/**
+	 * 获取插件已授予的权限
+	 */
+	async getPermissions(pluginId: string): Promise<string[]> {
+		const result =
+			await window.electron.plugin.getPermissions(pluginId);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data || [];
+	},
+
+	// ============ UI 贡献 ============
+
+	/**
+	 * 获取所有 UI 贡献
+	 */
+	async getUIContributions(): Promise<unknown> {
+		const result = await window.electron.plugin.getUIContributions();
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data;
+	},
+
+	/**
+	 * 获取插件页面 HTML
+	 */
+	async getPluginPageHTML(
+		pluginId: string,
+		pagePath: string,
+	): Promise<{ html: string; title?: string }> {
+		const result = await window.electron.plugin.getPluginPageHTML(
+			pluginId,
+			pagePath,
+		);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data!;
+	},
+
+	// ============ 开发模式 ============
+
+	/**
+	 * 开发模式安装插件
+	 */
+	async installDev(sourcePath: string): Promise<void> {
+		const result =
+			await window.electron.plugin.installDev(sourcePath);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+	},
+
+	/**
+	 * 重新加载开发模式插件
+	 */
+	async reloadDev(pluginId: string): Promise<void> {
+		const result =
+			await window.electron.plugin.reloadDev(pluginId);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+	},
+
+	// ============ 更新 ============
+
+	/**
+	 * 检查插件更新
+	 */
+	async checkUpdates(): Promise<
+		Array<{
+			pluginId: string;
+			currentVersion: string;
+			newVersion: string;
+		}>
+	> {
+		const result = await window.electron.plugin.checkUpdates();
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+		return result.data || [];
+	},
+
+	/**
+	 * 更新插件
+	 */
+	async updatePlugin(pluginId: string): Promise<void> {
+		const result =
+			await window.electron.plugin.updatePlugin(pluginId);
+		if (!result.success) {
+			throw new Error(result.error);
+		}
+	},
 };

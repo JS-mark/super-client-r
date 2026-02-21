@@ -2,6 +2,45 @@
  * 插件系统类型定义
  */
 
+// 插件权限类型
+export type PluginPermission =
+	| "fs.read" // 读取插件目录内文件
+	| "fs.write" // 写入插件目录内文件
+	| "fs.readExternal" // 读取插件目录外文件
+	| "fs.writeExternal" // 写入插件目录外文件
+	| "network" // HTTP 请求
+	| "window.notify" // 显示通知/消息对话框
+	| "window.input" // 显示输入对话框
+	| "storage" // 持久化存储
+	| "commands" // 注册命令
+	| "events" // 订阅应用事件
+	| "chat.hooks" // 聊天管道钩子
+	| "mcp.tools" // 注册 MCP 工具
+	| "skills.create" // 创建 Skill
+	| "ui.sidebar" // 侧边栏
+	| "ui.settings" // 设置面板
+	| "ui.pages"; // 自定义页面
+
+// 权限描述映射（用于 UI 显示）
+export const PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = {
+	"fs.read": "读取插件目录内的文件",
+	"fs.write": "写入插件目录内的文件",
+	"fs.readExternal": "读取插件目录外的文件",
+	"fs.writeExternal": "写入插件目录外的文件",
+	network: "发送网络请求",
+	"window.notify": "显示通知和消息对话框",
+	"window.input": "显示输入和选择对话框",
+	storage: "持久化存储数据",
+	commands: "注册和执行命令",
+	events: "订阅应用事件",
+	"chat.hooks": "介入 AI 聊天流程",
+	"mcp.tools": "注册 MCP 工具",
+	"skills.create": "创建 Skill 技能",
+	"ui.sidebar": "在侧边栏添加菜单项",
+	"ui.settings": "在设置中添加配置面板",
+	"ui.pages": "注册自定义页面",
+};
+
 // 插件激活时机
 export type ActivationEvent =
 	| "onStartup" // 应用启动时
@@ -112,6 +151,9 @@ export interface PluginManifest {
 		"super-client-r": string; // 支持的App版本范围
 		node?: string;
 	};
+
+	// 权限声明
+	permissions?: PluginPermission[];
 
 	// 激活事件
 	activationEvents?: ActivationEvent[];
@@ -229,6 +271,30 @@ export interface PluginAPI {
 		error(message: string, ...args: unknown[]): void;
 	};
 
+	// 聊天钩子
+	chat: {
+		onPreSend(handler: PreSendHook): { dispose(): void };
+		onSystemPrompt(handler: SystemPromptHook): { dispose(): void };
+		onPostStream(handler: PostStreamHook): { dispose(): void };
+		onPostResponse(handler: PostResponseHook): { dispose(): void };
+	};
+
+	// MCP 工具注册
+	mcp: {
+		registerTools(config: PluginMcpToolConfig): { dispose(): void };
+	};
+
+	// Skill 注册
+	skills: {
+		registerSkill(config: PluginSkillConfig): { dispose(): void };
+	};
+
+	// UI 扩展
+	ui: {
+		registerSidebarItem(config: SidebarItemConfig): { dispose(): void };
+		registerPage(config: PageConfig): { dispose(): void };
+	};
+
 	// 扩展路径
 	readonly extensionPath: string;
 
@@ -290,6 +356,88 @@ export interface FileStat {
 	mtime: number;
 }
 
+// 聊天钩子类型
+export interface PreSendHookContext {
+	messages: Array<{ role: string; content: string }>;
+	systemPrompt?: string;
+	/** 设置为 true 可阻止消息发送 */
+	cancelled?: boolean;
+}
+
+export type PreSendHook = (ctx: PreSendHookContext) => Promise<void> | void;
+
+export interface SystemPromptHookContext {
+	systemPrompt: string;
+}
+
+export type SystemPromptHook = (
+	ctx: SystemPromptHookContext,
+) => Promise<void> | void;
+
+export interface PostStreamHookContext {
+	chunk: string;
+}
+
+export type PostStreamHook = (
+	ctx: PostStreamHookContext,
+) => Promise<void> | void;
+
+export interface PostResponseHookContext {
+	response: string;
+}
+
+export type PostResponseHook = (
+	ctx: PostResponseHookContext,
+) => Promise<void> | void;
+
+// MCP 工具注册配置
+export interface PluginMcpToolConfig {
+	id: string;
+	name: string;
+	description: string;
+	tools: Array<{
+		name: string;
+		description: string;
+		inputSchema: Record<string, unknown>;
+		handler: (
+			args: Record<string, unknown>,
+		) => Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }>;
+	}>;
+}
+
+// Skill 注册配置
+export interface PluginSkillConfig {
+	id: string;
+	name: string;
+	description: string;
+	icon?: string;
+	category?: string;
+	systemPrompt?: string;
+	tools: Array<{
+		name: string;
+		description: string;
+		inputSchema: Record<string, unknown>;
+		handler: (input: Record<string, unknown>) => Promise<unknown>;
+	}>;
+}
+
+// UI 贡献配置
+export interface SidebarItemConfig {
+	id: string;
+	label: string;
+	icon: string;
+	iconType?: "default" | "emoji";
+	path?: string;
+	order?: number;
+}
+
+export interface PageConfig {
+	id: string;
+	path: string;
+	title: string;
+	htmlFile: string;
+}
+
 // 插件激活上下文
 export interface PluginContext {
 	readonly extensionPath: string;
@@ -306,6 +454,8 @@ export interface PluginContext {
 			callback: (...args: unknown[]) => unknown,
 		): { dispose(): void };
 	};
+	/** Full PluginAPI instance (available after Phase 1) */
+	readonly api?: PluginAPI;
 }
 
 // 存储接口

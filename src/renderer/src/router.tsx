@@ -7,6 +7,7 @@ import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
 import McpMarket from "./pages/McpMarket";
 import Plugins from "./pages/Plugins";
+import PluginPage from "./pages/PluginPage";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
 import Workspaces from "./pages/Workspaces";
@@ -73,5 +74,11 @@ export const router = createHashRouter([
 		element: <LogViewer />,
 		errorElement: <ErrorPage />,
 		handle: { title: "日志查看器" },
+	},
+	{
+		path: "/plugin/:pluginId/*",
+		element: <PluginPage />,
+		errorElement: <ErrorPage />,
+		handle: { title: "插件页面" },
 	},
 ]);
