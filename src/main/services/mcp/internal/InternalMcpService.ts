@@ -141,6 +141,7 @@ export class InternalMcpService {
 		const { createBrowserServer } = await import("./servers/browserServer");
 		const { createImageGenServer } = await import("./servers/imageGenServer");
 		const { createNodejsServer } = await import("./servers/nodejsServer");
+		const { createBashServer } = await import("./servers/bashServer");
 
 		const servers = [
 			createFetchServer(),
@@ -148,6 +149,7 @@ export class InternalMcpService {
 			createPythonServer(),
 			createJavaScriptServer(),
 			createNodejsServer(),
+			createBashServer(),
 			createBrowserServer(),
 			createImageGenServer(),
 		];
