@@ -8,6 +8,7 @@ import {
 import { cn } from "../../lib/utils";
 import type { SearchConfig } from "../../types/search";
 import { searchService } from "../../services/search/searchService";
+import { SEARCH_PROVIDERS } from "../settings/SearchProviders";
 
 export interface SearchEnginePanelProps {
 	selectedEngine: string;
@@ -25,8 +26,12 @@ function getEngineIcon(provider: string, size = 14) {
 			return <BaiduIcon size={size} />;
 		case "sogou":
 			return <SogouIcon size={size} />;
-		default:
-			return <span style={{ fontSize: size }}>🔍</span>;
+		default: {
+			const info = SEARCH_PROVIDERS.find((p) => p.id === provider);
+			return (
+				<span style={{ fontSize: size }}>{info?.icon ?? "🔍"}</span>
+			);
+		}
 	}
 }
 
