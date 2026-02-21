@@ -3,7 +3,7 @@ import {
 	ThunderboltOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
-import { Tag, theme } from "antd";
+import { Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import type { SkillManifest } from "../../types/electron";
@@ -12,8 +12,8 @@ const { useToken } = theme;
 
 export const BuiltinSkillCard: React.FC<{
 	skill: SkillManifest;
-	onSelect: (skillId: string) => void;
-}> = ({ skill, onSelect }) => {
+	onClick: (skill: SkillManifest) => void;
+}> = ({ skill, onClick }) => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 
@@ -21,7 +21,7 @@ export const BuiltinSkillCard: React.FC<{
 
 	return (
 		<div
-			onClick={() => onSelect(skill.id)}
+			onClick={() => onClick(skill)}
 			className="group relative flex flex-col rounded-xl border cursor-pointer transition-all duration-200"
 			style={{
 				borderColor: token.colorBorderSecondary,
@@ -45,26 +45,29 @@ export const BuiltinSkillCard: React.FC<{
 					{skill.icon || "🧩"}
 				</div>
 				<div className="flex-1 min-w-0">
-					<div className="flex items-center gap-2">
-						<span
-							className="font-semibold text-sm truncate"
-							style={{ color: token.colorText }}
-							title={skill.name}
-						>
-							{skill.name}
-						</span>
-						<CheckCircleFilled style={{ color: token.colorSuccess, fontSize: 14 }} />
-					</div>
+					<Tooltip title={skill.name} placement="top" mouseEnterDelay={0.4}>
+						<div className="flex items-center gap-2">
+							<span
+								className="font-semibold text-sm truncate"
+								style={{ color: token.colorText }}
+							>
+								{skill.name}
+							</span>
+							<CheckCircleFilled
+								style={{ color: token.colorSuccess, fontSize: 14 }}
+							/>
+						</div>
+					</Tooltip>
 					<div className="flex items-center gap-1.5 mt-1">
 						<Tag
-							bordered={false}
+							variant="filled"
 							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
 						>
 							v{skill.version}
 						</Tag>
 						{skill.category && (
 							<Tag
-								bordered={false}
+								variant="filled"
 								color="orange"
 								className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
 							>
@@ -76,36 +79,49 @@ export const BuiltinSkillCard: React.FC<{
 			</div>
 
 			{/* Description */}
-			<div className="px-4 flex-1">
-				<p
-					className="text-xs line-clamp-3 leading-relaxed m-0"
-					style={{ color: token.colorTextSecondary }}
-					title={skill.description}
-				>
-					{skill.description}
-				</p>
-			</div>
+			<Tooltip
+				title={skill.description}
+				placement="bottom"
+				mouseEnterDelay={0.4}
+			>
+				<div className="px-4 flex-1">
+					<p
+						className="text-xs line-clamp-3 leading-relaxed m-0"
+						style={{ color: token.colorTextSecondary }}
+					>
+						{skill.description}
+					</p>
+				</div>
+			</Tooltip>
 
 			{/* Footer */}
 			<div className="px-4 py-3 flex items-center justify-between">
 				<div className="flex items-center gap-2">
-					<span
-						className="text-xs"
-						style={{ color: token.colorTextTertiary }}
-					>
+					<span className="text-xs" style={{ color: token.colorTextTertiary }}>
 						{t("by", { ns: "skills" })} {skill.author}
 					</span>
 				</div>
 				<div className="flex items-center gap-1.5">
 					{toolCount > 0 && (
-						<Tag bordered={false} color="purple" className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+						<Tag
+							variant="filled"
+							color="purple"
+							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						>
 							<ToolOutlined className="mr-0.5" style={{ fontSize: 10 }} />
 							{toolCount} {toolCount === 1 ? "tool" : "tools"}
 						</Tag>
 					)}
 					{skill.systemPrompt && (
-						<Tag bordered={false} color="blue" className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
-							<ThunderboltOutlined className="mr-0.5" style={{ fontSize: 10 }} />
+						<Tag
+							variant="filled"
+							color="blue"
+							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						>
+							<ThunderboltOutlined
+								className="mr-0.5"
+								style={{ fontSize: 10 }}
+							/>
 							Prompt
 						</Tag>
 					)}

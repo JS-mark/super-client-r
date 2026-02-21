@@ -101,5 +101,18 @@
 		"searchPlaceholder": "搜索内置 MCP...",
 		"description": "内置 MCP 服务器在应用内直接运行，无需安装配置，始终可用。",
 		"noData": "暂无内置 MCP 服务器"
+	},
+	"detail": {
+		"title": "服务详情",
+		"tools": "工具",
+		"toolCount": "{{count}} 个工具",
+		"toolCount_one": "{{count}} 个工具",
+		"noTools": "暂无可用工具",
+		"noToolsHint": "连接服务器以获取可用工具列表",
+		"toolInputSchema": "输入参数",
+		"serverInfo": "服务信息",
+		"transport": "传输类型",
+		"version": "版本",
+		"type": "类型"
 	}
 }

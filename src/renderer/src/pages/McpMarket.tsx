@@ -37,6 +37,7 @@ import { MainLayout } from "../components/layout/MainLayout";
 import { InstalledMcpCard } from "../components/mcp/InstalledMcpCard";
 import { McpConfigModal } from "../components/mcp/McpConfigModal";
 import { McpDetailModal } from "../components/mcp/McpDetailModal";
+import { McpServerDetailModal } from "../components/mcp/McpServerDetailModal";
 import { McpMarketCard } from "../components/mcp/McpMarketCard";
 import {
 	MCP_LOGO_PATHS,
@@ -46,7 +47,11 @@ import {
 import { ThirdPartyMcpCard } from "../components/mcp/ThirdPartyMcpCard";
 import { useTitle } from "../hooks/useTitle";
 import { useMcpStore } from "../stores/mcpStore";
-import type { McpMarketItem, McpServer, BuiltinMcpDefinition } from "../types/mcp";
+import type {
+	McpMarketItem,
+	McpServer,
+	BuiltinMcpDefinition,
+} from "../types/mcp";
 
 const PAGE_SIZE = 12;
 
@@ -112,9 +117,15 @@ const McpMarket: React.FC = () => {
 	const [currentPage, setCurrentPage] = useState(1);
 	const [selectedTag, setSelectedTag] = useState<string | null>(null);
 	const [thirdPartyForm] = Form.useForm();
-	const [builtinDefinitions, setBuiltinDefinitions] = useState<BuiltinMcpDefinition[]>([]);
+	const [builtinDefinitions, setBuiltinDefinitions] = useState<
+		BuiltinMcpDefinition[]
+	>([]);
 	const [configModalOpen, setConfigModalOpen] = useState(false);
-	const [configuringServer, setConfiguringServer] = useState<McpServer | null>(null);
+	const [configuringServer, setConfiguringServer] = useState<McpServer | null>(
+		null,
+	);
+	const [detailServer, setDetailServer] = useState<McpServer | null>(null);
+	const [detailModalOpen, setDetailModalOpen] = useState(false);
 
 	useEffect(() => {
 		fetchMarketItems();
@@ -144,7 +155,8 @@ const McpMarket: React.FC = () => {
 		// 同步所有服务器的状态和工具
 		window.electron.mcp.getAllStatus().then((res) => {
 			if (res.success && res.data) {
-				const { updateServerStatus, updateServerTools } = useMcpStore.getState();
+				const { updateServerStatus, updateServerTools } =
+					useMcpStore.getState();
 				for (const status of res.data) {
 					updateServerStatus(status.id, status.status, status.error);
 					if (status.tools) {
@@ -158,14 +170,24 @@ const McpMarket: React.FC = () => {
 	useEffect(() => {
 		const timeoutId = setTimeout(() => {
 			setCurrentPage(1);
-			fetchMarketItems(1, PAGE_SIZE, selectedTag || undefined, marketSearchTerm);
+			fetchMarketItems(
+				1,
+				PAGE_SIZE,
+				selectedTag || undefined,
+				marketSearchTerm,
+			);
 		}, 300);
 		return () => clearTimeout(timeoutId);
 	}, [marketSearchTerm, selectedTag, fetchMarketItems]);
 
 	const handlePageChange = (page: number) => {
 		setCurrentPage(page);
-		fetchMarketItems(page, PAGE_SIZE, selectedTag || undefined, marketSearchTerm);
+		fetchMarketItems(
+			page,
+			PAGE_SIZE,
+			selectedTag || undefined,
+			marketSearchTerm,
+		);
 	};
 
 	const handleInstall = useCallback(
@@ -262,93 +284,106 @@ const McpMarket: React.FC = () => {
 		setConfigModalOpen(true);
 	}, []);
 
-	const handleSaveConfig = useCallback(async (serverId: string, config: Record<string, unknown>) => {
-		const server = servers.find((s) => s.id === serverId);
-		if (!server) return;
+	const handleViewServer = useCallback((server: McpServer) => {
+		setDetailServer(server);
+		setDetailModalOpen(true);
+	}, []);
 
-		try {
-			if (config.__generic) {
-				// Generic mode: directly update command/args/env/url
-				const updates: Partial<McpServer> = {};
+	const handleSaveConfig = useCallback(
+		async (serverId: string, config: Record<string, unknown>) => {
+			const server = servers.find((s) => s.id === serverId);
+			if (!server) return;
 
-				if (server.transport === "stdio") {
-					if (config._command) updates.command = config._command as string;
-					if (config._args !== undefined) {
-						updates.args = (config._args as string).split(" ").filter(Boolean);
-					}
-					if (config._env !== undefined) {
-						const envStr = config._env as string;
-						if (envStr.trim()) {
-							const env: Record<string, string> = {};
-							for (const line of envStr.split("\n")) {
-								const trimmed = line.trim();
-								if (!trimmed) continue;
-								const eqIdx = trimmed.indexOf("=");
-								if (eqIdx > 0) {
-									env[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
-								}
-							}
-							updates.env = env;
-						} else {
-							updates.env = undefined;
+			try {
+				if (config.__generic) {
+					// Generic mode: directly update command/args/env/url
+					const updates: Partial<McpServer> = {};
+
+					if (server.transport === "stdio") {
+						if (config._command) updates.command = config._command as string;
+						if (config._args !== undefined) {
+							updates.args = (config._args as string)
+								.split(" ")
+								.filter(Boolean);
 						}
+						if (config._env !== undefined) {
+							const envStr = config._env as string;
+							if (envStr.trim()) {
+								const env: Record<string, string> = {};
+								for (const line of envStr.split("\n")) {
+									const trimmed = line.trim();
+									if (!trimmed) continue;
+									const eqIdx = trimmed.indexOf("=");
+									if (eqIdx > 0) {
+										env[trimmed.slice(0, eqIdx)] = trimmed.slice(eqIdx + 1);
+									}
+								}
+								updates.env = env;
+							} else {
+								updates.env = undefined;
+							}
+						}
+					} else {
+						if (config._url) updates.url = config._url as string;
 					}
+
+					if (server.status === "connected") {
+						await window.electron.mcp.disconnect(serverId);
+					}
+
+					await window.electron.mcp.updateServer(serverId, updates);
+
+					const { updateServer } = useMcpStore.getState();
+					updateServer(serverId, {
+						...updates,
+						status: "disconnected",
+						tools: undefined,
+					});
 				} else {
-					if (config._url) updates.url = config._url as string;
+					// Schema mode: use builtin createConfig
+					const def = findBuiltinDefinition(server, builtinDefinitions);
+					if (!def) return;
+
+					const res = await window.electron.mcp.builtin.createConfig(
+						def.id,
+						config,
+					);
+					if (!res.success || !res.data) {
+						message.error(res.error || "Failed to create config");
+						return;
+					}
+
+					const newConfig = res.data;
+
+					if (server.status === "connected") {
+						await window.electron.mcp.disconnect(serverId);
+					}
+
+					await window.electron.mcp.updateServer(serverId, {
+						command: newConfig.command,
+						args: newConfig.args,
+						env: newConfig.env,
+					});
+
+					const { updateServer } = useMcpStore.getState();
+					updateServer(serverId, {
+						command: newConfig.command,
+						args: newConfig.args,
+						env: newConfig.env,
+						status: "disconnected",
+						tools: undefined,
+					});
 				}
 
-				if (server.status === "connected") {
-					await window.electron.mcp.disconnect(serverId);
-				}
-
-				await window.electron.mcp.updateServer(serverId, updates);
-
-				const { updateServer } = useMcpStore.getState();
-				updateServer(serverId, {
-					...updates,
-					status: "disconnected",
-					tools: undefined,
-				});
-			} else {
-				// Schema mode: use builtin createConfig
-				const def = findBuiltinDefinition(server, builtinDefinitions);
-				if (!def) return;
-
-				const res = await window.electron.mcp.builtin.createConfig(def.id, config);
-				if (!res.success || !res.data) {
-					message.error(res.error || "Failed to create config");
-					return;
-				}
-
-				const newConfig = res.data;
-
-				if (server.status === "connected") {
-					await window.electron.mcp.disconnect(serverId);
-				}
-
-				await window.electron.mcp.updateServer(serverId, {
-					command: newConfig.command,
-					args: newConfig.args,
-					env: newConfig.env,
-				});
-
-				const { updateServer } = useMcpStore.getState();
-				updateServer(serverId, {
-					command: newConfig.command,
-					args: newConfig.args,
-					env: newConfig.env,
-					status: "disconnected",
-					tools: undefined,
-				});
+				setConfigModalOpen(false);
+				setConfiguringServer(null);
+				message.success(t("messages.saveSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.saveError", { ns: "mcp" }));
 			}
-
-			setConfigModalOpen(false);
-			setConfiguringServer(null);
-			message.success(t("messages.saveSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.saveError", { ns: "mcp" }));
-		}
-	}, [servers, builtinDefinitions, t]);
+		},
+		[servers, builtinDefinitions, t],
+	);
 
 	const allTags = useMemo(() => {
 		const tagSet = new Set<string>();
@@ -377,12 +412,20 @@ const McpMarket: React.FC = () => {
 					currentPage={currentPage}
 					pageSize={PAGE_SIZE}
 					onPageChange={handlePageChange}
-					onItemClick={(item) => { setSelectedItem(item); setModalOpen(true); }}
+					onItemClick={(item) => {
+						setSelectedItem(item);
+						setModalOpen(true);
+					}}
 					onInstall={handleInstall}
 					onConfigure={handleOpenConfig}
 					onSearch={() => {
 						setCurrentPage(1);
-						fetchMarketItems(1, PAGE_SIZE, selectedTag || undefined, marketSearchTerm);
+						fetchMarketItems(
+							1,
+							PAGE_SIZE,
+							selectedTag || undefined,
+							marketSearchTerm,
+						);
 					}}
 				/>
 			),
@@ -413,6 +456,7 @@ const McpMarket: React.FC = () => {
 					servers={filterServers(internalServers, builtinSearchTerm)}
 					searchTerm={builtinSearchTerm}
 					onSearchChange={setBuiltinSearchTerm}
+					onView={handleViewServer}
 				/>
 			),
 		},
@@ -425,6 +469,7 @@ const McpMarket: React.FC = () => {
 					searchTerm={installedSearchTerm}
 					onSearchChange={setInstalledSearchTerm}
 					onConfigure={handleOpenConfig}
+					onView={handleViewServer}
 				/>
 			),
 		},
@@ -442,9 +487,21 @@ const McpMarket: React.FC = () => {
 				<McpDetailModal
 					item={selectedItem}
 					open={modalOpen}
-					onClose={() => { setModalOpen(false); setSelectedItem(null); }}
+					onClose={() => {
+						setModalOpen(false);
+						setSelectedItem(null);
+					}}
 					onInstall={handleInstall}
 					onConfigure={handleOpenConfig}
+				/>
+
+				<McpServerDetailModal
+					server={detailServer}
+					open={detailModalOpen}
+					onClose={() => {
+						setDetailModalOpen(false);
+						setDetailServer(null);
+					}}
 				/>
 
 				<ThirdPartyFormModal
@@ -460,7 +517,8 @@ const McpMarket: React.FC = () => {
 					server={configuringServer}
 					configSchema={
 						configuringServer
-							? findBuiltinDefinition(configuringServer, builtinDefinitions)?.configSchema
+							? findBuiltinDefinition(configuringServer, builtinDefinitions)
+									?.configSchema
 							: undefined
 					}
 					builtinDefinition={
@@ -469,7 +527,10 @@ const McpMarket: React.FC = () => {
 							: undefined
 					}
 					onSave={handleSaveConfig}
-					onCancel={() => { setConfigModalOpen(false); setConfiguringServer(null); }}
+					onCancel={() => {
+						setConfigModalOpen(false);
+						setConfiguringServer(null);
+					}}
 				/>
 			</div>
 		</MainLayout>
@@ -479,9 +540,23 @@ const McpMarket: React.FC = () => {
 // --- Tab sub-components ---
 
 function MarketTab({
-	marketItems, marketTotal, marketError, isLoading, servers, searchTerm, onSearchChange,
-	selectedTag, onTagChange, allTags, currentPage, pageSize, onPageChange,
-	onItemClick, onInstall, onConfigure, onSearch,
+	marketItems,
+	marketTotal,
+	marketError,
+	isLoading,
+	servers,
+	searchTerm,
+	onSearchChange,
+	selectedTag,
+	onTagChange,
+	allTags,
+	currentPage,
+	pageSize,
+	onPageChange,
+	onItemClick,
+	onInstall,
+	onConfigure,
+	onSearch,
 }: {
 	marketItems: McpMarketItem[];
 	marketTotal: number;
@@ -519,8 +594,16 @@ function MarketTab({
 					<Dropdown
 						menu={{
 							items: [
-								{ key: "all", label: t("tags.all", { ns: "mcp" }), onClick: () => onTagChange(null) },
-								...allTags.map((tag) => ({ key: tag, label: tag, onClick: () => onTagChange(tag) })),
+								{
+									key: "all",
+									label: t("tags.all", { ns: "mcp" }),
+									onClick: () => onTagChange(null),
+								},
+								...allTags.map((tag) => ({
+									key: tag,
+									label: tag,
+									onClick: () => onTagChange(tag),
+								})),
 							],
 						}}
 					>
@@ -529,18 +612,30 @@ function MarketTab({
 						</Button>
 					</Dropdown>
 				)}
-				<Button type="primary" icon={<SearchOutlined />} onClick={onSearch} loading={isLoading}>
+				<Button
+					type="primary"
+					icon={<SearchOutlined />}
+					onClick={onSearch}
+					loading={isLoading}
+				>
 					{t("search", { ns: "common" })}
 				</Button>
 			</div>
 			<div className="flex-1 overflow-y-auto min-h-0">
 				{isLoading ? (
-					<div className="flex justify-center items-center py-20"><Spin size="large" /></div>
+					<div className="flex justify-center items-center py-20">
+						<Spin size="large" />
+					</div>
 				) : marketError ? (
 					<Empty
 						description={
 							<div className="text-center">
-								<p className="mb-2">{t("marketError", { ns: "mcp", defaultValue: "Failed to load marketplace data" })}</p>
+								<p className="mb-2">
+									{t("marketError", {
+										ns: "mcp",
+										defaultValue: "Failed to load marketplace data",
+									})}
+								</p>
 								<p className="text-xs opacity-60 mb-3">{marketError}</p>
 								<Button icon={<ReloadOutlined />} onClick={onSearch}>
 									{t("retry", { ns: "common", defaultValue: "Retry" })}
@@ -568,7 +663,13 @@ function MarketTab({
 			</div>
 			{marketTotal > pageSize && (
 				<div className="flex justify-center pt-4 shrink-0">
-					<Pagination current={currentPage} total={marketTotal} pageSize={pageSize} onChange={onPageChange} showSizeChanger={false} />
+					<Pagination
+						current={currentPage}
+						total={marketTotal}
+						pageSize={pageSize}
+						onChange={onPageChange}
+						showSizeChanger={false}
+					/>
 				</div>
 			)}
 		</div>
@@ -576,7 +677,11 @@ function MarketTab({
 }
 
 function ThirdPartyTab({
-	servers, searchTerm, onSearchChange, onAdd, onEdit,
+	servers,
+	searchTerm,
+	onSearchChange,
+	onAdd,
+	onEdit,
 }: {
 	servers: McpServer[];
 	searchTerm: string;
@@ -609,7 +714,11 @@ function ThirdPartyTab({
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 					{servers.map((server) => (
-						<ThirdPartyMcpCard key={server.id} server={server} onEdit={() => onEdit(server)} />
+						<ThirdPartyMcpCard
+							key={server.id}
+							server={server}
+							onEdit={() => onEdit(server)}
+						/>
 					))}
 				</div>
 			)}
@@ -618,11 +727,15 @@ function ThirdPartyTab({
 }
 
 function BuiltinInternalTab({
-	servers, searchTerm, onSearchChange,
+	servers,
+	searchTerm,
+	onSearchChange,
+	onView,
 }: {
 	servers: McpServer[];
 	searchTerm: string;
 	onSearchChange: (v: string) => void;
+	onView: (server: McpServer) => void;
 }) {
 	const { t } = useTranslation();
 	const { token } = useToken();
@@ -644,14 +757,17 @@ function BuiltinInternalTab({
 				</p>
 			</div>
 			{servers.length === 0 ? (
-				<Empty description={t("internal.noData", { ns: "mcp" })} className="py-20" />
+				<Empty
+					description={t("internal.noData", { ns: "mcp" })}
+					className="py-20"
+				/>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 					{servers.map((server) => (
 						<InstalledMcpCard
 							key={server.id}
 							server={server}
-							onView={() => {}}
+							onView={() => onView(server)}
 						/>
 					))}
 				</div>
@@ -661,12 +777,17 @@ function BuiltinInternalTab({
 }
 
 function InstalledTab({
-	servers, searchTerm, onSearchChange, onConfigure,
+	servers,
+	searchTerm,
+	onSearchChange,
+	onConfigure,
+	onView,
 }: {
 	servers: McpServer[];
 	searchTerm: string;
 	onSearchChange: (v: string) => void;
 	onConfigure: (server: McpServer) => void;
+	onView: (server: McpServer) => void;
 }) {
 	const { t } = useTranslation();
 
@@ -682,14 +803,17 @@ function InstalledTab({
 				/>
 			</div>
 			{servers.length === 0 ? (
-				<Empty description={t("noInstalled", { ns: "mcp" })} className="py-20" />
+				<Empty
+					description={t("noInstalled", { ns: "mcp" })}
+					className="py-20"
+				/>
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 					{servers.map((server) => (
 						<InstalledMcpCard
 							key={server.id}
 							server={server}
-							onView={() => {}}
+							onView={() => onView(server)}
 							onConfigure={onConfigure}
 						/>
 					))}
@@ -699,7 +823,13 @@ function InstalledTab({
 	);
 }
 
-function McpLogoIcon({ size = 24, className }: { size?: number; className?: string }) {
+function McpLogoIcon({
+	size = 24,
+	className,
+}: {
+	size?: number;
+	className?: string;
+}) {
 	return (
 		<svg
 			width={size}
@@ -711,7 +841,7 @@ function McpLogoIcon({ size = 24, className }: { size?: number; className?: stri
 		>
 			{MCP_LOGO_PATHS.map((d, i) => (
 				<path
-					key={i}
+					key={d}
 					d={d}
 					stroke="currentColor"
 					strokeWidth="11.07"
@@ -751,7 +881,9 @@ function MarketSourcesTab() {
 							<div
 								className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
 								style={{
-									backgroundColor: source.official ? token.colorPrimary : token.colorFillSecondary,
+									backgroundColor: source.official
+										? token.colorPrimary
+										: token.colorFillSecondary,
 									color: source.official ? "#fff" : token.colorText,
 								}}
 							>
@@ -759,7 +891,10 @@ function MarketSourcesTab() {
 							</div>
 							<div className="flex-1 min-w-0">
 								<div className="flex items-center gap-2 mb-1">
-									<span className="font-semibold text-sm truncate" style={{ color: token.colorText }}>
+									<span
+										className="font-semibold text-sm truncate"
+										style={{ color: token.colorText }}
+									>
 										{isZh ? source.nameZh : source.name}
 									</span>
 									{source.official && (
@@ -769,7 +904,10 @@ function MarketSourcesTab() {
 										</Tag>
 									)}
 								</div>
-								<p className="text-xs m-0 line-clamp-2" style={{ color: token.colorTextSecondary }}>
+								<p
+									className="text-xs m-0 line-clamp-2"
+									style={{ color: token.colorTextSecondary }}
+								>
 									{isZh ? source.descriptionZh : source.description}
 								</p>
 							</div>
@@ -785,7 +923,11 @@ function MarketSourcesTab() {
 }
 
 function ThirdPartyFormModal({
-	open, editingServer, form, onCancel, onFinish,
+	open,
+	editingServer,
+	form,
+	onCancel,
+	onFinish,
 }: {
 	open: boolean;
 	editingServer: McpServer | null;
@@ -816,29 +958,90 @@ function ThirdPartyFormModal({
 			destroyOnHidden={true}
 		>
 			<Form form={form} layout="vertical" onFinish={onFinish}>
-				<Form.Item name="name" label={t("form.name", { ns: "mcp" })} rules={[{ required: true, message: t("form.nameRequired", { ns: "mcp" }) }]}>
-					<Input placeholder={t("form.namePlaceholder", { ns: "mcp" })} prefix={<ApiOutlined className="text-gray-400" />} />
+				<Form.Item
+					name="name"
+					label={t("form.name", { ns: "mcp" })}
+					rules={[
+						{ required: true, message: t("form.nameRequired", { ns: "mcp" }) },
+					]}
+				>
+					<Input
+						placeholder={t("form.namePlaceholder", { ns: "mcp" })}
+						prefix={<ApiOutlined className="text-gray-400" />}
+					/>
 				</Form.Item>
-				<Form.Item name="description" label={t("description", { ns: "common" })}>
-					<Input.TextArea placeholder={t("form.descriptionPlaceholder", { ns: "mcp" })} rows={2} />
+				<Form.Item
+					name="description"
+					label={t("description", { ns: "common" })}
+				>
+					<Input.TextArea
+						placeholder={t("form.descriptionPlaceholder", { ns: "mcp" })}
+						rows={2}
+					/>
 				</Form.Item>
-				<Form.Item name="transport" label={t("form.transport", { ns: "mcp" })} rules={[{ required: true, message: t("form.transportRequired", { ns: "mcp" }) }]} initialValue="http">
-					<Select options={[{ value: "http", label: "HTTP" }, { value: "sse", label: "SSE" }, { value: "stdio", label: "STDIO" }]} />
+				<Form.Item
+					name="transport"
+					label={t("form.transport", { ns: "mcp" })}
+					rules={[
+						{
+							required: true,
+							message: t("form.transportRequired", { ns: "mcp" }),
+						},
+					]}
+					initialValue="http"
+				>
+					<Select
+						options={[
+							{ value: "http", label: "HTTP" },
+							{ value: "sse", label: "SSE" },
+							{ value: "stdio", label: "STDIO" },
+						]}
+					/>
 				</Form.Item>
-				<Form.Item noStyle shouldUpdate={(prev, cur) => prev.transport !== cur.transport}>
+				<Form.Item
+					noStyle
+					shouldUpdate={(prev, cur) => prev.transport !== cur.transport}
+				>
 					{({ getFieldValue }) =>
 						getFieldValue("transport") === "stdio" ? (
 							<>
-								<Form.Item name="command" label={t("form.command", { ns: "mcp" })} rules={[{ required: true, message: t("form.commandRequired", { ns: "mcp" }) }]}>
-									<Input placeholder={t("form.commandPlaceholder", { ns: "mcp" })} prefix={<SaveOutlined className="text-gray-400" />} />
+								<Form.Item
+									name="command"
+									label={t("form.command", { ns: "mcp" })}
+									rules={[
+										{
+											required: true,
+											message: t("form.commandRequired", { ns: "mcp" }),
+										},
+									]}
+								>
+									<Input
+										placeholder={t("form.commandPlaceholder", { ns: "mcp" })}
+										prefix={<SaveOutlined className="text-gray-400" />}
+									/>
 								</Form.Item>
 								<Form.Item name="args" label={t("form.args", { ns: "mcp" })}>
-									<Input placeholder={t("form.argsPlaceholder", { ns: "mcp" })} />
+									<Input
+										placeholder={t("form.argsPlaceholder", { ns: "mcp" })}
+									/>
 								</Form.Item>
 							</>
 						) : (
-							<Form.Item name="url" label={t("form.url", { ns: "mcp" })} rules={[{ required: true, message: t("form.urlRequired", { ns: "mcp" }) }, { type: "url", message: t("form.urlInvalid", { ns: "mcp" }) }]}>
-								<Input placeholder={t("form.urlPlaceholder", { ns: "mcp" })} prefix={<LinkOutlined className="text-gray-400" />} />
+							<Form.Item
+								name="url"
+								label={t("form.url", { ns: "mcp" })}
+								rules={[
+									{
+										required: true,
+										message: t("form.urlRequired", { ns: "mcp" }),
+									},
+									{ type: "url", message: t("form.urlInvalid", { ns: "mcp" }) },
+								]}
+							>
+								<Input
+									placeholder={t("form.urlPlaceholder", { ns: "mcp" })}
+									prefix={<LinkOutlined className="text-gray-400" />}
+								/>
 							</Form.Item>
 						)
 					}

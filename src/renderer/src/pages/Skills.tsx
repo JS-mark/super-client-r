@@ -3,15 +3,7 @@ import {
 	SearchOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
-import {
-	Button,
-	Empty,
-	Input,
-	Pagination,
-	Spin,
-	Tabs,
-	theme,
-} from "antd";
+import { Button, Empty, Input, Pagination, Spin, Tabs, theme } from "antd";
 import * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -20,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { BuiltinSkillCard } from "../components/skill/BuiltinSkillCard";
+import { BuiltinSkillDetailModal } from "../components/skill/BuiltinSkillDetailModal";
 import { SkillCard } from "../components/skill/SkillCard";
 import { SkillDetailModal } from "../components/skill/SkillDetailModal";
 import { useTitle } from "../hooks/useTitle";
@@ -67,6 +60,9 @@ const Skills: React.FC = () => {
 	// Built-in skills state
 	const [builtinSkills, setBuiltinSkills] = useState<SkillManifest[]>([]);
 	const [builtinLoading, setBuiltinLoading] = useState(false);
+	const [selectedBuiltinSkill, setSelectedBuiltinSkill] =
+		useState<SkillManifest | null>(null);
+	const [builtinModalOpen, setBuiltinModalOpen] = useState(false);
 
 	const handleSkillClick = (skill: Skill) => {
 		setSelectedSkill(skill);
@@ -78,11 +74,25 @@ const Skills: React.FC = () => {
 		setSelectedSkill(null);
 	};
 
+	// Open detail modal for built-in skill
+	const handleBuiltinSkillClick = useCallback((skill: SkillManifest) => {
+		setSelectedBuiltinSkill(skill);
+		setBuiltinModalOpen(true);
+	}, []);
+
+	const handleCloseBuiltinModal = useCallback(() => {
+		setBuiltinModalOpen(false);
+		setSelectedBuiltinSkill(null);
+	}, []);
+
 	// Navigate to chat with skill selected
-	const handleSelectBuiltinSkill = useCallback((skillId: string) => {
-		useChatStore.getState().setPendingSkillId(skillId);
-		navigate("/");
-	}, [navigate]);
+	const handleUseBuiltinSkill = useCallback(
+		(skillId: string) => {
+			useChatStore.getState().setPendingSkillId(skillId);
+			navigate("/chat");
+		},
+		[navigate],
+	);
 
 	React.useEffect(() => {
 		fetchMarketSkills();
@@ -134,7 +144,8 @@ const Skills: React.FC = () => {
 			label: (
 				<span className="flex items-center gap-1.5">
 					<AppstoreOutlined />
-					{t("tabs.builtin", { ns: "skills", defaultValue: "内置技能" })} ({builtinSkills.length})
+					{t("tabs.builtin", { ns: "skills", defaultValue: "内置技能" })} (
+					{builtinSkills.length})
 				</span>
 			),
 			children: (
@@ -148,14 +159,20 @@ const Skills: React.FC = () => {
 					>
 						{t("builtinDescription", {
 							ns: "skills",
-							defaultValue: "内置技能随应用一起提供，无需安装。点击卡片可直接在聊天中使用该技能。",
+							defaultValue:
+								"内置技能随应用一起提供，无需安装。点击卡片可直接在聊天中使用该技能。",
 						})}
 					</div>
 					{builtinLoading ? (
-						<div className="flex justify-center items-center py-20"><Spin size="large" /></div>
+						<div className="flex justify-center items-center py-20">
+							<Spin size="large" />
+						</div>
 					) : builtinSkills.length === 0 ? (
 						<Empty
-							description={t("noBuiltin", { ns: "skills", defaultValue: "暂无内置技能" })}
+							description={t("noBuiltin", {
+								ns: "skills",
+								defaultValue: "暂无内置技能",
+							})}
 							className="py-20"
 						/>
 					) : (
@@ -164,7 +181,7 @@ const Skills: React.FC = () => {
 								<BuiltinSkillCard
 									key={skill.id}
 									skill={skill}
-									onSelect={handleSelectBuiltinSkill}
+									onClick={handleBuiltinSkillClick}
 								/>
 							))}
 						</div>
@@ -203,20 +220,35 @@ const Skills: React.FC = () => {
 					</div>
 					<div className="flex-1 overflow-y-auto min-h-0">
 						{isLoading ? (
-							<div className="flex justify-center items-center py-20"><Spin size="large" /></div>
+							<div className="flex justify-center items-center py-20">
+								<Spin size="large" />
+							</div>
 						) : marketSkills.length === 0 ? (
-							<Empty description={t("noData", { ns: "skills" })} className="py-20" />
+							<Empty
+								description={t("noData", { ns: "skills" })}
+								className="py-20"
+							/>
 						) : (
 							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
 								{marketSkills.map((item) => (
-									<SkillCard key={item.id} skill={item} onClick={() => handleSkillClick(item)} />
+									<SkillCard
+										key={item.id}
+										skill={item}
+										onClick={() => handleSkillClick(item)}
+									/>
 								))}
 							</div>
 						)}
 					</div>
 					{marketTotal > pageSize && (
 						<div className="flex justify-center pt-4 shrink-0">
-							<Pagination current={currentPage} total={marketTotal} pageSize={pageSize} onChange={handlePageChange} showSizeChanger={false} />
+							<Pagination
+								current={currentPage}
+								total={marketTotal}
+								pageSize={pageSize}
+								onChange={handlePageChange}
+								showSizeChanger={false}
+							/>
 						</div>
 					)}
 				</div>
@@ -240,11 +272,18 @@ const Skills: React.FC = () => {
 						</Button>
 					</div>
 					{filterInstalledSkills(installedSkills).length === 0 ? (
-						<Empty description={t("noInstalled", { ns: "skills" })} className="py-20" />
+						<Empty
+							description={t("noInstalled", { ns: "skills" })}
+							className="py-20"
+						/>
 					) : (
 						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
 							{filterInstalledSkills(installedSkills).map((item) => (
-								<SkillCard key={item.id} skill={item} onClick={() => handleSkillClick(item)} />
+								<SkillCard
+									key={item.id}
+									skill={item}
+									onClick={() => handleSkillClick(item)}
+								/>
 							))}
 						</div>
 					)}
@@ -261,7 +300,17 @@ const Skills: React.FC = () => {
 					items={items}
 					className="flex-1 min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
 				/>
-				<SkillDetailModal skill={selectedSkill} open={modalOpen} onClose={handleCloseModal} />
+				<SkillDetailModal
+					skill={selectedSkill}
+					open={modalOpen}
+					onClose={handleCloseModal}
+				/>
+				<BuiltinSkillDetailModal
+					skill={selectedBuiltinSkill}
+					open={builtinModalOpen}
+					onClose={handleCloseBuiltinModal}
+					onUse={handleUseBuiltinSkill}
+				/>
 			</div>
 		</MainLayout>
 	);

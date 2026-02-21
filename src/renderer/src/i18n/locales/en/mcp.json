@@ -101,5 +101,18 @@
 		"searchPlaceholder": "Search built-in MCP...",
 		"description": "Built-in MCP servers run directly in the app, always available without installation or configuration.",
 		"noData": "No built-in MCP servers"
+	},
+	"detail": {
+		"title": "Server Details",
+		"tools": "Tools",
+		"toolCount": "{{count}} tools",
+		"toolCount_one": "{{count}} tool",
+		"noTools": "No tools available",
+		"noToolsHint": "Connect the server to discover available tools",
+		"toolInputSchema": "Input Schema",
+		"serverInfo": "Server Info",
+		"transport": "Transport",
+		"version": "Version",
+		"type": "Type"
 	}
 }

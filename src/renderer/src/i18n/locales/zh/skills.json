@@ -29,5 +29,10 @@
 		"reinstalled": "已重装 {{name}}"
 	},
 	"by": "作者",
-	"installedVersion": "已安装版本: "
+	"installedVersion": "已安装版本: ",
+	"useSkill": "使用技能",
+	"builtinTag": "内置",
+	"systemPrompt": "系统提示词",
+	"tools": "工具",
+	"permissions": "权限"
 }

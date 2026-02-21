@@ -29,5 +29,10 @@
 		"reinstalled": "Reinstalled {{name}}"
 	},
 	"by": "By",
-	"installedVersion": "Installed: "
+	"installedVersion": "Installed: ",
+	"useSkill": "Use Skill",
+	"builtinTag": "Built-in",
+	"systemPrompt": "System Prompt",
+	"tools": "Tools",
+	"permissions": "Permissions"
 }
