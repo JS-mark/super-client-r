@@ -1,0 +1,9 @@
+{
+	"name": "novel-writer",
+	"description": "长篇小说创作助手插件，支持从大纲到连载的全流程创作，可调用网络搜索收集素材、生成配图",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"category": "creativity"
+}
