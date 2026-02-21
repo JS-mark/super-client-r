@@ -1,207 +1,213 @@
 {
-  "name": "super-client-r",
-  "version": "0.0.1",
-  "description": "A super client application built with Electron, React and Ant Design",
-  "author": "Mark",
-  "private": true,
-  "engines": {
-    "node": ">=22",
-    "pnpm": ">=10"
-  },
-  "packageManager": "pnpm@10.24.0",
-  "main": "out/main/main.js",
-  "scripts": {
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
-    "dev": "tsc -b && electron-vite dev",
-    "build": "tsc -b && electron-vite build && electron-builder",
-    "build:mac": "tsc -b && electron-vite build && electron-builder --mac",
-    "build:icons": "tsx scripts/build-icons.ts",
-    "lint": "oxlint .",
-    "lint:biome": "biome lint .",
-    "format": "biome format --write .",
-    "check:biome": "biome check --write .",
-    "preview": "electron-vite preview",
-    "check": "tsc -b --noEmit",
-    "i18n:check": "tsx scripts/i18n/check.ts",
-    "i18n:translate": "tsx scripts/i18n/translate.ts",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:run": "vitest run",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
-  },
-  "dependencies": {
-    "@ai-sdk/amazon-bedrock": "^4.0.60",
-    "@ai-sdk/anthropic": "^3.0.44",
-    "@ai-sdk/azure": "^3.0.30",
-    "@ai-sdk/cerebras": "^2.0.33",
-    "@ai-sdk/gateway": "^3.0.46",
-    "@ai-sdk/google": "^3.0.29",
-    "@ai-sdk/google-vertex": "^4.0.58",
-    "@ai-sdk/huggingface": "^1.0.32",
-    "@ai-sdk/mistral": "^3.0.20",
-    "@ai-sdk/openai": "^3.0.29",
-    "@ai-sdk/perplexity": "^3.0.19",
-    "@ai-sdk/provider": "^3.0.8",
-    "@ai-sdk/provider-utils": "^4.0.15",
-    "@ai-sdk/test-server": "^1.0.3",
-    "@ai-sdk/xai": "3.0.56",
-    "@ant-design/icons": "^6.1.0",
-    "@ant-design/x": "^2.2.2",
-    "@ant-design/x-markdown": "^2.2.2",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.42",
-    "@anthropic-ai/sdk": "^0.74.0",
-    "@google/genai": "^1.41.0",
-    "@koa/cors": "^5.0.0",
-    "@koa/router": "^15.3.0",
-    "@langchain/core": "^1.1.24",
-    "@langchain/openai": "^1.1.27",
-    "@langchain/textsplitters": "^1.0.1",
-    "@melloware/react-logviewer": "^6.3.5",
-    "@milkdown/crepe": "^7.18.0",
-    "@milkdown/kit": "^7.18.0",
-    "@milkdown/react": "^7.18.0",
-    "@modelcontextprotocol/sdk": "^1.26.0",
-    "@openrouter/ai-sdk-provider": "^2.2.3",
-    "ai": "^6.0.86",
-    "antd": "^6.3.0",
-    "axios": "^1.13.5",
-    "better-sqlite3": "^12.6.2",
-    "clsx": "^2.1.1",
-    "dayjs": "^1.11.19",
-    "electron-store": "^11.0.2",
-    "electron-updater": "^6.7.3",
-    "emoji-picker-element": "^1.29.0",
-    "emoji-picker-element-data": "^1.8.0",
-    "fs-extra": "^11.3.3",
-    "get-port": "^7.1.0",
-    "google-auth-library": "^10.5.0",
-    "i18next": "^25.8.7",
-    "i18next-browser-languagedetector": "^8.2.0",
-    "i18next-http-backend": "^3.0.2",
-    "koa": "^3.1.1",
-    "koa-bodyparser": "^4.4.1",
-    "koa-proxies": "^0.12.4",
-    "koa-swagger-decorator": "^1.8.7",
-    "lucide-react": "^0.564.0",
-    "md5": "^2.3.0",
-    "mermaid": "^11.12.2",
-    "mime": "^4.1.0",
-    "mime-types": "^3.0.2",
-    "motion": "^12.34.0",
-    "nanoid": "^5.1.6",
-    "openai": "^6.22.0",
-    "pyodide": "^0.29.3",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-i18next": "^16.5.4",
-    "react-router-dom": "^7.13.0",
-    "react-window": "^2.2.7",
-    "react18-json-view": "^0.2.9",
-    "swagger-ui-dist": "^5.31.0",
-    "tailwind-merge": "^3.4.0",
-    "tinyglobby": "^0.2.15",
-    "zustand": "^5.0.10"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.12",
-    "@electron/rebuild": "^4.0.3",
-    "@tailwindcss/vite": "^4.1.18",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/koa": "^3.0.1",
-    "@types/koa-bodyparser": "^4.3.13",
-    "@types/koa-router": "^7.4.9",
-    "@types/koa__cors": "^5.0.1",
-    "@types/koa__router": "^12.0.5",
-    "@types/node": "^25.0.10",
-    "@types/react": "^19.2.9",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/ui": "^4.0.18",
-    "autoprefixer": "^10.4.21",
-    "babel-plugin-react-dev-locator": "^1.0.6",
-    "chalk": "^5.6.2",
-    "code-inspector-plugin": "^1.4.2",
-    "dotenv": "^17.2.3",
-    "electron": "^38.7.2",
-    "electron-builder": "^26.4.0",
-    "electron-vite": "^5.0.0",
-    "jsdom": "^28.0.0",
-    "oxlint": "^1.47.0",
-    "playwright": "^1.58.2",
-    "postcss": "^8.5.6",
-    "rolldown": "1.0.0-rc.4",
-    "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.18",
-    "tsx": "^4.21.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.3.1",
-    "vite-plugin-trae-solo-badge": "^1.0.0",
-    "vite-tsconfig-paths": "^6.1.1",
-    "vitepress": "^1.6.4",
-    "vitest": "^4.0.18"
-  },
-  "build": {
-    "appId": "com.superclient.app",
-    "productName": "Super Client",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "out/**/*",
-      "build/icons/**/*"
-    ],
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "js-mark",
-        "repo": "super-client-r"
-      }
-    ],
-    "mac": {
-      "icon": "build/icons/icon.icns",
-      "category": "com.superclient.app",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ]
-    },
-    "dmg": {
-      "icon": "build/icons/icon.icns",
-      "iconSize": 128,
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    }
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@scarf/scarf",
-      "better-sqlite3",
-      "msw",
-      "protobufjs"
-    ]
-  }
+	"name": "super-client-r",
+	"version": "0.0.1",
+	"description": "A super client application built with Electron, React and Ant Design",
+	"author": "Mark",
+	"private": true,
+	"engines": {
+		"node": ">=22",
+		"pnpm": ">=10"
+	},
+	"packageManager": "pnpm@10.24.0",
+	"main": "out/main/main.js",
+	"scripts": {
+		"postinstall": "electron-rebuild -f -w better-sqlite3",
+		"dev": "tsc -b && electron-vite dev",
+		"build": "tsc -b && electron-vite build && electron-builder",
+		"build:mac": "tsc -b && electron-vite build && electron-builder --mac",
+		"build:icons": "tsx scripts/build-icons.ts",
+		"lint": "oxlint .",
+		"lint:biome": "biome lint .",
+		"format": "biome format --write .",
+		"check:biome": "biome check --write .",
+		"preview": "electron-vite preview",
+		"check": "tsc -b --noEmit",
+		"i18n:check": "tsx scripts/i18n/check.ts",
+		"i18n:translate": "tsx scripts/i18n/translate.ts",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run",
+		"docs:dev": "vitepress dev docs",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs"
+	},
+	"dependencies": {
+		"@ai-sdk/amazon-bedrock": "^4.0.60",
+		"@ai-sdk/anthropic": "^3.0.44",
+		"@ai-sdk/azure": "^3.0.30",
+		"@ai-sdk/cerebras": "^2.0.33",
+		"@ai-sdk/gateway": "^3.0.46",
+		"@ai-sdk/google": "^3.0.29",
+		"@ai-sdk/google-vertex": "^4.0.58",
+		"@ai-sdk/huggingface": "^1.0.32",
+		"@ai-sdk/mistral": "^3.0.20",
+		"@ai-sdk/openai": "^3.0.29",
+		"@ai-sdk/perplexity": "^3.0.19",
+		"@ai-sdk/provider": "^3.0.8",
+		"@ai-sdk/provider-utils": "^4.0.15",
+		"@ai-sdk/test-server": "^1.0.3",
+		"@ai-sdk/xai": "3.0.56",
+		"@ant-design/icons": "^6.1.0",
+		"@ant-design/x": "^2.2.2",
+		"@ant-design/x-markdown": "^2.2.2",
+		"@anthropic-ai/claude-agent-sdk": "^0.2.42",
+		"@anthropic-ai/sdk": "^0.74.0",
+		"@codemirror/language": "^6.12.1",
+		"@codemirror/state": "^6.5.4",
+		"@codemirror/view": "^6.39.15",
+		"@google/genai": "^1.41.0",
+		"@koa/cors": "^5.0.0",
+		"@koa/router": "^15.3.0",
+		"@langchain/core": "^1.1.24",
+		"@langchain/openai": "^1.1.27",
+		"@langchain/textsplitters": "^1.0.1",
+		"@melloware/react-logviewer": "^6.3.5",
+		"@milkdown/crepe": "^7.18.0",
+		"@milkdown/kit": "^7.18.0",
+		"@milkdown/react": "^7.18.0",
+		"@modelcontextprotocol/sdk": "^1.26.0",
+		"@openrouter/ai-sdk-provider": "^2.2.3",
+		"@uiw/codemirror-extensions-langs": "^4.25.4",
+		"@uiw/codemirror-theme-vscode": "^4.25.4",
+		"ai": "^6.0.86",
+		"antd": "^6.3.0",
+		"axios": "^1.13.5",
+		"better-sqlite3": "^12.6.2",
+		"clsx": "^2.1.1",
+		"dayjs": "^1.11.19",
+		"electron-store": "^11.0.2",
+		"electron-updater": "^6.7.3",
+		"emoji-picker-element": "^1.29.0",
+		"emoji-picker-element-data": "^1.8.0",
+		"fs-extra": "^11.3.3",
+		"get-port": "^7.1.0",
+		"google-auth-library": "^10.5.0",
+		"i18next": "^25.8.7",
+		"i18next-browser-languagedetector": "^8.2.0",
+		"i18next-http-backend": "^3.0.2",
+		"koa": "^3.1.1",
+		"koa-bodyparser": "^4.4.1",
+		"koa-proxies": "^0.12.4",
+		"koa-swagger-decorator": "^1.8.7",
+		"lucide-react": "^0.564.0",
+		"md5": "^2.3.0",
+		"mermaid": "^11.12.2",
+		"mime": "^4.1.0",
+		"mime-types": "^3.0.2",
+		"motion": "^12.34.0",
+		"nanoid": "^5.1.6",
+		"openai": "^6.22.0",
+		"pyodide": "^0.29.3",
+		"quickjs-emscripten": "^0.32.0",
+		"react": "^19.2.4",
+		"react-dom": "^19.2.4",
+		"react-i18next": "^16.5.4",
+		"react-router-dom": "^7.13.0",
+		"react-window": "^2.2.7",
+		"react18-json-view": "^0.2.9",
+		"swagger-ui-dist": "^5.31.0",
+		"tailwind-merge": "^3.4.0",
+		"tinyglobby": "^0.2.15",
+		"zustand": "^5.0.10"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.12",
+		"@electron/rebuild": "^4.0.3",
+		"@tailwindcss/vite": "^4.1.18",
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/koa": "^3.0.1",
+		"@types/koa-bodyparser": "^4.3.13",
+		"@types/koa-router": "^7.4.9",
+		"@types/koa__cors": "^5.0.1",
+		"@types/koa__router": "^12.0.5",
+		"@types/node": "^25.0.10",
+		"@types/react": "^19.2.9",
+		"@types/react-dom": "^19.2.3",
+		"@vitejs/plugin-react": "^5.1.2",
+		"@vitest/ui": "^4.0.18",
+		"autoprefixer": "^10.4.21",
+		"babel-plugin-react-dev-locator": "^1.0.6",
+		"chalk": "^5.6.2",
+		"code-inspector-plugin": "^1.4.2",
+		"dotenv": "^17.2.3",
+		"electron": "^38.7.2",
+		"electron-builder": "^26.4.0",
+		"electron-vite": "^5.0.0",
+		"jsdom": "^28.0.0",
+		"oxlint": "^1.47.0",
+		"playwright": "^1.58.2",
+		"postcss": "^8.5.6",
+		"rolldown": "1.0.0-rc.4",
+		"sharp": "^0.34.5",
+		"tailwindcss": "^4.1.18",
+		"tsx": "^4.21.0",
+		"typescript": "~5.8.3",
+		"vite": "^7.3.1",
+		"vite-plugin-trae-solo-badge": "^1.0.0",
+		"vite-tsconfig-paths": "^6.1.1",
+		"vitepress": "^1.6.4",
+		"vitest": "^4.0.18"
+	},
+	"build": {
+		"appId": "com.superclient.app",
+		"productName": "Super Client",
+		"directories": {
+			"output": "dist"
+		},
+		"files": [
+			"out/**/*",
+			"build/icons/**/*"
+		],
+		"publish": [
+			{
+				"provider": "github",
+				"owner": "js-mark",
+				"repo": "super-client-r"
+			}
+		],
+		"mac": {
+			"icon": "build/icons/icon.icns",
+			"category": "com.superclient.app",
+			"target": [
+				{
+					"target": "dmg",
+					"arch": [
+						"x64",
+						"arm64"
+					]
+				},
+				{
+					"target": "zip",
+					"arch": [
+						"x64",
+						"arm64"
+					]
+				}
+			]
+		},
+		"dmg": {
+			"icon": "build/icons/icon.icns",
+			"iconSize": 128,
+			"contents": [
+				{
+					"x": 130,
+					"y": 220
+				},
+				{
+					"x": 410,
+					"y": 220,
+					"type": "link",
+					"path": "/Applications"
+				}
+			]
+		}
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"@scarf/scarf",
+			"better-sqlite3",
+			"msw",
+			"protobufjs"
+		]
+	}
 }

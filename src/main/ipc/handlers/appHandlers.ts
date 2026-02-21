@@ -296,7 +296,7 @@ export function registerAppHandlers() {
 				electronVersion: process.versions.electron,
 				v8Version: process.versions.v8,
 				homedir: os.homedir(),
-				cwd: process.cwd(),
+				cwd: os.homedir(),
 				appVersion: app.getVersion(),
 				locale: app.getLocale(),
 			},

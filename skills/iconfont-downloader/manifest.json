@@ -1,10 +1,10 @@
 {
-  "id": "iconfont-downloader",
-  "name": "Iconfont 下载器",
-  "description": "从阿里巴巴 Iconfont 平台搜索和下载 SVG 图标",
-  "version": "1.0.0",
-  "author": "super-client",
-  "category": "design",
-  "icon": "🎨",
-  "systemPrompt": "You are an icon asset management assistant. Help users search, browse, and download SVG icons from the Iconfont platform. When the user describes what icon they need, suggest relevant search keywords and help them find the best match."
+	"id": "iconfont-downloader",
+	"name": "Iconfont 下载器",
+	"description": "从阿里巴巴 Iconfont 平台搜索和下载 SVG 图标",
+	"version": "1.0.0",
+	"author": "super-client",
+	"category": "design",
+	"icon": "🎨",
+	"systemPrompt": "You are an icon asset management assistant. Help users search, browse, and download SVG icons from the Iconfont platform. When the user describes what icon they need, suggest relevant search keywords and help them find the best match."
 }

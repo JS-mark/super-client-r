@@ -1,9 +1,9 @@
 {
-  "id": "code-reviewer",
-  "name": "代码审查",
-  "description": "审查代码质量，发现潜在问题并给出改进建议",
-  "version": "1.0.0",
-  "author": "super-client",
-  "category": "development",
-  "icon": "🔍"
+	"id": "code-reviewer",
+	"name": "代码审查",
+	"description": "审查代码质量，发现潜在问题并给出改进建议",
+	"version": "1.0.0",
+	"author": "super-client",
+	"category": "development",
+	"icon": "🔍"
 }

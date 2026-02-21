@@ -33,7 +33,7 @@ async function initBrowser(): Promise<{ browser: Browser; page: Page }> {
 
 		// 设置用户代理
 		await page.setUserAgent(
-			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 		);
 	}
 
@@ -45,7 +45,7 @@ async function initBrowser(): Promise<{ browser: Browser; page: Page }> {
  */
 export async function loginWithPuppeteer(
 	username: string,
-	password: string
+	password: string,
 ): Promise<{ success: boolean; message: string }> {
 	try {
 		const { page } = await initBrowser();
@@ -71,20 +71,20 @@ export async function loginWithPuppeteer(
 		// 尝试输入用户名
 		try {
 			// 方法1：普通输入框
-			await page.type("input[placeholder*='用户名' i], input[placeholder*='账号' i], input[name='username']", username, {
-				delay: 100,
-			});
+			await page.type(
+				"input[placeholder*='用户名' i], input[placeholder*='账号' i], input[name='username']",
+				username,
+				{
+					delay: 100,
+				},
+			);
 		} catch {
 			// 方法2：如果是手机号登录，可能需要切换
 			const switchToAccount = await page.$(".switch-login-type, .login-switch");
 			if (switchToAccount) {
 				await switchToAccount.click();
 				await page.waitForTimeout(500);
-				await page.type(
-					"input[type='text']",
-					username,
-					{ delay: 100 }
-				);
+				await page.type("input[type='text']", username, { delay: 100 });
 			}
 		}
 
@@ -92,7 +92,7 @@ export async function loginWithPuppeteer(
 		await page.type(
 			"input[type='password'], input[placeholder*='密码' i]",
 			password,
-			{ delay: 100 }
+			{ delay: 100 },
 		);
 
 		console.log("[Puppeteer] 点击登录按钮...");
@@ -116,13 +116,13 @@ export async function loginWithPuppeteer(
 						document.querySelector(".user-info, .avatar, .user-name") !== null
 					);
 				},
-				{ timeout: 60000 }
+				{ timeout: 60000 },
 			);
 		}
 
 		// 检查登录是否成功
 		const userElement = await page.$(
-			".user-info, .avatar, .user-name, .user-center"
+			".user-info, .avatar, .user-name, .user-center",
 		);
 
 		if (userElement) {
@@ -138,7 +138,7 @@ export async function loginWithPuppeteer(
 			const cookies = await page.cookies();
 			await fs.writeFile(
 				path.join(process.cwd(), "iconfont-cookies.json"),
-				JSON.stringify(cookies, null, 2)
+				JSON.stringify(cookies, null, 2),
 			);
 
 			return {
@@ -149,7 +149,9 @@ export async function loginWithPuppeteer(
 
 		// 检查错误信息
 		const errorText = await page.evaluate(() => {
-			const errorEl = document.querySelector(".error-msg, .error-message, .tip-error");
+			const errorEl = document.querySelector(
+				".error-msg, .error-message, .tip-error",
+			);
 			return errorEl?.textContent?.trim();
 		});
 
@@ -178,7 +180,7 @@ export async function loginWithPuppeteer(
  */
 export async function searchWithPuppeteer(
 	keyword: string,
-	limit = 10
+	limit = 10,
 ): Promise<
 	Array<{
 		id: string;
@@ -194,7 +196,7 @@ export async function searchWithPuppeteer(
 
 	// 构建搜索 URL
 	const searchUrl = `https://www.iconfont.cn/search/index?searchType=icon&q=${encodeURIComponent(
-		keyword
+		keyword,
 	)}&page=1&tag=${encodeURIComponent(keyword)}`;
 
 	await page.goto(searchUrl, { waitUntil: "networkidle0" });
@@ -216,7 +218,7 @@ export async function searchWithPuppeteer(
 
 		// 根据实际的 DOM 结构选择器
 		const iconElements = document.querySelectorAll(
-			".icon-item, .icon-card, .icon"
+			".icon-item, .icon-card, .icon",
 		);
 
 		iconElements.forEach((el, index) => {
@@ -259,7 +261,7 @@ export async function searchWithPuppeteer(
 export async function downloadIconWithPuppeteer(
 	iconId: string,
 	outputPath: string,
-	fileName: string
+	fileName: string,
 ): Promise<{ success: boolean; filePath: string; message: string }> {
 	const { page } = await initBrowser();
 
@@ -344,7 +346,7 @@ export async function loadCookies(): Promise<boolean> {
 		const { page } = await initBrowser();
 		const cookiesData = await fs.readFile(
 			path.join(process.cwd(), "iconfont-cookies.json"),
-			"utf-8"
+			"utf-8",
 		);
 		const cookies = JSON.parse(cookiesData);
 
