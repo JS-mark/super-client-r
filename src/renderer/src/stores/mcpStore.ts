@@ -1,9 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { McpServer, McpMarketItem, BuiltinMcpDefinition } from "../types/mcp";
+import type {
+	McpServer,
+	McpMarketItem,
+	BuiltinMcpDefinition,
+} from "../types/mcp";
 
 // 生成唯一 ID
-const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateId = () =>
+	`${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 interface McpState {
 	// 已安装的服务器
@@ -35,7 +40,11 @@ interface McpState {
 	disableServer: (id: string) => void;
 	toggleServer: (id: string) => void;
 	disconnectServer: (id: string) => Promise<void>;
-	updateServerStatus: (id: string, status: McpServer["status"], error?: string) => void;
+	updateServerStatus: (
+		id: string,
+		status: McpServer["status"],
+		error?: string,
+	) => void;
 	updateServerTools: (id: string, tools: McpServer["tools"]) => void;
 	setServers: (servers: McpServer[]) => void;
 
@@ -49,7 +58,12 @@ interface McpState {
 	setMarketError: (error: string | null) => void;
 	setMarketPagination: (total: number, page: number, limit: number) => void;
 	addMarketItem: (item: McpMarketItem) => void;
-	fetchMarketItems: (page?: number, limit?: number, tag?: string, query?: string) => Promise<void>;
+	fetchMarketItems: (
+		page?: number,
+		limit?: number,
+		tag?: string,
+		query?: string,
+	) => Promise<void>;
 	installMarketItem: (item: McpMarketItem) => void;
 
 	// Actions - 标签
@@ -144,14 +158,24 @@ export const useMcpStore = create<McpState>()(
 					await window.electron.mcp.disconnect(id);
 					set((state) => ({
 						servers: state.servers.map((s) =>
-							s.id === id ? { ...s, status: "disconnected" as const, tools: undefined, error: undefined } : s,
+							s.id === id
+								? {
+										...s,
+										status: "disconnected" as const,
+										tools: undefined,
+										error: undefined,
+									}
+								: s,
 						),
 					}));
 				} catch (error) {
-					const errorMsg = error instanceof Error ? error.message : "Disconnect failed";
+					const errorMsg =
+						error instanceof Error ? error.message : "Disconnect failed";
 					set((state) => ({
 						servers: state.servers.map((s) =>
-							s.id === id ? { ...s, status: "error" as const, error: errorMsg } : s,
+							s.id === id
+								? { ...s, status: "error" as const, error: errorMsg }
+								: s,
 						),
 					}));
 				}
@@ -180,7 +204,8 @@ export const useMcpStore = create<McpState>()(
 
 			// 市场
 			setMarketItems: (items) => set({ marketItems: items }),
-			setMarketLoading: (loading) => set({ isLoadingMarket: loading, isLoading: loading }),
+			setMarketLoading: (loading) =>
+				set({ isLoadingMarket: loading, isLoading: loading }),
 			setMarketError: (error) => set({ marketError: error }),
 			setMarketPagination: (total, page, limit) =>
 				set({ marketTotal: total, marketPage: page, marketLimit: limit }),
@@ -189,7 +214,12 @@ export const useMcpStore = create<McpState>()(
 					marketItems: [...state.marketItems, item],
 				})),
 
-			fetchMarketItems: async (page = 1, limit = 12, tag?: string, query?: string) => {
+			fetchMarketItems: async (
+				page = 1,
+				limit = 12,
+				tag?: string,
+				query?: string,
+			) => {
 				set({ isLoadingMarket: true, isLoading: true, marketError: null });
 				try {
 					const response = await window.electron.mcp.market.search({
@@ -216,7 +246,8 @@ export const useMcpStore = create<McpState>()(
 					});
 				} catch (error) {
 					set({
-						marketError: error instanceof Error ? error.message : "Unknown error",
+						marketError:
+							error instanceof Error ? error.message : "Unknown error",
 						isLoadingMarket: false,
 						isLoading: false,
 					});
@@ -276,7 +307,9 @@ export const useMcpStore = create<McpState>()(
 
 				set((state) => ({
 					servers: state.servers.map((s) =>
-						s.id === id ? { ...s, status: "connecting" as const, error: undefined } : s,
+						s.id === id
+							? { ...s, status: "connecting" as const, error: undefined }
+							: s,
 					),
 				}));
 
@@ -292,7 +325,8 @@ export const useMcpStore = create<McpState>()(
 						throw new Error(response.error || "Connection failed");
 					}
 				} catch (error) {
-					const errorMsg = error instanceof Error ? error.message : "Connection failed";
+					const errorMsg =
+						error instanceof Error ? error.message : "Connection failed";
 					set((state) => ({
 						servers: state.servers.map((s) =>
 							s.id === id

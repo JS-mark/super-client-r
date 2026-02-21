@@ -7,9 +7,14 @@ interface SkinState {
 	// Markdown theme state
 	activeMarkdownPluginId: string | null;
 	activeMarkdownThemeId: string | null;
+	markdownThemeCSS: string | null;
 	setActiveSkin: (pluginId: string | null, themeId: string | null) => void;
 	setAntdTokenOverrides: (tokens: Record<string, unknown> | null) => void;
-	setActiveMarkdownTheme: (pluginId: string | null, themeId: string | null) => void;
+	setActiveMarkdownTheme: (
+		pluginId: string | null,
+		themeId: string | null,
+	) => void;
+	setMarkdownThemeCSS: (css: string | null) => void;
 	initialize: () => Promise<void>;
 }
 
@@ -19,14 +24,19 @@ export const useSkinStore = create<SkinState>()((set) => ({
 	antdTokenOverrides: null,
 	activeMarkdownPluginId: null,
 	activeMarkdownThemeId: null,
-	setActiveSkin: (pluginId, themeId) => set({ activeSkinPluginId: pluginId, activeSkinThemeId: themeId }),
+	markdownThemeCSS: null,
+	setActiveSkin: (pluginId, themeId) =>
+		set({ activeSkinPluginId: pluginId, activeSkinThemeId: themeId }),
 	setAntdTokenOverrides: (tokens) => set({ antdTokenOverrides: tokens }),
-	setActiveMarkdownTheme: (pluginId, themeId) => set({ activeMarkdownPluginId: pluginId, activeMarkdownThemeId: themeId }),
+	setActiveMarkdownTheme: (pluginId, themeId) =>
+		set({ activeMarkdownPluginId: pluginId, activeMarkdownThemeId: themeId }),
+	setMarkdownThemeCSS: (css) => set({ markdownThemeCSS: css }),
 	initialize: async () => {
 		try {
-			const [skinResult, mdResult] = await Promise.all([
+			const [skinResult, mdResult, cssResult] = await Promise.all([
 				window.electron.skin.getActiveSkin(),
 				window.electron.markdownTheme.getActive(),
+				window.electron.markdownTheme.getCSS(),
 			]);
 			const updates: Partial<SkinState> = {};
 			if (skinResult.success && skinResult.data) {
@@ -36,6 +46,9 @@ export const useSkinStore = create<SkinState>()((set) => ({
 			if (mdResult.success && mdResult.data) {
 				updates.activeMarkdownPluginId = mdResult.data.pluginId;
 				updates.activeMarkdownThemeId = mdResult.data.themeId;
+			}
+			if (cssResult.success && cssResult.data) {
+				updates.markdownThemeCSS = cssResult.data;
 			}
 			set(updates);
 		} catch (error) {

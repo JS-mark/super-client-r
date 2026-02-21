@@ -4,6 +4,7 @@ import {
 	DisconnectOutlined,
 	PlayCircleOutlined,
 	SettingOutlined,
+	ToolOutlined,
 } from "@ant-design/icons";
 import { Button, Modal, Tag, Tooltip, message, theme } from "antd";
 import type * as React from "react";
@@ -25,51 +26,64 @@ export const InstalledMcpCard: React.FC<{
 	const { removeServer, testConnection, disconnectServer } = useMcpStore();
 	const [connecting, setConnecting] = useState(false);
 
-	const handleDelete = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		Modal.confirm({
-			title: t("confirm.delete", { ns: "mcp" }),
-			content: t("confirm.deleteContent", { name: server.name, ns: "mcp" }),
-			onOk: () => {
-				removeServer(server.id);
-				message.success(
-					t("messages.deleted", { ns: "mcp", name: server.name }),
-				);
-			},
-		});
-	}, [removeServer, server.id, server.name, t]);
+	const handleDelete = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			Modal.confirm({
+				title: t("confirm.delete", { ns: "mcp" }),
+				content: t("confirm.deleteContent", { name: server.name, ns: "mcp" }),
+				onOk: () => {
+					removeServer(server.id);
+					message.success(
+						t("messages.deleted", { ns: "mcp", name: server.name }),
+					);
+				},
+			});
+		},
+		[removeServer, server.id, server.name, t],
+	);
 
-	const handleConnect = useCallback(async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		setConnecting(true);
-		try {
-			await testConnection(server.id);
-			message.success(t("messages.connectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.connectError", { ns: "mcp" }));
-		} finally {
-			setConnecting(false);
-		}
-	}, [testConnection, server.id, t]);
+	const handleConnect = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			setConnecting(true);
+			try {
+				await testConnection(server.id);
+				message.success(t("messages.connectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.connectError", { ns: "mcp" }));
+			} finally {
+				setConnecting(false);
+			}
+		},
+		[testConnection, server.id, t],
+	);
 
-	const handleDisconnect = useCallback(async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		try {
-			await disconnectServer(server.id);
-			message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.disconnectError", { ns: "mcp" }));
-		}
-	}, [disconnectServer, server.id, t]);
+	const handleDisconnect = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			try {
+				await disconnectServer(server.id);
+				message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.disconnectError", { ns: "mcp" }));
+			}
+		},
+		[disconnectServer, server.id, t],
+	);
 
-	const handleConfigure = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		onConfigure?.(server);
-	}, [onConfigure, server]);
+	const handleConfigure = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onConfigure?.(server);
+		},
+		[onConfigure, server],
+	);
 
 	const isInternal = server.type === "internal";
 	const isConnected = server.status === "connected";
 	const isConnecting = server.status === "connecting" || connecting;
+	const toolCount = server.tools?.length ?? 0;
 
 	const iconBg = isConnected
 		? `linear-gradient(135deg, ${token.colorPrimary}, ${token.colorPrimaryActive})`
@@ -98,7 +112,12 @@ export const InstalledMcpCard: React.FC<{
 					className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
 					style={{ background: iconBg }}
 				>
-					<ApiOutlined style={{ color: isConnected ? "#fff" : token.colorTextTertiary, fontSize: 16 }} />
+					<ApiOutlined
+						style={{
+							color: isConnected ? "#fff" : token.colorTextTertiary,
+							fontSize: 16,
+						}}
+					/>
 				</div>
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2">
@@ -129,19 +148,39 @@ export const InstalledMcpCard: React.FC<{
 			{/* Footer */}
 			<div className="px-4 py-3 flex items-center justify-between">
 				<div className="flex items-center gap-1.5">
-					<Tag bordered={false} className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+					<Tag
+						bordered={false}
+						className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+					>
 						{server.transport}
 					</Tag>
 					{isInternal && (
-						<Tag bordered={false} color="blue" className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+						<Tag
+							bordered={false}
+							color="blue"
+							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						>
 							{t("internal.label", { ns: "mcp" })}
+						</Tag>
+					)}
+					{toolCount > 0 && (
+						<Tag
+							bordered={false}
+							color="purple"
+							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						>
+							<ToolOutlined className="mr-0.5" style={{ fontSize: 10 }} />
+							{toolCount}
 						</Tag>
 					)}
 				</div>
 
 				{/* Actions */}
 				{!isInternal && (
-					<div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+					<div
+						className="flex items-center gap-0.5"
+						onClick={(e) => e.stopPropagation()}
+					>
 						{isConnected ? (
 							<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
 								<Button
@@ -162,7 +201,15 @@ export const InstalledMcpCard: React.FC<{
 								<Button
 									size="small"
 									type="text"
-									icon={<PlayCircleOutlined style={server.status === "error" ? { color: token.colorError } : undefined} />}
+									icon={
+										<PlayCircleOutlined
+											style={
+												server.status === "error"
+													? { color: token.colorError }
+													: undefined
+											}
+										/>
+									}
 									onClick={handleConnect}
 									loading={isConnecting}
 								/>

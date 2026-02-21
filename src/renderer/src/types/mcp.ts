@@ -1,8 +1,4 @@
-import type {
-	McpServerType,
-	McpTransportType,
-	McpTool,
-} from "./electron";
+import type { McpServerType, McpTransportType, McpTool } from "./electron";
 
 export interface McpServer {
 	id: string;

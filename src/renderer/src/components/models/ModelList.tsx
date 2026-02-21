@@ -170,7 +170,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				if (result.data.success) {
 					message.success(
 						t("messages.testSuccess", { ns: "models" }) +
-						` (${result.data.latencyMs}ms)`,
+							` (${result.data.latencyMs}ms)`,
 					);
 				} else {
 					message.error(
@@ -192,11 +192,17 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const handleFetchModels = useCallback(async () => {
 		const baseUrl = form.getFieldValue("baseUrl");
 		const apiKey = form.getFieldValue("apiKey");
-		const preset = form.getFieldValue("preset") as ModelProviderPreset | undefined;
+		const preset = form.getFieldValue("preset") as
+			| ModelProviderPreset
+			| undefined;
 		if (!baseUrl) return;
 		setIsFetchingModels(true);
 		try {
-			const result = await modelService.fetchModels(baseUrl, apiKey || "", preset);
+			const result = await modelService.fetchModels(
+				baseUrl,
+				apiKey || "",
+				preset,
+			);
 			if (result.success && result.data) {
 				setFetchedModels(result.data.models);
 				if (selectedModelIds.length === 0) {
@@ -225,13 +231,13 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			const models: ProviderModel[] =
 				fetchedModels.length > 0
 					? fetchedModels.map((m) => ({
-						...m,
-						enabled: selectedModelIds.includes(m.id),
-					}))
+							...m,
+							enabled: selectedModelIds.includes(m.id),
+						}))
 					: (selectedProvider?.models ?? []).map((m) => ({
-						...m,
-						enabled: selectedModelIds.includes(m.id),
-					}));
+							...m,
+							enabled: selectedModelIds.includes(m.id),
+						}));
 
 			const provider: ModelProvider = {
 				id: selectedProvider?.id ?? `provider_${now}`,
@@ -326,7 +332,10 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				{/* Left Panel - Provider List */}
 				<div
 					className="w-64 shrink-0 border-r flex flex-col"
-					style={{ borderColor: token.colorBorderSecondary, background: token.colorBgLayout }}
+					style={{
+						borderColor: token.colorBorderSecondary,
+						background: token.colorBgLayout,
+					}}
 				>
 					{/* Search */}
 					<div
@@ -334,7 +343,9 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 						style={{ borderColor: token.colorBorderSecondary }}
 					>
 						<Input
-							prefix={<SearchOutlined style={{ color: token.colorTextQuaternary }} />}
+							prefix={
+								<SearchOutlined style={{ color: token.colorTextQuaternary }} />
+							}
 							placeholder={t("searchProvider", { ns: "models" })}
 							value={searchText}
 							onChange={(e) => setSearchText(e.target.value)}
@@ -347,17 +358,22 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 					{/* Provider List */}
 					<div className="flex-1 overflow-y-auto">
 						{filteredProviders.map((provider) => {
-							const isSelected = selectedProviderId === provider.id && !isAdding;
+							const isSelected =
+								selectedProviderId === provider.id && !isAdding;
 							return (
 								<div
 									key={provider.id}
 									className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors border-l-2"
 									style={{
-										borderLeftColor: isSelected ? token.colorPrimary : "transparent",
+										borderLeftColor: isSelected
+											? token.colorPrimary
+											: "transparent",
 										background: isSelected ? token.colorPrimaryBg : undefined,
 									}}
 									onMouseEnter={(e) => {
-										if (!isSelected) e.currentTarget.style.background = token.colorFillTertiary;
+										if (!isSelected)
+											e.currentTarget.style.background =
+												token.colorFillTertiary;
 									}}
 									onMouseLeave={(e) => {
 										if (!isSelected) e.currentTarget.style.background = "";
@@ -366,10 +382,16 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 								>
 									<ProviderIcon preset={provider.preset} size={32} />
 									<div className="flex-1 min-w-0">
-										<div className="text-sm font-medium truncate" style={{ color: token.colorText }}>
+										<div
+											className="text-sm font-medium truncate"
+											style={{ color: token.colorText }}
+										>
 											{provider.name}
 										</div>
-										<div className="text-xs truncate" style={{ color: token.colorTextSecondary }}>
+										<div
+											className="text-xs truncate"
+											style={{ color: token.colorTextSecondary }}
+										>
 											{getPresetName(provider.preset)}
 										</div>
 									</div>
@@ -390,7 +412,10 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 								<Empty
 									image={Empty.PRESENTED_IMAGE_SIMPLE}
 									description={
-										<span className="text-xs" style={{ color: token.colorTextSecondary }}>
+										<span
+											className="text-xs"
+											style={{ color: token.colorTextSecondary }}
+										>
 											{t("empty", { ns: "models" })}
 										</span>
 									}
@@ -417,12 +442,18 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				</div>
 
 				{/* Right Panel - Provider Detail */}
-				<div className="flex-1 overflow-y-auto" style={{ background: token.colorBgContainer }}>
+				<div
+					className="flex-1 overflow-y-auto"
+					style={{ background: token.colorBgContainer }}
+				>
 					{showRightPanel ? (
 						<div className="p-6">
 							{/* Header */}
 							<div className="flex items-center justify-between mb-6">
-								<h3 className="text-lg font-semibold m-0" style={{ color: token.colorText }}>
+								<h3
+									className="text-lg font-semibold m-0"
+									style={{ color: token.colorText }}
+								>
 									{isAdding
 										? t("addProvider", { ns: "models" })
 										: selectedProvider?.name}
@@ -529,7 +560,11 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 									{testResult && (
 										<span
 											className="text-sm"
-											style={{ color: testResult.success ? token.colorSuccess : token.colorError }}
+											style={{
+												color: testResult.success
+													? token.colorSuccess
+													: token.colorError,
+											}}
 										>
 											{testResult.success ? (
 												<>
@@ -588,7 +623,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 												)}
 											</Space>
 										</div>
-
 									</>
 								)}
 
@@ -638,9 +672,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 					onClose={() => setManageModalOpen(false)}
 					provider={selectedProvider}
 					models={
-						fetchedModels.length > 0
-							? fetchedModels
-							: selectedProvider.models
+						fetchedModels.length > 0 ? fetchedModels : selectedProvider.models
 					}
 					onModelsChange={(updatedModels) => {
 						if (fetchedModels.length > 0) {

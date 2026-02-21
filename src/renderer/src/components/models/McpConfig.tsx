@@ -6,7 +6,17 @@ import {
 	SettingOutlined,
 	ShopOutlined,
 } from "@ant-design/icons";
-import { Badge, Button, Empty, List, Modal, Tag, Tooltip, message, theme } from "antd";
+import {
+	Badge,
+	Button,
+	Empty,
+	List,
+	Modal,
+	Tag,
+	Tooltip,
+	message,
+	theme,
+} from "antd";
 import type * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -58,9 +68,13 @@ export const McpConfig: React.FC = () => {
 	const testConnection = useMcpStore((state) => state.testConnection);
 	const disconnectServer = useMcpStore((state) => state.disconnectServer);
 	const [connectingIds, setConnectingIds] = useState<Set<string>>(new Set());
-	const [builtinDefinitions, setBuiltinDefinitions] = useState<BuiltinMcpDefinition[]>([]);
+	const [builtinDefinitions, setBuiltinDefinitions] = useState<
+		BuiltinMcpDefinition[]
+	>([]);
 	const [configModalOpen, setConfigModalOpen] = useState(false);
-	const [configuringServer, setConfiguringServer] = useState<McpServer | null>(null);
+	const [configuringServer, setConfiguringServer] = useState<McpServer | null>(
+		null,
+	);
 
 	useEffect(() => {
 		window.electron.mcp.builtin.getDefinitions().then((res) => {
@@ -70,136 +84,165 @@ export const McpConfig: React.FC = () => {
 		});
 	}, []);
 
-	const handleConnect = useCallback(async (id: string) => {
-		setConnectingIds((prev) => new Set(prev).add(id));
-		try {
-			await testConnection(id);
-			message.success(t("messages.connectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.connectError", { ns: "mcp" }));
-		} finally {
-			setConnectingIds((prev) => {
-				const next = new Set(prev);
-				next.delete(id);
-				return next;
+	const handleConnect = useCallback(
+		async (id: string) => {
+			setConnectingIds((prev) => new Set(prev).add(id));
+			try {
+				await testConnection(id);
+				message.success(t("messages.connectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.connectError", { ns: "mcp" }));
+			} finally {
+				setConnectingIds((prev) => {
+					const next = new Set(prev);
+					next.delete(id);
+					return next;
+				});
+			}
+		},
+		[testConnection, t],
+	);
+
+	const handleDisconnect = useCallback(
+		async (id: string) => {
+			try {
+				await disconnectServer(id);
+				message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.disconnectError", { ns: "mcp" }));
+			}
+		},
+		[disconnectServer, t],
+	);
+
+	const handleDelete = useCallback(
+		(id: string, name: string) => {
+			Modal.confirm({
+				title: t("confirm.delete", { ns: "mcp" }),
+				content: t("confirm.deleteContent", { name, ns: "mcp" }),
+				onOk: () => {
+					removeServer(id);
+					message.success(t("messages.deleted", { ns: "mcp", name }));
+				},
 			});
-		}
-	}, [testConnection, t]);
-
-	const handleDisconnect = useCallback(async (id: string) => {
-		try {
-			await disconnectServer(id);
-			message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.disconnectError", { ns: "mcp" }));
-		}
-	}, [disconnectServer, t]);
-
-	const handleDelete = useCallback((id: string, name: string) => {
-		Modal.confirm({
-			title: t("confirm.delete", { ns: "mcp" }),
-			content: t("confirm.deleteContent", { name, ns: "mcp" }),
-			onOk: () => {
-				removeServer(id);
-				message.success(t("messages.deleted", { ns: "mcp", name }));
-			},
-		});
-	}, [removeServer, t]);
+		},
+		[removeServer, t],
+	);
 
 	const handleConfigure = useCallback((server: McpServer) => {
 		setConfiguringServer(server);
 		setConfigModalOpen(true);
 	}, []);
 
-	const handleSaveConfig = useCallback(async (serverId: string, config: Record<string, unknown>) => {
-		const server = servers.find((s) => s.id === serverId);
-		if (!server) return;
+	const handleSaveConfig = useCallback(
+		async (serverId: string, config: Record<string, unknown>) => {
+			const server = servers.find((s) => s.id === serverId);
+			if (!server) return;
 
-		try {
-			if (config.__generic) {
-				// Generic mode: directly update command/args/env/url
-				const updates: Partial<McpServer> = {};
+			try {
+				if (config.__generic) {
+					// Generic mode: directly update command/args/env/url
+					const updates: Partial<McpServer> = {};
 
-				if (server.transport === "stdio") {
-					if (config._command) updates.command = config._command as string;
-					if (config._args !== undefined) {
-						updates.args = (config._args as string).split(" ").filter(Boolean);
+					if (server.transport === "stdio") {
+						if (config._command) updates.command = config._command as string;
+						if (config._args !== undefined) {
+							updates.args = (config._args as string)
+								.split(" ")
+								.filter(Boolean);
+						}
+						if (config._env !== undefined) {
+							const envStr = config._env as string;
+							updates.env = envStr.trim() ? parseEnvString(envStr) : undefined;
+						}
+					} else {
+						if (config._url) updates.url = config._url as string;
 					}
-					if (config._env !== undefined) {
-						const envStr = config._env as string;
-						updates.env = envStr.trim() ? parseEnvString(envStr) : undefined;
+
+					if (server.status === "connected") {
+						await window.electron.mcp.disconnect(serverId);
 					}
+
+					await window.electron.mcp.updateServer(serverId, updates);
+
+					const { updateServer } = useMcpStore.getState();
+					updateServer(serverId, {
+						...updates,
+						status: "disconnected",
+						tools: undefined,
+					});
 				} else {
-					if (config._url) updates.url = config._url as string;
+					// Schema mode: use builtin createConfig
+					const def = findBuiltinDefinition(server, builtinDefinitions);
+					if (!def) return;
+
+					const res = await window.electron.mcp.builtin.createConfig(
+						def.id,
+						config,
+					);
+					if (!res.success || !res.data) {
+						message.error(res.error || "Failed to create config");
+						return;
+					}
+
+					const newConfig = res.data;
+
+					if (server.status === "connected") {
+						await window.electron.mcp.disconnect(serverId);
+					}
+
+					await window.electron.mcp.updateServer(serverId, {
+						command: newConfig.command,
+						args: newConfig.args,
+						env: newConfig.env,
+					});
+
+					const { updateServer } = useMcpStore.getState();
+					updateServer(serverId, {
+						command: newConfig.command,
+						args: newConfig.args,
+						env: newConfig.env,
+						status: "disconnected",
+						tools: undefined,
+					});
 				}
 
-				if (server.status === "connected") {
-					await window.electron.mcp.disconnect(serverId);
-				}
-
-				await window.electron.mcp.updateServer(serverId, updates);
-
-				const { updateServer } = useMcpStore.getState();
-				updateServer(serverId, {
-					...updates,
-					status: "disconnected",
-					tools: undefined,
-				});
-			} else {
-				// Schema mode: use builtin createConfig
-				const def = findBuiltinDefinition(server, builtinDefinitions);
-				if (!def) return;
-
-				const res = await window.electron.mcp.builtin.createConfig(def.id, config);
-				if (!res.success || !res.data) {
-					message.error(res.error || "Failed to create config");
-					return;
-				}
-
-				const newConfig = res.data;
-
-				if (server.status === "connected") {
-					await window.electron.mcp.disconnect(serverId);
-				}
-
-				await window.electron.mcp.updateServer(serverId, {
-					command: newConfig.command,
-					args: newConfig.args,
-					env: newConfig.env,
-				});
-
-				const { updateServer } = useMcpStore.getState();
-				updateServer(serverId, {
-					command: newConfig.command,
-					args: newConfig.args,
-					env: newConfig.env,
-					status: "disconnected",
-					tools: undefined,
-				});
+				setConfigModalOpen(false);
+				setConfiguringServer(null);
+				message.success(t("messages.saveSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.saveError", { ns: "mcp" }));
 			}
-
-			setConfigModalOpen(false);
-			setConfiguringServer(null);
-			message.success(t("messages.saveSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.saveError", { ns: "mcp" }));
-		}
-	}, [servers, builtinDefinitions, t]);
+		},
+		[servers, builtinDefinitions, t],
+	);
 
 	const getStatusBadge = (status: string) => {
 		switch (status) {
 			case "connected":
-				return <Badge status="success" text={t("status.connected", { ns: "mcp" })} />;
+				return (
+					<Badge status="success" text={t("status.connected", { ns: "mcp" })} />
+				);
 			case "connecting":
-				return <Badge status="processing" text={t("status.connecting", { ns: "mcp" })} />;
+				return (
+					<Badge
+						status="processing"
+						text={t("status.connecting", { ns: "mcp" })}
+					/>
+				);
 			case "error":
 				return <Badge status="error" text={t("status.error", { ns: "mcp" })} />;
 			default:
-				return <Badge status="default" text={t("status.disconnected", { ns: "mcp" })} />;
+				return (
+					<Badge
+						status="default"
+						text={t("status.disconnected", { ns: "mcp" })}
+					/>
+				);
 		}
 	};
 
-	const getServerDetail = (item: typeof servers[0]) => {
+	const getServerDetail = (item: (typeof servers)[0]) => {
 		if (item.url) return item.url;
 		if (item.command) {
 			const args = item.args?.join(" ") || "";
@@ -215,7 +258,10 @@ export const McpConfig: React.FC = () => {
 				className="flex items-center justify-between mb-4 p-3 rounded-lg"
 				style={{ backgroundColor: token.colorFillQuaternary }}
 			>
-				<div className="flex items-center gap-2" style={{ color: token.colorTextSecondary }}>
+				<div
+					className="flex items-center gap-2"
+					style={{ color: token.colorTextSecondary }}
+				>
 					<ApiOutlined />
 					<span className="text-sm">
 						{t("settingsMcpDesc", {
@@ -264,7 +310,8 @@ export const McpConfig: React.FC = () => {
 					dataSource={servers}
 					renderItem={(item) => {
 						const isConnected = item.status === "connected";
-						const isConnecting = item.status === "connecting" || connectingIds.has(item.id);
+						const isConnecting =
+							item.status === "connecting" || connectingIds.has(item.id);
 
 						return (
 							<List.Item
@@ -272,7 +319,10 @@ export const McpConfig: React.FC = () => {
 								className="!px-4 !py-3"
 								actions={[
 									isConnected ? (
-										<Tooltip title={t("actions.disconnect", { ns: "mcp" })} key="disconnect">
+										<Tooltip
+											title={t("actions.disconnect", { ns: "mcp" })}
+											key="disconnect"
+										>
 											<Button
 												size="small"
 												type="text"
@@ -294,7 +344,11 @@ export const McpConfig: React.FC = () => {
 												type="text"
 												icon={
 													<PlayCircleOutlined
-														style={item.status === "error" ? { color: token.colorError } : undefined}
+														style={
+															item.status === "error"
+																? { color: token.colorError }
+																: undefined
+														}
 													/>
 												}
 												loading={isConnecting}
@@ -302,7 +356,10 @@ export const McpConfig: React.FC = () => {
 											/>
 										</Tooltip>
 									),
-									<Tooltip title={t("actions.settings", { ns: "mcp" })} key="settings">
+									<Tooltip
+										title={t("actions.settings", { ns: "mcp" })}
+										key="settings"
+									>
 										<Button
 											size="small"
 											type="text"
@@ -310,7 +367,10 @@ export const McpConfig: React.FC = () => {
 											onClick={() => handleConfigure(item)}
 										/>
 									</Tooltip>,
-									<Tooltip title={t("actions.delete", { ns: "mcp" })} key="delete">
+									<Tooltip
+										title={t("actions.delete", { ns: "mcp" })}
+										key="delete"
+									>
 										<Button
 											size="small"
 											type="text"
@@ -330,19 +390,29 @@ export const McpConfig: React.FC = () => {
 									title={
 										<div className="flex items-center gap-2 min-w-0">
 											<Tooltip title={item.name} placement="topLeft">
-												<span className="truncate" style={{ color: token.colorText, maxWidth: 200 }}>
+												<span
+													className="truncate"
+													style={{ color: token.colorText, maxWidth: 200 }}
+												>
 													{item.name}
 												</span>
 											</Tooltip>
-											<Tag className="!text-xs !m-0 shrink-0">{item.transport}</Tag>
-											<span className="shrink-0">{getStatusBadge(item.status)}</span>
+											<Tag className="!text-xs !m-0 shrink-0">
+												{item.transport}
+											</Tag>
+											<span className="shrink-0">
+												{getStatusBadge(item.status)}
+											</span>
 										</div>
 									}
 									description={
 										<Tooltip title={getServerDetail(item)} placement="topLeft">
 											<span
 												className="text-xs truncate block"
-												style={{ color: token.colorTextTertiary, maxWidth: 360 }}
+												style={{
+													color: token.colorTextTertiary,
+													maxWidth: 360,
+												}}
 											>
 												{getServerDetail(item)}
 											</span>
@@ -359,7 +429,8 @@ export const McpConfig: React.FC = () => {
 				server={configuringServer}
 				configSchema={
 					configuringServer
-						? findBuiltinDefinition(configuringServer, builtinDefinitions)?.configSchema
+						? findBuiltinDefinition(configuringServer, builtinDefinitions)
+								?.configSchema
 						: undefined
 				}
 				builtinDefinition={
@@ -368,7 +439,10 @@ export const McpConfig: React.FC = () => {
 						: undefined
 				}
 				onSave={handleSaveConfig}
-				onCancel={() => { setConfigModalOpen(false); setConfiguringServer(null); }}
+				onCancel={() => {
+					setConfigModalOpen(false);
+					setConfiguringServer(null);
+				}}
 			/>
 		</div>
 	);

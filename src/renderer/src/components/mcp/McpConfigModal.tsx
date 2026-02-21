@@ -26,15 +26,20 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 	const [form] = Form.useForm();
 	const [homedir, setHomedir] = useState<string>("");
 
-	const hasSchema = !!configSchema && Object.keys((configSchema as any)?.properties || {}).length > 0;
+	const hasSchema =
+		!!configSchema &&
+		Object.keys((configSchema as any)?.properties || {}).length > 0;
 
 	// 获取用户主目录用于路径字段默认值
 	useEffect(() => {
-		window.electron.system.getHomedir().then((res) => {
-			if (res.success && res.data) {
-				setHomedir(res.data);
-			}
-		}).catch(() => {});
+		window.electron.system
+			.getHomedir()
+			.then((res) => {
+				if (res.success && res.data) {
+					setHomedir(res.data);
+				}
+			})
+			.catch(() => {});
 	}, []);
 
 	// 从 server 的 env/args 提取当前配置值
@@ -61,7 +66,8 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 						const baseArgsLen = builtinDefinition.args.length;
 						const extraArgs = server.args?.slice(baseArgsLen) || [];
 						// 预填用户主目录（如果没有已配置的路径）
-						initialValues[key] = extraArgs.length > 0 ? extraArgs.join("\n") : homedir;
+						initialValues[key] =
+							extraArgs.length > 0 ? extraArgs.join("\n") : homedir;
 					}
 				} else if (prop.type === "string") {
 					if (server.env?.[key]) {
@@ -83,8 +89,8 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 				initialValues._args = server.args?.join(" ") || "";
 				initialValues._env = server.env
 					? Object.entries(server.env)
-						.map(([k, v]) => `${k}=${v}`)
-						.join("\n")
+							.map(([k, v]) => `${k}=${v}`)
+							.join("\n")
 					: "";
 			} else {
 				initialValues._url = server.url || "";
@@ -111,7 +117,9 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 	if (!server) return null;
 
 	const properties = hasSchema ? (configSchema as any)?.properties || {} : {};
-	const required: string[] = hasSchema ? (configSchema as any)?.required || [] : [];
+	const required: string[] = hasSchema
+		? (configSchema as any)?.required || []
+		: [];
 
 	return (
 		<Modal
@@ -137,7 +145,11 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 				{hasSchema ? (
 					// Schema-based fields
 					Object.entries(properties).map(([key, schema]) => {
-						const prop = schema as { type: string; description?: string; items?: { type: string } };
+						const prop = schema as {
+							type: string;
+							description?: string;
+							items?: { type: string };
+						};
 						const isRequired = required.includes(key);
 
 						if (prop.type === "boolean") {
@@ -160,8 +172,16 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 									key={key}
 									name={key}
 									label={key}
-									extra={prop.description ? `${prop.description} (${t("config.onePerLine", { ns: "mcp" })})` : t("config.onePerLine", { ns: "mcp" })}
-									rules={isRequired ? [{ required: true, message: `${key} is required` }] : undefined}
+									extra={
+										prop.description
+											? `${prop.description} (${t("config.onePerLine", { ns: "mcp" })})`
+											: t("config.onePerLine", { ns: "mcp" })
+									}
+									rules={
+										isRequired
+											? [{ required: true, message: `${key} is required` }]
+											: undefined
+									}
 								>
 									<Input.TextArea
 										rows={3}
@@ -178,53 +198,76 @@ export const McpConfigModal: React.FC<McpConfigModalProps> = ({
 								name={key}
 								label={key}
 								extra={prop.description}
-								rules={isRequired ? [{ required: true, message: `${key} is required` }] : undefined}
+								rules={
+									isRequired
+										? [{ required: true, message: `${key} is required` }]
+										: undefined
+								}
 							>
 								<Input
 									placeholder={prop.description || key}
-									type={key.toLowerCase().includes("token") || key.toLowerCase().includes("key") ? "password" : "text"}
+									type={
+										key.toLowerCase().includes("token") ||
+										key.toLowerCase().includes("key")
+											? "password"
+											: "text"
+									}
 								/>
 							</Form.Item>
 						);
 					})
-				) : (
-					// Generic fields for servers without configSchema
-					server.transport === "stdio" ? (
-						<>
-							<Form.Item
-								name="_command"
-								label={t("form.command", { ns: "mcp" })}
-								rules={[{ required: true, message: t("form.commandRequired", { ns: "mcp" }) }]}
-							>
-								<Input placeholder="npx" />
-							</Form.Item>
-							<Form.Item
-								name="_args"
-								label={t("form.args", { ns: "mcp" })}
-								extra={t("config.argsHint", { ns: "mcp", defaultValue: "Space-separated arguments" })}
-							>
-								<Input placeholder="-y @modelcontextprotocol/server-filesystem /path/to/dir" />
-							</Form.Item>
-							<Form.Item
-								name="_env"
-								label={t("config.envVars", { ns: "mcp", defaultValue: "Environment Variables" })}
-								extra={t("config.envHint", { ns: "mcp", defaultValue: "One per line, KEY=VALUE format" })}
-							>
-								<Input.TextArea
-									rows={3}
-									placeholder={"API_KEY=your-key\nOTHER_VAR=value"}
-								/>
-							</Form.Item>
-						</>
-					) : (
+				) : // Generic fields for servers without configSchema
+				server.transport === "stdio" ? (
+					<>
 						<Form.Item
-							name="_url"
-							label={t("form.url", { ns: "mcp" })}
-							rules={[{ required: true, message: t("form.urlRequired", { ns: "mcp" }) }]}
+							name="_command"
+							label={t("form.command", { ns: "mcp" })}
+							rules={[
+								{
+									required: true,
+									message: t("form.commandRequired", { ns: "mcp" }),
+								},
+							]}
 						>
-							<Input placeholder="http://localhost:3000/mcp" />
+							<Input placeholder="npx" />
 						</Form.Item>
-					)
+						<Form.Item
+							name="_args"
+							label={t("form.args", { ns: "mcp" })}
+							extra={t("config.argsHint", {
+								ns: "mcp",
+								defaultValue: "Space-separated arguments",
+							})}
+						>
+							<Input placeholder="-y @modelcontextprotocol/server-filesystem /path/to/dir" />
+						</Form.Item>
+						<Form.Item
+							name="_env"
+							label={t("config.envVars", {
+								ns: "mcp",
+								defaultValue: "Environment Variables",
+							})}
+							extra={t("config.envHint", {
+								ns: "mcp",
+								defaultValue: "One per line, KEY=VALUE format",
+							})}
+						>
+							<Input.TextArea
+								rows={3}
+								placeholder={"API_KEY=your-key\nOTHER_VAR=value"}
+							/>
+						</Form.Item>
+					</>
+				) : (
+					<Form.Item
+						name="_url"
+						label={t("form.url", { ns: "mcp" })}
+						rules={[
+							{ required: true, message: t("form.urlRequired", { ns: "mcp" }) },
+						]}
+					>
+						<Input placeholder="http://localhost:3000/mcp" />
+					</Form.Item>
 				)}
 			</Form>
 		</Modal>

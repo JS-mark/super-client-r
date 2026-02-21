@@ -25,42 +25,51 @@ export const ThirdPartyMcpCard: React.FC<{
 	const { removeServer, testConnection, disconnectServer } = useMcpStore();
 	const [connecting, setConnecting] = useState(false);
 
-	const handleDelete = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		Modal.confirm({
-			title: t("confirm.delete", { ns: "mcp" }),
-			content: t("confirm.deleteContent", { name: server.name, ns: "mcp" }),
-			onOk: () => {
-				removeServer(server.id);
-				message.success(
-					t("messages.deleted", { ns: "mcp", name: server.name }),
-				);
-			},
-		});
-	}, [removeServer, server.id, server.name, t]);
+	const handleDelete = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			Modal.confirm({
+				title: t("confirm.delete", { ns: "mcp" }),
+				content: t("confirm.deleteContent", { name: server.name, ns: "mcp" }),
+				onOk: () => {
+					removeServer(server.id);
+					message.success(
+						t("messages.deleted", { ns: "mcp", name: server.name }),
+					);
+				},
+			});
+		},
+		[removeServer, server.id, server.name, t],
+	);
 
-	const handleConnect = useCallback(async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		setConnecting(true);
-		try {
-			await testConnection(server.id);
-			message.success(t("messages.connectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.connectError", { ns: "mcp" }));
-		} finally {
-			setConnecting(false);
-		}
-	}, [testConnection, server.id, t]);
+	const handleConnect = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			setConnecting(true);
+			try {
+				await testConnection(server.id);
+				message.success(t("messages.connectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.connectError", { ns: "mcp" }));
+			} finally {
+				setConnecting(false);
+			}
+		},
+		[testConnection, server.id, t],
+	);
 
-	const handleDisconnect = useCallback(async (e: React.MouseEvent) => {
-		e.stopPropagation();
-		try {
-			await disconnectServer(server.id);
-			message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
-		} catch {
-			message.error(t("messages.disconnectError", { ns: "mcp" }));
-		}
-	}, [disconnectServer, server.id, t]);
+	const handleDisconnect = useCallback(
+		async (e: React.MouseEvent) => {
+			e.stopPropagation();
+			try {
+				await disconnectServer(server.id);
+				message.success(t("messages.disconnectSuccess", { ns: "mcp" }));
+			} catch {
+				message.error(t("messages.disconnectError", { ns: "mcp" }));
+			}
+		},
+		[disconnectServer, server.id, t],
+	);
 
 	const isConnected = server.status === "connected";
 	const isConnecting = server.status === "connecting" || connecting;
@@ -91,7 +100,12 @@ export const ThirdPartyMcpCard: React.FC<{
 					className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
 					style={{ background: iconBg }}
 				>
-					<GlobalOutlined style={{ color: isConnected ? "#fff" : token.colorTextTertiary, fontSize: 16 }} />
+					<GlobalOutlined
+						style={{
+							color: isConnected ? "#fff" : token.colorTextTertiary,
+							fontSize: 16,
+						}}
+					/>
 				</div>
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center gap-2">
@@ -132,13 +146,20 @@ export const ThirdPartyMcpCard: React.FC<{
 			{/* Footer */}
 			<div className="px-4 py-3 flex items-center justify-between">
 				<div className="flex items-center gap-1.5">
-					<Tag bordered={false} color="green" className="!text-xs !px-1.5 !py-0 !m-0 !rounded">
+					<Tag
+						bordered={false}
+						color="green"
+						className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+					>
 						{server.transport}
 					</Tag>
 				</div>
 
 				{/* Actions */}
-				<div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+				<div
+					className="flex items-center gap-0.5"
+					onClick={(e) => e.stopPropagation()}
+				>
 					{isConnected ? (
 						<Tooltip title={t("actions.disconnect", { ns: "mcp" })}>
 							<Button
@@ -159,7 +180,15 @@ export const ThirdPartyMcpCard: React.FC<{
 							<Button
 								size="small"
 								type="text"
-								icon={<PlayCircleOutlined style={server.status === "error" ? { color: token.colorError } : undefined} />}
+								icon={
+									<PlayCircleOutlined
+										style={
+											server.status === "error"
+												? { color: token.colorError }
+												: undefined
+										}
+									/>
+								}
 								onClick={handleConnect}
 								loading={isConnecting}
 							/>
