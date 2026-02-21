@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import { localServer } from "../../server";
+import { getOrCreateApiKey } from "../../server/config";
 import { storeManager } from "../../store";
 import { API_CHANNELS } from "../channels";
 
@@ -14,7 +15,10 @@ function validatePort(port: number): { valid: boolean; error?: string } {
 		return { valid: false, error: "Port must be an integer" };
 	}
 	if (port < PORT_MIN || port > PORT_MAX) {
-		return { valid: false, error: `Port must be between ${PORT_MIN} and ${PORT_MAX}` };
+		return {
+			valid: false,
+			error: `Port must be between ${PORT_MIN} and ${PORT_MAX}`,
+		};
 	}
 	return { valid: true };
 }
@@ -66,5 +70,9 @@ export function registerApiHandlers() {
 	// 获取服务器端口
 	ipcMain.handle("get-server-port", () => {
 		return localServer.getPort();
+	});
+
+	ipcMain.handle(API_CHANNELS.GET_API_KEY, () => {
+		return getOrCreateApiKey();
 	});
 }
