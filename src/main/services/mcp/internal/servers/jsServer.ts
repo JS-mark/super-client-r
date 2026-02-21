@@ -124,10 +124,7 @@ const executeJavaScriptHandler: InternalToolHandler = async (args) => {
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
 		if (msg.includes("interrupted")) {
-			return textResult(
-				`Error: Execution timed out after ${timeout}ms`,
-				true,
-			);
+			return textResult(`Error: Execution timed out after ${timeout}ms`, true);
 		}
 		return textResult(`Error: ${msg}`, true);
 	}
@@ -192,9 +189,7 @@ function shouldInterruptAfterDeadline(deadline: number) {
 /**
  * 格式化 console 日志
  */
-function formatLogs(
-	logs: Array<{ level: string; args: string[] }>,
-): string {
+function formatLogs(logs: Array<{ level: string; args: string[] }>): string {
 	return logs
 		.map((entry) => {
 			const prefix = entry.level === "log" ? "" : `[${entry.level}] `;

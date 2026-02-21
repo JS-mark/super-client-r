@@ -712,7 +712,12 @@ body {
 	display: block;
 	width: 50%;
 	height: 100%;
-	background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		var(--color-primary),
+		transparent
+	);
 	animation: tool-call-progress 1.5s ease-in-out infinite;
 }
 

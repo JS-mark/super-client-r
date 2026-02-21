@@ -86,10 +86,7 @@ export class LocalServer {
 		const getSwaggerUiDir = () => {
 			// swagger-ui-dist 作为 externalized dep 始终在 node_modules 中
 			try {
-				return join(
-					require.resolve("swagger-ui-dist"),
-					"..",
-				);
+				return join(require.resolve("swagger-ui-dist"), "..");
 			} catch {
 				return join(
 					electronApp.getAppPath(),
@@ -119,7 +116,8 @@ export class LocalServer {
 
 				const cached = fileCache.get(fileName);
 				if (cached) {
-					ctx.type = MIME_TYPES[extname(fileName)] || "application/octet-stream";
+					ctx.type =
+						MIME_TYPES[extname(fileName)] || "application/octet-stream";
 					ctx.body = cached;
 					return;
 				}
@@ -128,7 +126,8 @@ export class LocalServer {
 					const filePath = join(getSwaggerUiDir(), fileName);
 					const content = await readFile(filePath);
 					fileCache.set(fileName, content);
-					ctx.type = MIME_TYPES[extname(fileName)] || "application/octet-stream";
+					ctx.type =
+						MIME_TYPES[extname(fileName)] || "application/octet-stream";
 					ctx.body = content;
 				} catch {
 					ctx.status = 404;

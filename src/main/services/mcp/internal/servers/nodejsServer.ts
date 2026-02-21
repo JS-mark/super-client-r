@@ -79,18 +79,13 @@ const executeNodejsHandler: InternalToolHandler = async (args) => {
 						if (error) {
 							// 超时
 							if (error.killed || error.signal === "SIGTERM") {
-								reject(
-									new Error(
-										`Execution timed out after ${timeout}ms`,
-									),
-								);
+								reject(new Error(`Execution timed out after ${timeout}ms`));
 								return;
 							}
 							// 非零退出码但有输出 — 正常返回输出 + 错误
 							resolve({
 								stdout: stdout || "",
-								stderr:
-									stderr || error.message || String(error),
+								stderr: stderr || error.message || String(error),
 							});
 							return;
 						}
@@ -153,17 +148,12 @@ const executeNodejsFileHandler: InternalToolHandler = async (args) => {
 					(error, stdout, stderr) => {
 						if (error) {
 							if (error.killed || error.signal === "SIGTERM") {
-								reject(
-									new Error(
-										`Execution timed out after ${timeout}ms`,
-									),
-								);
+								reject(new Error(`Execution timed out after ${timeout}ms`));
 								return;
 							}
 							resolve({
 								stdout: stdout || "",
-								stderr:
-									stderr || error.message || String(error),
+								stderr: stderr || error.message || String(error),
 							});
 							return;
 						}
@@ -234,8 +224,7 @@ export function createNodejsServer(): InternalMcpServer {
 					properties: {
 						filePath: {
 							type: "string",
-							description:
-								"Absolute path to the .js or .mjs file to execute",
+							description: "Absolute path to the .js or .mjs file to execute",
 						},
 						args: {
 							type: "array",

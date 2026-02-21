@@ -4,7 +4,13 @@ import { storeManager } from "../store";
 export const SERVER_CONFIG = {
 	PORT: 3000,
 	/** 无需认证的公开路径 */
-	PUBLIC_PATHS: ["/health", "/favicon.ico", "/api-docs", "/swagger.json", "/swagger-ui/"],
+	PUBLIC_PATHS: [
+		"/health",
+		"/favicon.ico",
+		"/api-docs",
+		"/swagger.json",
+		"/swagger-ui/",
+	],
 };
 
 /**

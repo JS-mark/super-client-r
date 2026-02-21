@@ -111,12 +111,18 @@ export const MermaidChart: React.FC<MermaidChartProps> = ({
 	}
 
 	return (
-		<div className="rounded-lg overflow-hidden" style={{ backgroundColor: token.colorFillQuaternary }}>
+		<div
+			className="rounded-lg overflow-hidden"
+			style={{ backgroundColor: token.colorFillQuaternary }}
+		>
 			<div
 				className="flex items-center justify-between px-3 py-1.5"
 				style={{ backgroundColor: token.colorFillTertiary }}
 			>
-				<span className="text-xs font-medium" style={{ color: token.colorTextSecondary }}>
+				<span
+					className="text-xs font-medium"
+					style={{ color: token.colorTextSecondary }}
+				>
 					Mermaid
 				</span>
 				<CopyButton getText={getCode} />

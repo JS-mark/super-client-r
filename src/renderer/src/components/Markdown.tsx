@@ -56,10 +56,7 @@ const CodeBlock: FC<ComponentProps> = ({
 	return <code {...props}>{children}</code>;
 };
 
-const BlockquoteBlock: FC<ComponentProps> = ({
-	children,
-	...props
-}) => {
+const BlockquoteBlock: FC<ComponentProps> = ({ children, ...props }) => {
 	const quoteRef = useRef<HTMLQuoteElement>(null);
 
 	const getText = useCallback(() => quoteRef.current?.textContent ?? "", []);
@@ -120,13 +117,13 @@ export const Markdown: FC<MarkdownProps> = ({
 		() =>
 			streaming
 				? {
-					hasNextChunk: true,
-					enableAnimation: true,
-					animationConfig: {
-						fadeDuration: 150,
-						easing: "ease-out",
-					},
-				}
+						hasNextChunk: true,
+						enableAnimation: true,
+						animationConfig: {
+							fadeDuration: 150,
+							easing: "ease-out",
+						},
+					}
 				: undefined,
 		[streaming],
 	);

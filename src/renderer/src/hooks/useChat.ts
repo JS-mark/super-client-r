@@ -570,7 +570,8 @@ export function useChat() {
 					tools,
 					toolMapping,
 					toolPermission,
-					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					toolCallMode:
+						sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
 					temperature: sessionSettings.temperatureEnabled
 						? sessionSettings.temperature
 						: undefined,
@@ -696,7 +697,8 @@ export function useChat() {
 					tools,
 					toolMapping,
 					toolPermission,
-					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					toolCallMode:
+						sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
 					temperature: sessionSettings.temperatureEnabled
 						? sessionSettings.temperature
 						: undefined,
@@ -835,7 +837,8 @@ export function useChat() {
 					tools,
 					toolMapping,
 					toolPermission,
-					toolCallMode: sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
+					toolCallMode:
+						sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
 					temperature: sessionSettings.temperatureEnabled
 						? sessionSettings.temperature
 						: undefined,

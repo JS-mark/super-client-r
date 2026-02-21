@@ -95,17 +95,13 @@ ${toolDescriptions}`;
  * Pattern that matches <tool_call>…</tool_call> or <tool_use>…</tool_use>
  * (case-insensitive).
  */
-const TOOL_BLOCK_RE =
-	/<(tool_call|tool_use)>\s*([\s\S]*?)\s*<\/\1>/gi;
+const TOOL_BLOCK_RE = /<(tool_call|tool_use)>\s*([\s\S]*?)\s*<\/\1>/gi;
 
 /**
  * Try to extract a valid tool call from a raw JSON string found inside
  * a tool XML block. Handles several common payload shapes.
  */
-function tryParseToolPayload(
-	raw: string,
-	idx: number,
-): ParsedToolCall | null {
+function tryParseToolPayload(raw: string, idx: number): ParsedToolCall | null {
 	let obj: Record<string, unknown>;
 	try {
 		obj = JSON.parse(raw);
@@ -303,7 +299,13 @@ export class LLMService {
 			const toolPrompt = buildToolPrompt(request.tools);
 			if (toolPrompt) {
 				const first = conversationMessages[0];
-				if (first && "role" in first && first.role === "system" && "content" in first && typeof first.content === "string") {
+				if (
+					first &&
+					"role" in first &&
+					first.role === "system" &&
+					"content" in first &&
+					typeof first.content === "string"
+				) {
 					first.content += toolPrompt;
 				} else {
 					conversationMessages.unshift({
@@ -575,11 +577,7 @@ export class LLMService {
 				}
 
 				// Prompt-based tool call parsing: extract <tool_call>/<tool_use> blocks
-				if (
-					isPromptMode &&
-					toolExecutor &&
-					hasToolBlocks(accumulatedContent)
-				) {
+				if (isPromptMode && toolExecutor && hasToolBlocks(accumulatedContent)) {
 					const { cleanText, toolCalls: parsedToolCalls } =
 						parseToolCallsFromText(accumulatedContent);
 
@@ -637,8 +635,7 @@ export class LLMService {
 									toolResult = await toolExecutor(tc.name, tc.arguments);
 								} catch (err) {
 									isError = true;
-									toolResult =
-										err instanceof Error ? err.message : String(err);
+									toolResult = err instanceof Error ? err.message : String(err);
 								}
 								const toolDuration = Date.now() - toolStart;
 

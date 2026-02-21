@@ -144,7 +144,7 @@ export function SearchConfigModal({
 			onCancel={onClose}
 			footer={null}
 			width={560}
-      destroyOnHidden
+			destroyOnHidden
 			afterOpenChange={(visible) => {
 				if (visible && editingConfig) {
 					form.setFieldsValue({

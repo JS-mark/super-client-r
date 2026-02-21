@@ -637,9 +637,7 @@ export class PluginManager extends EventEmitter {
 	/**
 	 * 获取已注册命令
 	 */
-	getRegisteredCommands(
-		pluginId?: string,
-	): Array<{
+	getRegisteredCommands(pluginId?: string): Array<{
 		command: string;
 		pluginId: string;
 		title?: string;

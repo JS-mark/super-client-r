@@ -1160,8 +1160,7 @@ const electronAPI: ElectronAPI = {
 		onCSSChanged: (callback: (css: string | null) => void) => {
 			const listener = (_event: unknown, css: string | null) => callback(css);
 			ipcRenderer.on("markdown-theme:css-changed", listener);
-			return () =>
-				ipcRenderer.off("markdown-theme:css-changed", listener);
+			return () => ipcRenderer.off("markdown-theme:css-changed", listener);
 		},
 	},
 
