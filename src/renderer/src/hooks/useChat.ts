@@ -187,6 +187,7 @@ export function useChat() {
 	} = useChatStore();
 
 	const [input, setInput] = useState("");
+	const editingMessageIdRef = useRef<string | null>(null);
 	const [chatMode, setChatMode] = useState<ChatMode>("direct");
 	const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 	const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -937,7 +938,8 @@ export function useChat() {
 	);
 
 	/**
-	 * Edit a user message – populate input and remove messages from that point
+	 * Edit a user message – populate input and mark for editing.
+	 * Messages are only truncated when the user actually sends the edited content.
 	 */
 	const editMessage = useCallback(
 		(messageId: string) => {
@@ -945,10 +947,10 @@ export function useChat() {
 			const target = allMessages.find((m) => m.id === messageId);
 			if (!target || target.role !== "user") return;
 
+			editingMessageIdRef.current = messageId;
 			setInput(target.content);
-			deleteMessagesFrom(messageId);
 		},
-		[setInput, deleteMessagesFrom],
+		[setInput],
 	);
 
 	/**
@@ -960,6 +962,12 @@ export function useChat() {
 
 			const mode = options?.mode || chatMode;
 			const content = input.trim();
+
+			// If editing a previous message, truncate from that point first
+			if (editingMessageIdRef.current) {
+				deleteMessagesFrom(editingMessageIdRef.current);
+				editingMessageIdRef.current = null;
+			}
 
 			// Auto-create conversation if none exists
 			const { currentConversationId, createConversation } =
@@ -1022,6 +1030,7 @@ export function useChat() {
 			selectedAgentId,
 			selectedSkillId,
 			addMessage,
+			deleteMessagesFrom,
 			sendDirectMessage,
 			sendAgentMessage,
 			sendSkillMessage,
