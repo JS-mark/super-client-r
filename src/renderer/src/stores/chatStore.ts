@@ -55,9 +55,11 @@ interface ChatState {
 	isStreaming: boolean;
 	streamingContent: string;
 
-	// Pending input (from plugins, etc.)
+	// Pending input (from plugins, float widget, etc.)
 	pendingInput: string | null;
 	setPendingInput: (input: string | null) => void;
+	pendingAutoSend: boolean;
+	setPendingAutoSend: (value: boolean) => void;
 
 	// Pending skill selection (from Skills page, etc.)
 	pendingSkillId: string | null;
@@ -106,6 +108,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	streamingContent: "",
 	pendingInput: null,
 	setPendingInput: (input) => set({ pendingInput: input }),
+	pendingAutoSend: false,
+	setPendingAutoSend: (value) => set({ pendingAutoSend: value }),
 	pendingSkillId: null,
 	setPendingSkillId: (id) => set({ pendingSkillId: id }),
 	conversations: [],

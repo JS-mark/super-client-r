@@ -153,8 +153,8 @@ function createFloatingWindow(): void {
 	const { width: workWidth } = primaryDisplay.workAreaSize;
 
 	floatingWindow = new BrowserWindow({
-		width: 300,
-		height: 60,
+		width: 56,
+		height: 56,
 		frame: false,
 		transparent: true,
 		resizable: false,
@@ -171,7 +171,7 @@ function createFloatingWindow(): void {
 		},
 	});
 
-	const x = workWidth - 350;
+	const x = workWidth - 80;
 	const y = 100;
 	floatingWindow.setPosition(x, y);
 
@@ -408,18 +408,30 @@ function createMenu(): void {
 function registerWindowHandlers(): void {
 	ipcMain.on("resize-float-window", (_event, { width, height }) => {
 		if (floatingWindow) {
-			floatingWindow.setSize(width, height);
+			const [currentX, currentY] = floatingWindow.getPosition();
+			const [currentWidth] = floatingWindow.getSize();
+			const newX = currentX + (currentWidth - width);
+			floatingWindow.setBounds({ x: newX, y: currentY, width, height });
 		}
 	});
 
-	ipcMain.on("open-main-window", () => {
-		if (mainWindow) {
-			mainWindow.show();
-			mainWindow.focus();
-		} else {
-			createWindow();
-		}
-	});
+	ipcMain.on(
+		"open-main-window",
+		(_event, data?: { message?: string }) => {
+			if (mainWindow) {
+				mainWindow.show();
+				mainWindow.focus();
+			} else {
+				createWindow();
+			}
+			if (data?.message && mainWindow) {
+				mainWindow.webContents.send("navigate-to", "/chat");
+				mainWindow.webContents.send("float:pending-message", {
+					message: data.message,
+				});
+			}
+		},
+	);
 }
 
 /**

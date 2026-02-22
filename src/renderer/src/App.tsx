@@ -8,6 +8,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { PluginWindowHandler } from "./components/plugin/PluginWindowHandler";
 import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
+import { useChatStore } from "./stores/chatStore";
 import { useSkinStore } from "./stores/skinStore";
 import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
 
@@ -75,15 +76,29 @@ function App() {
 			router.navigate(path);
 		};
 
+		// Float widget pending message handler
+		const handleFloatMessage = (_event: any, ...args: any[]) => {
+			const data = args[0] as { message: string } | undefined;
+			if (data?.message) {
+				useChatStore.getState().setPendingInput(data.message);
+				useChatStore.getState().setPendingAutoSend(true);
+			}
+		};
+
 		// Check if electron API is available
 		if (window.electron && window.electron.ipc) {
 			window.electron.ipc.on("navigate-to", handleNavigate);
+			window.electron.ipc.on("float:pending-message", handleFloatMessage);
 		}
 
 		return () => {
-			// Cleanup event listener
+			// Cleanup event listeners
 			if (window.electron && window.electron.ipc) {
 				window.electron.ipc.off("navigate-to", handleNavigate);
+				window.electron.ipc.off(
+					"float:pending-message",
+					handleFloatMessage,
+				);
 			}
 		};
 	}, []);
