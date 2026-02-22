@@ -99,7 +99,8 @@
 	"sessionStatus": {
 		"preparing": "准备中...",
 		"streaming": "回复中...",
-		"tool_calling": "工具调用中..."
+		"tool_calling": "工具调用中...",
+		"thinking": "思考中"
 	},
 	"sidebar": {
 		"newChat": "新对话",

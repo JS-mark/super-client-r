@@ -99,7 +99,8 @@
 	"sessionStatus": {
 		"preparing": "Preparing...",
 		"streaming": "Responding...",
-		"tool_calling": "Calling tools..."
+		"tool_calling": "Calling tools...",
+		"thinking": "Thinking"
 	},
 	"sidebar": {
 		"newChat": "New Chat",

@@ -60,6 +60,7 @@ import {
 	useSearchEngine,
 } from "../components/chat/SearchEnginePanel";
 import { SlashCommandPanel } from "../components/chat/SlashCommandPanel";
+import { ThinkingIndicator } from "../components/chat/ThinkingIndicator";
 import { ToolCallCard } from "../components/chat/ToolCallCard";
 import { MainLayout } from "../components/layout/MainLayout";
 import { Markdown } from "../components/Markdown";
@@ -410,6 +411,8 @@ const Chat: React.FC = () => {
 		switchConversation,
 		pendingInput,
 		setPendingInput,
+		pendingAutoSend,
+		setPendingAutoSend,
 		pendingSkillId,
 		setPendingSkillId,
 	} = useChatStore();
@@ -427,13 +430,31 @@ const Chat: React.FC = () => {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
-	// Consume pendingInput from plugins or other sources
+	// Consume pendingInput from plugins, float widget, or other sources
+	const [floatAutoSend, setFloatAutoSend] = useState(false);
+
 	useEffect(() => {
 		if (pendingInput) {
 			setInput(pendingInput);
 			setPendingInput(null);
+			if (pendingAutoSend) {
+				setPendingAutoSend(false);
+				setFloatAutoSend(true);
+			}
 		}
-	}, [pendingInput, setInput, setPendingInput]);
+	}, [pendingInput, pendingAutoSend, setInput, setPendingInput, setPendingAutoSend]);
+
+	// Auto-send after input state has updated (float widget flow)
+	useEffect(() => {
+		if (floatAutoSend && input.trim()) {
+			setFloatAutoSend(false);
+			const doSend = async () => {
+				await useChatStore.getState().createConversation(input.trim().slice(0, 50));
+				sendMessage({ mode: "direct" });
+			};
+			doSend();
+		}
+	}, [floatAutoSend, input, sendMessage]);
 
 	// Consume pendingSkillId from Skills page navigation
 	useEffect(() => {
@@ -829,6 +850,7 @@ const Chat: React.FC = () => {
 				shape: "round" as const,
 				rootClassName: "group",
 				avatar: undefined as React.ReactNode,
+				loadingRender: () => <ThinkingIndicator />,
 				styles: {
 					content: {
 						display: "inline-block",
@@ -1794,6 +1816,7 @@ const Chat: React.FC = () => {
 														title={t("actions.stop", "终止", { ns: "chat" })}
 													>
 														<Button
+															className="chat-stop-btn"
 															type="primary"
 															danger
 															shape="circle"
@@ -1802,7 +1825,11 @@ const Chat: React.FC = () => {
 														/>
 													</Tooltip>
 												) : (
-													<SendButton type="primary" shape="circle" />
+													<SendButton
+														className="chat-send-btn"
+														type="primary"
+														shape="circle"
+													/>
 												)}
 											</Flex>
 										</Flex>
