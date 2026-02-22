@@ -1,17 +1,19 @@
 import {
+	AppstoreOutlined,
 	BugOutlined,
 	CodeOutlined,
 	FileTextOutlined,
+	FormatPainterOutlined,
 	GithubOutlined,
 	HeartOutlined,
 	InfoCircleOutlined,
-	ReloadOutlined,
+	LayoutOutlined,
 	RocketOutlined,
+	SearchOutlined,
 	StarOutlined,
 	TeamOutlined,
-	TrophyOutlined,
 } from "@ant-design/icons";
-import { Button, Card, Tabs, Tag, Timeline, Typography, theme } from "antd";
+import { Button, Card, Tabs, Tag, Typography, theme } from "antd";
 import type React from "react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,7 +25,6 @@ const { Title, Paragraph } = Typography;
 
 interface AboutSectionProps {
 	appInfo: AppInfo | null;
-	onCheckUpdate: () => void;
 	onOpenGitHub: () => void;
 	onReportBug: () => void;
 	onOpenLicense: () => void;
@@ -55,6 +56,30 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 			color: "from-orange-500 to-red-500",
 		},
 		{
+			icon: <AppstoreOutlined />,
+			titleKey: "about.features.plugin.title",
+			descKey: "about.features.plugin.desc",
+			color: "from-indigo-500 to-violet-500",
+		},
+		{
+			icon: <SearchOutlined />,
+			titleKey: "about.features.webSearch.title",
+			descKey: "about.features.webSearch.desc",
+			color: "from-teal-500 to-cyan-500",
+		},
+		{
+			icon: <FormatPainterOutlined />,
+			titleKey: "about.features.themes.title",
+			descKey: "about.features.themes.desc",
+			color: "from-pink-500 to-rose-500",
+		},
+		{
+			icon: <LayoutOutlined />,
+			titleKey: "about.features.floatWidget.title",
+			descKey: "about.features.floatWidget.desc",
+			color: "from-amber-500 to-orange-500",
+		},
+		{
 			icon: <InfoCircleOutlined />,
 			titleKey: "about.features.localApi.title",
 			descKey: "about.features.localApi.desc",
@@ -78,7 +103,7 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 							v{appInfo?.version || "0.0.1"}
 						</Tag>
 						<Tag className="!bg-green-500/20 !text-green-400 !border-green-500/30 !rounded-full !px-2 !py-0 !text-xs">
-							MIT
+							GPL-2.0
 						</Tag>
 					</div>
 					<Paragraph className="!text-slate-400 !text-xs !mb-0">
@@ -126,174 +151,8 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	);
 };
 
-// 系统信息 Tab - 更紧凑
-const SystemInfoTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
-	const { t } = useTranslation();
-	const { token } = useToken();
-
-	const systemItems = [
-		{
-			label: t("platform", "Platform", { ns: "settings" }),
-			value:
-				appInfo?.platform === "darwin" ? "macOS" : appInfo?.platform || "N/A",
-			icon: <InfoCircleOutlined />,
-		},
-		{
-			label: t("architecture", "Arch", { ns: "settings" }),
-			value: appInfo?.arch || "N/A",
-			icon: <CodeOutlined />,
-		},
-		{ label: "Node.js", value: appInfo?.node || "N/A", icon: <CodeOutlined /> },
-		{
-			label: "Electron",
-			value: appInfo?.electron || "N/A",
-			icon: <CodeOutlined />,
-		},
-	];
-
-	return (
-		<div className="space-y-3">
-			<Card
-				size="small"
-				title={
-					<span className="flex items-center gap-1.5 text-sm">
-						<CodeOutlined className="text-blue-500" />
-						<span>{t("about.systemInfo", { ns: "settings" })}</span>
-					</span>
-				}
-				className="!rounded-lg"
-				style={{ borderColor: token.colorBorder }}
-			>
-				<div className="grid grid-cols-2 gap-2">
-					{systemItems.map((item) => (
-						<div
-							key={item.label}
-							className="flex items-center gap-2 p-2 rounded-md border"
-							style={{
-								backgroundColor: token.colorBgContainer,
-								borderColor: token.colorBorder,
-							}}
-						>
-							<div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs">
-								{item.icon}
-							</div>
-							<div className="min-w-0">
-								<div
-									className="text-xs font-medium truncate"
-									style={{ color: token.colorTextHeading }}
-								>
-									{item.value}
-								</div>
-								<div
-									className="text-[10px]"
-									style={{ color: token.colorTextSecondary }}
-								>
-									{item.label}
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			</Card>
-
-			<Card
-				size="small"
-				title={
-					<span className="flex items-center gap-1.5 text-sm">
-						<TrophyOutlined className="text-yellow-500" />
-						<span>{t("about.achievements", { ns: "settings" })}</span>
-					</span>
-				}
-				className="!rounded-lg !mt-[10px]"
-				style={{ borderColor: token.colorBorder }}
-			>
-				<div className="flex flex-wrap gap-1.5">
-					<Tag color="blue" className="!text-xs">
-						AI Chat
-					</Tag>
-					<Tag color="purple" className="!text-xs">
-						MCP
-					</Tag>
-					<Tag color="orange" className="!text-xs">
-						Skills
-					</Tag>
-					<Tag color="green" className="!text-xs">
-						API
-					</Tag>
-					<Tag color="cyan" className="!text-xs">
-						i18n
-					</Tag>
-					<Tag color="magenta" className="!text-xs">
-						Dark
-					</Tag>
-				</div>
-			</Card>
-		</div>
-	);
-};
-
-// 更新日志 Tab - 更紧凑
-const ChangelogTab: React.FC = () => {
-	const { t } = useTranslation();
-	const { token } = useToken();
-
-	return (
-		<Card
-			size="small"
-			title={
-				<span className="flex items-center gap-1.5 text-sm">
-					<InfoCircleOutlined className="text-purple-500" />
-					<span>{t("about.recentUpdates", { ns: "settings" })}</span>
-				</span>
-			}
-			className="!rounded-lg"
-			style={{ borderColor: token.colorBorder }}
-		>
-			<Timeline
-				mode="left"
-				className="!text-xs"
-				items={[
-					{
-						color: "green",
-						label: "v0.0.1",
-						children: (
-							<span className="text-slate-500 text-xs">
-								Initial release with core chat
-							</span>
-						),
-					},
-					{
-						color: "blue",
-						label: "MCP",
-						children: (
-							<span className="text-slate-500 text-xs">
-								MCP server integration
-							</span>
-						),
-					},
-					{
-						color: "purple",
-						label: "Skills",
-						children: (
-							<span className="text-slate-500 text-xs">Skill marketplace</span>
-						),
-					},
-					{
-						color: "orange",
-						label: "API",
-						children: (
-							<span className="text-slate-500 text-xs">JWT & API key auth</span>
-						),
-					},
-				]}
-			/>
-		</Card>
-	);
-};
-
-// 团队 Tab - 更紧凑
+// 团队 Tab
 const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
-	onCheckUpdate,
 	onOpenGitHub,
 	onReportBug,
 	onOpenLicense,
@@ -352,30 +211,21 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 					<p className="mb-1">
 						{t(
 							"about.licenseText",
-							"This project is licensed under the MIT License.",
+							"This project is licensed under the GNU General Public License v2.0.",
 							{ ns: "settings" },
 						)}
 					</p>
 					<p>
 						{t(
 							"about.licenseDesc",
-							"You are free to use, modify, and distribute this software.",
+							"You are free to use, modify, and distribute this software under the terms of the GPL-2.0 license.",
 							{ ns: "settings" },
 						)}
 					</p>
 				</div>
 			</Card>
 
-			{/* 底部操作按钮 - 更紧凑 */}
 			<div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-				<Button
-					type="primary"
-					icon={<ReloadOutlined />}
-					onClick={onCheckUpdate}
-					className="!rounded-md"
-				>
-					{t("checkUpdate", "Check Update", { ns: "settings" })}
-				</Button>
 				<Button
 					icon={<GithubOutlined />}
 					onClick={onOpenGitHub}
@@ -404,7 +254,6 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 
 export const AboutSection: React.FC<AboutSectionProps> = ({
 	appInfo,
-	onCheckUpdate,
 	onOpenGitHub,
 	onReportBug,
 	onOpenLicense,
@@ -424,26 +273,6 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 			children: <OverviewTab appInfo={appInfo} />,
 		},
 		{
-			key: "system",
-			label: (
-				<span className="flex items-center gap-1 text-xs">
-					<CodeOutlined />
-					{t("about.systemInfo", { ns: "settings" })}
-				</span>
-			),
-			children: <SystemInfoTab appInfo={appInfo} />,
-		},
-		{
-			key: "changelog",
-			label: (
-				<span className="flex items-center gap-1 text-xs">
-					<RocketOutlined />
-					{t("about.recentUpdates", { ns: "settings" })}
-				</span>
-			),
-			children: <ChangelogTab />,
-		},
-		{
 			key: "team",
 			label: (
 				<span className="flex items-center gap-1 text-xs">
@@ -453,7 +282,6 @@ export const AboutSection: React.FC<AboutSectionProps> = ({
 			),
 			children: (
 				<TeamTab
-					onCheckUpdate={onCheckUpdate}
 					onOpenGitHub={onOpenGitHub}
 					onReportBug={onReportBug}
 					onOpenLicense={onOpenLicense}

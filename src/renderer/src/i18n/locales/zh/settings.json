@@ -182,6 +182,22 @@
 			"localApi": {
 				"title": "本地 API",
 				"desc": "内置 HTTP 服务"
+			},
+			"plugin": {
+				"title": "插件系统",
+				"desc": "插件扩展、主题皮肤、市场安装"
+			},
+			"webSearch": {
+				"title": "联网搜索",
+				"desc": "多引擎搜索集成"
+			},
+			"themes": {
+				"title": "主题定制",
+				"desc": "皮肤与 Markdown 主题"
+			},
+			"floatWidget": {
+				"title": "悬浮窗",
+				"desc": "快捷唤起 AI 助手"
 			}
 		},
 		"overview": "概览",

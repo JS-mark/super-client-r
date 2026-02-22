@@ -180,6 +180,22 @@
 			"localApi": {
 				"title": "Local API",
 				"desc": "Built-in HTTP service"
+			},
+			"plugin": {
+				"title": "Plugins",
+				"desc": "Extensions, skins & marketplace"
+			},
+			"webSearch": {
+				"title": "Web Search",
+				"desc": "Multi-engine search integration"
+			},
+			"themes": {
+				"title": "Themes",
+				"desc": "Skins & Markdown themes"
+			},
+			"floatWidget": {
+				"title": "Float Widget",
+				"desc": "Quick-access AI assistant"
 			}
 		},
 		"overview": "Overview",
