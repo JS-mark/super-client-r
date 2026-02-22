@@ -83,6 +83,8 @@ export const SYSTEM_CHANNELS = {
 	GET_HOMEDIR: "system:get-homedir",
 	// 获取环境信息（用于系统提示词注入）
 	GET_ENV_INFO: "system:get-env-info",
+	// 获取进程性能指标
+	GET_PROCESS_METRICS: "system:get-process-metrics",
 } as const;
 
 // App 相关通道

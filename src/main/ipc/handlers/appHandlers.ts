@@ -302,4 +302,26 @@ export function registerAppHandlers() {
 			},
 		};
 	});
+
+	// 获取进程性能指标
+	ipcMain.handle(SYSTEM_CHANNELS.GET_PROCESS_METRICS, () => {
+		const mem = process.memoryUsage();
+		const cpuUsage = process.cpuUsage();
+		return {
+			success: true,
+			data: {
+				heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+				heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+				rss: Math.round(mem.rss / 1024 / 1024),
+				systemTotal: Math.round(os.totalmem() / 1024 / 1024),
+				systemFree: Math.round(os.freemem() / 1024 / 1024),
+				cpuCores: os.cpus().length,
+				cpuModel: os.cpus()[0]?.model || "N/A",
+				cpuUser: cpuUsage.user,
+				cpuSystem: cpuUsage.system,
+				uptime: Math.round(process.uptime()),
+				pid: process.pid,
+			},
+		};
+	});
 }

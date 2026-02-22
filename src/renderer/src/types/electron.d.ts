@@ -860,6 +860,21 @@ export interface ElectronAPI {
 				locale: string;
 			}>
 		>;
+		getProcessMetrics: () => Promise<
+			IPCResponse<{
+				heapUsed: number;
+				heapTotal: number;
+				rss: number;
+				systemTotal: number;
+				systemFree: number;
+				cpuCores: number;
+				cpuModel: string;
+				cpuUser: number;
+				cpuSystem: number;
+				uptime: number;
+				pid: number;
+			}>
+		>;
 	};
 
 	// 通用 IPC

@@ -18,7 +18,6 @@ import {
 	Progress,
 	Row,
 	Skeleton,
-	Statistic,
 	Tabs,
 	theme,
 } from "antd";
@@ -77,7 +76,8 @@ const QuickActionsTab: React.FC = () => {
 				ns: "settings",
 			}),
 			onClick: handleOpenDevTools,
-			type: "primary" as const,
+			iconBg: token.colorPrimaryBg,
+			iconColor: token.colorPrimary,
 		},
 		{
 			key: "relaunch",
@@ -89,6 +89,8 @@ const QuickActionsTab: React.FC = () => {
 			confirmTitle: t("confirmRelaunch", "确定要重启应用吗？", {
 				ns: "settings",
 			}),
+			iconBg: token.colorWarningBg,
+			iconColor: token.colorWarning,
 		},
 		{
 			key: "clearStorage",
@@ -101,6 +103,8 @@ const QuickActionsTab: React.FC = () => {
 			),
 			onClick: handleClearStorage,
 			danger: true,
+			iconBg: token.colorErrorBg,
+			iconColor: token.colorError,
 		},
 	];
 
@@ -117,23 +121,11 @@ const QuickActionsTab: React.FC = () => {
 				>
 					<div className="flex items-center gap-4">
 						<div
-							className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-								action.type === "primary"
-									? "bg-blue-500 text-white"
-									: action.danger
-										? "text-red-500"
-										: ""
-							}`}
-							style={
-								action.danger
-									? { backgroundColor: token.colorErrorBg }
-									: action.type !== "primary"
-										? {
-												backgroundColor: token.colorBgContainer,
-												color: token.colorText,
-											}
-										: undefined
-							}
+							className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
+							style={{
+								backgroundColor: action.iconBg,
+								color: action.iconColor,
+							}}
 						>
 							{action.icon}
 						</div>
@@ -157,7 +149,6 @@ const QuickActionsTab: React.FC = () => {
 							cancelText={t("cancel", "取消", { ns: "common" })}
 						>
 							<Button
-								type={action.type}
 								danger={action.danger}
 								className="!rounded-lg"
 							>
@@ -166,7 +157,6 @@ const QuickActionsTab: React.FC = () => {
 						</Popconfirm>
 					) : (
 						<Button
-							type={action.type}
 							danger={action.danger}
 							onClick={action.onClick}
 							className="!rounded-lg"
@@ -334,177 +324,249 @@ const SystemInfoTab: React.FC = () => {
 	);
 };
 
+// 格式化内存大小（MB 输入，超过 1000 自动转换单位）
+function formatMemory(mb: number): string {
+	if (mb >= 1000000) return `${(mb / 1000000).toFixed(1)} PB`;
+	if (mb >= 1000) return `${(mb / 1000).toFixed(1)} GB`;
+	return `${mb} MB`;
+}
+
+// 格式化运行时间
+function formatUptime(seconds: number): string {
+	const h = Math.floor(seconds / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
+	const s = seconds % 60;
+	if (h > 0) return `${h}h ${m}m ${s}s`;
+	if (m > 0) return `${m}m ${s}s`;
+	return `${s}s`;
+}
+
+interface ProcessMetrics {
+	heapUsed: number;
+	heapTotal: number;
+	rss: number;
+	systemTotal: number;
+	systemFree: number;
+	cpuCores: number;
+	cpuModel: string;
+	cpuUser: number;
+	cpuSystem: number;
+	uptime: number;
+	pid: number;
+}
+
 // 性能监控 Tab
 const PerformanceMonitorTab: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
-	const [metrics, setMetrics] = useState({
-		pageLoadTime: 0,
-		memoryUsed: 0,
-		memoryTotal: 0,
-		cpuCores: navigator.hardwareConcurrency || 0,
-		networkStatus: navigator.onLine,
-		language: navigator.language,
-	});
+	const [metrics, setMetrics] = useState<ProcessMetrics | null>(null);
+	const [online, setOnline] = useState(navigator.onLine);
+	const [lastRefresh, setLastRefresh] = useState<string>("");
 
-	useEffect(() => {
-		const navigation = performance.getEntriesByType(
-			"navigation",
-		)[0] as PerformanceNavigationTiming;
-		const loadTime = navigation
-			? navigation.loadEventEnd - navigation.startTime || 0
-			: performance.now();
-		const memory = (
-			performance as unknown as {
-				memory?: { usedJSHeapSize: number; totalJSHeapSize: number };
+	const fetchMetrics = useCallback(async () => {
+		try {
+			const res = await window.electron.system.getProcessMetrics();
+			if (res.success && res.data) {
+				setMetrics(res.data);
 			}
-		).memory;
-
-		setMetrics({
-			pageLoadTime: Math.round(loadTime),
-			memoryUsed: memory ? Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
-			memoryTotal: memory
-				? Math.round(memory.totalJSHeapSize / 1024 / 1024)
-				: 0,
-			cpuCores: navigator.hardwareConcurrency || 0,
-			networkStatus: navigator.onLine,
-			language: navigator.language,
-		});
+		} catch {
+			// ignore fetch errors
+		}
+		setLastRefresh(new Date().toLocaleTimeString());
 	}, []);
 
-	const statCards = [
-		{
-			title: t("pageLoadTime", "页面加载时间", { ns: "settings" }),
-			value: `${metrics.pageLoadTime} ms`,
-			icon: <ThunderboltOutlined />,
-			color: "#3b82f6",
-		},
-		{
-			title: t("networkStatus", "网络状态", { ns: "settings" }),
-			value: metrics.networkStatus
-				? t("online", "在线", { ns: "settings" })
-				: t("offline", "离线", { ns: "settings" }),
-			icon: <GlobalOutlined />,
-			color: metrics.networkStatus ? "#22c55e" : "#ef4444",
-		},
-		{
-			title: t("cpuCores", "CPU 核心数", { ns: "settings" }),
-			value: metrics.cpuCores || "N/A",
-			icon: <DesktopOutlined />,
-			color: "#a855f7",
-		},
-		{
-			title: t("language", "语言", { ns: "settings" }),
-			value: metrics.language.toUpperCase(),
-			icon: <InfoCircleOutlined />,
-			color: "#f97316",
-		},
-	];
+	useEffect(() => {
+		fetchMetrics();
+		const interval = setInterval(fetchMetrics, 3000);
+		return () => clearInterval(interval);
+	}, [fetchMetrics]);
 
-	const memoryUsagePercent = metrics.memoryTotal
-		? Math.round((metrics.memoryUsed / metrics.memoryTotal) * 100)
-		: 0;
+	useEffect(() => {
+		const goOnline = () => setOnline(true);
+		const goOffline = () => setOnline(false);
+		window.addEventListener("online", goOnline);
+		window.addEventListener("offline", goOffline);
+		return () => {
+			window.removeEventListener("online", goOnline);
+			window.removeEventListener("offline", goOffline);
+		};
+	}, []);
+
+	const statCards = metrics
+		? [
+				{
+					title: t("appUptime", "App 运行时间", { ns: "settings" }),
+					value: formatUptime(metrics.uptime),
+					icon: <ThunderboltOutlined />,
+					iconBg: token.colorPrimaryBg,
+					iconColor: token.colorPrimary,
+				},
+				{
+					title: t("cpuCores", "CPU 核心", { ns: "settings" }),
+					value: `${metrics.cpuCores} ${t("cores", "核", { ns: "settings" })}`,
+					description: metrics.cpuModel,
+					icon: <DesktopOutlined />,
+					iconBg: token.colorWarningBg,
+					iconColor: token.colorWarning,
+				},
+				{
+					title: t("processMemory", "进程内存 (RSS)", { ns: "settings" }),
+					value: formatMemory(metrics.rss),
+					icon: <MonitorOutlined />,
+					iconBg: token.colorInfoBg,
+					iconColor: token.colorInfo,
+				},
+				{
+					title: t("networkStatus", "网络状态", { ns: "settings" }),
+					value: online
+						? t("online", "在线", { ns: "settings" })
+						: t("offline", "离线", { ns: "settings" }),
+					icon: <GlobalOutlined />,
+					iconBg: online ? token.colorSuccessBg : token.colorErrorBg,
+					iconColor: online ? token.colorSuccess : token.colorError,
+				},
+			]
+		: [];
+
+	const systemMemPercent =
+		metrics && metrics.systemTotal > 0
+			? Math.round(
+					((metrics.systemTotal - metrics.systemFree) / metrics.systemTotal) *
+						100,
+				)
+			: 0;
+
+	const heapPercent =
+		metrics && metrics.heapTotal > 0
+			? Math.round((metrics.heapUsed / metrics.heapTotal) * 100)
+			: 0;
+
+	const progressColor = (pct: number) =>
+		pct > 80 ? token.colorError : pct > 60 ? token.colorWarning : token.colorSuccess;
 
 	return (
 		<div className="space-y-6">
-			<Row gutter={[16, 16]}>
-				{statCards.map((card) => (
-					<Col span={12} key={card.value}>
-						<Card
-							className="!rounded-xl"
-							style={{ borderColor: token.colorBorder }}
-						>
-							<Statistic
-								title={card.title}
-								value={card.value}
-								prefix={
-									<span style={{ color: card.color, marginRight: 8 }}>
-										{card.icon}
-									</span>
-								}
-								styles={{ content: { color: card.color, fontSize: "24px" } }}
-							/>
-						</Card>
-					</Col>
-				))}
-			</Row>
-
-			{metrics.memoryTotal > 0 && (
-				<Card
-					title={
-						<span className="flex items-center gap-2">
-							<MonitorOutlined />
-							{t("memoryUsage", "内存使用", { ns: "settings" })}
-						</span>
-					}
-					className="rounded-xl!"
-					style={{ borderColor: token.colorBorder }}
+			<div className="flex items-center justify-end gap-3">
+				{lastRefresh && (
+					<span className="text-xs" style={{ color: token.colorTextTertiary }}>
+						{t("lastRefresh", "上次刷新", { ns: "settings" })}: {lastRefresh}
+					</span>
+				)}
+				<Button
+					icon={<ReloadOutlined />}
+					onClick={fetchMetrics}
+					size="small"
 				>
-					<div className="space-y-4">
-						<Progress
-							percent={memoryUsagePercent}
-							status={memoryUsagePercent > 80 ? "exception" : "active"}
-							strokeColor={
-								memoryUsagePercent > 80
-									? "#ef4444"
-									: memoryUsagePercent > 60
-										? "#f97316"
-										: "#22c55e"
-							}
-						/>
-						<div
-							className="flex justify-between text-sm"
-							style={{ color: token.colorTextSecondary }}
-						>
-							<span>
-								{t("used", "已使用", { ns: "settings" })}: {metrics.memoryUsed}{" "}
-								MB
-							</span>
-							<span>
-								{t("total", "总计", { ns: "settings" })}: {metrics.memoryTotal}{" "}
-								MB
-							</span>
-						</div>
-					</div>
-				</Card>
-			)}
+					{t("refresh", "刷新", { ns: "settings" })}
+				</Button>
+			</div>
 
-			<Card
-				className="!rounded-xl"
-				style={{
-					borderColor: token.colorBorder,
-					backgroundColor: token.colorInfoBg,
-				}}
-			>
-				<div className="flex items-start gap-3">
-					<InfoCircleOutlined className="text-blue-500 mt-1" />
-					<div>
-						<div className="font-medium" style={{ color: token.colorText }}>
-							{t("performanceTips", "性能提示", { ns: "settings" })}
+			{!metrics ? (
+				<Skeleton active />
+			) : (
+				<>
+					<Row gutter={[16, 16]}>
+						{statCards.map((card) => (
+							<Col span={12} key={card.title}>
+								<div
+									className="p-4 rounded-xl border"
+									style={{
+										backgroundColor: token.colorBgContainer,
+										borderColor: token.colorBorder,
+									}}
+								>
+									<div className="flex items-center gap-3">
+										<div
+											className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+											style={{
+												backgroundColor: card.iconBg,
+												color: card.iconColor,
+											}}
+										>
+											{card.icon}
+										</div>
+										<div className="min-w-0">
+											<div
+												className="text-xs"
+												style={{ color: token.colorTextSecondary }}
+											>
+												{card.title}
+											</div>
+											<div
+												className="text-lg font-semibold"
+												style={{ color: token.colorText }}
+											>
+												{card.value}
+											</div>
+											{"description" in card && card.description && (
+												<div
+													className="text-xs truncate"
+													style={{ color: token.colorTextTertiary }}
+													title={card.description}
+												>
+													{card.description}
+												</div>
+											)}
+										</div>
+									</div>
+								</div>
+							</Col>
+						))}
+					</Row>
+
+					<Card
+						title={
+							<span className="flex items-center gap-2">
+								<MonitorOutlined />
+								{t("memoryUsage", "内存使用", { ns: "settings" })}
+							</span>
+						}
+						className="!rounded-xl"
+						style={{ borderColor: token.colorBorder }}
+					>
+						<div className="space-y-5">
+							<div>
+								<div
+									className="flex justify-between text-sm mb-1"
+									style={{ color: token.colorTextSecondary }}
+								>
+									<span>
+										{t("systemMemory", "系统内存", { ns: "settings" })}
+									</span>
+									<span>
+										{formatMemory(metrics.systemTotal - metrics.systemFree)} /{" "}
+										{formatMemory(metrics.systemTotal)}
+									</span>
+								</div>
+								<Progress
+									percent={systemMemPercent}
+									status={systemMemPercent > 80 ? "exception" : "active"}
+									strokeColor={progressColor(systemMemPercent)}
+								/>
+							</div>
+							<div>
+								<div
+									className="flex justify-between text-sm mb-1"
+									style={{ color: token.colorTextSecondary }}
+								>
+									<span>
+										{t("processHeapMemory", "主进程堆内存", { ns: "settings" })}
+									</span>
+									<span>
+										{formatMemory(metrics.heapUsed)} /{" "}
+										{formatMemory(metrics.heapTotal)}
+									</span>
+								</div>
+								<Progress
+									percent={heapPercent}
+									status={heapPercent > 80 ? "exception" : "active"}
+									strokeColor={progressColor(heapPercent)}
+								/>
+							</div>
 						</div>
-						<ul
-							className="text-sm mt-2 space-y-1 list-disc list-inside"
-							style={{ color: token.colorTextSecondary }}
-						>
-							<li>
-								{t("performanceTip1", "定期清理日志文件可以释放磁盘空间", {
-									ns: "settings",
-								})}
-							</li>
-							<li>
-								{t("performanceTip2", "关闭不用的功能可以减少内存占用", {
-									ns: "settings",
-								})}
-							</li>
-							<li>
-								{t("performanceTip3", "使用开发者工具可以分析性能瓶颈", {
-									ns: "settings",
-								})}
-							</li>
-						</ul>
-					</div>
-				</div>
-			</Card>
+					</Card>
+				</>
+			)}
 		</div>
 	);
 };
