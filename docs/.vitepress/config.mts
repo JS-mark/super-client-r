@@ -115,7 +115,7 @@ export default defineConfig({
       { icon: "github", link: "https://github.com/js-mark/super-client-r" },
     ],
     footer: {
-      message: "基于 MIT 许可发布",
+      message: "基于 GPL-2.0 许可发布",
       copyright: "Copyright © 2026 Super Client R 团队",
     },
     editLink: {
