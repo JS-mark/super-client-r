@@ -464,19 +464,115 @@ pnpm build --analyze
 
 ## 发布流程
 
+### 本地构建发布（推荐）
+
+使用 `pnpm release` 脚本进行本地构建和发布，它封装了完整的构建流水线。
+
+#### 基本用法
+
 ```bash
-# 1. 更新版本
-# 修改 package.json version
-
-# 2. 更新 CHANGELOG.md
-
-# 3. 构建并测试
-pnpm build
-pnpm preview  # 测试生产构建
-
-# 4. 打包
-pnpm dist
-
-# 5. 发布
-# 上传 dist/ 目录中的安装包
+pnpm release <platform> [options]
 ```
+
+#### 平台参数
+
+| 参数  | 说明                        |
+|-------|-----------------------------|
+| `mac` | 构建 macOS（dmg + zip）     |
+| `win` | 构建 Windows（nsis exe）    |
+| `all` | 构建所有平台                |
+
+#### 可选参数
+
+| 参数              | 说明                                              |
+|-------------------|---------------------------------------------------|
+| `--arch <arch>`   | 目标架构：`x64` 或 `arm64`，默认两者都构建        |
+| `--mode <mode>`   | Vite 构建模式（对应 `electron-vite build --mode`） |
+| `--publish`       | 构建完成后上传到 GitHub Release                    |
+| `--tag <tag>`     | 指定 Release tag，默认取 `package.json` 的 `v{version}` |
+| `-h, --help`      | 显示帮助信息                                       |
+
+#### 常用示例
+
+```bash
+# 构建 macOS 双架构 (x64 + arm64)
+pnpm release mac
+
+# 仅构建 macOS arm64 (Apple Silicon)
+pnpm release mac --arch arm64
+
+# 仅构建 macOS x64
+pnpm release mac --arch x64
+
+# 构建 Windows 双架构
+pnpm release win
+
+# 构建所有平台
+pnpm release all
+
+# 指定 Vite 构建模式
+pnpm release mac --mode production
+
+# 构建并发布到 GitHub Release（自动使用 package.json 版本号）
+pnpm release mac --publish
+
+# 构建并发布到指定 tag
+pnpm release mac --publish --tag v1.0.0
+
+# 构建所有平台并发布
+pnpm release all --publish
+```
+
+#### 构建流水线
+
+脚本会按顺序执行以下步骤：
+
+1. **清理** — 删除 `dist/` 目录
+2. **构建图标** — `pnpm build:icons`
+3. **TypeScript 编译** — `tsc -b`
+4. **Vite 打包** — `electron-vite build`
+5. **平台打包** — `electron-builder --<platform> --<arch>`
+6. **列出产物** — 显示 `dist/` 下的安装包及大小
+7. **发布**（可选） — 通过 `gh` CLI 上传到 GitHub Release
+
+#### 前置要求
+
+- 发布功能（`--publish`）依赖 [GitHub CLI](https://cli.github.com/)
+- 使用前需完成认证：`gh auth login`
+- 如果 Release 已存在，会追加上传产物（`--clobber` 覆盖同名文件）
+- tag 包含 `-`（如 `v1.0.0-beta.1`）会自动标记为 Prerelease
+
+#### 构建产物
+
+产物输出在 `dist/` 目录：
+
+| 平台    | 文件格式              |
+|---------|-----------------------|
+| macOS   | `.dmg`, `.zip`        |
+| Windows | `.exe`                |
+
+### 快捷构建命令
+
+如果只需要构建（不需要 release 脚本的完整流程），也可以使用：
+
+```bash
+pnpm build:mac    # tsc + vite build + electron-builder --mac
+pnpm build:win    # tsc + vite build + electron-builder --win
+pnpm build        # tsc + vite build + electron-builder (默认平台)
+```
+
+### CI/CD 自动发布
+
+项目配置了 GitHub Actions 自动构建发布（`.github/workflows/release.yml`）：
+
+- **触发方式**：推送 `v*` tag 或手动触发 workflow_dispatch
+- **构建矩阵**：macOS (x64 + arm64) + Windows (x64 + arm64)
+- **流程**：自动构建 → 上传 artifacts → 创建 GitHub Release
+
+```bash
+# 通过 tag 触发 CI 发布
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+手动触发时可指定 Vite 构建模式和 Release tag。

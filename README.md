@@ -4,32 +4,32 @@
 
 | 文档                                           | 说明                 |
 |------------------------------------------------|----------------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md)           | 系统架构设计文档     |
-| [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) | 项目结构规范         |
-| [CODING_STANDARDS.md](./CODING_STANDARDS.md)   | 代码规范             |
-| [DEVELOPMENT.md](./DEVELOPMENT.md)             | 开发指南             |
-| [API.md](./API.md)                             | IPC 和 HTTP API 文档 |
-| [CLAUDE_CODE_GUIDE.md](./CLAUDE_CODE_GUIDE.md) | Claude Code 开发指南 |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md)           | 系统架构设计文档     |
+| [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) | 项目结构规范         |
+| [CODING_STANDARDS.md](./docs/CODING_STANDARDS.md)   | 代码规范             |
+| [DEVELOPMENT.md](./docs/DEVELOPMENT.md)             | 开发指南             |
+| [API.md](./docs/API.md)                             | IPC 和 HTTP API 文档 |
+| [CLAUDE_CODE_GUIDE.md](./docs/CLAUDE_CODE_GUIDE.md) | Claude Code 开发指南 |
 
 ## 快速导航
 
 ### 如果你是新开发者
 
-1. 先阅读 [ARCHITECTURE.md](./ARCHITECTURE.md) 了解系统架构
-2. 查看 [DEVELOPMENT.md](./DEVELOPMENT.md) 配置开发环境
-3. 遵循 [CODING_STANDARDS.md](./CODING_STANDARDS.md) 编写代码
+1. 先阅读 [ARCHITECTURE.md](./docs/ARCHITECTURE.md) 了解系统架构
+2. 查看 [DEVELOPMENT.md](./docs/DEVELOPMENT.md) 配置开发环境
+3. 遵循 [CODING_STANDARDS.md](./docs/CODING_STANDARDS.md) 编写代码
 
 ### 如果你要添加新功能
 
-1. 参考 [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) 确定文件位置
-2. 查看 [API.md](./API.md) 了解通信接口
-3. 遵循 [CODING_STANDARDS.md](./CODING_STANDARDS.md) 代码规范
+1. 参考 [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md) 确定文件位置
+2. 查看 [API.md](./docs/API.md) 了解通信接口
+3. 遵循 [CODING_STANDARDS.md](./docs/CODING_STANDARDS.md) 代码规范
 
 ### 如果你要调试问题
 
-1. 查看 [DEVELOPMENT.md](./DEVELOPMENT.md) 的"常见问题"章节
-2. 参考 [ARCHITECTURE.md](./ARCHITECTURE.md) 的模块关系图
-3. 使用 [API.md](./API.md) 验证接口调用
+1. 查看 [DEVELOPMENT.md](./docs/DEVELOPMENT.md) 的"常见问题"章节
+2. 参考 [ARCHITECTURE.md](./docs/ARCHITECTURE.md) 的模块关系图
+3. 使用 [API.md](./docs/API.md) 验证接口调用
 
 ---
 
