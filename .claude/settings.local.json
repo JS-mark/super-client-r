@@ -137,7 +137,14 @@
       "Bash(claude --plugin-dir:*)",
       "Bash(claude plugin list:*)",
       "Bash(claude plugin:*)",
-      "Bash(# Check for any credentials.json, *.pem, *.key files ever committed git log --all --oneline --diff-filter=A -- ''*.pem'' ''*.key'' ''*.p12'' ''*.pfx'' ''credentials.json'' ''**/credentials*'' ''**/secret*'')"
+      "Bash(# Check for any credentials.json, *.pem, *.key files ever committed git log --all --oneline --diff-filter=A -- ''*.pem'' ''*.key'' ''*.p12'' ''*.pfx'' ''credentials.json'' ''**/credentials*'' ''**/secret*'')",
+      "Bash(pnpm build:icons:*)",
+      "Bash(npx electron-builder:*)",
+      "Bash(npx electron-vite build:*)",
+      "Bash(pnpm release --help:*)",
+      "Bash(pnpm release:*)",
+      "Bash(env)",
+      "Bash(npm config:*)"
     ]
   }
 }
