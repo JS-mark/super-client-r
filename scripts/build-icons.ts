@@ -105,6 +105,57 @@ async function generateIcns(): Promise<void> {
 	console.log(`  ✓ Generated icon.icns`);
 }
 
+/**
+ * 生成 ICO 文件
+ * ICO 格式: ICONDIR header + ICONDIRENTRY 数组 + PNG 数据
+ */
+async function generateIco(): Promise<void> {
+	console.log("Generating icon.ico...");
+
+	const ICO_SIZES = [16, 32, 48, 64, 128, 256];
+	const pngBuffers: Buffer[] = [];
+
+	for (const size of ICO_SIZES) {
+		pngBuffers.push(await convertSvgToPng(size));
+	}
+
+	const numImages = ICO_SIZES.length;
+	// ICONDIR: 6 bytes, ICONDIRENTRY: 16 bytes each
+	const headerSize = 6 + numImages * 16;
+	let dataOffset = headerSize;
+
+	// ICONDIR header
+	const header = Buffer.alloc(6);
+	header.writeUInt16LE(0, 0); // Reserved
+	header.writeUInt16LE(1, 2); // Type: 1 = ICO
+	header.writeUInt16LE(numImages, 4); // Number of images
+
+	// ICONDIRENTRY array
+	const entries = Buffer.alloc(numImages * 16);
+	for (let i = 0; i < numImages; i++) {
+		const size = ICO_SIZES[i];
+		const pngData = pngBuffers[i];
+		const offset = i * 16;
+
+		entries.writeUInt8(size >= 256 ? 0 : size, offset); // Width (0 = 256)
+		entries.writeUInt8(size >= 256 ? 0 : size, offset + 1); // Height (0 = 256)
+		entries.writeUInt8(0, offset + 2); // Color palette
+		entries.writeUInt8(0, offset + 3); // Reserved
+		entries.writeUInt16LE(1, offset + 4); // Color planes
+		entries.writeUInt16LE(32, offset + 6); // Bits per pixel
+		entries.writeUInt32LE(pngData.length, offset + 8); // Image data size
+		entries.writeUInt32LE(dataOffset, offset + 12); // Offset to image data
+
+		dataOffset += pngData.length;
+		console.log(`  ✓ Added ${size}x${size}`);
+	}
+
+	const icoBuffer = Buffer.concat([header, entries, ...pngBuffers]);
+	const icoPath = join(OUTPUT_DIR, "icon.ico");
+	writeFileSync(icoPath, icoBuffer);
+	console.log(`  ✓ Generated icon.ico`);
+}
+
 async function generateTrayIcon(): Promise<void> {
 	console.log("Generating tray icon...");
 
@@ -155,6 +206,8 @@ async function main(): Promise<void> {
 		await generateTrayIcon();
 		console.log();
 		await generateIcns();
+		console.log();
+		await generateIco();
 		console.log("\n=== Icon build complete ===");
 	} catch (error) {
 		console.error("Error building icons:", error);
