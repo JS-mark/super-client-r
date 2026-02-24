@@ -1,0 +1,8 @@
+{
+	"name": "drama-writer",
+	"description": "短剧剧本创作助手，支持竖屏短剧和横屏微短剧全流程创作，覆盖都市、仙侠、古装、悬疑等主流题材",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	}
+}
