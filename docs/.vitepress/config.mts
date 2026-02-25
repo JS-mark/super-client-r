@@ -17,6 +17,7 @@ export default defineConfig({
     logo: "/logo.svg",
     nav: [
       { text: "首页", link: "/" },
+      { text: "功能", link: "/FEATURES" },
       { text: "指南", link: "/guide/getting-started" },
       { text: "API", link: "/api/" },
       { text: "开发", link: "/development/" },
@@ -44,6 +45,7 @@ export default defineConfig({
         {
           text: "功能",
           items: [
+            { text: "功能概览", link: "/FEATURES" },
             { text: "AI 聊天", link: "/guide/features/chat" },
             { text: "模型管理", link: "/guide/features/models" },
             { text: "MCP 服务器", link: "/guide/features/mcp" },
