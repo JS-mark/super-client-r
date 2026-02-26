@@ -2,7 +2,15 @@ import { App } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SessionSettings } from "../components/chat/ChatSettingsModal";
 import { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
-import { type EnvInfo, buildSystemPrompt } from "../prompt";
+import {
+	type EnvInfo,
+	BROWSER_INSTRUCTIONS,
+	CLEAR_INSTRUCTIONS,
+	KNOWLEDGE_INSTRUCTIONS,
+	TOOLS_INSTRUCTIONS,
+	USER_CONFIG_INSTRUCTIONS,
+	buildSystemPrompt,
+} from "../prompt";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
 import { searchService } from "../services/search/searchService";
@@ -86,7 +94,25 @@ async function fetchMcpTools(): Promise<{
 			const toolNames = tools
 				.map((t) => t.function.name.split("__").pop())
 				.join(", ");
-			const toolHint = `\n\nYou have access to the following tools and SHOULD actively use them when the user's request can benefit from them: ${toolNames}. Do not say you cannot access files, databases, or the web if a relevant tool is available — use the tool instead.`;
+
+			// Build context-aware tool instructions based on available servers/tools
+			const serverIds = new Set(mcpTools.map((t) => t.serverId));
+			const allToolNames = new Set(mcpTools.map((t) => t.tool.name));
+			const hints: string[] = [
+				`\n\nYou have access to the following tools and SHOULD actively use them when the user's request can benefit from them: ${toolNames}. Do not say you cannot access files, databases, or the web if a relevant tool is available — use the tool instead.`,
+				CLEAR_INSTRUCTIONS,
+				TOOLS_INSTRUCTIONS,
+			];
+			if (serverIds.has("@scp/browser")) {
+				hints.push(BROWSER_INSTRUCTIONS);
+			}
+			if (allToolNames.has("knowledge_base_search")) {
+				hints.push(KNOWLEDGE_INSTRUCTIONS);
+			}
+			if (allToolNames.has("request_user_config")) {
+				hints.push(USER_CONFIG_INSTRUCTIONS);
+			}
+			const toolHint = hints.join("\n");
 			return { tools, toolMapping, toolHint };
 		}
 	} catch (err) {

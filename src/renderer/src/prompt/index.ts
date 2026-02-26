@@ -16,6 +16,7 @@ import { createLogger } from "../services/logService";
 export { BROWSER_INSTRUCTIONS } from "./browser";
 export { CLEAR_INSTRUCTIONS } from "./clear";
 export { KNOWLEDGE_INSTRUCTIONS } from "./knowledge";
+export { TOOLS_INSTRUCTIONS } from "./tools";
 export { USER_CONFIG_INSTRUCTIONS } from "./userConfig";
 
 const logger = createLogger("SystemPrompt");
