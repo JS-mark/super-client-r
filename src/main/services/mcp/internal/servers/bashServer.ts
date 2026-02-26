@@ -7,8 +7,21 @@
 import { exec, execFile } from "child_process";
 import { mkdtemp, writeFile, rm, chmod } from "fs/promises";
 import { join } from "path";
-import { tmpdir, platform, arch, hostname, userInfo, cpus, totalmem, freemem, homedir, uptime, type } from "os";
+import {
+	tmpdir,
+	platform,
+	arch,
+	hostname,
+	userInfo,
+	cpus,
+	totalmem,
+	freemem,
+	homedir,
+	uptime,
+	type,
+} from "os";
 import type { InternalMcpServer, InternalToolHandler } from "../types";
+import { textResult } from "./shared";
 import { logger } from "../../../../utils/logger";
 
 const log = logger.withContext("InternalMCP:Bash");
@@ -61,10 +74,6 @@ const DANGEROUS_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
 /*  工具函数                                                           */
 /* ------------------------------------------------------------------ */
 
-function textResult(text: string, isError = false) {
-	return { content: [{ type: "text" as const, text }], isError };
-}
-
 function clampTimeout(
 	value: unknown,
 	defaultMs: number,
@@ -76,6 +85,26 @@ function clampTimeout(
 
 function checkDangerous(command: string): string | null {
 	for (const { pattern, description } of DANGEROUS_PATTERNS) {
+		if (pattern.test(command)) {
+			return description;
+		}
+	}
+	return null;
+}
+
+/** Patterns that require explicit confirmation before execution */
+const DELETE_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
+	{ pattern: /\brm\s+/, description: "rm command" },
+	{ pattern: /\brmdir\s+/, description: "rmdir command" },
+	{ pattern: /\bunlink\s+/, description: "unlink command" },
+	{ pattern: /\bshred\s+/, description: "shred command" },
+	{ pattern: /\btruncate\s+/, description: "truncate command" },
+	{ pattern: /\bfind\b.*-delete/, description: "find with -delete" },
+	{ pattern: /\bgit\s+clean\s+-[^\s]*f/, description: "git clean -f" },
+];
+
+function checkDeleteCommand(command: string): string | null {
+	for (const { pattern, description } of DELETE_PATTERNS) {
 		if (pattern.test(command)) {
 			return description;
 		}
@@ -144,17 +173,33 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 		return textResult("Error: command is required and must be a string", true);
 	}
 
+	log.debug("execute_command", { command: command.slice(0, 200), workingDir: args.workingDir });
+
 	// 危险命令检测
 	const danger = checkDangerous(command);
 	if (danger) {
+		log.warn("Dangerous command blocked", { command: command.slice(0, 200), reason: danger });
 		return textResult(
 			`Error: command blocked for safety — ${danger}. If you really need this, please run it manually in a terminal.`,
 			true,
 		);
 	}
 
+	// 删除命令确认
+	const deleteMatch = checkDeleteCommand(command);
+	if (deleteMatch && args.confirmed !== true) {
+		log.info("Delete command requires confirmation", { command: command.slice(0, 200), match: deleteMatch });
+		return textResult(
+			`⚠️ This command contains a delete operation (${deleteMatch}). Please confirm with the user before re-calling with confirmed=true.`,
+		);
+	}
+
 	const workingDir = (args.workingDir as string) || undefined;
-	const timeout = clampTimeout(args.timeout, DEFAULT_CMD_TIMEOUT, MAX_CMD_TIMEOUT);
+	const timeout = clampTimeout(
+		args.timeout,
+		DEFAULT_CMD_TIMEOUT,
+		MAX_CMD_TIMEOUT,
+	);
 	const shell = resolveShell(args.shell);
 	const extraEnv = parseEnvArg(args.env);
 
@@ -171,17 +216,13 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 					timeout,
 					maxBuffer: MAX_OUTPUT_SIZE * 2,
 					shell,
-					env: extraEnv
-						? { ...process.env, ...extraEnv }
-						: process.env,
+					env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
 				},
 				(error, stdout, stderr) => {
 					if (error) {
 						// 超时被 kill
 						if (error.killed || error.signal === "SIGTERM") {
-							reject(
-								new Error(`Command timed out after ${timeout}ms`),
-							);
+							reject(new Error(`Command timed out after ${timeout}ms`));
 							return;
 						}
 						// 非零退出但有输出
@@ -214,10 +255,12 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 			child.on("exit", () => clearTimeout(killTimer));
 		});
 
+		log.debug("Command finished", { exitCode, stdoutLen: stdout.length, stderrLen: stderr.length });
 		const isError = exitCode !== 0 && !stdout && !!stderr;
 		return textResult(formatExecResult(stdout, stderr, exitCode), isError);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
+		log.error("Command execution failed", error instanceof Error ? error : new Error(msg));
 		return textResult(`Error: ${msg}`, true);
 	}
 };
@@ -230,6 +273,27 @@ const executeScriptHandler: InternalToolHandler = async (args) => {
 	const script = args.script as string;
 	if (!script || typeof script !== "string") {
 		return textResult("Error: script is required and must be a string", true);
+	}
+
+	log.debug("execute_script", { interpreter: args.interpreter, scriptLen: script.length, workingDir: args.workingDir });
+
+	// 危险命令检测
+	const danger = checkDangerous(script);
+	if (danger) {
+		log.warn("Dangerous script blocked", { reason: danger });
+		return textResult(
+			`Error: script blocked for safety — ${danger}. If you really need this, please run it manually in a terminal.`,
+			true,
+		);
+	}
+
+	// 删除命令确认
+	const deleteMatch = checkDeleteCommand(script);
+	if (deleteMatch && args.confirmed !== true) {
+		log.info("Delete script requires confirmation", { match: deleteMatch });
+		return textResult(
+			`⚠️ This script contains a delete operation (${deleteMatch}). Please confirm with the user before re-calling with confirmed=true.`,
+		);
 	}
 
 	const interpreterArg = (args.interpreter as string) || "bash";
@@ -273,28 +337,18 @@ const executeScriptHandler: InternalToolHandler = async (args) => {
 					cwd: workingDir,
 					timeout,
 					maxBuffer: MAX_OUTPUT_SIZE * 2,
-					env: extraEnv
-						? { ...process.env, ...extraEnv }
-						: process.env,
+					env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
 				},
 				(error, stdout, stderr) => {
 					if (error) {
 						if (error.killed || error.signal === "SIGTERM") {
-							reject(
-								new Error(
-									`Script timed out after ${timeout}ms`,
-								),
-							);
+							reject(new Error(`Script timed out after ${timeout}ms`));
 							return;
 						}
 						resolve({
 							stdout: stdout || "",
-							stderr:
-								stderr || error.message || String(error),
-							exitCode:
-								typeof error.code === "number"
-									? error.code
-									: 1,
+							stderr: stderr || error.message || String(error),
+							exitCode: typeof error.code === "number" ? error.code : 1,
 						});
 						return;
 					}
@@ -319,10 +373,12 @@ const executeScriptHandler: InternalToolHandler = async (args) => {
 			child.on("exit", () => clearTimeout(killTimer));
 		});
 
+		log.debug("Script finished", { exitCode, stdoutLen: stdout.length, stderrLen: stderr.length });
 		const isError = exitCode !== 0 && !stdout && !!stderr;
 		return textResult(formatExecResult(stdout, stderr, exitCode), isError);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
+		log.error("Script execution failed", error instanceof Error ? error : new Error(msg));
 		return textResult(`Error: ${msg}`, true);
 	} finally {
 		if (tmpDir) {
@@ -429,20 +485,16 @@ const checkCommandsHandler: InternalToolHandler = async (args) => {
 
 			// 尝试获取版本
 			const version = await new Promise<string | null>((resolve) => {
-				exec(
-					`${cmd} --version`,
-					{ timeout: 5_000 },
-					(err, stdout, stderr) => {
-						if (err && !stdout && !stderr) {
-							resolve(null);
-							return;
-						}
-						const output = (stdout || stderr || "").trim();
-						// 取第一行，通常包含版本号
-						const firstLine = output.split("\n")[0] || null;
-						resolve(firstLine);
-					},
-				);
+				exec(`${cmd} --version`, { timeout: 5_000 }, (err, stdout, stderr) => {
+					if (err && !stdout && !stderr) {
+						resolve(null);
+						return;
+					}
+					const output = (stdout || stderr || "").trim();
+					// 取第一行，通常包含版本号
+					const firstLine = output.split("\n")[0] || null;
+					resolve(firstLine);
+				});
 			});
 
 			results[cmd] = { available: true, path: cmdPath, version };
@@ -472,11 +524,7 @@ const getEnvHandler: InternalToolHandler = async (args) => {
 					{ timeout: 10_000, maxBuffer: MAX_OUTPUT_SIZE },
 					(err, stdout) => {
 						if (err) {
-							reject(
-								new Error(
-									`Failed to load shell env: ${err.message}`,
-								),
-							);
+							reject(new Error(`Failed to load shell env: ${err.message}`));
 							return;
 						}
 						resolve(stdout);
@@ -532,13 +580,17 @@ const listProcessesHandler: InternalToolHandler = async (args) => {
 				? "tasklist /fo csv /nh"
 				: "ps -eo pid,pcpu,pmem,comm --no-headers --sort=-pcpu";
 
-			exec(cmd, { timeout: 10_000, maxBuffer: MAX_OUTPUT_SIZE }, (err, stdout) => {
-				if (err) {
-					reject(new Error(`Failed to list processes: ${err.message}`));
-					return;
-				}
-				resolve(stdout);
-			});
+			exec(
+				cmd,
+				{ timeout: 10_000, maxBuffer: MAX_OUTPUT_SIZE },
+				(err, stdout) => {
+					if (err) {
+						reject(new Error(`Failed to list processes: ${err.message}`));
+						return;
+					}
+					resolve(stdout);
+				},
+			);
 		});
 
 		interface ProcessInfo {
@@ -655,6 +707,7 @@ const killProcessHandler: InternalToolHandler = async (args) => {
 	}
 
 	try {
+		log.info("Sending signal to process", { pid, signal: signalName });
 		process.kill(pid, signalName as NodeJS.Signals);
 		return textResult(
 			`Signal ${signalName} sent to process ${pid} successfully.`,
@@ -731,6 +784,11 @@ export function createBashServer(): InternalMcpServer {
 							description:
 								"Shell binary path (default: user's default shell, e.g. /bin/bash or /bin/zsh)",
 						},
+						confirmed: {
+							type: "boolean",
+							description:
+								"Set to true to confirm execution of delete commands (rm, rmdir, unlink, shred, truncate, find -delete, git clean -f). Required when the command contains delete operations.",
+						},
 					},
 					required: ["command"],
 				},
@@ -765,9 +823,13 @@ export function createBashServer(): InternalMcpServer {
 						},
 						env: {
 							type: "object",
-							description:
-								"Additional environment variables (key-value pairs)",
+							description: "Additional environment variables (key-value pairs)",
 							additionalProperties: { type: "string" },
+						},
+						confirmed: {
+							type: "boolean",
+							description:
+								"Set to true to confirm execution of scripts containing delete commands. Required when the script contains delete operations.",
 						},
 					},
 					required: ["script"],
@@ -878,8 +940,7 @@ export function createBashServer(): InternalMcpServer {
 								"SIGUSR1",
 								"SIGUSR2",
 							],
-							description:
-								"Signal to send (default: 'SIGTERM')",
+							description: "Signal to send (default: 'SIGTERM')",
 						},
 					},
 					required: ["pid"],
