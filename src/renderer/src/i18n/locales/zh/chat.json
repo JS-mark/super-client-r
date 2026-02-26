@@ -180,6 +180,9 @@
 		"paramTypeText": "文本",
 		"paramTypeNumber": "数字",
 		"paramTypeBoolean": "布尔值",
+		"toolTimeout": "工具超时",
+		"toolTimeoutDesc": "单次工具调用的最大执行时间。超时后工具调用将被终止。",
+		"toolTimeoutMin": "分钟",
 		"reset": "恢复默认",
 		"permission": {
 			"title": "工具权限",

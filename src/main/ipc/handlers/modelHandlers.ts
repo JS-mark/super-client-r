@@ -223,6 +223,7 @@ export function registerModelHandlers(): void {
 				const workspaceDir = getWorkspaceDir(request.conversationId);
 
 				// Build a tool executor that maps prefixed tool names back to MCP servers
+				const toolTimeoutMs = (request.toolTimeout ?? 180) * 1000;
 				const toolExecutor = request.toolMapping
 					? async (name: string, args: Record<string, unknown>) => {
 							const mapping = request.toolMapping![name];
@@ -232,11 +233,18 @@ export function registerModelHandlers(): void {
 								args,
 								workspaceDir,
 							);
-							const result = await mcpService.callTool(
+							const callPromise = mcpService.callTool(
 								mapping.serverId,
 								mapping.toolName,
 								resolvedArgs,
 							);
+							const timeoutPromise = new Promise<never>((_, reject) => {
+								setTimeout(
+									() => reject(new Error(`Tool "${name}" timed out after ${request.toolTimeout ?? 180}s`)),
+									toolTimeoutMs,
+								);
+							});
+							const result = await Promise.race([callPromise, timeoutPromise]);
 							if (!result.success) {
 								throw new Error(result.error || "Tool call failed");
 							}

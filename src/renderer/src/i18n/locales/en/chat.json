@@ -180,6 +180,9 @@
 		"paramTypeText": "Text",
 		"paramTypeNumber": "Number",
 		"paramTypeBoolean": "Boolean",
+		"toolTimeout": "Tool Timeout",
+		"toolTimeoutDesc": "Maximum execution time for a single tool call. If a tool exceeds this time, it will be terminated.",
+		"toolTimeoutMin": "min",
 		"reset": "Reset",
 		"permission": {
 			"title": "Tool Permission",

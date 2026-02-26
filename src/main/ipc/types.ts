@@ -496,6 +496,8 @@ export interface ChatCompletionRequest {
 	extraParams?: Record<string, unknown>;
 	/** Conversation ID for resolving workspace directory in tool calls */
 	conversationId?: string;
+	/** Tool execution timeout in seconds (default 180) */
+	toolTimeout?: number;
 }
 
 export interface OpenAIToolCall {

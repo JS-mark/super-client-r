@@ -334,6 +334,7 @@ export interface ElectronAPI {
 			providerPreset?: string;
 			extraParams?: Record<string, unknown>;
 			conversationId?: string;
+		toolTimeout?: number;
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		toolApprovalResponse: (

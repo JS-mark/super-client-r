@@ -96,6 +96,7 @@ export const modelService = {
 		providerPreset?: string;
 		extraParams?: Record<string, unknown>;
 		conversationId?: string;
+		toolTimeout?: number;
 	}) => window.electron.llm.chatCompletion(request),
 
 	stopStream: (requestId: string) => window.electron.llm.stopStream(requestId),

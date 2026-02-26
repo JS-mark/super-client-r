@@ -41,6 +41,7 @@ export interface SessionSettings {
 	toolCallMode: ToolCallMode;
 	toolPermissionMode: ToolPermissionMode;
 	authorizedTools: string[];
+	toolTimeout: number; // Tool execution timeout in seconds (min 60)
 	temperatureEnabled: boolean;
 	temperature: number;
 	topPEnabled: boolean;
@@ -56,6 +57,7 @@ export const DEFAULT_SESSION_SETTINGS: SessionSettings = {
 	toolCallMode: "function",
 	toolPermissionMode: "approve_always",
 	authorizedTools: [],
+	toolTimeout: 180,
 	temperatureEnabled: true,
 	temperature: 0.7,
 	topPEnabled: false,
@@ -482,6 +484,29 @@ export function ChatSettingsModal({
 						onToggle={handleToggleTool}
 					/>
 				)}
+
+				<SettingCell
+					label={t("settings.toolTimeout", "Tool Timeout")}
+					tooltip={t(
+						"settings.toolTimeoutDesc",
+						"Maximum execution time for a single tool call. If a tool exceeds this time, it will be terminated.",
+					)}
+					extra={
+						<span className="text-xs tabular-nums opacity-50">
+							{settings.toolTimeout >= 60
+								? `${Math.floor(settings.toolTimeout / 60)}${t("settings.toolTimeoutMin", "min")}`
+								: `${settings.toolTimeout}s`}
+						</span>
+					}
+				>
+					<Slider
+						min={60}
+						max={600}
+						step={30}
+						value={settings.toolTimeout}
+						onChange={(value) => updateSetting("toolTimeout", value)}
+					/>
+				</SettingCell>
 
 				<Separator />
 

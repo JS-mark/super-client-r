@@ -590,6 +590,7 @@ export function useChat() {
 					extraParams: parseCustomParams(sessionSettings.customParams),
 					conversationId:
 						useChatStore.getState().currentConversationId ?? undefined,
+					toolTimeout: sessionSettings.toolTimeout,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send direct message:", error);
@@ -717,6 +718,7 @@ export function useChat() {
 					extraParams: parseCustomParams(sessionSettings.customParams),
 					conversationId:
 						useChatStore.getState().currentConversationId ?? undefined,
+					toolTimeout: sessionSettings.toolTimeout,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send agent message:", error);
@@ -857,6 +859,7 @@ export function useChat() {
 					extraParams: parseCustomParams(sessionSettings.customParams),
 					conversationId:
 						useChatStore.getState().currentConversationId ?? undefined,
+					toolTimeout: sessionSettings.toolTimeout,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send skill message:", error);

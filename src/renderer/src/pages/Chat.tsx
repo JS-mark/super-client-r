@@ -51,7 +51,10 @@ import { FileUploadButton } from "../components/attachment/FileUpload";
 import { ChatExportDialog } from "../components/chat/ChatExportDialog";
 import type { ChatModeSelection } from "../components/chat/ChatModePanel";
 import { ChatModePanel } from "../components/chat/ChatModePanel";
-import { ChatSettingsModal } from "../components/chat/ChatSettingsModal";
+import {
+	ChatSettingsModal,
+	DEFAULT_SESSION_SETTINGS,
+} from "../components/chat/ChatSettingsModal";
 import { ChatSidebar } from "../components/chat/ChatSidebar";
 import { MessageContextMenu } from "../components/chat/MessageContextMenu";
 import { MessageSearch } from "../components/chat/MessageSearch";
@@ -468,20 +471,7 @@ const Chat: React.FC = () => {
 	// Reset session model override and settings when switching conversations
 	useEffect(() => {
 		setSessionModelOverride(null);
-		setSessionSettings({
-			toolCallMode: "function",
-			toolPermissionMode: "approve_always",
-			authorizedTools: [],
-			temperatureEnabled: true,
-			temperature: 0.7,
-			topPEnabled: false,
-			topP: 1,
-			maxTokens: 4096,
-			contextCount: -1,
-			streamingEnabled: true,
-			systemPrompt: "",
-			customParams: [],
-		});
+		setSessionSettings({ ...DEFAULT_SESSION_SETTINGS });
 	}, [currentConversationId, setSessionModelOverride, setSessionSettings]);
 
 	// Fetch workspace directory path for the current conversation
