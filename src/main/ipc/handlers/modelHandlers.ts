@@ -18,8 +18,9 @@ import { logger } from "../../utils/logger";
 
 const log = logger.withContext("ModelHandlers");
 
-const FILE_SYSTEM_SERVER_ID = "@scp/file-system";
+const SERVERS_WITH_PATH_ARGS = new Set(["@scp/file-system", "@scp/grep"]);
 const PATH_ARG_KEYS = ["path", "source", "destination"];
+const SERVERS_WITH_STORAGE = new Set(["@scp/plan", "@scp/task"]);
 
 /**
  * Get the workspace directory for a conversation.
@@ -36,14 +37,22 @@ function getWorkspaceDir(conversationId?: string): string | undefined {
 
 /**
  * Resolve relative file paths in tool arguments against the workspace directory.
- * Only applies to the internal file-system server's tools.
+ * Also injects _storageDir for servers that need persistent storage.
  */
 function resolveToolPaths(
 	serverId: string,
 	args: Record<string, unknown>,
 	workspaceDir?: string,
 ): Record<string, unknown> {
-	if (!workspaceDir || serverId !== FILE_SYSTEM_SERVER_ID) return args;
+	if (!workspaceDir) return args;
+
+	// Inject storage directory for plan/task servers
+	if (SERVERS_WITH_STORAGE.has(serverId)) {
+		return { ...args, _storageDir: path.join(workspaceDir, "todo") };
+	}
+
+	// Resolve relative paths for file-system and grep servers
+	if (!SERVERS_WITH_PATH_ARGS.has(serverId)) return args;
 
 	const resolved = { ...args };
 	for (const key of PATH_ARG_KEYS) {
@@ -240,7 +249,12 @@ export function registerModelHandlers(): void {
 							);
 							const timeoutPromise = new Promise<never>((_, reject) => {
 								setTimeout(
-									() => reject(new Error(`Tool "${name}" timed out after ${request.toolTimeout ?? 180}s`)),
+									() =>
+										reject(
+											new Error(
+												`Tool "${name}" timed out after ${request.toolTimeout ?? 180}s`,
+											),
+										),
 									toolTimeoutMs,
 								);
 							});
