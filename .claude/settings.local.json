@@ -144,7 +144,17 @@
       "Bash(pnpm release --help:*)",
       "Bash(pnpm release:*)",
       "Bash(env)",
-      "Bash(npm config:*)"
+      "Bash(npm config:*)",
+      "Bash(git -C /Users/mark/myself/code/me/super-client-r diff)",
+      "Bash(git -C /Users/mark/myself/code/me/super-client-r log --oneline -10)",
+      "Bash(git -C /Users/mark/myself/code/me/super-client-r commit -m \"$\\(cat <<''EOF''\nfeat\\(chat\\): add tool execution timeout configuration\n\nAdd configurable timeout for MCP tool calls in conversation settings\n\\(default 3min, range 1-10min\\). Prevents tools from hanging indefinitely\nduring execution.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(gh run list:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(pnpm -v:*)",
+      "Bash(/Users/mark/Library/pnpm/pnpm store path)",
+      "Bash(corepack pnpm:*)",
+      "Bash(npm ls:*)",
+      "Bash(git diff:*)"
     ]
   }
 }
