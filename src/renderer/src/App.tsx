@@ -95,10 +95,7 @@ function App() {
 			// Cleanup event listeners
 			if (window.electron && window.electron.ipc) {
 				window.electron.ipc.off("navigate-to", handleNavigate);
-				window.electron.ipc.off(
-					"float:pending-message",
-					handleFloatMessage,
-				);
+				window.electron.ipc.off("float:pending-message", handleFloatMessage);
 			}
 		};
 	}, []);

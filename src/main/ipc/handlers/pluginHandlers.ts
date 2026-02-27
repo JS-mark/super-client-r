@@ -716,10 +716,7 @@ module.exports = {
 		"plugin:grantPermissions",
 		async (
 			_event,
-			{
-				pluginId,
-				permissions,
-			}: { pluginId: string; permissions: string[] },
+			{ pluginId, permissions }: { pluginId: string; permissions: string[] },
 		): Promise<{ success: boolean; error?: string }> => {
 			try {
 				pluginManager.grantPermissions(
@@ -790,8 +787,7 @@ module.exports = {
 			error?: string;
 		}> => {
 			try {
-				const pages =
-					pluginManager.uiContributionRegistry.getAllPages();
+				const pages = pluginManager.uiContributionRegistry.getAllPages();
 				// Match by path or by id as fallback
 				const page = pages.find(
 					(p) =>

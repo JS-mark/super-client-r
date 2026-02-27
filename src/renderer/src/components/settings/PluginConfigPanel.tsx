@@ -34,10 +34,7 @@ export function PluginConfigPanel({
 			const loaded: Record<string, unknown> = {};
 			for (const [key, prop] of Object.entries(properties)) {
 				try {
-					const val = await pluginService.getStorage(
-						pluginId,
-						`config.${key}`,
-					);
+					const val = await pluginService.getStorage(pluginId, `config.${key}`);
 					loaded[key] = val ?? prop.default;
 				} catch {
 					loaded[key] = prop.default;

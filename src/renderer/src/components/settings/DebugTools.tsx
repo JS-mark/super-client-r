@@ -148,10 +148,7 @@ const QuickActionsTab: React.FC = () => {
 							okText={t("confirm", "确定", { ns: "common" })}
 							cancelText={t("cancel", "取消", { ns: "common" })}
 						>
-							<Button
-								danger={action.danger}
-								className="!rounded-lg"
-							>
+							<Button danger={action.danger} className="!rounded-lg">
 								{action.label}
 							</Button>
 						</Popconfirm>
@@ -442,7 +439,11 @@ const PerformanceMonitorTab: React.FC = () => {
 			: 0;
 
 	const progressColor = (pct: number) =>
-		pct > 80 ? token.colorError : pct > 60 ? token.colorWarning : token.colorSuccess;
+		pct > 80
+			? token.colorError
+			: pct > 60
+				? token.colorWarning
+				: token.colorSuccess;
 
 	return (
 		<div className="space-y-6">
@@ -452,11 +453,7 @@ const PerformanceMonitorTab: React.FC = () => {
 						{t("lastRefresh", "上次刷新", { ns: "settings" })}: {lastRefresh}
 					</span>
 				)}
-				<Button
-					icon={<ReloadOutlined />}
-					onClick={fetchMetrics}
-					size="small"
-				>
+				<Button icon={<ReloadOutlined />} onClick={fetchMetrics} size="small">
 					{t("refresh", "刷新", { ns: "settings" })}
 				</Button>
 			</div>

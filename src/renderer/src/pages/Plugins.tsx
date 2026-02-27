@@ -41,7 +41,10 @@ import { pluginService } from "../services/pluginService";
 import { useChatStore } from "../stores/chatStore";
 import { useSkinStore } from "../stores/skinStore";
 import type { MarketPlugin, PluginCommand, PluginInfo } from "../types/plugin";
-import { PERMISSION_DESCRIPTIONS, type PluginPermission } from "../types/plugin";
+import {
+	PERMISSION_DESCRIPTIONS,
+	type PluginPermission,
+} from "../types/plugin";
 
 const { Search } = Input;
 
@@ -157,27 +160,18 @@ export default function Plugins() {
 			if (permissions && permissions.length > 0) {
 				// 非内置插件安装后需要授权
 				Modal.confirm({
-					title: t(
-						"plugins.permissionRequired",
-						"权限确认",
-						{ ns: "plugins" },
-					),
+					title: t("plugins.permissionRequired", "权限确认", { ns: "plugins" }),
 					content: (
 						<div>
 							<p style={{ marginBottom: 12 }}>
-								{t(
-									"plugins.permissionDesc",
-									"该插件需要以下权限：",
-									{ ns: "plugins" },
-								)}
+								{t("plugins.permissionDesc", "该插件需要以下权限：", {
+									ns: "plugins",
+								})}
 							</p>
 							<ul style={{ paddingLeft: 20 }}>
 								{permissions.map((p: string) => (
 									<li key={p} style={{ marginBottom: 4 }}>
-										<Tag
-											bordered={false}
-											style={{ margin: 0, fontSize: 11 }}
-										>
+										<Tag bordered={false} style={{ margin: 0, fontSize: 11 }}>
 											{p}
 										</Tag>{" "}
 										<span style={{ fontSize: 12 }}>
@@ -191,10 +185,7 @@ export default function Plugins() {
 					okText: t("plugins.grant", "授权", { ns: "plugins" }),
 					cancelText: t("cancel", "取消", { ns: "common" }),
 					onOk: async () => {
-						await pluginService.grantPermissions(
-							plugin.id,
-							permissions,
-						);
+						await pluginService.grantPermissions(plugin.id, permissions);
 						message.success(
 							t("plugins.pluginInstalled", "插件安装成功", { ns: "plugins" }),
 						);
@@ -202,7 +193,11 @@ export default function Plugins() {
 					},
 					onCancel: () => {
 						message.info(
-							t("plugins.permissionDenied", "已安装但未授权，启用时将再次请求权限", { ns: "plugins" }),
+							t(
+								"plugins.permissionDenied",
+								"已安装但未授权，启用时将再次请求权限",
+								{ ns: "plugins" },
+							),
 						);
 						loadInstalledPlugins();
 					},
@@ -259,41 +254,28 @@ export default function Plugins() {
 						await loadPluginCommands(plugins);
 					};
 
-					if (
-						permissions &&
-						permissions.length > 0 &&
-						!plugin.isBuiltin
-					) {
+					if (permissions && permissions.length > 0 && !plugin.isBuiltin) {
 						// Check if already granted
-						const granted = await pluginService.getPermissions(
-							plugin.id,
-						);
+						const granted = await pluginService.getPermissions(plugin.id);
 						const ungrantedPerms = permissions.filter(
 							(p: string) => !granted.includes(p),
 						);
 
 						if (ungrantedPerms.length > 0) {
 							Modal.confirm({
-								title: t(
-									"plugins.permissionRequired",
-									"权限确认",
-									{ ns: "plugins" },
-								),
+								title: t("plugins.permissionRequired", "权限确认", {
+									ns: "plugins",
+								}),
 								content: (
 									<div>
 										<p style={{ marginBottom: 12 }}>
-											{t(
-												"plugins.permissionDesc",
-												"该插件需要以下权限：",
-												{ ns: "plugins" },
-											)}
+											{t("plugins.permissionDesc", "该插件需要以下权限：", {
+												ns: "plugins",
+											})}
 										</p>
 										<ul style={{ paddingLeft: 20 }}>
 											{ungrantedPerms.map((p: string) => (
-												<li
-													key={p}
-													style={{ marginBottom: 4 }}
-												>
+												<li key={p} style={{ marginBottom: 4 }}>
 													<Tag
 														bordered={false}
 														style={{
@@ -303,12 +285,9 @@ export default function Plugins() {
 													>
 														{p}
 													</Tag>{" "}
-													<span
-														style={{ fontSize: 12 }}
-													>
-														{PERMISSION_DESCRIPTIONS[
-															p as PluginPermission
-														] || p}
+													<span style={{ fontSize: 12 }}>
+														{PERMISSION_DESCRIPTIONS[p as PluginPermission] ||
+															p}
 													</span>
 												</li>
 											))}
@@ -348,27 +327,18 @@ export default function Plugins() {
 		async (pluginId: string, permissions?: PluginPermission[]) => {
 			if (permissions && permissions.length > 0) {
 				Modal.confirm({
-					title: t(
-						"plugins.permissionRequired",
-						"权限确认",
-						{ ns: "plugins" },
-					),
+					title: t("plugins.permissionRequired", "权限确认", { ns: "plugins" }),
 					content: (
 						<div>
 							<p style={{ marginBottom: 12 }}>
-								{t(
-									"plugins.permissionDesc",
-									"该插件需要以下权限：",
-									{ ns: "plugins" },
-								)}
+								{t("plugins.permissionDesc", "该插件需要以下权限：", {
+									ns: "plugins",
+								})}
 							</p>
 							<ul style={{ paddingLeft: 20 }}>
 								{permissions.map((p) => (
 									<li key={p} style={{ marginBottom: 4 }}>
-										<Tag
-											bordered={false}
-											style={{ margin: 0, fontSize: 11 }}
-										>
+										<Tag bordered={false} style={{ margin: 0, fontSize: 11 }}>
 											{p}
 										</Tag>{" "}
 										<span style={{ fontSize: 12 }}>
@@ -386,19 +356,13 @@ export default function Plugins() {
 					onOk: async () => {
 						try {
 							setLoading(true);
-							const plugin =
-								await pluginService.downloadPlugin(pluginId);
+							const plugin = await pluginService.downloadPlugin(pluginId);
 							// Grant permissions after install
-							await pluginService.grantPermissions(
-								pluginId,
-								permissions,
-							);
+							await pluginService.grantPermissions(pluginId, permissions);
 							message.success(
-								t(
-									"plugins.downloadSuccess",
-									"插件下载并安装成功",
-									{ ns: "plugins" },
-								),
+								t("plugins.downloadSuccess", "插件下载并安装成功", {
+									ns: "plugins",
+								}),
 							);
 							loadMarketPlugins();
 							loadInstalledPlugins();
@@ -415,11 +379,9 @@ export default function Plugins() {
 					setLoading(true);
 					await pluginService.downloadPlugin(pluginId);
 					message.success(
-						t(
-							"plugins.downloadSuccess",
-							"插件下载并安装成功",
-							{ ns: "plugins" },
-						),
+						t("plugins.downloadSuccess", "插件下载并安装成功", {
+							ns: "plugins",
+						}),
 					);
 					loadMarketPlugins();
 					loadInstalledPlugins();
@@ -445,25 +407,27 @@ export default function Plugins() {
 	);
 
 	// 执行命令
-	const handleExecuteCommand = useCallback(async (command: string) => {
-		try {
-			setExecutingCommand(command);
-			const result =
-				await pluginService.executeCommand<unknown>(command);
-			if (result !== undefined && result !== null) {
-				setCommandResult(result);
-				setCommandModalOpen(true);
-			} else {
-				message.success(
-					t("plugins.commandExecuted", "命令已执行", { ns: "plugins" }),
-				);
+	const handleExecuteCommand = useCallback(
+		async (command: string) => {
+			try {
+				setExecutingCommand(command);
+				const result = await pluginService.executeCommand<unknown>(command);
+				if (result !== undefined && result !== null) {
+					setCommandResult(result);
+					setCommandModalOpen(true);
+				} else {
+					message.success(
+						t("plugins.commandExecuted", "命令已执行", { ns: "plugins" }),
+					);
+				}
+			} catch (error) {
+				message.error(String(error));
+			} finally {
+				setExecutingCommand(null);
 			}
-		} catch (error) {
-			message.error(String(error));
-		} finally {
-			setExecutingCommand(null);
-		}
-	}, [t]);
+		},
+		[t],
+	);
 
 	// 激活主题
 	const handleActivateTheme = useCallback(
@@ -1166,18 +1130,14 @@ export default function Plugins() {
 				title={
 					<div className="flex items-center gap-2">
 						<ThunderboltOutlined style={{ color: token.colorPrimary }} />
-						{(commandResult as Record<string, unknown>)?.name as string ||
+						{((commandResult as Record<string, unknown>)?.name as string) ||
 							t("plugins.commandResult", "命令结果", { ns: "plugins" })}
 					</div>
 				}
 				open={commandModalOpen}
 				onCancel={() => setCommandModalOpen(false)}
 				footer={[
-					<Button
-						key="copy"
-						icon={<CopyOutlined />}
-						onClick={handleCopyResult}
-					>
+					<Button key="copy" icon={<CopyOutlined />} onClick={handleCopyResult}>
 						{t("plugins.copy", "复制", { ns: "plugins" })}
 					</Button>,
 					<Button
@@ -1191,57 +1151,58 @@ export default function Plugins() {
 				]}
 				width={600}
 			>
-				{commandResult != null && ((): React.ReactNode => {
-					const result = commandResult as Record<string, unknown>;
-					const isTemplate =
-						typeof result.template === "string" &&
-						typeof result.description === "string";
+				{commandResult != null &&
+					((): React.ReactNode => {
+						const result = commandResult as Record<string, unknown>;
+						const isTemplate =
+							typeof result.template === "string" &&
+							typeof result.description === "string";
 
-					if (isTemplate) {
-						return (
-							<div className="space-y-4">
-								<div>
-									<Text type="secondary" className="text-xs block mb-1">
-										{t("plugins.description", "描述", { ns: "plugins" })}
-									</Text>
-									<Text>{result.description as string}</Text>
-								</div>
-								<div>
-									<Text type="secondary" className="text-xs block mb-1">
-										{t("plugins.template", "模板", { ns: "plugins" })}
-									</Text>
-									<div
-										className="p-3 rounded-lg text-sm font-mono whitespace-pre-wrap"
-										style={{
-											backgroundColor: token.colorFillTertiary,
-											border: `1px solid ${token.colorBorderSecondary}`,
-										}}
-									>
-										{result.template as string}
+						if (isTemplate) {
+							return (
+								<div className="space-y-4">
+									<div>
+										<Text type="secondary" className="text-xs block mb-1">
+											{t("plugins.description", "描述", { ns: "plugins" })}
+										</Text>
+										<Text>{result.description as string}</Text>
+									</div>
+									<div>
+										<Text type="secondary" className="text-xs block mb-1">
+											{t("plugins.template", "模板", { ns: "plugins" })}
+										</Text>
+										<div
+											className="p-3 rounded-lg text-sm font-mono whitespace-pre-wrap"
+											style={{
+												backgroundColor: token.colorFillTertiary,
+												border: `1px solid ${token.colorBorderSecondary}`,
+											}}
+										>
+											{result.template as string}
+										</div>
 									</div>
 								</div>
+							);
+						}
+
+						const displayText =
+							typeof commandResult === "string"
+								? commandResult
+								: JSON.stringify(commandResult, null, 2);
+						return (
+							<div
+								className="p-3 rounded-lg text-sm font-mono whitespace-pre-wrap"
+								style={{
+									backgroundColor: token.colorFillTertiary,
+									border: `1px solid ${token.colorBorderSecondary}`,
+									maxHeight: 400,
+									overflow: "auto",
+								}}
+							>
+								{displayText}
 							</div>
 						);
-					}
-
-					const displayText =
-						typeof commandResult === "string"
-							? commandResult
-							: JSON.stringify(commandResult, null, 2);
-					return (
-						<div
-							className="p-3 rounded-lg text-sm font-mono whitespace-pre-wrap"
-							style={{
-								backgroundColor: token.colorFillTertiary,
-								border: `1px solid ${token.colorBorderSecondary}`,
-								maxHeight: 400,
-								overflow: "auto",
-							}}
-						>
-							{displayText}
-						</div>
-					);
-				})()}
+					})()}
 			</Modal>
 		</MainLayout>
 	);

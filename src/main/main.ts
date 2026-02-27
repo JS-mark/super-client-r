@@ -415,23 +415,20 @@ function registerWindowHandlers(): void {
 		}
 	});
 
-	ipcMain.on(
-		"open-main-window",
-		(_event, data?: { message?: string }) => {
-			if (mainWindow) {
-				mainWindow.show();
-				mainWindow.focus();
-			} else {
-				createWindow();
-			}
-			if (data?.message && mainWindow) {
-				mainWindow.webContents.send("navigate-to", "/chat");
-				mainWindow.webContents.send("float:pending-message", {
-					message: data.message,
-				});
-			}
-		},
-	);
+	ipcMain.on("open-main-window", (_event, data?: { message?: string }) => {
+		if (mainWindow) {
+			mainWindow.show();
+			mainWindow.focus();
+		} else {
+			createWindow();
+		}
+		if (data?.message && mainWindow) {
+			mainWindow.webContents.send("navigate-to", "/chat");
+			mainWindow.webContents.send("float:pending-message", {
+				message: data.message,
+			});
+		}
+	});
 }
 
 /**

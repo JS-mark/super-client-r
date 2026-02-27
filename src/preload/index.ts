@@ -334,7 +334,7 @@ export interface ElectronAPI {
 			providerPreset?: string;
 			extraParams?: Record<string, unknown>;
 			conversationId?: string;
-		toolTimeout?: number;
+			toolTimeout?: number;
 		}) => Promise<IPCResponse>;
 		stopStream: (requestId: string) => Promise<IPCResponse>;
 		toolApprovalResponse: (
@@ -1242,8 +1242,7 @@ const electronAPI: ElectronAPI = {
 			}),
 		getPermissions: (pluginId: string) =>
 			ipcRenderer.invoke("plugin:getPermissions", { pluginId }),
-		getUIContributions: () =>
-			ipcRenderer.invoke("plugin:getUIContributions"),
+		getUIContributions: () => ipcRenderer.invoke("plugin:getUIContributions"),
 		getPluginPageHTML: (pluginId: string, pagePath: string) =>
 			ipcRenderer.invoke("plugin:getPluginPageHTML", {
 				pluginId,
@@ -1256,14 +1255,11 @@ const electronAPI: ElectronAPI = {
 		checkUpdates: () => ipcRenderer.invoke("plugin:checkUpdates"),
 		updatePlugin: (pluginId: string) =>
 			ipcRenderer.invoke("plugin:updatePlugin", { pluginId }),
-		onUIContributionsChanged: (
-			callback: (contributions: unknown) => void,
-		) => {
+		onUIContributionsChanged: (callback: (contributions: unknown) => void) => {
 			const listener = (_event: unknown, contributions: unknown) =>
 				callback(contributions);
 			ipcRenderer.on("plugin:ui-contributions-changed", listener);
-			return () =>
-				ipcRenderer.off("plugin:ui-contributions-changed", listener);
+			return () => ipcRenderer.off("plugin:ui-contributions-changed", listener);
 		},
 		onShowMessage: (
 			callback: (data: {

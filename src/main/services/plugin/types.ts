@@ -401,7 +401,10 @@ export interface PluginMcpToolConfig {
 		inputSchema: Record<string, unknown>;
 		handler: (
 			args: Record<string, unknown>,
-		) => Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }>;
+		) => Promise<{
+			content: Array<{ type: "text"; text: string }>;
+			isError?: boolean;
+		}>;
 	}>;
 }
 

@@ -445,14 +445,22 @@ const Chat: React.FC = () => {
 				setFloatAutoSend(true);
 			}
 		}
-	}, [pendingInput, pendingAutoSend, setInput, setPendingInput, setPendingAutoSend]);
+	}, [
+		pendingInput,
+		pendingAutoSend,
+		setInput,
+		setPendingInput,
+		setPendingAutoSend,
+	]);
 
 	// Auto-send after input state has updated (float widget flow)
 	useEffect(() => {
 		if (floatAutoSend && input.trim()) {
 			setFloatAutoSend(false);
 			const doSend = async () => {
-				await useChatStore.getState().createConversation(input.trim().slice(0, 50));
+				await useChatStore
+					.getState()
+					.createConversation(input.trim().slice(0, 50));
 				sendMessage({ mode: "direct" });
 			};
 			doSend();

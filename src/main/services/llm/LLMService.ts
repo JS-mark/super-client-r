@@ -181,8 +181,9 @@ export class LLMService {
 		{ resolve: (approved: boolean) => void }
 	>();
 	// Chat hook registry (injected from PluginManager)
-	private chatHookRegistry: import("../plugin/hooks/ChatHooks").ChatHookRegistry | null =
-		null;
+	private chatHookRegistry:
+		| import("../plugin/hooks/ChatHooks").ChatHookRegistry
+		| null = null;
 
 	/**
 	 * Set the chat hook registry for plugin integration
@@ -732,9 +733,7 @@ export class LLMService {
 					await this.chatHookRegistry.runPostResponseHooks(hookCtx);
 					// If response was modified, broadcast the delta
 					if (hookCtx.response !== accumulatedContent) {
-						const delta = hookCtx.response.slice(
-							accumulatedContent.length,
-						);
+						const delta = hookCtx.response.slice(accumulatedContent.length);
 						if (delta) {
 							this.broadcast({
 								requestId: request.requestId,

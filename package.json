@@ -168,7 +168,10 @@
 			}
 		],
 		"mac": {
-			"electronLanguages": ["en", "zh_CN"],
+			"electronLanguages": [
+				"en",
+				"zh_CN"
+			],
 			"icon": "build/icons/icon.icns",
 			"category": "com.superclient.app",
 			"target": [

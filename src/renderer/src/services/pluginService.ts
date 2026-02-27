@@ -315,8 +315,7 @@ export const pluginService = {
 	 * 获取插件已授予的权限
 	 */
 	async getPermissions(pluginId: string): Promise<string[]> {
-		const result =
-			await window.electron.plugin.getPermissions(pluginId);
+		const result = await window.electron.plugin.getPermissions(pluginId);
 		if (!result.success) {
 			throw new Error(result.error);
 		}
@@ -359,8 +358,7 @@ export const pluginService = {
 	 * 开发模式安装插件
 	 */
 	async installDev(sourcePath: string): Promise<void> {
-		const result =
-			await window.electron.plugin.installDev(sourcePath);
+		const result = await window.electron.plugin.installDev(sourcePath);
 		if (!result.success) {
 			throw new Error(result.error);
 		}
@@ -370,8 +368,7 @@ export const pluginService = {
 	 * 重新加载开发模式插件
 	 */
 	async reloadDev(pluginId: string): Promise<void> {
-		const result =
-			await window.electron.plugin.reloadDev(pluginId);
+		const result = await window.electron.plugin.reloadDev(pluginId);
 		if (!result.success) {
 			throw new Error(result.error);
 		}
@@ -400,8 +397,7 @@ export const pluginService = {
 	 * 更新插件
 	 */
 	async updatePlugin(pluginId: string): Promise<void> {
-		const result =
-			await window.electron.plugin.updatePlugin(pluginId);
+		const result = await window.electron.plugin.updatePlugin(pluginId);
 		if (!result.success) {
 			throw new Error(result.error);
 		}

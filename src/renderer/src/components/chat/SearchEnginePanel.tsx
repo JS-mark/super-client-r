@@ -28,9 +28,7 @@ function getEngineIcon(provider: string, size = 14) {
 			return <SogouIcon size={size} />;
 		default: {
 			const info = SEARCH_PROVIDERS.find((p) => p.id === provider);
-			return (
-				<span style={{ fontSize: size }}>{info?.icon ?? "🔍"}</span>
-			);
+			return <span style={{ fontSize: size }}>{info?.icon ?? "🔍"}</span>;
 		}
 	}
 }
@@ -184,9 +182,7 @@ export function useSearchEngine() {
 				if (result.data.defaultProvider) {
 					setSelectedEngine(result.data.defaultProvider);
 				} else {
-					const firstEnabled = result.data.configs.find(
-						(c) => c.enabled,
-					);
+					const firstEnabled = result.data.configs.find((c) => c.enabled);
 					if (firstEnabled) {
 						setSelectedEngine(firstEnabled.provider);
 					}

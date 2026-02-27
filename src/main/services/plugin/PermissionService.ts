@@ -57,10 +57,7 @@ export class PermissionService {
 	/**
 	 * 授予插件一组权限
 	 */
-	grantPermissions(
-		pluginId: string,
-		permissions: PluginPermission[],
-	): void {
+	grantPermissions(pluginId: string, permissions: PluginPermission[]): void {
 		let perms = this.permissions.get(pluginId);
 		if (!perms) {
 			perms = new Set();

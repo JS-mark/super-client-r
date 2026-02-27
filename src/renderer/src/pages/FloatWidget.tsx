@@ -162,29 +162,26 @@ const FloatWidget: React.FC = () => {
 	}, [showToast]);
 
 	// File picker — same as main chat's FileUploadButton
-	const handleFileSelect = useCallback(
-		async (fileList: FileList | null) => {
-			if (!fileList || fileList.length === 0) return;
+	const handleFileSelect = useCallback(async (fileList: FileList | null) => {
+		if (!fileList || fileList.length === 0) return;
 
-			const newFiles: SelectedFile[] = [];
-			for (const file of Array.from(fileList)) {
-				const reader = new FileReader();
-				const dataUrl = await new Promise<string>((resolve) => {
-					reader.onloadend = () => resolve(reader.result as string);
-					reader.readAsDataURL(file);
-				});
-				newFiles.push({
-					name: file.name,
-					path: (file as any).path || file.name,
-					size: file.size,
-					mimeType: file.type || "application/octet-stream",
-					dataUrl,
-				});
-			}
-			setFiles((prev) => [...prev, ...newFiles]);
-		},
-		[],
-	);
+		const newFiles: SelectedFile[] = [];
+		for (const file of Array.from(fileList)) {
+			const reader = new FileReader();
+			const dataUrl = await new Promise<string>((resolve) => {
+				reader.onloadend = () => resolve(reader.result as string);
+				reader.readAsDataURL(file);
+			});
+			newFiles.push({
+				name: file.name,
+				path: (file as any).path || file.name,
+				size: file.size,
+				mimeType: file.type || "application/octet-stream",
+				dataUrl,
+			});
+		}
+		setFiles((prev) => [...prev, ...newFiles]);
+	}, []);
 
 	const handleAttachClick = useCallback(() => {
 		fileInputRef.current?.click();
@@ -268,12 +265,14 @@ const FloatWidget: React.FC = () => {
 					{/* Circle content (idle) — fades out on expand */}
 					<div
 						className="absolute inset-0 flex items-center justify-center transition-opacity cursor-pointer"
-						style={{
-							opacity: isExpanded ? 0 : 1,
-							pointerEvents: isExpanded ? "none" : "auto",
-							WebkitAppRegion: isExpanded ? "no-drag" : "drag",
-							transitionDuration: `${TRANSITION_MS}ms`,
-						} as React.CSSProperties}
+						style={
+							{
+								opacity: isExpanded ? 0 : 1,
+								pointerEvents: isExpanded ? "none" : "auto",
+								WebkitAppRegion: isExpanded ? "no-drag" : "drag",
+								transitionDuration: `${TRANSITION_MS}ms`,
+							} as React.CSSProperties
+						}
 					>
 						<MessageCircle className="w-6 h-6 text-white" />
 					</div>
@@ -325,8 +324,7 @@ const FloatWidget: React.FC = () => {
 						maxHeight: mode === "active" ? 280 : 0,
 						opacity: mode === "active" ? 1 : 0,
 						transitionDuration: `${TRANSITION_MS}ms`,
-						background:
-							"linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 100%)",
+						background: "linear-gradient(135deg, #f0f0ff 0%, #f5f0ff 100%)",
 						border: "1px solid rgba(147,51,234,0.15)",
 					}}
 				>
