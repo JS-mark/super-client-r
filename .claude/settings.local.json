@@ -154,7 +154,12 @@
       "Bash(/Users/mark/Library/pnpm/pnpm store path)",
       "Bash(corepack pnpm:*)",
       "Bash(npm ls:*)",
-      "Bash(git diff:*)"
+      "Bash(git diff:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(done)",
+      "Bash(for f in src/renderer/src/components/attachment/AttachmentManager.tsx src/renderer/src/components/attachment/FileUpload.tsx src/renderer/src/components/chat/ChatExportDialog.tsx src/renderer/src/components/chat/MessageContextMenu.tsx src/renderer/src/components/logviewer/LogDetailDrawer.tsx src/renderer/src/components/mcp/InstalledMcpCard.tsx src/renderer/src/components/mcp/McpDetailModal.tsx src/renderer/src/components/mcp/ThirdPartyMcpCard.tsx src/renderer/src/components/settings/ApiKeysConfig.tsx src/renderer/src/components/settings/ApiServiceSettings.tsx)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(for f in src/renderer/src/pages/FloatWidget.tsx src/renderer/src/pages/PluginPage.tsx src/renderer/src/pages/Plugins.tsx src/renderer/src/pages/Workspaces.tsx src/renderer/src/components/workspace/EditWorkspaceModal.tsx src/renderer/src/components/workspace/WorkspaceSwitcher.tsx src/renderer/src/components/chat/SearchEnginePanel.tsx src/renderer/src/components/settings/SettingSection.tsx)"
     ]
   }
 }
