@@ -3,7 +3,7 @@ import {
 	PaperClipOutlined,
 	UploadOutlined,
 } from "@ant-design/icons";
-import { Button, message, Progress } from "antd";
+import { App, Button, Progress } from "antd";
 import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
@@ -47,6 +47,7 @@ export function FileUpload({
 	className,
 	children,
 }: FileUploadProps) {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const [uploadingFiles, setUploadingFiles] = useState<UploadingFile[]>([]);
 	const [isDragging, setIsDragging] = useState(false);

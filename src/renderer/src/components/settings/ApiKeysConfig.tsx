@@ -3,7 +3,7 @@ import {
 	KeyOutlined,
 	SaveOutlined,
 } from "@ant-design/icons";
-import { Button, Input, message, theme } from "antd";
+import { App, Button, Input, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,7 @@ import { SettingSection } from "./SettingSection";
 const { useToken } = theme;
 
 export const ApiKeysConfig: React.FC = () => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const [skillsmpKey, setSkillsmpKey] = useState("");

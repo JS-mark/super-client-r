@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dropdown, Modal, Input, message as antdMessage } from "antd";
+import { App, Dropdown, Modal, Input } from "antd";
 import type { MenuProps } from "antd";
 import {
 	StarOutlined,
@@ -30,6 +30,7 @@ export function MessageContextMenu({
 	onDelete,
 	onEdit,
 }: MessageContextMenuProps) {
+	const { message: antdMessage } = App.useApp();
 	const { t } = useTranslation();
 	const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
 	const [note, setNote] = useState("");

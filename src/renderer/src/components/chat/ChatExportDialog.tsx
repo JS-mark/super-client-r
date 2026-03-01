@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Modal, Radio, Input, Button, message, theme } from "antd";
+import { App, Modal, Radio, Input, Button, theme } from "antd";
 import {
 	FileTextOutlined,
 	CodeOutlined,
@@ -22,6 +22,7 @@ export function ChatExportDialog({
 	isOpen,
 	onClose,
 }: ChatExportDialogProps) {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const [format, setFormat] = useState<ExportFormat>("markdown");
 	const [filename, setFilename] = useState("");

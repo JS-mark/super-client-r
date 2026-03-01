@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Input, Empty, Dropdown, message, Badge, theme } from "antd";
+import { App, Button, Input, Empty, Dropdown, Badge, theme } from "antd";
 import {
 	SearchOutlined,
 	DeleteOutlined,
@@ -49,6 +49,7 @@ export function AttachmentManager({
 	selectable = false,
 	className,
 }: AttachmentManagerProps) {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const {
 		attachments,

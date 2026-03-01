@@ -5,7 +5,7 @@ import {
 	SettingOutlined,
 	StarFilled,
 } from "@ant-design/icons";
-import { Button, Modal, message, Tag } from "antd";
+import { App, Button, Modal, Tag } from "antd";
 import type React from "react";
 import { useTranslation } from "react-i18next";
 import { useMcpStore } from "../../stores/mcpStore";
@@ -26,6 +26,7 @@ export const McpDetailModal: React.FC<McpDetailModalProps> = ({
 	onInstall,
 	onConfigure,
 }) => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { servers, removeServer } = useMcpStore();
 

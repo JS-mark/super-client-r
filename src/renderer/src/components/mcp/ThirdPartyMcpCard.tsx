@@ -6,7 +6,7 @@ import {
 	LinkOutlined,
 	PlayCircleOutlined,
 } from "@ant-design/icons";
-import { Button, Modal, Tag, Tooltip, message, theme } from "antd";
+import { App, Button, Modal, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ export const ThirdPartyMcpCard: React.FC<{
 	server: McpServer;
 	onEdit: () => void;
 }> = ({ server, onEdit }) => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const { removeServer, testConnection, disconnectServer } = useMcpStore();

@@ -6,7 +6,7 @@ import {
 	SettingOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
-import { Button, Modal, Tag, Tooltip, message, theme } from "antd";
+import { App, Button, Modal, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +21,7 @@ export const InstalledMcpCard: React.FC<{
 	onView: () => void;
 	onConfigure?: (server: McpServer) => void;
 }> = ({ server, onView, onConfigure }) => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const { removeServer, testConnection, disconnectServer } = useMcpStore();

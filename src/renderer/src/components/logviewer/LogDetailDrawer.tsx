@@ -4,7 +4,7 @@
  */
 
 import { CopyOutlined } from "@ant-design/icons";
-import { Button, Drawer, message, Tag, theme } from "antd";
+import { App, Button, Drawer, Tag, theme } from "antd";
 import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +20,7 @@ const LEVEL_COLORS: Record<string, string> = {
 };
 
 export const LogDetailDrawer: React.FC = () => {
+	const { message } = App.useApp();
 	const { t } = useTranslation("logviewer");
 	const { token } = useToken();
 	const record = useLogViewerStore((s) => s.selectedRecord);

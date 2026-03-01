@@ -5,7 +5,7 @@ import {
 	PoweroffOutlined,
 	ReloadOutlined,
 } from "@ant-design/icons";
-import { Button, Form, InputNumber, message, Tooltip, theme } from "antd";
+import { App, Button, Form, InputNumber, Tooltip, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,7 @@ const PORT_MAX = 65535;
 const DEFAULT_PORT = 3000;
 
 export const ApiServiceSettings: React.FC = () => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const [apiStatus, setApiStatus] = useState<ApiStatus>({
