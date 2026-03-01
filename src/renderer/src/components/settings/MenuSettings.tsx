@@ -1,7 +1,7 @@
 import { ReloadOutlined, SettingOutlined } from "@ant-design/icons";
 import { Popconfirm, Tooltip, theme } from "antd";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useMenuStore } from "../../stores/menuStore";
@@ -24,12 +24,16 @@ export const MenuSettings: React.FC<{
 	const toggleEnabled = useMenuStore((state) => state.toggleEnabled);
 	const resetConfig = useMenuStore((state) => state.resetConfig);
 
-	// Drag state
+	// Drag state – use refs to avoid re-renders on every onDragOver event,
+	// and only sync to state when the drop target actually changes.
 	const [dragIndex, setDragIndex] = useState<number | null>(null);
 	const [dropIndex, setDropIndex] = useState<number | null>(null);
 	const [dropPosition, setDropPosition] = useState<"above" | "below" | null>(
 		null,
 	);
+	const dragIndexRef = useRef<number | null>(null);
+	const dropIndexRef = useRef<number | null>(null);
+	const dropPositionRef = useRef<"above" | "below" | null>(null);
 
 	// Filter out settings item (fixed at bottom of sidebar, not configurable)
 	const configurableItems = menuItems.filter((item) => item.id !== "settings");
@@ -49,34 +53,45 @@ export const MenuSettings: React.FC<{
 	);
 
 	const handleDragStart = useCallback((index: number) => {
+		dragIndexRef.current = index;
 		setDragIndex(index);
 	}, []);
 
 	const handleDragEnter = useCallback(
 		(index: number, rect: DOMRect, clientY: number) => {
-			if (dragIndex === null || dragIndex === index) {
-				setDropIndex(null);
-				setDropPosition(null);
+			if (dragIndexRef.current === null || dragIndexRef.current === index) {
+				if (dropIndexRef.current !== null) {
+					dropIndexRef.current = null;
+					dropPositionRef.current = null;
+					setDropIndex(null);
+					setDropPosition(null);
+				}
 				return;
 			}
 			const midY = rect.top + rect.height / 2;
+			const newPosition = clientY < midY ? "above" : "below";
+			if (dropIndexRef.current === index && dropPositionRef.current === newPosition) {
+				return; // No change, skip re-render
+			}
+			dropIndexRef.current = index;
+			dropPositionRef.current = newPosition;
 			setDropIndex(index);
-			setDropPosition(clientY < midY ? "above" : "below");
+			setDropPosition(newPosition);
 		},
-		[dragIndex],
+		[],
 	);
 
 	const handleDragEnd = useCallback(() => {
-		if (
-			dragIndex !== null &&
-			dropIndex !== null &&
-			dropPosition !== null &&
-			dragIndex !== dropIndex
-		) {
-			const newItems = [...configurableItems];
-			const [removed] = newItems.splice(dragIndex, 1);
-			let insertAt = dropPosition === "above" ? dropIndex : dropIndex + 1;
-			if (dragIndex < dropIndex) insertAt--;
+		const di = dragIndexRef.current;
+		const dri = dropIndexRef.current;
+		const drp = dropPositionRef.current;
+
+		if (di !== null && dri !== null && drp !== null && di !== dri) {
+			const items = menuItems.filter((item) => item.id !== "settings");
+			const newItems = [...items];
+			const [removed] = newItems.splice(di, 1);
+			let insertAt = drp === "above" ? dri : dri + 1;
+			if (di < dri) insertAt--;
 			newItems.splice(insertAt, 0, removed);
 
 			const settingsItem = menuItems.find((item) => item.id === "settings");
@@ -84,17 +99,13 @@ export const MenuSettings: React.FC<{
 			setConfig({ items: finalItems });
 		}
 
+		dragIndexRef.current = null;
+		dropIndexRef.current = null;
+		dropPositionRef.current = null;
 		setDragIndex(null);
 		setDropIndex(null);
 		setDropPosition(null);
-	}, [
-		dragIndex,
-		dropIndex,
-		dropPosition,
-		configurableItems,
-		menuItems,
-		setConfig,
-	]);
+	}, [menuItems, setConfig]);
 
 	const handleReset = useCallback(() => {
 		resetConfig();

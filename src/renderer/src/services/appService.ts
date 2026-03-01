@@ -26,7 +26,7 @@ export interface AppInfo {
 export interface UpdateCheckResult {
 	updateAvailable: boolean;
 	version?: string;
-	message: string;
+	error?: string;
 }
 
 export interface LogFileInfo {

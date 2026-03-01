@@ -1,11 +1,14 @@
 import {
 	ApiOutlined,
 	AppstoreOutlined,
+	DesktopOutlined,
 	FolderOutlined,
 	MessageOutlined,
+	MoonOutlined,
 	RocketOutlined,
 	SettingOutlined,
 	StarOutlined,
+	SunOutlined,
 } from "@ant-design/icons";
 import { Dropdown, type MenuProps, Tooltip, theme } from "antd";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
@@ -24,6 +27,7 @@ import {
 	useUserStore,
 } from "../../stores/userStore";
 import type { MenuItemConfig } from "../../types/menu";
+import { useThemeStore } from "../../stores/themeStore";
 import { AboutModal } from "../AboutModal";
 import { TitleBar } from "./TitleBar";
 
@@ -150,6 +154,57 @@ const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
 						}}
 					/>
 				)}
+			</motion.button>
+		</Tooltip>
+	);
+};
+
+/**
+ * Theme toggle button — cycles through light → dark → auto.
+ * Self-contained component to isolate theme store re-renders.
+ */
+const THEME_CYCLE = ["light", "dark", "auto"] as const;
+
+const ThemeToggleButton: React.FC = () => {
+	const { t } = useTranslation();
+	const mode = useThemeStore((s) => s.mode);
+
+	const handleToggle = useCallback(async () => {
+		const { mode: current, setMode } = useThemeStore.getState();
+		const currentIdx = THEME_CYCLE.indexOf(current);
+		const newMode = THEME_CYCLE[(currentIdx + 1) % THEME_CYCLE.length];
+		setMode(newMode);
+		try {
+			await window.electron.theme.set(newMode);
+		} catch (error) {
+			console.error("Failed to sync theme to main:", error);
+		}
+	}, []);
+
+	const icon =
+		mode === "dark" ? (
+			<MoonOutlined className="text-xl" />
+		) : mode === "auto" ? (
+			<DesktopOutlined className="text-xl" />
+		) : (
+			<SunOutlined className="text-xl" />
+		);
+
+	const label = t(`theme.${mode}`, { ns: "settings" });
+
+	return (
+		<Tooltip title={label} placement="right" mouseEnterDelay={0.5}>
+			<motion.button
+				type="button"
+				onClick={handleToggle}
+				whileHover={{ scale: 1.08 }}
+				whileTap={{ scale: 0.92 }}
+				transition={springTransition}
+				className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
+			>
+				<span className="w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200 hover:bg-slate-700/50">
+					{icon}
+				</span>
 			</motion.button>
 		</Tooltip>
 	);
@@ -338,8 +393,9 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 						</LayoutGroup>
 					</div>
 
-					{/* Settings - fixed at bottom */}
+					{/* Theme toggle & Settings - fixed at bottom */}
 					<div className="mt-auto px-2 pb-4 pt-4 border-t border-slate-700/50">
+						<ThemeToggleButton />
 						<LayoutGroup>
 							<Tooltip
 								title={t("settings", { ns: "menu" })}

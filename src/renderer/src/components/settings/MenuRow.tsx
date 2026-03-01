@@ -1,7 +1,7 @@
 import { EditOutlined } from "@ant-design/icons";
 import { Switch, Tooltip, theme } from "antd";
 import type React from "react";
-import { useCallback, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import type { MenuItemConfig } from "../../types/menu";
@@ -22,7 +22,7 @@ interface MenuRowProps {
 	onDragEnd: () => void;
 }
 
-export const MenuRow: React.FC<MenuRowProps> = ({
+export const MenuRow: React.FC<MenuRowProps> = memo(({
 	item,
 	index,
 	isDragging,
@@ -173,4 +173,4 @@ export const MenuRow: React.FC<MenuRowProps> = ({
 			)}
 		</div>
 	);
-};
+});
