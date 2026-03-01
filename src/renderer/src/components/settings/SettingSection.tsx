@@ -1,6 +1,7 @@
 import { ReloadOutlined } from "@ant-design/icons";
 import { Alert, Button, theme } from "antd";
 import type React from "react";
+import { useTranslation } from "react-i18next";
 
 const { useToken } = theme;
 
@@ -41,20 +42,23 @@ export const ErrorState: React.FC<{
 	message: string;
 	onRetry: () => void;
 	loading?: boolean;
-}> = ({ message: errorMessage, onRetry, loading }) => (
-	<Alert
-		type="error"
-		title={errorMessage}
-		className="mb-4"
-		action={
-			<Button
-				size="small"
-				onClick={onRetry}
-				loading={loading}
-				icon={<ReloadOutlined />}
-			>
-				重试
-			</Button>
-		}
-	/>
-);
+}> = ({ message: errorMessage, onRetry, loading }) => {
+	const { t } = useTranslation();
+	return (
+		<Alert
+			type="error"
+			title={errorMessage}
+			className="mb-4"
+			action={
+				<Button
+					size="small"
+					onClick={onRetry}
+					loading={loading}
+					icon={<ReloadOutlined />}
+				>
+					{t("retry", { ns: "common" })}
+				</Button>
+			}
+		/>
+	);
+};

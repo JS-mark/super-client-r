@@ -45,26 +45,37 @@ export const ICON_MAP: Record<
 	DatabaseOutlined,
 };
 
-// Icon type options for Segmented
-export const ICON_TYPE_OPTIONS = [
-	{ label: "预设图标", value: "default" as MenuItemIconType },
-	{ label: "Emoji", value: "emoji" as MenuItemIconType },
-	{ label: "图片", value: "image" as MenuItemIconType },
+// Icon type options for Segmented - use getter for i18n
+import i18n from "i18next";
+
+function settingsT(key: string, fallback: string): string {
+	return i18n.t(key, { ns: "settings", defaultValue: fallback });
+}
+
+export const getIconTypeOptions = () => [
+	{ label: settingsT("presetIcons", "预设图标"), value: "default" as MenuItemIconType },
+	{ label: settingsT("emojiIcon", "Emoji"), value: "emoji" as MenuItemIconType },
+	{ label: settingsT("imageIcon", "图片"), value: "image" as MenuItemIconType },
 ];
 
+// For backward compat
+export const ICON_TYPE_OPTIONS = getIconTypeOptions();
+
 // Available preset icons
-export const AVAILABLE_ICONS = [
-	{ label: "💬 消息", value: "MessageOutlined" },
-	{ label: "📦 应用", value: "AppstoreOutlined" },
-	{ label: "🚀 火箭", value: "RocketOutlined" },
-	{ label: "⚙️ 设置", value: "SettingOutlined" },
-	{ label: "🏠 首页", value: "HomeOutlined" },
-	{ label: "👤 用户", value: "UserOutlined" },
-	{ label: "💻 代码", value: "CodeOutlined" },
-	{ label: "📄 文档", value: "FileTextOutlined" },
-	{ label: "☁️ 云", value: "CloudOutlined" },
-	{ label: "🗄️ 数据库", value: "DatabaseOutlined" },
+export const getAvailableIcons = () => [
+	{ label: `💬 ${settingsT("presetIcon.message", "消息")}`, value: "MessageOutlined" },
+	{ label: `📦 ${settingsT("presetIcon.apps", "应用")}`, value: "AppstoreOutlined" },
+	{ label: `🚀 ${settingsT("presetIcon.rocket", "火箭")}`, value: "RocketOutlined" },
+	{ label: `⚙️ ${settingsT("presetIcon.settings", "设置")}`, value: "SettingOutlined" },
+	{ label: `🏠 ${settingsT("presetIcon.home", "首页")}`, value: "HomeOutlined" },
+	{ label: `👤 ${settingsT("presetIcon.user", "用户")}`, value: "UserOutlined" },
+	{ label: `💻 ${settingsT("presetIcon.code", "代码")}`, value: "CodeOutlined" },
+	{ label: `📄 ${settingsT("presetIcon.document", "文档")}`, value: "FileTextOutlined" },
+	{ label: `☁️ ${settingsT("presetIcon.cloud", "云")}`, value: "CloudOutlined" },
+	{ label: `🗄️ ${settingsT("presetIcon.database", "数据库")}`, value: "DatabaseOutlined" },
 ];
+
+export const AVAILABLE_ICONS = getAvailableIcons();
 
 /**
  * Render an icon for a menu item
@@ -138,7 +149,7 @@ export const IconSelector: React.FC<IconSelectorProps> = ({
 				<Input
 					value={value}
 					onChange={(e) => onChange(e.target.value)}
-					placeholder="输入 Emoji..."
+					placeholder={t("emojiPlaceholder", { ns: "settings" })}
 					className="flex-1 h-12 text-base"
 					maxLength={4}
 				/>

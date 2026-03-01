@@ -564,14 +564,14 @@ export default function Plugins() {
 				isMarkdownTheme && activeMarkdownPluginId === plugin.id;
 
 			const stateConfig: Record<string, { color: string; text: string }> = {
-				installing: { color: "processing", text: "安装中" },
-				installed: { color: "default", text: "已安装" },
-				activating: { color: "processing", text: "激活中" },
-				active: { color: "green", text: "运行中" },
-				deactivating: { color: "orange", text: "停用中" },
-				inactive: { color: "default", text: "已停用" },
-				error: { color: "red", text: "错误" },
-				uninstalling: { color: "orange", text: "卸载中" },
+				installing: { color: "processing", text: t("plugins.state.installing", { ns: "plugins" }) },
+				installed: { color: "default", text: t("plugins.state.installed", { ns: "plugins" }) },
+				activating: { color: "processing", text: t("plugins.state.activating", { ns: "plugins" }) },
+				active: { color: "green", text: t("plugins.state.active", { ns: "plugins" }) },
+				deactivating: { color: "orange", text: t("plugins.state.deactivating", { ns: "plugins" }) },
+				inactive: { color: "default", text: t("plugins.state.inactive", { ns: "plugins" }) },
+				error: { color: "red", text: t("plugins.state.error", { ns: "plugins" }) },
+				uninstalling: { color: "orange", text: t("plugins.state.uninstalling", { ns: "plugins" }) },
 			};
 			const stateInfo = stateConfig[plugin.state] || stateConfig.inactive;
 
@@ -632,7 +632,7 @@ export default function Plugins() {
 								</div>
 							</div>
 							<div className="flex items-center gap-2 shrink-0">
-								<Tooltip title={plugin.enabled ? "禁用" : "启用"}>
+								<Tooltip title={plugin.enabled ? t("plugins.disable", { ns: "plugins" }) : t("plugins.enable", { ns: "plugins" })}>
 									<Switch
 										size="small"
 										checked={plugin.enabled}
@@ -645,7 +645,7 @@ export default function Plugins() {
 									okText={t("common.yes", "是")}
 									cancelText={t("no", "否", { ns: "common" })}
 								>
-									<Tooltip title="卸载">
+									<Tooltip title={t("plugins.uninstall", { ns: "plugins" })}>
 										<Button
 											type="text"
 											size="small"
@@ -679,7 +679,7 @@ export default function Plugins() {
 										color: token.colorPrimary,
 									}}
 								>
-									内置
+									{t("plugins.builtin", { ns: "plugins" })}
 								</Tag>
 							)}
 							{plugin.isDev && (
@@ -693,7 +693,7 @@ export default function Plugins() {
 										padding: "0 6px",
 									}}
 								>
-									开发
+									{t("plugins.dev", { ns: "plugins" })}
 								</Tag>
 							)}
 						</div>
@@ -968,8 +968,8 @@ export default function Plugins() {
 											className="flex items-center gap-3 text-xs"
 											style={{ color: token.colorTextQuaternary }}
 										>
-											<span>{plugin.downloads} 下载</span>
-											<span>{plugin.rating} 评分</span>
+											<span>{plugin.downloads} {t("plugins.downloads", { ns: "plugins" })}</span>
+											<span>{plugin.rating} {t("plugins.rating", { ns: "plugins" })}</span>
 										</div>
 										{plugin.installed ? (
 											<Tag

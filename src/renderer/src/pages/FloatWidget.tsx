@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 type Mode = "idle" | "hover" | "active";
 
@@ -30,6 +31,7 @@ const TRANSITION_MS = 200;
 const TOAST_DURATION = 2000;
 
 const FloatWidget: React.FC = () => {
+	const { t } = useTranslation();
 	const [mode, setMode] = useState<Mode>("idle");
 	const modeRef = useRef<Mode>("idle");
 	const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,7 +160,7 @@ const FloatWidget: React.FC = () => {
 	}, [collapseTo]);
 
 	const handleMicClick = useCallback(() => {
-		showToast("功能开发中...");
+		showToast(t("featureInDevelopment", { ns: "common" }));
 	}, [showToast]);
 
 	// File picker — same as main chat's FileUploadButton
@@ -302,7 +304,7 @@ const FloatWidget: React.FC = () => {
 							onClick={handleInputAreaClick}
 						>
 							<span className="text-white/70 text-sm truncate block">
-								有问题尽管问我...
+								{t("askMeAnything", { ns: "common" })}
 							</span>
 						</div>
 
@@ -357,7 +359,7 @@ const FloatWidget: React.FC = () => {
 							value={inputValue}
 							onChange={handleInputChange}
 							onKeyDown={handleTextareaKeyDown}
-							placeholder="输入你的问题..."
+							placeholder={t("typeYourQuestion", { ns: "common" })}
 							className="w-full resize-none text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent leading-relaxed"
 							style={{ height: files.length > 0 ? 140 : 180 }}
 						/>

@@ -6,6 +6,7 @@
 
 import { Input, Modal, Radio, Space } from "antd";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
  * 向主进程回复插件对话框结果
@@ -15,9 +16,18 @@ function respondToPlugin(responseChannel: string, result: unknown): void {
 }
 
 export function PluginWindowHandler() {
+	const { t } = useTranslation();
 	const inputRef = useRef<string>("");
 
 	useEffect(() => {
+		const titleMap: Record<string, string> = {
+			error: t("error", { ns: "common" }),
+			warning: t("warning", { ns: "common" }),
+			info: t("info", { ns: "common" }),
+		};
+		const okText = t("confirm", { ns: "common" });
+		const cancelText = t("cancel", { ns: "common" });
+
 		// 消息对话框 (info / warning / error)
 		const unsubMessage = window.electron.plugin.onShowMessage((data) => {
 			const { type, message: msg, items, responseChannel } = data;
@@ -31,11 +41,10 @@ export function PluginWindowHandler() {
 			if (items && items.length > 0) {
 				// 带按钮选项的消息
 				Modal.confirm({
-					title:
-						type === "error" ? "错误" : type === "warning" ? "警告" : "提示",
+					title: titleMap[type] || titleMap.info,
 					content: msg,
 					okText: items[0],
-					cancelText: items.length > 1 ? items[1] : "取消",
+					cancelText: items.length > 1 ? items[1] : cancelText,
 					onOk: () => respondToPlugin(responseChannel, items[0]),
 					onCancel: () =>
 						respondToPlugin(
@@ -45,8 +54,7 @@ export function PluginWindowHandler() {
 				});
 			} else {
 				modalMethod({
-					title:
-						type === "error" ? "错误" : type === "warning" ? "警告" : "提示",
+					title: titleMap[type] || titleMap.info,
 					content: msg,
 					onOk: () => respondToPlugin(responseChannel, undefined),
 				});
@@ -64,7 +72,7 @@ export function PluginWindowHandler() {
 			inputRef.current = opts.value || "";
 
 			Modal.confirm({
-				title: opts.prompt || "输入",
+				title: opts.prompt || t("input", { ns: "common" }),
 				content: (
 					<Input
 						placeholder={opts.placeHolder}
@@ -75,8 +83,8 @@ export function PluginWindowHandler() {
 						autoFocus
 					/>
 				),
-				okText: "确定",
-				cancelText: "取消",
+				okText,
+				cancelText,
 				onOk: () => respondToPlugin(responseChannel, inputRef.current),
 				onCancel: () => respondToPlugin(responseChannel, undefined),
 			});
@@ -89,7 +97,7 @@ export function PluginWindowHandler() {
 			let selectedItem: unknown = items[0];
 
 			Modal.confirm({
-				title: opts.placeHolder || "选择",
+				title: opts.placeHolder || t("select", { ns: "common" }),
 				content: (
 					<Radio.Group
 						defaultValue={0}
@@ -119,8 +127,8 @@ export function PluginWindowHandler() {
 						</Space>
 					</Radio.Group>
 				),
-				okText: "确定",
-				cancelText: "取消",
+				okText,
+				cancelText,
 				onOk: () => respondToPlugin(responseChannel, selectedItem),
 				onCancel: () => respondToPlugin(responseChannel, undefined),
 			});
@@ -131,7 +139,7 @@ export function PluginWindowHandler() {
 			unsubInputBox();
 			unsubQuickPick();
 		};
-	}, []);
+	}, [t]);
 
 	return null;
 }

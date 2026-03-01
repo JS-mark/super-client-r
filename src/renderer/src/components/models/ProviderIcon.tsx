@@ -1,3 +1,4 @@
+import i18n from "i18next";
 import type { ModelProviderPreset } from "../../types/models";
 
 // SVG path data (viewBox 0 0 24 24) from simple-icons + manual additions
@@ -28,10 +29,11 @@ interface ProviderIconConfig {
 	bg: string;
 	fg: string;
 	label: string;
+	labelEn?: string;
 }
 
 const PROVIDER_CONFIGS: Record<ModelProviderPreset, ProviderIconConfig> = {
-	dashscope: { bg: "#FF6A00", fg: "#fff", label: "阿" },
+	dashscope: { bg: "#FF6A00", fg: "#fff", label: "阿", labelEn: "AC" },
 	deepseek: { bg: "#4D6BFE", fg: "#fff", label: "DS" },
 	openai: { bg: "#000000", fg: "#fff", label: "" },
 	anthropic: { bg: "#191919", fg: "#fff", label: "" },
@@ -40,13 +42,13 @@ const PROVIDER_CONFIGS: Record<ModelProviderPreset, ProviderIconConfig> = {
 	siliconflow: { bg: "#6C5CE7", fg: "#fff", label: "SF" },
 	aihubmix: { bg: "#00BCD4", fg: "#fff", label: "AH" },
 	ocoolai: { bg: "#2196F3", fg: "#fff", label: "OC" },
-	"zhipu-ai": { bg: "#1A73E8", fg: "#fff", label: "智" },
+	"zhipu-ai": { bg: "#1A73E8", fg: "#fff", label: "智", labelEn: "ZP" },
 	"302ai": { bg: "#FF5722", fg: "#fff", label: "302" },
 	moonshot: { bg: "#1a1a2e", fg: "#fff", label: "🌙" },
-	baichuan: { bg: "#FF9800", fg: "#fff", label: "百" },
+	baichuan: { bg: "#FF9800", fg: "#fff", label: "百", labelEn: "BC" },
 	volcengine: { bg: "#3370FF", fg: "#fff", label: "🌋" },
 	minimax: { bg: "#E73562", fg: "#fff", label: "" },
-	hunyuan: { bg: "#006EFF", fg: "#fff", label: "混" },
+	hunyuan: { bg: "#006EFF", fg: "#fff", label: "混", labelEn: "HY" },
 	grok: { bg: "#000000", fg: "#fff", label: "" },
 	"github-models": { bg: "#181717", fg: "#fff", label: "" },
 	huggingface: { bg: "#FFD21E", fg: "#000", label: "" },
@@ -94,11 +96,13 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
 	}
 
 	// Text/emoji fallback
-	const isEmoji = /\p{Emoji_Presentation}/u.test(config.label);
+	const isZh = i18n.language?.startsWith("zh");
+	const label = !isZh && config.labelEn ? config.labelEn : config.label;
+	const isEmoji = /\p{Emoji_Presentation}/u.test(label);
 	const fontSize =
-		config.label.length >= 3
+		label.length >= 3
 			? size * 0.3
-			: config.label.length === 2
+			: label.length === 2
 				? size * 0.38
 				: isEmoji
 					? size * 0.5
@@ -120,10 +124,10 @@ export const ProviderIcon: React.FC<ProviderIconProps> = ({
 				fontWeight: 700,
 				lineHeight: 1,
 				flexShrink: 0,
-				letterSpacing: config.label.length >= 3 ? "-0.5px" : 0,
+				letterSpacing: label.length >= 3 ? "-0.5px" : 0,
 			}}
 		>
-			{config.label}
+			{label}
 		</div>
 	);
 };

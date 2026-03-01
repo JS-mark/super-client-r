@@ -4,6 +4,7 @@
  */
 
 import { Button, Result } from "antd";
+import i18n from "i18next";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
@@ -64,21 +65,24 @@ export class ErrorBoundary extends Component<Props, State> {
 				return this.props.fallback;
 			}
 
+			const t = i18n.t.bind(i18n);
+
 			// Default error UI
 			return (
 				<div className="flex items-center justify-center min-h-screen p-4">
 					<Result
 						status="error"
-						title="Something went wrong"
+						title={t("somethingWentWrong", { ns: "error" })}
 						subTitle={
-							this.state.error?.message || "An unexpected error occurred"
+							this.state.error?.message ||
+							t("unexpectedError", { ns: "error" })
 						}
 						extra={[
 							<Button type="primary" key="retry" onClick={this.handleReset}>
-								Try Again
+								{t("tryAgain", { ns: "error" })}
 							</Button>,
 							<Button key="reload" onClick={() => window.location.reload()}>
-								Reload Page
+								{t("reloadPage", { ns: "error" })}
 							</Button>,
 						]}
 					/>

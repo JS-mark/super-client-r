@@ -41,7 +41,7 @@ export const ThemeSettings: React.FC = () => {
 					<SunOutlined className="text-sm" />
 				)}
 				<span className="text-sm">
-					{t("theme", "Theme", { ns: "settings" })}
+					{t("theme.label", "Theme", { ns: "settings" })}
 				</span>
 			</div>
 			<Select

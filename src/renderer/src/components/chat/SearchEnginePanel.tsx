@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
 	GoogleIcon,
 	BingIcon,
@@ -38,6 +39,7 @@ export function SearchEnginePanel({
 	onSelectEngine,
 	onClose,
 }: SearchEnginePanelProps) {
+	const { t } = useTranslation();
 	const [searchConfigs, setSearchConfigs] = useState<SearchConfig[]>([]);
 	const panelRef = useRef<HTMLDivElement>(null);
 
@@ -97,12 +99,12 @@ export function SearchEnginePanel({
 			<div className="py-1 max-h-[200px] overflow-y-auto">
 				{enabledConfigs.length === 0 ? (
 					<div className="px-3 py-6 text-center text-[13px] text-[#858585]">
-						暂无可用搜索引擎，请在设置中配置
+						{t("searchEngine.noEnginesAvailable", { ns: "chat" })}
 					</div>
 				) : (
 					<>
 						<div className="px-3 py-1.5 text-[11px] text-[#858585] uppercase tracking-wider">
-							网络搜索
+							{t("searchEngine.webSearch", { ns: "chat" })}
 						</div>
 						{enabledConfigs.map((config) => (
 							<button
@@ -135,7 +137,7 @@ export function SearchEnginePanel({
 								</div>
 								{config.isDefault && (
 									<span className="text-[11px] text-white/80 bg-white/20 px-1.5 py-0.5 rounded">
-										默认
+										{t("default", { ns: "common" })}
 									</span>
 								)}
 							</button>
@@ -155,14 +157,16 @@ export function SearchEnginePanel({
 						<path d="M8.5 1.5a.5.5 0 00-1 0v5.793L5.354 5.146a.5.5 0 10-.707.707l3 3a.5.5 0 00.707 0l3-3a.5.5 0 00-.707-.707L8.5 7.293V1.5z" />
 						<path d="M3.5 9.5a.5.5 0 00-1 0v2A2.5 2.5 0 005 14h6a2.5 2.5 0 002.5-2.5v-2a.5.5 0 00-1 0v2A1.5 1.5 0 0111 13H5a1.5 1.5 0 01-1.5-1.5v-2z" />
 					</svg>
-					<span className="text-[11px] text-[#cccccc]">网络搜索</span>
+					<span className="text-[11px] text-[#cccccc]">
+						{t("searchEngine.webSearch", { ns: "chat" })}
+					</span>
 				</div>
 				<div className="flex items-center gap-1.5 text-[10px] text-[#858585]">
 					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">ESC</span>
-					<span>关闭</span>
+					<span>{t("close", { ns: "common" })}</span>
 					<span className="mx-1">·</span>
 					<span className="px-1 py-0.5 bg-[#3c3c3c] rounded">↵</span>
-					<span>确认</span>
+					<span>{t("confirm", { ns: "common" })}</span>
 				</div>
 			</div>
 		</div>

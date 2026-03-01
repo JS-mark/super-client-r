@@ -1,5 +1,6 @@
 import { Spin, theme } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
@@ -8,6 +9,7 @@ import { pluginService } from "../services/pluginService";
 const { useToken } = theme;
 
 export default function PluginPage() {
+	const { t } = useTranslation();
 	const { token } = useToken();
 	const { pluginId, "*": pagePath } = useParams<{
 		pluginId: string;
@@ -17,7 +19,7 @@ export default function PluginPage() {
 	const [html, setHtml] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [pageTitle_, setPageTitle_] = useState<string>("插件页面");
+	const [pageTitle_, setPageTitle_] = useState<string>(t("plugins.pluginPage", { ns: "plugins" }));
 
 	const pageTitle = useMemo(
 		() => (

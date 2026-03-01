@@ -1,5 +1,9 @@
 {
-	"title": "Something went wrong",
-	"defaultMessage": "Sorry, an unexpected error has occurred.",
-	"backHome": "Back Home"
+  "title": "Something went wrong",
+  "defaultMessage": "Sorry, an unexpected error has occurred.",
+  "backHome": "Back Home",
+  "somethingWentWrong": "Something went wrong",
+  "unexpectedError": "An unexpected error occurred",
+  "tryAgain": "Try Again",
+  "reloadPage": "Reload Page"
 }

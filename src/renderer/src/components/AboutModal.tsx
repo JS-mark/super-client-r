@@ -1,5 +1,5 @@
 import { CheckOutlined, CopyOutlined } from "@ant-design/icons";
-import { Button, Modal, message, theme } from "antd";
+import { App, Button, Modal, theme } from "antd";
 import type React from "react";
 import { useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,6 +19,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 	onClose,
 	appInfo,
 }) => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const clickCountRef = useRef(0);
@@ -55,12 +56,12 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 	};
 
 	const infoItems = [
-		{ label: "Version", value: appInfo?.version || "N/A" },
+		{ label: t("version", { ns: "settings" }), value: appInfo?.version || "N/A" },
 		{ label: "Electron", value: appInfo?.electron || "N/A" },
 		{ label: "Node.js", value: appInfo?.node || "N/A" },
 		{ label: "V8", value: appInfo?.v8 || "N/A" },
 		{
-			label: "OS",
+			label: t("platform", { ns: "settings" }),
 			value: appInfo?.platform ? `${appInfo.platform} ${appInfo.arch}` : "N/A",
 		},
 	];

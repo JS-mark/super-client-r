@@ -75,6 +75,33 @@
 	"devToolsOpened": "Developer tools opened",
 	"devToolsError": "Failed to open developer tools",
 	"performanceMonitor": "Performance Monitor",
+	"appName": "App Name",
+	"version": "Version",
+	"apiPort": "API Port",
+	"appUptime": "App Uptime",
+	"cpuCores": "CPU Cores",
+	"cores": "Cores",
+	"processMemory": "Process Memory (RSS)",
+	"networkStatus": "Network Status",
+	"online": "Online",
+	"offline": "Offline",
+	"lastRefresh": "Last Refresh",
+	"memoryUsage": "Memory Usage",
+	"systemMemory": "System Memory",
+	"processHeapMemory": "Main Process Heap Memory",
+	"emojiPlaceholder": "Enter Emoji...",
+	"presetIcon": {
+		"message": "Message",
+		"apps": "Apps",
+		"rocket": "Rocket",
+		"settings": "Settings",
+		"home": "Home",
+		"user": "User",
+		"code": "Code",
+		"document": "Document",
+		"cloud": "Cloud",
+		"database": "Database"
+	},
 	"menuConfig": "Menu Configuration",
 	"menuLabel": "Label Name",
 	"iconType": "Icon Type",
@@ -105,6 +132,7 @@
 	"apiKeys": "API Keys",
 	"skillsmpApi": "SkillsMP API",
 	"skillsmpApiKey": "API Key",
+  "aboutTitle": "About",
 	"skillsmpApiKeyPlaceholder": "Enter your SkillsMP API Key",
 	"skillsmpApiKeyHint": "Get your API Key from skillsmp.com",
 	"apiKeySaved": "API Key saved successfully",
@@ -119,11 +147,35 @@
 	"enableFloatWidget": "Enable Float Widget",
 	"floatWidgetHint": "Show a floating widget on desktop",
 	"preferences": "Preferences",
-	"theme": "Theme",
+	"theme": {
+		"label": "Theme",
+		"light": "Light",
+		"dark": "Dark",
+		"auto": "Auto"
+	},
 	"themeDesc": "Select the theme style for the application",
 	"updates": "Updates",
 	"checkForUpdates": "Check for and install the latest application updates",
+	"update": {
+		"available": "New version {{latest}} is available",
+		"notAvailable": "You are using the latest version",
+		"error": "Failed to check for updates: {{error}}",
+		"downloading": "Downloading update...",
+		"downloaded": "Update downloaded, restart to install"
+	},
 	"userDataPathHint": "Application data storage path, cannot be changed",
+	"searchProviders": {
+		"zhipu": { "name": "Zhipu AI", "description": "Zhipu AI Search API", "apiKeyPlaceholder": "Enter Zhipu AI API Key" },
+		"tavily": { "description": "Tavily AI Search Engine", "apiKeyPlaceholder": "Enter Tavily API Key" },
+		"searxng": { "description": "Self-hosted SearXNG search service", "apiKeyLabel": "API Key (optional)", "apiKeyPlaceholder": "Enter API Key if access is restricted", "apiUrlLabel": "API URL" },
+		"exa": { "description": "Exa AI Search Engine", "apiKeyPlaceholder": "Enter Exa API Key" },
+		"exa_mcp": { "apiKeyPlaceholder": "Enter Exa API Key" },
+		"bocha": { "name": "Bocha", "description": "Bocha AI Search Engine", "apiKeyPlaceholder": "Enter Bocha API Key" },
+		"sogou": { "name": "Sogou", "description": "Sogou Search API", "apiKeyPlaceholder": "Enter Sogou API Key" },
+		"google": { "description": "Google Search (via API)", "apiKeyPlaceholder": "Enter Google API Key or CX ID" },
+		"bing": { "description": "Bing Search (via API)", "apiKeyPlaceholder": "Enter Bing API Key" },
+		"baidu": { "name": "Baidu", "description": "Baidu Search (via API)", "apiKeyPlaceholder": "Enter Baidu API Key" }
+	},
 	"search": {
 		"title": "Web Search Configuration",
 		"description": "Configure third-party search services to allow AI to access the latest web information. Supports API search and traditional search engines.",
@@ -162,6 +214,9 @@
 		"apiSearch": "API Search",
 		"traditionalSearch": "Traditional Search"
 	},
+  "openDevToolsDesc": "Open Chromium DevTools for debugging",
+	"relaunchDesc": "Completely restart the application",
+	"clearStorageDesc": "Clear localStorage and sessionStorage",
 	"about": {
 		"features": {
 			"title": "Features",
@@ -202,6 +257,7 @@
 		"systemInfo": "System Information",
 		"recentUpdates": "Recent Updates",
 		"team": "Team",
-		"achievements": "Achievements"
+		"achievements": "Achievements",
+    "thanks": "Thanks to all contributors and users for their support"
 	}
 }

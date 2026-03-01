@@ -189,7 +189,7 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 						className="text-xs mt-1"
 						style={{ color: token.colorTextSecondary }}
 					>
-						{t("about.thanks", "感谢所有贡献者和用户的支持", {
+						{t("about.thanks", "Thanks to all contributors and users for their support", {
 							ns: "settings",
 						})}
 					</div>

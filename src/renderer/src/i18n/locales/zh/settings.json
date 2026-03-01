@@ -76,6 +76,33 @@
 	"devToolsOpened": "开发者工具已打开",
 	"devToolsError": "打开开发者工具失败",
 	"performanceMonitor": "性能监控",
+	"appName": "应用名称",
+	"version": "版本",
+	"apiPort": "API 端口",
+	"appUptime": "App 运行时间",
+	"cpuCores": "CPU 核心",
+	"cores": "核",
+	"processMemory": "进程内存 (RSS)",
+	"networkStatus": "网络状态",
+	"online": "在线",
+	"offline": "离线",
+	"lastRefresh": "上次刷新",
+	"memoryUsage": "内存使用",
+	"systemMemory": "系统内存",
+	"processHeapMemory": "主进程堆内存",
+	"emojiPlaceholder": "输入 Emoji...",
+	"presetIcon": {
+		"message": "消息",
+		"apps": "应用",
+		"rocket": "火箭",
+		"settings": "设置",
+		"home": "首页",
+		"user": "用户",
+		"code": "代码",
+		"document": "文档",
+		"cloud": "云",
+		"database": "数据库"
+	},
 	"menuConfig": "菜单配置",
 	"menuLabel": "标签名称",
 	"iconType": "图标类型",
@@ -120,11 +147,35 @@
 	"enableFloatWidget": "启用悬浮窗",
 	"floatWidgetHint": "在桌面上显示悬浮窗",
 	"preferences": "偏好设置",
-	"theme": "主题",
+	"theme": {
+		"label": "主题",
+		"light": "浅色",
+		"dark": "深色",
+		"auto": "跟随系统"
+	},
 	"themeDesc": "选择应用的主题样式",
 	"updates": "更新",
 	"checkForUpdates": "检查并安装最新的应用更新",
+	"update": {
+		"available": "发现新版本 {{latest}}",
+		"notAvailable": "当前已是最新版本",
+		"error": "检查更新失败：{{error}}",
+		"downloading": "正在下载更新...",
+		"downloaded": "更新已下载，重启以安装"
+	},
 	"userDataPathHint": "应用数据存储路径，不能更改",
+	"searchProviders": {
+		"zhipu": { "name": "智谱 AI", "description": "智谱 AI 搜索 API", "apiKeyPlaceholder": "请输入智谱 AI API Key" },
+		"tavily": { "description": "Tavily AI 搜索引擎", "apiKeyPlaceholder": "请输入 Tavily API Key" },
+		"searxng": { "description": "自建 SearXNG 搜索服务", "apiKeyLabel": "API Key (可选)", "apiKeyPlaceholder": "如有访问限制，请输入 API Key", "apiUrlLabel": "API 地址" },
+		"exa": { "description": "Exa AI 搜索引擎", "apiKeyPlaceholder": "请输入 Exa API Key" },
+		"exa_mcp": { "apiKeyPlaceholder": "请输入 Exa API Key" },
+		"bocha": { "name": "博查", "description": "博查 AI 搜索引擎", "apiKeyPlaceholder": "请输入博查 API Key" },
+		"sogou": { "name": "搜狗", "description": "搜狗搜索 API", "apiKeyPlaceholder": "请输入搜狗 API Key" },
+		"google": { "description": "Google 搜索 (通过 API)", "apiKeyPlaceholder": "请输入 Google API Key 或 CX ID" },
+		"bing": { "description": "必应搜索 (通过 API)", "apiKeyPlaceholder": "请输入 Bing API Key" },
+		"baidu": { "name": "百度", "description": "百度搜索 (通过 API)", "apiKeyPlaceholder": "请输入百度 API Key" }
+	},
 	"search": {
 		"title": "网络搜索配置",
 		"description": "配置第三方搜索服务，让 AI 能够获取最新的网络信息。支持 API 搜索和传统搜索引擎。",
@@ -163,8 +214,11 @@
 		"apiSearch": "API 搜索",
 		"traditionalSearch": "传统搜索"
 	},
-
+  "openDevToolsDesc": "打开 Chromium DevTools 进行调试",
+	"relaunchDesc": "完全重启应用程序",
+	"clearStorageDesc": "清除 localStorage 和 sessionStorage",
 	"about": {
+    "thanks": "感谢所有贡献者和用户的支持!",
 		"features": {
 			"title": "功能特性",
 			"aiChat": {

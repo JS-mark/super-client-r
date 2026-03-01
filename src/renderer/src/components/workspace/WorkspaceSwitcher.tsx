@@ -56,6 +56,7 @@ function WorkspaceBadge({
 	size?: "small" | "default";
 	showName?: boolean;
 }) {
+	const { t } = useTranslation();
 	const isSmall = size === "small";
 
 	return (
@@ -81,7 +82,7 @@ function WorkspaceBadge({
 					</span>
 					{!isSmall && (
 						<span className="text-xs text-slate-500 ">
-							{workspace.sessionIds.length} 个会话
+							{t("sessionCount", { ns: "workspaces", count: workspace.sessionIds.length })}
 						</span>
 					)}
 				</div>
@@ -126,7 +127,7 @@ function CreateWorkspaceModal({
 				<Form.Item
 					name="name"
 					label={t("workspaces.name", "名称", { ns: "workspaces" })}
-					rules={[{ required: true, message: "请输入工作区名称" }]}
+					rules={[{ required: true, message: t("nameRequired", { ns: "workspaces" }) }]}
 				>
 					<Input
 						placeholder={t("workspaces.namePlaceholder", "我的工作区", {
