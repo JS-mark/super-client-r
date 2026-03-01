@@ -1,0 +1,11 @@
+{
+	"name": "i18n-helper",
+	"description": "i18n 多语言助手，将硬编码文本替换为 i18n 翻译调用，同步更新 en/zh 语言文件",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "🌍",
+	"category": "development",
+	"displayName": "多语言助手"
+}

@@ -1,0 +1,11 @@
+{
+	"name": "changelog-gen",
+	"description": "变更日志生成助手，基于 git 历史生成结构化的 CHANGELOG 和 Release Notes",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "📋",
+	"category": "development",
+	"displayName": "变更日志生成"
+}

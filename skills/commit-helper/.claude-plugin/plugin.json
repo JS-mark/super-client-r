@@ -1,0 +1,11 @@
+{
+	"name": "commit-helper",
+	"description": "规范提交助手，基于 Conventional Commits 规范生成英文 commit message",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "📝",
+	"category": "development",
+	"displayName": "规范提交助手"
+}

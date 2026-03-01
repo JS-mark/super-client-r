@@ -1,0 +1,11 @@
+{
+	"name": "pr-reviewer",
+	"description": "PR 审查助手，基于项目架构规范审查代码变更",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "👀",
+	"category": "development",
+	"displayName": "PR 审查助手"
+}

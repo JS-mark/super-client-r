@@ -1,0 +1,11 @@
+{
+	"name": "dev-standards",
+	"description": "项目开发规范检查助手，基于 CLAUDE.md 和 CODING_STANDARDS.md 检查代码合规性",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "📏",
+	"category": "development",
+	"displayName": "开发规范检查"
+}

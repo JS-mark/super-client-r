@@ -1,0 +1,11 @@
+{
+	"name": "log-analyzer",
+	"description": "日志排查分析助手，分析应用日志和错误信息，定位问题根因",
+	"version": "1.0.0",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "🔎",
+	"category": "development",
+	"displayName": "日志排查分析"
+}
