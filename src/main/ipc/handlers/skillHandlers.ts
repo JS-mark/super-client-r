@@ -97,6 +97,30 @@ export function registerSkillHandlers(): void {
 		},
 	);
 
+	// 获取 command 提示词
+	ipcMain.handle(
+		SKILL_CHANNELS.GET_COMMAND_PROMPT,
+		(_event: IpcMainInvokeEvent, skillId: string, commandName: string) => {
+			const skillService = getSkillService();
+			const prompt = skillService.getCommandPrompt(skillId, commandName);
+			return { success: true, data: prompt };
+		},
+	);
+
+	// 校验 skill
+	ipcMain.handle(
+		SKILL_CHANNELS.VALIDATE_SKILL,
+		async (_event: IpcMainInvokeEvent, source: string) => {
+			try {
+				const skillService = getSkillService();
+				const result = await skillService.validateSkill(source);
+				return { success: true, data: result };
+			} catch (error: any) {
+				return { success: false, error: error.message };
+			}
+		},
+	);
+
 	// 获取所有可用工具
 	ipcMain.handle("skill:get-all-tools", () => {
 		const skillService = getSkillService();

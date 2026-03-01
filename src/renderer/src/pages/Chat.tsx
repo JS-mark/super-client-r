@@ -62,7 +62,10 @@ import {
 	SearchEnginePanel,
 	useSearchEngine,
 } from "../components/chat/SearchEnginePanel";
-import { SlashCommandPanel } from "../components/chat/SlashCommandPanel";
+import {
+	SlashCommandPanel,
+	type SlashItem,
+} from "../components/chat/SlashCommandPanel";
 import { ThinkingIndicator } from "../components/chat/ThinkingIndicator";
 import { ToolCallCard } from "../components/chat/ToolCallCard";
 import { MainLayout } from "../components/layout/MainLayout";
@@ -265,6 +268,8 @@ const Chat: React.FC = () => {
 		setChatMode,
 		selectedSkillId,
 		setSelectedSkillId,
+		selectedCommandName,
+		setSelectedCommandName,
 		sessionModelOverride,
 		setSessionModelOverride,
 		sessionSettings,
@@ -551,9 +556,7 @@ const Chat: React.FC = () => {
 	const [modePanelOpen, setModePanelOpen] = useState(false);
 	const [slashPanelOpen, setSlashPanelOpen] = useState(false);
 	const [slashQuery, setSlashQuery] = useState("");
-	const [slashSkills, setSlashSkills] = useState<
-		import("../types/electron").SkillManifest[]
-	>([]);
+	const [slashItems, setSlashItems] = useState<SlashItem[]>([]);
 	const [slashHighlight, setSlashHighlight] = useState(0);
 	const senderWrapperRef = useRef<HTMLDivElement>(null);
 	const [toolbarExpanded, setToolbarExpanded] = useState(false);
@@ -574,6 +577,10 @@ const Chat: React.FC = () => {
 					mode: chatMode,
 					skillId:
 						chatMode === "skill" ? (selectedSkillId ?? undefined) : undefined,
+					commandName:
+						chatMode === "skill"
+							? (selectedCommandName ?? undefined)
+							: undefined,
 					searchEngine: selectedEngine || undefined,
 					searchConfigs: searchConfigs,
 				});
@@ -586,6 +593,7 @@ const Chat: React.FC = () => {
 			sendMessage,
 			chatMode,
 			selectedSkillId,
+			selectedCommandName,
 			selectedEngine,
 			searchConfigs,
 		],
@@ -603,55 +611,85 @@ const Chat: React.FC = () => {
 		[setChatMode, setSelectedSkillId],
 	);
 
-	// Load skills once for slash command
+	// Load skills and commands once for slash panel
 	useEffect(() => {
 		import("../services/skill/skillService").then(({ skillClient }) => {
 			skillClient
 				.listSkills()
-				.then(setSlashSkills)
-				.catch(() => setSlashSkills([]));
+				.then((skills) => {
+					const items: SlashItem[] = [];
+					for (const skill of skills) {
+						items.push({ type: "skill", skill });
+						if (skill.commands) {
+							for (const cmd of skill.commands) {
+								items.push({
+									type: "command",
+									command: cmd,
+									skillName: skill.name,
+									skillIcon: skill.icon,
+								});
+							}
+						}
+					}
+					setSlashItems(items);
+				})
+				.catch(() => setSlashItems([]));
 		});
 	}, []);
 
-	// Filtered skill list for slash command
-	const slashFilteredSkills = useMemo(() => {
+	// Filtered items for slash command panel
+	const slashFilteredItems = useMemo(() => {
 		if (!slashPanelOpen) return [];
-		return slashSkills.filter((s) => {
-			if (!slashQuery) return true;
-			const q = slashQuery.toLowerCase();
+		if (!slashQuery) return slashItems;
+		const q = slashQuery.toLowerCase();
+		return slashItems.filter((item) => {
+			if (item.type === "skill") {
+				return (
+					item.skill.name.toLowerCase().includes(q) ||
+					item.skill.description.toLowerCase().includes(q) ||
+					item.skill.id.toLowerCase().includes(q)
+				);
+			}
 			return (
-				s.name.toLowerCase().includes(q) ||
-				s.description.toLowerCase().includes(q)
+				item.command.name.toLowerCase().includes(q) ||
+				item.command.description.toLowerCase().includes(q) ||
+				item.skillName.toLowerCase().includes(q)
 			);
 		});
-	}, [slashPanelOpen, slashSkills, slashQuery]);
+	}, [slashPanelOpen, slashItems, slashQuery]);
 
 	// Reset highlight when query changes
 	useEffect(() => {
 		setSlashHighlight(0);
 	}, [slashQuery]);
 
-	// Slash command skill selection
+	// Slash command item selection
 	const handleSlashSelect = useCallback(
-		(skillId: string, _skillName: string) => {
+		(item: SlashItem) => {
 			setChatMode("skill");
-			setSelectedSkillId(skillId);
+			if (item.type === "command") {
+				setSelectedSkillId(item.command.skillId);
+				setSelectedCommandName(item.command.name);
+			} else {
+				setSelectedSkillId(item.skill.id);
+				setSelectedCommandName(null);
+			}
 			setInput("");
 			setSlashPanelOpen(false);
 			setSlashQuery("");
 		},
-		[setChatMode, setSelectedSkillId, setInput],
+		[setChatMode, setSelectedSkillId, setSelectedCommandName, setInput],
 	);
 
 	// Use refs so the native capture listener always sees fresh values
 	const slashStateRef = useRef({
 		open: false,
-		skills: [] as typeof slashFilteredSkills,
+		items: [] as SlashItem[],
 		highlight: 0,
 	});
 	slashStateRef.current = {
 		open: slashPanelOpen,
-		skills: slashFilteredSkills,
+		items: slashFilteredItems,
 		highlight: slashHighlight,
 	};
 
@@ -661,23 +699,22 @@ const Chat: React.FC = () => {
 		if (!el) return;
 
 		const handleKeyDown = (e: KeyboardEvent) => {
-			const { open, skills, highlight } = slashStateRef.current;
+			const { open, items, highlight } = slashStateRef.current;
 			if (!open) return;
 
 			if (e.key === "ArrowDown") {
 				e.preventDefault();
 				e.stopImmediatePropagation();
-				setSlashHighlight(highlight < skills.length - 1 ? highlight + 1 : 0);
+				setSlashHighlight(highlight < items.length - 1 ? highlight + 1 : 0);
 			} else if (e.key === "ArrowUp") {
 				e.preventDefault();
 				e.stopImmediatePropagation();
-				setSlashHighlight(highlight > 0 ? highlight - 1 : skills.length - 1);
+				setSlashHighlight(highlight > 0 ? highlight - 1 : items.length - 1);
 			} else if (e.key === "Enter") {
 				e.preventDefault();
 				e.stopImmediatePropagation();
-				if (skills.length > 0) {
-					const skill = skills[highlight];
-					handleSlashSelect(skill.id, skill.name);
+				if (items.length > 0) {
+					handleSlashSelect(items[highlight]);
 				}
 			} else if (e.key === "Escape") {
 				e.preventDefault();
@@ -1251,6 +1288,12 @@ const Chat: React.FC = () => {
 						`${t("chat.metrics.speed", "每秒", { ns: "chat" })} ${footerMeta.tokensPerSecond} tokens`,
 					);
 				}
+				if (footerMeta?.duration != null) {
+					const seconds = (footerMeta.duration / 1000).toFixed(1);
+					tooltipLines.push(
+						`${t("chat.metrics.duration", "回答耗时", { ns: "chat" })} ${seconds} s`,
+					);
+				}
 				if (footerMeta?.tokens != null) {
 					const parts = [`Tokens: ${footerMeta.tokens}`];
 					if (footerMeta.inputTokens != null)
@@ -1559,7 +1602,7 @@ const Chat: React.FC = () => {
 							{slashPanelOpen && (
 								<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
 									<SlashCommandPanel
-										skills={slashFilteredSkills}
+										items={slashFilteredItems}
 										highlightIndex={slashHighlight}
 										onSelect={handleSlashSelect}
 										onHighlightChange={setSlashHighlight}

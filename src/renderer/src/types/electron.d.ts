@@ -42,6 +42,14 @@ export interface AgentStreamEvent {
 	data: unknown;
 }
 
+export interface SkillCommand {
+	name: string;
+	skillId: string;
+	description: string;
+	prompt: string;
+	allowedTools?: string[];
+}
+
 export interface SkillManifest {
 	id: string;
 	name: string;
@@ -53,6 +61,7 @@ export interface SkillManifest {
 	permissions?: string[];
 	tools?: SkillTool[];
 	systemPrompt?: string;
+	commands?: SkillCommand[];
 }
 
 export interface SkillTool {
@@ -65,6 +74,34 @@ export interface SkillExecutionResult {
 	success: boolean;
 	output?: unknown;
 	error?: string;
+}
+
+export type ValidationSeverity = "error" | "warning";
+export type ValidationCategory =
+	| "structural"
+	| "content"
+	| "compatibility"
+	| "consistency"
+	| "security";
+
+export type SkillType = "claude-code";
+
+export interface ValidationIssue {
+	code: string;
+	severity: ValidationSeverity;
+	category: ValidationCategory;
+	messageKey: string;
+	messageParams?: Record<string, string | number>;
+	fallbackMessage: string;
+}
+
+export interface SkillValidationResult {
+	valid: boolean;
+	issues: ValidationIssue[];
+	errorCount: number;
+	warningCount: number;
+	manifest: SkillManifest | null;
+	skillType: SkillType;
 }
 
 export type McpServerType = "builtin" | "third-party" | "market" | "internal";
@@ -471,6 +508,13 @@ export interface ElectronAPI {
 		enableSkill: (id: string) => Promise<IPCResponse>;
 		disableSkill: (id: string) => Promise<IPCResponse>;
 		getSystemPrompt: (id: string) => Promise<IPCResponse<string | null>>;
+		getCommandPrompt: (
+			skillId: string,
+			commandName: string,
+		) => Promise<IPCResponse<string | null>>;
+		validateSkill: (
+			source: string,
+		) => Promise<IPCResponse<SkillValidationResult>>;
 	};
 
 	// MCP 相关

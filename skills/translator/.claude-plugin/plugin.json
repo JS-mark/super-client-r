@@ -1,9 +1,11 @@
 {
-	"id": "translator",
-	"name": "翻译助手",
+	"name": "translator",
 	"description": "专业多语言翻译，支持中英日韩等语言互译",
 	"version": "1.0.0",
-	"author": "super-client",
+	"author": {
+		"name": "super-client"
+	},
+	"icon": "🌐",
 	"category": "language",
-	"icon": "🌐"
+	"displayName": "翻译助手"
 }

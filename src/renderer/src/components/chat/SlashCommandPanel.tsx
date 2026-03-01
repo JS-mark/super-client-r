@@ -1,20 +1,29 @@
-import { ThunderboltOutlined } from "@ant-design/icons";
+import { CodeOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { Empty, theme } from "antd";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
-import type { SkillManifest } from "../../types/electron";
+import type { SkillCommand, SkillManifest } from "../../types/electron";
+
+export type SlashItem =
+	| { type: "skill"; skill: SkillManifest }
+	| {
+			type: "command";
+			command: SkillCommand;
+			skillName: string;
+			skillIcon?: string;
+	  };
 
 interface SlashCommandPanelProps {
-	skills: SkillManifest[];
+	items: SlashItem[];
 	highlightIndex: number;
-	onSelect: (skillId: string, skillName: string) => void;
+	onSelect: (item: SlashItem) => void;
 	onClose: () => void;
 	onHighlightChange: (index: number) => void;
 }
 
 export function SlashCommandPanel({
-	skills,
+	items,
 	highlightIndex,
 	onSelect,
 	onClose,
@@ -49,8 +58,8 @@ export function SlashCommandPanel({
 	}, [highlightIndex]);
 
 	const handleItemClick = useCallback(
-		(skill: SkillManifest) => {
-			onSelect(skill.id, skill.name);
+		(item: SlashItem) => {
+			onSelect(item);
 		},
 		[onSelect],
 	);
@@ -71,12 +80,12 @@ export function SlashCommandPanel({
 				className="px-3 py-2 text-xs font-medium"
 				style={{ color: token.colorTextSecondary }}
 			>
-				{t("slashCommand.title", "选择技能", { ns: "chat" })}
+				{t("slashCommand.title", "选择技能或命令", { ns: "chat" })}
 			</div>
 
-			{/* Skill list */}
+			{/* Item list */}
 			<div className="py-1 max-h-[240px] overflow-y-auto">
-				{skills.length === 0 ? (
+				{items.length === 0 ? (
 					<div className="px-3 py-4">
 						<Empty
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -93,50 +102,72 @@ export function SlashCommandPanel({
 						/>
 					</div>
 				) : (
-					skills.map((skill, index) => (
-						<button
-							key={skill.id}
-							type="button"
-							data-index={index}
-							onClick={() => handleItemClick(skill)}
-							className={cn(
-								"w-full flex items-center gap-3 px-3 py-2.5 transition-colors",
-							)}
-							style={{
-								backgroundColor:
-									highlightIndex === index
-										? token.colorFillTertiary
-										: "transparent",
-							}}
-							onMouseEnter={() => onHighlightChange(index)}
-						>
-							<span
-								className="w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0"
-								style={{
-									backgroundColor: token.colorSuccessBg,
-									color: token.colorSuccess,
-								}}
-							>
-								<ThunderboltOutlined />
-							</span>
-							<div className="flex flex-col items-start min-w-0">
-								<span
-									className="text-[13px] font-medium truncate"
-									style={{ color: token.colorText }}
-								>
-									{skill.name}
-								</span>
-								{skill.description && (
-									<span
-										className="text-[11px] truncate max-w-[300px]"
-										style={{ color: token.colorTextQuaternary }}
-									>
-										{skill.description}
-									</span>
+					items.map((item, index) => {
+						const isCommand = item.type === "command";
+						const key = isCommand
+							? `cmd-${item.command.skillId}-${item.command.name}`
+							: `skill-${item.skill.id}`;
+						const name = isCommand
+							? `/${item.command.name}`
+							: item.skill.name;
+						const description = isCommand
+							? item.command.description ||
+								t("slashCommand.commandFrom", {
+									ns: "chat",
+									skill: item.skillName,
+									defaultValue: item.skillName,
+								})
+							: item.skill.description;
+
+						return (
+							<button
+								key={key}
+								type="button"
+								data-index={index}
+								onClick={() => handleItemClick(item)}
+								className={cn(
+									"w-full flex items-center gap-3 px-3 py-2.5 transition-colors",
 								)}
-							</div>
-						</button>
-					))
+								style={{
+									backgroundColor:
+										highlightIndex === index
+											? token.colorFillTertiary
+											: "transparent",
+								}}
+								onMouseEnter={() => onHighlightChange(index)}
+							>
+								<span
+									className="w-7 h-7 flex items-center justify-center rounded-md flex-shrink-0"
+									style={{
+										backgroundColor: isCommand
+											? token.colorInfoBg
+											: token.colorSuccessBg,
+										color: isCommand
+											? token.colorInfo
+											: token.colorSuccess,
+									}}
+								>
+									{isCommand ? <CodeOutlined /> : <ThunderboltOutlined />}
+								</span>
+								<div className="flex flex-col items-start min-w-0">
+									<span
+										className="text-[13px] font-medium truncate"
+										style={{ color: token.colorText }}
+									>
+										{name}
+									</span>
+									{description && (
+										<span
+											className="text-[11px] truncate max-w-[300px]"
+											style={{ color: token.colorTextQuaternary }}
+										>
+											{description}
+										</span>
+									)}
+								</div>
+							</button>
+						);
+					})
 				)}
 			</div>
 

@@ -1,12 +1,13 @@
 {
-	"id": "iconfont-downloader",
-	"name": "Iconfont图标下载器",
-	"description": "从iconfont.cn搜索并下载SVG图标。支持浏览器MCP、Playwright、Puppeteer多种自动化方式。搜索后展示结果让用户选择，支持批量下载。",
+	"name": "iconfont-downloader",
+	"description": "从阿里巴巴 Iconfont 平台搜索和下载 SVG 图标",
 	"version": "2.0.0",
-	"author": "Super Client R",
-	"category": "design",
+	"author": {
+		"name": "super-client"
+	},
 	"icon": "🎨",
-	"permissions": ["network", "filesystem"],
+	"category": "design",
+	"displayName": "Iconfont 下载器",
 	"tools": [
 		{
 			"name": "login",

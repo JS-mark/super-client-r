@@ -111,6 +111,21 @@ export class SkillClient {
 		if (result.success) return result.data ?? null;
 		throw new Error(result.error || "Failed to get system prompt");
 	}
+
+	/**
+	 * 获取 skill command 的提示词
+	 */
+	async getCommandPrompt(
+		skillId: string,
+		commandName: string,
+	): Promise<string | null> {
+		const result = await window.electron.skill.getCommandPrompt(
+			skillId,
+			commandName,
+		);
+		if (result.success) return result.data ?? null;
+		throw new Error(result.error || "Failed to get command prompt");
+	}
 }
 
 // 单例实例

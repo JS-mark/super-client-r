@@ -47,6 +47,13 @@ export interface ElectronAPI {
 		enableSkill: (id: string) => Promise<IPCResponse>;
 		disableSkill: (id: string) => Promise<IPCResponse>;
 		getSystemPrompt: (id: string) => Promise<IPCResponse<string | null>>;
+		getCommandPrompt: (
+			skillId: string,
+			commandName: string,
+		) => Promise<IPCResponse<string | null>>;
+		validateSkill: (
+			source: string,
+		) => Promise<IPCResponse<SkillValidationResult>>;
 	};
 
 	// MCP 相关
@@ -533,6 +540,30 @@ export interface SkillExecutionResult {
 	error?: string;
 }
 
+export type ValidationSeverity = "error" | "warning";
+export type ValidationCategory =
+	| "structural"
+	| "content"
+	| "compatibility"
+	| "security";
+
+export interface ValidationIssue {
+	code: string;
+	severity: ValidationSeverity;
+	category: ValidationCategory;
+	messageKey: string;
+	messageParams?: Record<string, string | number>;
+	fallbackMessage: string;
+}
+
+export interface SkillValidationResult {
+	valid: boolean;
+	issues: ValidationIssue[];
+	errorCount: number;
+	warningCount: number;
+	manifest: SkillManifest | null;
+}
+
 export type McpServerType = "builtin" | "third-party" | "market";
 export type McpTransportType = "stdio" | "sse" | "http";
 
@@ -955,6 +986,10 @@ const electronAPI: ElectronAPI = {
 		enableSkill: (id) => ipcRenderer.invoke("skill:enable", id),
 		disableSkill: (id) => ipcRenderer.invoke("skill:disable", id),
 		getSystemPrompt: (id) => ipcRenderer.invoke("skill:get-system-prompt", id),
+		getCommandPrompt: (skillId, commandName) =>
+			ipcRenderer.invoke("skill:get-command-prompt", skillId, commandName),
+		validateSkill: (source) =>
+			ipcRenderer.invoke("skill:validate-skill", source),
 	},
 
 	// MCP API

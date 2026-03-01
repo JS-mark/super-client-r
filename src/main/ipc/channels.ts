@@ -33,6 +33,10 @@ export const SKILL_CHANNELS = {
 	EXECUTE_SKILL: "skill:execute",
 	// 获取 skill 系统提示词
 	GET_SYSTEM_PROMPT: "skill:get-system-prompt",
+	// 获取 command 提示词
+	GET_COMMAND_PROMPT: "skill:get-command-prompt",
+	// 校验 skill
+	VALIDATE_SKILL: "skill:validate-skill",
 } as const;
 
 // Chat 相关通道

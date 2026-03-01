@@ -6,17 +6,21 @@ import {
 	SyncOutlined,
 } from "@ant-design/icons";
 import type { MenuProps } from "antd";
-import { Button, Card, Dropdown, message, Tag, Tooltip } from "antd";
+import { App, Button, Card, Dropdown, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useSkillStore } from "../../stores/skillStore";
 import type { Skill } from "../../types/skills";
 
+const { useToken } = theme;
+
 export const SkillCard: React.FC<{
 	skill: Skill;
 	onClick: () => void;
 }> = ({ skill, onClick }) => {
+	const { message } = App.useApp();
 	const { t } = useTranslation();
+	const { token } = useToken();
 	const {
 		installedSkills,
 		installSkill,
@@ -126,8 +130,16 @@ export const SkillCard: React.FC<{
 
 	return (
 		<Card
-			hoverable
-			className="h-full flex flex-col cursor-pointer"
+			className="h-full flex flex-col cursor-pointer transition-all duration-200"
+			style={{ borderColor: token.colorBorderSecondary }}
+			onMouseEnter={(e) => {
+				e.currentTarget.style.borderColor = token.colorPrimaryBorder;
+				e.currentTarget.style.boxShadow = `0 0 12px ${token.colorPrimaryBg}`;
+			}}
+			onMouseLeave={(e) => {
+				e.currentTarget.style.borderColor = token.colorBorderSecondary;
+				e.currentTarget.style.boxShadow = "none";
+			}}
 			actions={actions}
 			onClick={onClick}
 			title={

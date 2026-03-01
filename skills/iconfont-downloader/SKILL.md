@@ -2,6 +2,7 @@
 name: iconfont-downloader
 description: |
   Iconfont图标下载器 Skill 可以帮助用户从 iconfont.cn 搜索并下载最匹配的 SVG 图标。
+allowed-tools: Read, Write, Bash, WebFetch
 ---
 
 # Iconfont图标下载器 Skill

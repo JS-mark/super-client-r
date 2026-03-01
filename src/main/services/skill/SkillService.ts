@@ -8,10 +8,13 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { app } from "electron";
 import type {
+	SkillCommand,
 	SkillExecutionResult,
 	SkillManifest,
 	SkillTool,
+	SkillValidationResult,
 } from "../../ipc/types";
+import { validateSkill as runValidation } from "./SkillValidator";
 
 export interface SkillConfig {
 	id: string;
@@ -68,6 +71,7 @@ export class SkillService extends EventEmitter {
 
 	/**
 	 * 扫描指定目录下的 skills
+	 * 使用 SKILL.md + plugin.json（Claude Code 模式）
 	 */
 	private async scanSkillsDir(dir: string): Promise<void> {
 		const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -75,59 +79,267 @@ export class SkillService extends EventEmitter {
 		for (const entry of entries) {
 			if (entry.isDirectory()) {
 				const skillPath = path.join(dir, entry.name);
-				const manifestPath = path.join(skillPath, "manifest.json");
+				const manifest = await this.discoverSkillMetadata(skillPath);
+				if (!manifest) continue;
 
+				// 跳过已加载的同 ID skill（用户目录优先）
+				if (this.skills.has(manifest.id)) continue;
+
+				// SKILL.md body is the base prompt; prompts/main.txt is appended as app-specific context
+				const promptPath = path.join(skillPath, "prompts", "main.txt");
 				try {
-					const manifestContent = await fs.readFile(manifestPath, "utf-8");
-					const manifest: SkillManifest = JSON.parse(manifestContent);
-
-					if (this.isValidManifest(manifest)) {
-						// 跳过已加载的同 ID skill（用户目录优先）
-						if (this.skills.has(manifest.id)) continue;
-
-						// Auto-load systemPrompt from prompts/main.txt if not inline
-						if (!manifest.systemPrompt) {
-							const promptPath = path.join(skillPath, "prompts", "main.txt");
-							try {
-								manifest.systemPrompt = await fs.readFile(promptPath, "utf-8");
-							} catch {
-								// No prompts/main.txt, skip
-							}
-						}
-
-						const config: SkillConfig = {
-							id: manifest.id,
-							manifest,
-							path: skillPath,
-							enabled: true,
-						};
-
-						this.skills.set(manifest.id, config);
-						this.emit("loaded", manifest);
+					const mainTxtPrompt = await fs.readFile(promptPath, "utf-8");
+					if (mainTxtPrompt.trim()) {
+						manifest.systemPrompt = manifest.systemPrompt
+							? `${manifest.systemPrompt}\n\n${mainTxtPrompt}`
+							: mainTxtPrompt;
 					}
 				} catch {
-					// Skill directory without valid manifest, skip
+					// No prompts/main.txt, keep SKILL.md body as systemPrompt
 				}
+
+				// Discover slash commands from commands/*.md
+				manifest.commands = await this.discoverCommands(
+					skillPath,
+					manifest.id,
+				);
+
+				const config: SkillConfig = {
+					id: manifest.id,
+					manifest,
+					path: skillPath,
+					enabled: true,
+				};
+
+				this.skills.set(manifest.id, config);
+				this.emit("loaded", manifest);
 			}
 		}
 	}
 
 	/**
-	 * 验证 manifest 是否有效
+	 * 从 skill 目录中发现元数据，返回合并后的 SkillManifest
+	 *
+	 * 查找路径：
+	 * 1. skills/<id>/SKILL.md（Claude Code 标准布局）
+	 * 2. SKILL.md（根目录）
+	 *
+	 * 元数据合并策略：
+	 * - id: SKILL.md name
+	 * - name（显示名）: plugin.json displayName > plugin.json description > SKILL.md name
+	 * - description: plugin.json description > SKILL.md description
+	 * - version: plugin.json version
+	 * - author: plugin.json author.name
+	 * - icon/category/tools: plugin.json
 	 */
-	private isValidManifest(manifest: unknown): manifest is SkillManifest {
-		if (!manifest || typeof manifest !== "object") {
-			return false;
+	private async discoverSkillMetadata(
+		skillPath: string,
+	): Promise<SkillManifest | null> {
+		const skillMdPath = await this.findSkillMdPath(skillPath);
+		if (!skillMdPath) return null;
+
+		return this.buildManifestFromSkillMd(skillPath, skillMdPath);
+	}
+
+	/**
+	 * 查找 SKILL.md 文件路径
+	 */
+	private async findSkillMdPath(skillPath: string): Promise<string | null> {
+		// 1. skills/*/SKILL.md 布局
+		const skillsSubDir = path.join(skillPath, "skills");
+		try {
+			const entries = await fs.readdir(skillsSubDir, { withFileTypes: true });
+			for (const e of entries) {
+				if (e.isDirectory()) {
+					const candidate = path.join(skillsSubDir, String(e.name), "SKILL.md");
+					try {
+						await fs.access(candidate);
+						return candidate;
+					} catch {
+						// continue
+					}
+				}
+			}
+		} catch {
+			// no skills/ subdir
 		}
 
-		const m = manifest as Partial<SkillManifest>;
-		return (
-			typeof m.id === "string" &&
-			typeof m.name === "string" &&
-			typeof m.description === "string" &&
-			typeof m.version === "string" &&
-			typeof m.author === "string"
-		);
+		// 2. 根目录 SKILL.md
+		const rootPath = path.join(skillPath, "SKILL.md");
+		try {
+			await fs.access(rootPath);
+			return rootPath;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * 从 SKILL.md + plugin.json 构建 SkillManifest
+	 */
+	private async buildManifestFromSkillMd(
+		skillPath: string,
+		skillMdPath: string,
+	): Promise<SkillManifest | null> {
+		try {
+			const content = await fs.readFile(skillMdPath, "utf-8");
+			const trimmed = content.trimStart();
+			if (!trimmed.startsWith("---")) return null;
+
+			const secondDash = trimmed.indexOf("---", 3);
+			if (secondDash === -1) return null;
+
+			const yamlBlock = trimmed.slice(3, secondDash).trim();
+			const fmData: Record<string, string> = {};
+			const lines = yamlBlock.split("\n");
+			let i = 0;
+			while (i < lines.length) {
+				const line = lines[i];
+				const match = line.match(/^(\S[\w-]*)\s*:\s*(.*)/);
+				if (match) {
+					const key = match[1];
+					let value = match[2].trim();
+					if (value === "|" || value === "|+") {
+						const multiLines: string[] = [];
+						i++;
+						while (i < lines.length && /^\s+/.test(lines[i])) {
+							multiLines.push(lines[i].replace(/^\s+/, ""));
+							i++;
+						}
+						fmData[key] = multiLines.join("\n");
+						continue;
+					}
+					if (
+						(value.startsWith('"') && value.endsWith('"')) ||
+						(value.startsWith("'") && value.endsWith("'"))
+					) {
+						value = value.slice(1, -1);
+					}
+					fmData[key] = value;
+				}
+				i++;
+			}
+
+			if (!fmData.name) return null;
+
+			// 读取 plugin.json（唯一的补充元数据来源）
+			let pluginVersion = "0.0.0";
+			let pluginAuthor = "unknown";
+			let pluginDesc = fmData.description || "";
+			let pluginDisplayName: string | undefined;
+			let pluginIcon: string | undefined;
+			let pluginCategory: string | undefined;
+			let pluginTools: SkillManifest["tools"];
+			const pluginJsonPath = path.join(skillPath, ".claude-plugin", "plugin.json");
+			try {
+				const raw = await fs.readFile(pluginJsonPath, "utf-8");
+				const pj = JSON.parse(raw);
+				if (pj && typeof pj === "object") {
+					if (typeof pj.version === "string") pluginVersion = pj.version;
+					if (pj.author && typeof pj.author.name === "string")
+						pluginAuthor = pj.author.name;
+					if (typeof pj.description === "string") pluginDesc = pj.description;
+					if (typeof pj.displayName === "string") pluginDisplayName = pj.displayName;
+					if (typeof pj.icon === "string") pluginIcon = pj.icon;
+					if (typeof pj.category === "string") pluginCategory = pj.category;
+					if (Array.isArray(pj.tools)) pluginTools = pj.tools;
+				}
+			} catch {
+				// no plugin.json
+			}
+
+			// Extract SKILL.md body (content after frontmatter) as systemPrompt
+			const body = trimmed.slice(secondDash + 3).trim();
+
+			return {
+				id: fmData.name,
+				name: pluginDisplayName ?? pluginDesc ?? fmData.name,
+				description: pluginDesc || fmData.description || "",
+				version: pluginVersion,
+				author: pluginAuthor,
+				category: pluginCategory,
+				icon: pluginIcon,
+				tools: pluginTools,
+				systemPrompt: body || undefined,
+			};
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Discover slash commands from commands/*.md files
+	 */
+	private async discoverCommands(
+		skillPath: string,
+		skillId: string,
+	): Promise<SkillCommand[]> {
+		const commandsDir = path.join(skillPath, "commands");
+		try {
+			const entries = await fs.readdir(commandsDir, { withFileTypes: true });
+			const commands: SkillCommand[] = [];
+
+			for (const entry of entries) {
+				if (!entry.isFile() || !entry.name.endsWith(".md")) continue;
+
+				const cmdPath = path.join(commandsDir, entry.name);
+				try {
+					const raw = await fs.readFile(cmdPath, "utf-8");
+					const trimmed = raw.trimStart();
+
+					let description = "";
+					let prompt = trimmed;
+					let allowedTools: string[] | undefined;
+
+					// Parse optional frontmatter
+					if (trimmed.startsWith("---")) {
+						const secondDash = trimmed.indexOf("---", 3);
+						if (secondDash !== -1) {
+							const yamlBlock = trimmed.slice(3, secondDash).trim();
+							for (const line of yamlBlock.split("\n")) {
+								const match = line.match(/^(\S[\w-]*)\s*:\s*(.*)/);
+								if (match) {
+									const key = match[1];
+									let value = match[2].trim();
+									if (
+										(value.startsWith('"') && value.endsWith('"')) ||
+										(value.startsWith("'") && value.endsWith("'"))
+									) {
+										value = value.slice(1, -1);
+									}
+									if (key === "description") description = value;
+									if (key === "allowed-tools") {
+										allowedTools = value
+											.split(",")
+											.map((s) => s.trim())
+											.filter(Boolean);
+									}
+								}
+							}
+							prompt = trimmed.slice(secondDash + 3).trim();
+						}
+					}
+
+					if (!prompt) continue;
+
+					const name = entry.name.replace(/\.md$/, "");
+					commands.push({
+						name,
+						skillId,
+						description,
+						prompt,
+						allowedTools,
+					});
+				} catch {
+					// Skip unreadable command files
+				}
+			}
+
+			return commands;
+		} catch {
+			// No commands/ directory
+			return [];
+		}
 	}
 
 	/**
@@ -147,6 +359,15 @@ export class SkillService extends EventEmitter {
 	}
 
 	/**
+	 * 校验 skill（供 IPC 和 installSkill 调用）
+	 */
+	async validateSkill(source: string): Promise<SkillValidationResult> {
+		const sourcePath = path.resolve(source);
+		const installedIds = Array.from(this.skills.keys());
+		return runValidation(sourcePath, installedIds);
+	}
+
+	/**
 	 * 安装 skill
 	 */
 	async installSkill(source: string): Promise<SkillManifest> {
@@ -160,26 +381,18 @@ export class SkillService extends EventEmitter {
 			} else {
 				// 本地路径
 				const sourcePath = path.resolve(source);
-				const sourceManifestPath = path.join(sourcePath, "manifest.json");
 
-				// 验证源目录存在
-				const sourceStat = await fs.stat(sourcePath);
-				if (!sourceStat.isDirectory()) {
-					throw new Error("Source must be a directory");
+				// 执行校验
+				const validation = await this.validateSkill(source);
+				if (!validation.valid) {
+					const summary = validation.issues
+						.filter((i) => i.severity === "error")
+						.map((i) => i.fallbackMessage)
+						.join("; ");
+					throw new Error(`Skill validation failed: ${summary}`);
 				}
 
-				// 读取并验证 manifest
-				const manifestContent = await fs.readFile(sourceManifestPath, "utf-8");
-				const manifest: SkillManifest = JSON.parse(manifestContent);
-
-				if (!this.isValidManifest(manifest)) {
-					throw new Error("Invalid manifest file");
-				}
-
-				// 检查是否已安装
-				if (this.skills.has(manifest.id)) {
-					throw new Error(`Skill ${manifest.id} is already installed`);
-				}
+				const manifest = validation.manifest!;
 
 				// 创建目标目录
 				skillPath = path.join(this.skillsDir, manifest.id);
@@ -337,23 +550,25 @@ export class SkillService extends EventEmitter {
 			}
 
 			// 检查是否有实现文件
-			const implPath = path.join(skill.path, "index.js");
-			const implTsPath = path.join(skill.path, "index.ts");
+			const implCandidates = [
+				path.join(skill.path, "index.js"),
+				path.join(skill.path, "index.ts"),
+				path.join(skill.path, "scripts", "index.js"),
+				path.join(skill.path, "scripts", "index.ts"),
+			];
 
-			let implExists = false;
-			try {
-				await fs.access(implPath);
-				implExists = true;
-			} catch {
+			let resolvedImplPath: string | null = null;
+			for (const candidate of implCandidates) {
 				try {
-					await fs.access(implTsPath);
-					implExists = true;
+					await fs.access(candidate);
+					resolvedImplPath = candidate;
+					break;
 				} catch {
-					// No implementation file
+					// continue
 				}
 			}
 
-			if (!implExists) {
+			if (!resolvedImplPath) {
 				return {
 					success: false,
 					error: `Skill ${skillId} has no implementation file`,
@@ -361,7 +576,7 @@ export class SkillService extends EventEmitter {
 			}
 
 			// 动态加载并执行 skill 代码
-			const modulePath = `file://${implPath}`;
+			const modulePath = `file://${resolvedImplPath}`;
 			const skillModule = await import(modulePath);
 
 			// 查找匹配的导出函数: 优先 toolName，再 default 对象上的 toolName，最后 default 函数
@@ -418,6 +633,19 @@ export class SkillService extends EventEmitter {
 		} catch {
 			return null;
 		}
+	}
+
+	/**
+	 * 获取 skill command 的提示词
+	 */
+	getCommandPrompt(skillId: string, commandName: string): string | null {
+		const skill = this.skills.get(skillId);
+		if (!skill) return null;
+
+		const command = skill.manifest.commands?.find(
+			(c) => c.name === commandName,
+		);
+		return command?.prompt ?? null;
 	}
 
 	/**

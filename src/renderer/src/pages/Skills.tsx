@@ -149,7 +149,7 @@ const Skills: React.FC = () => {
 				</span>
 			),
 			children: (
-				<div className="h-full overflow-y-auto pr-2">
+				<div className="h-full overflow-y-auto px-1 pb-1">
 					<div
 						className="mb-4 p-3 rounded-lg text-xs leading-relaxed"
 						style={{
@@ -193,8 +193,8 @@ const Skills: React.FC = () => {
 			key: "market",
 			label: t("tabs.market", { ns: "skills" }),
 			children: (
-				<div className="h-full flex flex-col pr-2">
-					<div className="mb-4 flex gap-2 shrink-0">
+				<div className="h-full flex flex-col">
+					<div className="mb-4 flex gap-2 shrink-0 px-1">
 						<Input
 							prefix={<SearchOutlined className="text-gray-400" />}
 							placeholder={t("searchPlaceholder", { ns: "skills" })}
@@ -218,7 +218,7 @@ const Skills: React.FC = () => {
 							{t("search", { ns: "common" })}
 						</Button>
 					</div>
-					<div className="flex-1 overflow-y-auto min-h-0">
+					<div className="flex-1 overflow-y-auto min-h-0 px-1 pb-1">
 						{isLoading ? (
 							<div className="flex justify-center items-center py-20">
 								<Spin size="large" />
@@ -258,7 +258,7 @@ const Skills: React.FC = () => {
 			key: "installed",
 			label: `${t("tabs.installed", { ns: "skills" })} (${installedSkills.length})`,
 			children: (
-				<div className="h-full overflow-y-auto pr-2">
+				<div className="h-full overflow-y-auto px-1 pb-1">
 					<div className="mb-4 flex gap-2">
 						<Input
 							prefix={<SearchOutlined className="text-gray-400" />}
@@ -294,11 +294,11 @@ const Skills: React.FC = () => {
 
 	return (
 		<MainLayout>
-			<div className="p-4 h-full overflow-auto">
+			<div className="p-4 h-full flex flex-col overflow-hidden">
 				<Tabs
 					defaultActiveKey="builtin"
 					items={items}
-					className="flex-1 min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
+					className="flex-1 min-h-0 flex flex-col [&_.ant-tabs-content-holder]:flex-1 [&_.ant-tabs-content-holder]:min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
 				/>
 				<SkillDetailModal
 					skill={selectedSkill}

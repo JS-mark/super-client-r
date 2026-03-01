@@ -37,6 +37,14 @@ export interface AgentStreamEvent {
 
 // ============ Skill 相关类型 ============
 
+export interface SkillCommand {
+	name: string;
+	skillId: string;
+	description: string;
+	prompt: string;
+	allowedTools?: string[];
+}
+
 export interface SkillManifest {
 	id: string;
 	name: string;
@@ -48,6 +56,7 @@ export interface SkillManifest {
 	permissions?: string[];
 	tools?: SkillTool[];
 	systemPrompt?: string;
+	commands?: SkillCommand[];
 }
 
 export interface SkillTool {
@@ -571,6 +580,36 @@ export interface SearchExecuteResponse {
 	provider: string;
 	query: string;
 	searchTimeMs: number;
+}
+
+// ============ Skill Validation 相关类型 ============
+
+export type ValidationSeverity = "error" | "warning";
+export type ValidationCategory =
+	| "structural"
+	| "content"
+	| "compatibility"
+	| "consistency"
+	| "security";
+
+export interface ValidationIssue {
+	code: string;
+	severity: ValidationSeverity;
+	category: ValidationCategory;
+	messageKey: string;
+	messageParams?: Record<string, string | number>;
+	fallbackMessage: string;
+}
+
+export type SkillType = "claude-code";
+
+export interface SkillValidationResult {
+	valid: boolean;
+	issues: ValidationIssue[];
+	errorCount: number;
+	warningCount: number;
+	manifest: SkillManifest | null;
+	skillType: SkillType;
 }
 
 // ============ IPC 请求/响应类型 ============
