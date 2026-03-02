@@ -16,7 +16,6 @@ export function useTheme() {
 		actualTheme,
 		systemTheme,
 		setMode,
-		updateActualTheme,
 		getEffectiveTheme,
 		isDark,
 	} = useThemeStore();
@@ -27,14 +26,14 @@ export function useTheme() {
 			try {
 				const response = await window.electron.theme.get();
 				if (response.success && response.data) {
-					setMode(response.data as ThemeMode);
+					useThemeStore.getState().setMode(response.data as ThemeMode);
 				}
 			} catch (error) {
 				console.error("Failed to load theme from main:", error);
 			}
 		};
 		loadThemeFromMain();
-	}, [setMode]);
+	}, []);
 
 	// 初始化系统主题检测
 	useEffect(() => {
@@ -43,16 +42,16 @@ export function useTheme() {
 
 	// 当模式或系统主题变化时，更新实际主题
 	useEffect(() => {
-		updateActualTheme();
-	}, [updateActualTheme]);
+		useThemeStore.getState().updateActualTheme();
+	}, [mode, systemTheme]);
 
 	// 监听主进程主题变更
 	useEffect(() => {
 		const unsubscribe = window.electron.theme.onChange((newMode) => {
-			setMode(newMode as ThemeMode);
+			useThemeStore.getState().setMode(newMode as ThemeMode);
 		});
 		return unsubscribe;
-	}, [setMode]);
+	}, []);
 
 	// 切换主题模式并同步到主进程
 	const setThemeMode = async (newMode: ThemeMode) => {
