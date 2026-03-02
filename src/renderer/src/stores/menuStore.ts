@@ -58,6 +58,19 @@ export const useMenuStore = create<MenuState>()(
 		{
 			name: "menu-config",
 			partialize: (state) => ({ items: state.items }),
+			merge: (persisted, current) => {
+				const saved = persisted as Partial<MenuState> | undefined;
+				if (!saved?.items) return { ...current };
+				// Merge: append any new default items not present in saved config
+				const savedIds = new Set(saved.items.map((i) => i.id));
+				const newItems = DEFAULT_MENU_CONFIG.items.filter(
+					(i) => !savedIds.has(i.id),
+				);
+				return {
+					...current,
+					items: [...saved.items, ...newItems],
+				};
+			},
 		},
 	),
 );
