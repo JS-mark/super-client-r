@@ -887,6 +887,14 @@ export interface ElectronAPI {
 		) => () => void;
 	};
 
+	// Webhook API
+	webhook: {
+		getConfigs: () => Promise<IPCResponse>;
+		saveConfig: (config: unknown) => Promise<IPCResponse>;
+		deleteConfig: (id: string) => Promise<IPCResponse>;
+		test: (configId: string) => Promise<IPCResponse>;
+	};
+
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;
