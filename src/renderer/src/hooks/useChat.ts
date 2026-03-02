@@ -124,6 +124,105 @@ async function fetchMcpTools(): Promise<{
 }
 
 /**
+ * Fetch tools defined by a specific skill and build function calling format.
+ * Uses `skill:{skillId}` as serverId convention to distinguish from MCP tools.
+ */
+async function fetchSkillTools(skillId: string): Promise<{
+  tools: Array<{
+    type: "function";
+    function: {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+  }>;
+  toolMapping: Record<string, { serverId: string; toolName: string }>;
+}> {
+  try {
+    const allSkillTools = await skillClient.getAllTools();
+    const skillTools = allSkillTools.filter((t) => t.skillId === skillId);
+    const tools: Array<{
+      type: "function";
+      function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      };
+    }> = [];
+    const toolMapping: Record<string, { serverId: string; toolName: string }> =
+      {};
+    for (const { skillId: sid, tool } of skillTools) {
+      const prefixedName = `skill-${sid}__${tool.name}`;
+      tools.push({
+        type: "function",
+        function: {
+          name: prefixedName,
+          description: tool.description || "",
+          parameters: tool.inputSchema || { type: "object", properties: {} },
+        },
+      });
+      toolMapping[prefixedName] = {
+        serverId: `skill:${sid}`,
+        toolName: tool.name,
+      };
+    }
+    return { tools, toolMapping };
+  } catch (err) {
+    console.warn("[useChat] Failed to fetch skill tools:", err);
+    return { tools: [], toolMapping: {} };
+  }
+}
+
+/**
+ * Fetch tools from ALL enabled skills (not filtered by skillId).
+ * Used by direct/agent modes so Claude can access skill tools globally.
+ */
+async function fetchAllSkillTools(): Promise<{
+  tools: Array<{
+    type: "function";
+    function: {
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+    };
+  }>;
+  toolMapping: Record<string, { serverId: string; toolName: string }>;
+}> {
+  try {
+    const allSkillTools = await skillClient.getAllTools();
+    const tools: Array<{
+      type: "function";
+      function: {
+        name: string;
+        description: string;
+        parameters: Record<string, unknown>;
+      };
+    }> = [];
+    const toolMapping: Record<string, { serverId: string; toolName: string }> =
+      {};
+    for (const { skillId, tool } of allSkillTools) {
+      const prefixedName = `skill-${skillId}__${tool.name}`;
+      tools.push({
+        type: "function",
+        function: {
+          name: prefixedName,
+          description: tool.description || "",
+          parameters: tool.inputSchema || { type: "object", properties: {} },
+        },
+      });
+      toolMapping[prefixedName] = {
+        serverId: `skill:${skillId}`,
+        toolName: tool.name,
+      };
+    }
+    return { tools, toolMapping };
+  } catch (err) {
+    console.warn("[useChat] Failed to fetch all skill tools:", err);
+    return { tools: [], toolMapping: {} };
+  }
+}
+
+/**
  * Parse custom params from SessionSettings into a Record.
  */
 function parseCustomParams(
@@ -276,13 +375,33 @@ export function useChat() {
           const prefixedName = `${safePrefix}__${tool.name}`;
           return { prefixedName, displayName: tool.name };
         });
+
+        // Also load skill tools when a skill is selected
+        if (selectedSkillId) {
+          try {
+            const skillTools = await skillClient.getAllTools();
+            const filtered = skillTools.filter(
+              (t) => t.skillId === selectedSkillId,
+            );
+            for (const { skillId, tool } of filtered) {
+              const prefixedName = `skill-${skillId}__${tool.name}`;
+              tools.push({
+                prefixedName,
+                displayName: `${skillId}/${tool.name}`,
+              });
+            }
+          } catch {
+            // Skill tools loading failure is non-fatal
+          }
+        }
+
         setAvailableTools(tools);
       } catch {
         setAvailableTools([]);
       }
     };
     loadTools();
-  }, []);
+  }, [selectedSkillId]);
 
   const currentRequestIdRef = useRef<string | null>(null);
   const streamContentRef = useRef("");
@@ -593,8 +712,18 @@ export function useChat() {
         const mcpResult = isToolsDisabled
           ? { toolHint: "" }
           : await fetchMcpTools();
-        const tools = isToolsDisabled ? undefined : mcpResult.tools;
-        const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+
+        // Fetch all enabled skill tools and merge with MCP tools
+        const skillResult = isToolsDisabled
+          ? { tools: [], toolMapping: {} }
+          : await fetchAllSkillTools();
+
+        const tools = isToolsDisabled
+          ? undefined
+          : [...(mcpResult.tools || []), ...skillResult.tools];
+        const toolMapping = isToolsDisabled
+          ? undefined
+          : { ...(mcpResult.toolMapping || {}), ...skillResult.toolMapping };
         if (mcpResult.toolHint) {
           history[0].content += mcpResult.toolHint;
         }
@@ -612,8 +741,11 @@ export function useChat() {
           apiKey: provider.apiKey,
           model: model.id,
           messages: history,
-          tools,
-          toolMapping,
+          tools: tools && tools.length > 0 ? tools : undefined,
+          toolMapping:
+            toolMapping && Object.keys(toolMapping).length > 0
+              ? toolMapping
+              : undefined,
           toolPermission,
           toolCallMode:
             sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
@@ -721,8 +853,18 @@ export function useChat() {
         const mcpResult = isToolsDisabled
           ? { toolHint: "" }
           : await fetchMcpTools();
-        const tools = isToolsDisabled ? undefined : mcpResult.tools;
-        const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+
+        // Fetch all enabled skill tools and merge with MCP tools
+        const skillResult = isToolsDisabled
+          ? { tools: [], toolMapping: {} }
+          : await fetchAllSkillTools();
+
+        const tools = isToolsDisabled
+          ? undefined
+          : [...(mcpResult.tools || []), ...skillResult.tools];
+        const toolMapping = isToolsDisabled
+          ? undefined
+          : { ...(mcpResult.toolMapping || {}), ...skillResult.toolMapping };
         if (mcpResult.toolHint) {
           history[0].content += mcpResult.toolHint;
         }
@@ -740,8 +882,11 @@ export function useChat() {
           apiKey: provider.apiKey,
           model: model.id,
           messages: history,
-          tools,
-          toolMapping,
+          tools: tools && tools.length > 0 ? tools : undefined,
+          toolMapping:
+            toolMapping && Object.keys(toolMapping).length > 0
+              ? toolMapping
+              : undefined,
           toolPermission,
           toolCallMode:
             sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
@@ -870,8 +1015,26 @@ export function useChat() {
         const mcpResult = isToolsDisabled
           ? { toolHint: "" }
           : await fetchMcpTools();
-        const tools = isToolsDisabled ? undefined : mcpResult.tools;
-        const toolMapping = isToolsDisabled ? undefined : mcpResult.toolMapping;
+
+        // Fetch skill tools and merge with MCP tools
+        const skillToolsResult =
+          skillId && !isToolsDisabled
+            ? await fetchSkillTools(skillId)
+            : { tools: [], toolMapping: {} };
+
+        const tools = isToolsDisabled
+          ? undefined
+          : [
+              ...(mcpResult.tools || []),
+              ...skillToolsResult.tools,
+            ];
+        const toolMapping = isToolsDisabled
+          ? undefined
+          : {
+              ...(mcpResult.toolMapping || {}),
+              ...skillToolsResult.toolMapping,
+            };
+
         if (mcpResult.toolHint) {
           history[0].content += mcpResult.toolHint;
         }
@@ -889,8 +1052,11 @@ export function useChat() {
           apiKey: provider.apiKey,
           model: model.id,
           messages: history,
-          tools,
-          toolMapping,
+          tools: tools && tools.length > 0 ? tools : undefined,
+          toolMapping:
+            toolMapping && Object.keys(toolMapping).length > 0
+              ? toolMapping
+              : undefined,
           toolPermission,
           toolCallMode:
             sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",

@@ -34,9 +34,10 @@ interface ChatSidebarProps {
 	open: boolean;
 	onClose: () => void;
 	onNewChat: () => void;
+	newChatDisabled?: boolean;
 }
 
-export function ChatSidebar({ open, onClose, onNewChat }: ChatSidebarProps) {
+export function ChatSidebar({ open, onClose, onNewChat, newChatDisabled }: ChatSidebarProps) {
 	const { t } = useTranslation("chat");
 	const { token } = useToken();
 	const [searchText, setSearchText] = useState("");
@@ -145,6 +146,7 @@ export function ChatSidebar({ open, onClose, onNewChat }: ChatSidebarProps) {
 						type="primary"
 						icon={<PlusOutlined />}
 						onClick={handleNewChat}
+						disabled={newChatDisabled}
 					/>
 				</div>
 

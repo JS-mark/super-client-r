@@ -387,6 +387,15 @@ const Chat: React.FC = () => {
 							className="rounded-lg"
 						/>
 					</Tooltip>
+					<Tooltip title={t("chat.toolbar.newChat", "新建会话", { ns: "chat" })}>
+						<Button
+							type="text"
+							icon={<PlusOutlined />}
+							onClick={() => useChatStore.getState().createConversation()}
+							disabled={isStreaming || messages.length === 0}
+							className="rounded-lg"
+						/>
+					</Tooltip>
 
 					<Tooltip title={t("chat.chatHistory", "会话历史", { ns: "chat" })}>
 						<Button
@@ -1471,6 +1480,7 @@ const Chat: React.FC = () => {
 					open={sidebarOpen}
 					onClose={() => setSidebarOpen(false)}
 					onNewChat={handleNewChat}
+					newChatDisabled={isStreaming || messages.length === 0}
 				/>
 
 				{/* Main Chat Area */}
