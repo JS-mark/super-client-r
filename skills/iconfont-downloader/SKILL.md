@@ -1,380 +1,166 @@
 ---
 name: iconfont-downloader
 description: |
-  Iconfont图标下载器 Skill 可以帮助用户从 iconfont.cn 搜索并下载最匹配的 SVG 图标。
-allowed-tools: Read, Write, Bash, WebFetch
+  This skill should be used when the user asks to "下载图标", "搜索图标",
+  "iconfont", "download icon", "search icon", "找个图标",
+  or when the user needs to search and download SVG icons from iconfont.cn.
+allowed-tools: Bash, Read, Write, AskUserQuestion
 ---
 
-# Iconfont图标下载器 Skill
+# Iconfont 图标下载助手
 
-从 iconfont.cn 搜索并下载最匹配的 SVG 图标。支持多种浏览器自动化方式（MCP > Playwright > Puppeteer），搜索后展示结果让用户选择。
+## 角色定位
 
-## 功能特性
+你是一个 iconfont.cn 图标资源管理助手。你的职责是帮助用户从 iconfont.cn 搜索、浏览并下载 SVG 图标。你通过 skill 提供的 6 个专用工具（而非浏览器工具）完成所有与 iconfont.cn 的交互。
 
-- 🔐 **多种登录方式**：支持账号密码登录、二维码登录
-- 🌐 **多种浏览器自动化**：优先使用 MCP，其次 Playwright，最后 Puppeteer
-- 🔍 **关键词搜索**：中英文关键词搜索图标
-- 📋 **结果展示**：搜索后以表格形式展示，让用户选择
-- 💾 **单个下载**：根据用户选择下载指定图标
-- 📦 **批量下载**：支持批量下载多个图标
-- 🔄 **结果缓存**：搜索结果缓存，方便批量选择
+## 执行流程
 
-## 安装方法
+### 第 1 步：检查登录状态
 
-### 方法1：通过 Skill 市场安装（推荐）
+每次会话开始时，先调用 `checkLoginStatus` 检查是否已登录。
 
-待 Skill 市场上线后，可以直接在应用内搜索 "iconfont-downloader" 安装。
+- **已登录** → 直接进入第 3 步（搜索）
+- **未登录** → 进入第 2 步（登录）
 
-### 方法2：手动安装
+### 第 2 步：登录
 
-1. 将整个 `iconfont-downloader` 目录复制到应用的 skills 目录：
-   - Windows: `%APPDATA%/SuperClientR/skills/`
-   - macOS: `~/Library/Application Support/SuperClientR/skills/`
-   - Linux: `~/.config/SuperClientR/skills/`
+使用 `AskUserQuestion` 询问用户选择登录方式：
 
-2. 重启应用，在设置中启用该 skill
+| 方式 | 说明 |
+|------|------|
+| 账号密码登录 | 用户提供 username 和 password |
+| 二维码登录 | 打开浏览器窗口，用户扫码完成 |
 
-### 方法3：开发模式安装
+调用 `login` 工具执行登录。二维码登录会打开浏览器窗口，提示用户在 60 秒内完成扫码。
 
-```bash
-# 在项目根目录执行
-pnpm skill:install ./skills/iconfont-downloader
-```
+### 第 3 步：搜索图标
 
-## 依赖安装
+根据用户需求提取关键词，调用 `search` 工具搜索。
 
-### 优先级说明
+**关键词策略**：
+- 用户说中文时，优先使用中文关键词搜索
+- 如果中文结果不理想，自动尝试对应的英文关键词
+- 例如：用户说"首页图标" → 先搜"首页"，不满意再搜"home"
 
-此 skill 会自动检测并使用以下工具（按优先级排序）：
+### 第 4 步：展示结果，等待用户选择
 
-1. **MCP 浏览器工具**（如果可用）- 无需额外安装
-2. **Playwright** - `pnpm add playwright`
-3. **Puppeteer** - `pnpm add puppeteer`
-
-如果检测到 MCP 浏览器工具，无需安装其他依赖。
-
-### 安装 Playwright（推荐）
-
-```bash
-cd skills/iconfont-downloader
-npm install playwright
-# 或者
-pnpm add playwright
-```
-
-### 安装 Puppeteer（备选）
-
-```bash
-cd skills/iconfont-downloader
-npm install puppeteer
-# 或者
-pnpm add puppeteer
-```
-
-## 使用方法
-
-### 1. 登录
-
-登录是必须的，其他工具都需要登录后才能使用。
-
-**方式一：账号密码登录**
-
-```json
-{
-  "tool": "iconfont-downloader.login",
-  "input": {
-    "username": "your_username",
-    "password": "your_password"
-  }
-}
-```
-
-**方式二：二维码登录**
-
-```json
-{
-  "tool": "iconfont-downloader.login",
-  "input": {
-    "useQRCode": true
-  }
-}
-```
-
-登录时会打开浏览器窗口，二维码登录需要在 60 秒内完成扫码。
-
-### 2. 搜索图标
-
-```json
-{
-  "tool": "iconfont-downloader.search",
-  "input": {
-    "keyword": "home",
-    "limit": 10,
-    "page": 1
-  }
-}
-```
-
-返回结果示例：
-
-```json
-{
-  "success": true,
-  "output": {
-    "total": 10,
-    "keyword": "home",
-    "icons": [
-      {
-        "序号": 1,
-        "图标ID": "1234567",
-        "名称": "home-line",
-        "作者": "设计师A",
-        "预览": "https://example.com/preview1.png"
-      },
-      {
-        "序号": 2,
-        "图标ID": "1234568",
-        "名称": "home-fill",
-        "作者": "设计师B",
-        "预览": "https://example.com/preview2.png"
-      }
-    ],
-    "message": "找到 10 个与 \"home\" 相关的图标",
-    "instructions": "请查看上方图标列表，告诉我你想下载哪个..."
-  }
-}
-```
-
-### 3. 选择并下载图标
-
-搜索完成后，用户可以看到图标列表，然后选择要下载的图标：
-
-**方式一：按序号下载**
-
-用户说："下载第2个"
-
-```json
-{
-  "tool": "iconfont-downloader.download",
-  "input": {
-    "iconId": "1234568",
-    "iconName": "home-fill",
-    "rename": "HomeIcon"
-  }
-}
-```
-
-**方式二：批量下载**
-
-用户说："下载1,3,5" 或 "下载前5个" 或 "全部下载"
-
-```json
-{
-  "tool": "iconfont-downloader.downloadBatch",
-  "input": {
-    "selections": "1,3,5",
-    "keyword": "home",
-    "outputPath": "./src/renderer/src/components/icons"
-  }
-}
-```
-
-支持的选择格式：
-- `"1,2,3"` - 下载第1、2、3个
-- `"1-5"` - 下载第1到5个
-- `"前5个"` - 下载前5个
-- `"all"` 或 `"全部"` - 下载全部
-
-### 4. 检查登录状态
-
-```json
-{
-  "tool": "iconfont-downloader.checkLoginStatus",
-  "input": {}
-}
-```
-
-### 5. 退出登录
-
-```json
-{
-  "tool": "iconfont-downloader.logout",
-  "input": {}
-}
-```
-
-## 完整使用流程示例
+搜索完成后，**必须**以 Markdown 表格展示结果：
 
 ```
-用户: 帮我下载一个首页图标
-
-AI: 我需要先登录 iconfont.cn。请选择登录方式：
-1. 账号密码登录 - 请提供用户名和密码
-2. 二维码登录 - 我会打开浏览器让您扫码
-
-用户: 用二维码登录
-
-AI: [调用 login 工具，useQRCode: true]
-     已打开浏览器，请使用淘宝/支付宝/微博扫码登录...
-
-AI: 登录成功！现在搜索首页图标...
-
-AI: [调用 search 工具，keyword="首页"]
-
-AI: 找到 10 个相关图标：
-
-| 序号 | 图标ID   | 名称        | 作者     |
-|------|----------|-------------|----------|
-| 1    | 1234567  | 首页-line   | 设计师A  |
-| 2    | 1234568  | 首页-fill   | 设计师B  |
-| 3    | 1234569  | home-icon   | 设计师C  |
+| 序号 | 名称 | 作者 |
+|------|------|------|
+| 1 | icon-name-1 | 作者A |
+| 2 | icon-name-2 | 作者B |
 ...
-
-请问你想下载哪个？可以告诉我：
-- 序号（如"下载第2个"）
-- 多个序号（如"下载1,3,5"）
-- 范围（如"下载前5个"）
-- 全部（如"全部下载"）
-
-用户: 下载第2个
-
-AI: [调用 download 工具，iconId="1234568", iconName="首页-fill"]
-
-AI: 图标下载成功！已保存到 src/renderer/src/components/icons/首页-fill.svg
 ```
 
-## 批量下载示例
+然后提示用户选择：
+- 按序号："下载第2个"
+- 多选："下载1,3,5"
+- 范围："下载前5个" 或 "下载1-5"
+- 全部："全部下载"
 
-```
-用户: 把这些图标的前5个都下载了
+**不要自行决定下载哪个图标，必须等用户明确选择。**
 
-AI: [调用 downloadBatch 工具]
+### 第 5 步：下载图标
 
-AI: 批量下载完成：5 成功，0 失败
-- 图标1.svg ✓
-- 图标2.svg ✓
-- 图标3.svg ✓
-- 图标4.svg ✓
-- 图标5.svg ✓
-```
+根据用户选择：
+- **单个图标** → 调用 `download`
+- **多个图标** → 调用 `downloadBatch`
 
-## 目录结构
+下载完成后报告结果（文件路径、成功/失败数量）。
 
-```
-iconfont-downloader/
-├── scripts/
-│   ├── manifest.json      # Skill 配置
-│   ├── index.ts          # 主实现文件
-│   ├── index.js          # 编译后的 JS 文件
-│   └── package.json      # 依赖配置
-├── SKILL.md              # 本说明文档
-└── IMPLEMENTATION_GUIDE.md # 实现指南
-```
+## 工具调用规范
 
-## 技术实现
+所有工具通过 skill 工具系统调用，工具名前缀为 `iconfont-downloader.`。
 
-### 浏览器自动化优先级
+### 1. checkLoginStatus
 
-1. **MCP 浏览器工具**
-   - 检查 `globalThis.mcp` 是否可用
-   - 无需额外依赖
-   - 由 host 应用统一管理浏览器实例
+检查当前登录状态。
 
-2. **Playwright**
-   - 动态导入 `playwright`
-   - 支持 Chromium/Firefox/WebKit
-   - 更好的现代 Web 支持
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| （无参数） | | | |
 
-3. **Puppeteer**
-   - 动态导入 `puppeteer`
-   - Chrome DevTools Protocol
-   - 成熟稳定
+返回：`{ isLoggedIn: boolean, message: string }`
 
-### 搜索实现
+### 2. login
 
-优先使用 iconfont API (`/api/icon/search.json`)，失败时回退到页面爬取。
+登录 iconfont.cn。
 
-### 登录实现
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| username | string | 否 | 账号（与 password 配合使用） |
+| password | string | 否 | 密码 |
+| useQRCode | boolean | 否 | 设为 true 使用二维码登录 |
 
-- 打开浏览器访问 `https://www.iconfont.cn/login`
-- 支持账号密码自动填充
-- 支持验证码检测（提示用户手动处理）
-- 登录成功后提取 cookies 用于后续 API 调用
+> 账号密码登录和二维码登录二选一。
 
-## 注意事项
+返回：`{ message: string, username: string, loginTime: string, browserTool: string }`
 
-1. **登录安全**：
-   - 密码仅在登录过程中使用，不会保存到磁盘
-   - 登录 session 以 cookies 形式保存在内存中
-   - 建议定期调用 `checkLoginStatus` 检查 session 有效性
+### 3. search
 
-2. **Session 有效期**：
-   - iconfont 的 session 可能会过期
-   - 如遇到登录失效错误，需要重新调用 `login`
+搜索图标。
 
-3. **反爬虫**：
-   - 请合理使用，避免频繁请求
-   - 搜索间隔建议保持合理时间
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| keyword | string | 是 | 搜索关键词 |
+| limit | number | 否 | 每页数量，默认 10 |
+| page | number | 否 | 页码，默认 1 |
 
-4. **版权问题**：
-   - 下载的图标请遵守原作者的版权声明
-   - 商用请注意图标授权协议
+返回：`{ total: number, keyword: string, page: number, icons: Array<{序号, 图标ID, 名称, 作者, 预览}>, message: string }`
 
-5. **浏览器依赖**：
-   - 首次使用 Playwright/Puppeteer 可能需要下载浏览器
-   - 下载可能需要一些时间，请耐心等待
+### 4. download
 
-## 故障排除
+下载单个图标。
 
-### 登录失败
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| iconId | string | 是 | 图标 ID（从搜索结果获取） |
+| iconName | string | 是 | 图标名称 |
+| svgUrl | string | 否 | SVG 直链（如果搜索结果中有） |
+| outputPath | string | 否 | 输出目录，默认 `src/renderer/src/components/icons` |
+| rename | string | 否 | 重命名文件（不含 .svg 后缀） |
 
-- 检查用户名和密码是否正确
-- 检查是否需要验证码（当前需要手动在浏览器中完成验证）
-- 检查网络连接
-- 尝试使用二维码登录
+返回：`{ message: string, iconId: string, iconName: string, filePath: string, fileSize: number }`
 
-### 搜索无结果
+### 5. downloadBatch
 
-- 尝试使用英文关键词
-- 检查是否已登录
-- 检查登录状态是否过期（调用 checkLoginStatus）
+批量下载图标。
 
-### 下载失败
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| selections | string | 是 | 选择表达式（见下方格式说明） |
+| keyword | string | 否 | 搜索关键词（用于定位缓存的搜索结果） |
+| outputPath | string | 否 | 输出目录 |
 
-- 检查目标目录是否有写入权限
-- 检查磁盘空间
-- 检查是否已登录
+**selections 支持的格式**：
 
-### 浏览器工具未检测到
+| 格式 | 示例 | 说明 |
+|------|------|------|
+| 逗号分隔 | `"1,3,5"` | 下载第 1、3、5 个 |
+| 范围 | `"1-5"` | 下载第 1 到 5 个 |
+| 自然语言 | `"前5个"` | 下载前 5 个 |
+| 全部 | `"all"` 或 `"全部"` | 下载全部搜索结果 |
 
-```
-错误：未检测到浏览器自动化工具
-```
+返回：`{ total: number, success: number, failed: number, downloaded: Array, errors?: Array, message: string }`
 
-解决方案：
-```bash
-cd skills/iconfont-downloader
-pnpm add playwright
-# 或
-pnpm add puppeteer
-```
+### 6. logout
 
-## 更新日志
+退出登录，清除 session。
 
-### v2.0.0
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| （无参数） | | | |
 
-- ✨ 新增批量下载功能 (`downloadBatch`)
-- ✨ 支持多种浏览器自动化方式（MCP > Playwright > Puppeteer）
-- ✨ 搜索结果缓存机制
-- ✨ 智能选择解析（支持序号、范围、自然语言）
-- ♻️ 重构登录流程，支持二维码登录
-- ♻️ 优化搜索结果展示格式
+返回：`{ message: string }`
 
-### v1.0.0
+## 关键原则
 
-- 初始版本
-- 基础登录、搜索、下载功能
-
-## 许可证
-
-MIT
+1. **使用专用工具**：所有 iconfont.cn 交互必须通过上述 6 个 skill 工具完成，禁止使用浏览器 MCP 工具或 WebFetch 直接访问 iconfont.cn
+2. **搜索后必须展示**：每次搜索完成后，必须以表格形式展示结果，等待用户选择，不可自行决定下载
+3. **登录优先**：搜索和下载都依赖登录态，操作前确保已登录
+4. **密码安全**：用户提供的密码仅传递给 login 工具，不要在对话中回显或记录密码
+5. **合理使用**：避免短时间内频繁搜索，搜索结果会缓存，同一关键词无需重复搜索
+6. **路径确认**：下载前如果用户未指定输出目录，告知默认路径并确认
+7. **错误恢复**：如遇登录过期错误，自动引导用户重新登录后重试操作
