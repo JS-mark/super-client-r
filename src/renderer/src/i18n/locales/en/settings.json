@@ -259,5 +259,59 @@
 		"team": "Team",
 		"achievements": "Achievements",
     "thanks": "Thanks to all contributors and users for their support"
+	},
+	"webhook": {
+		"title": "Notifications",
+		"description": "Configure Webhook push notifications",
+		"list": "Configured Webhooks",
+		"empty": "No webhooks configured",
+		"add": "Add Webhook",
+		"edit": "Edit",
+		"delete": "Delete",
+		"confirmDelete": "Delete this webhook configuration?",
+		"test": "Send Test",
+		"testSuccess": "Test message sent successfully",
+		"testFailed": "Test message failed to send",
+		"name": "Name",
+		"type": "Type",
+		"url": "Webhook URL",
+		"signKey": "Signing Key",
+		"signKeyHint": "Optional, for message signature verification",
+		"enabled": "Enabled",
+		"types": {
+			"dingtalk": "DingTalk",
+			"feishu": "Feishu",
+			"telegram": "Telegram",
+			"twitter": "Twitter (X)",
+			"facebook": "Facebook",
+			"custom": "Custom"
+		},
+		"telegram": {
+			"botToken": "Bot Token",
+			"botTokenHint": "Telegram Bot API Token",
+			"chatId": "Chat ID",
+			"chatIdHint": "Target Chat ID or Channel ID",
+			"parseMode": "Parse Mode"
+		},
+		"twitter": {
+			"apiKey": "API Key",
+			"apiKeyHint": "Twitter API Key (Consumer Key)",
+			"api*": "API *",
+			"api*Hint": "Twitter API * (Consumer *)",
+			"accessToken": "Access Token",
+			"accessTokenHint": "Twitter Access Token",
+			"access*": "Access Token *",
+			"access*Hint": "Twitter Access Token *",
+			"userId": "User ID (Optional)",
+			"userIdHint": "Send DM to this user ID, or leave empty to tweet"
+		},
+		"facebook": {
+			"pageToken": "Page Access Token",
+			"pageTokenHint": "Facebook Page Access Token",
+			"pageId": "Page ID",
+			"pageIdHint": "Facebook Page ID",
+			"app*": "App * (Optional)",
+			"app*Hint": "Facebook App * for webhook verification"
+		}
 	}
 }

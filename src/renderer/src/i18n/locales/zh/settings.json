@@ -259,5 +259,59 @@
 		"recentUpdates": "最近更新",
 		"team": "团队",
 		"achievements": "成就"
+	},
+	"webhook": {
+		"title": "消息推送",
+		"description": "配置 Webhook 通知推送",
+		"list": "已配置的 Webhook",
+		"empty": "暂未配置 Webhook",
+		"add": "添加 Webhook",
+		"edit": "编辑",
+		"delete": "删除",
+		"confirmDelete": "确认删除该 Webhook 配置？",
+		"test": "发送测试",
+		"testSuccess": "测试消息发送成功",
+		"testFailed": "测试消息发送失败",
+		"name": "名称",
+		"type": "类型",
+		"url": "Webhook URL",
+		"signKey": "签名密钥",
+		"signKeyHint": "可选，用于消息签名验证",
+		"enabled": "启用",
+		"types": {
+			"dingtalk": "钉钉",
+			"feishu": "飞书",
+			"telegram": "Telegram",
+			"twitter": "Twitter (X)",
+			"facebook": "Facebook",
+			"custom": "自定义"
+		},
+		"telegram": {
+			"botToken": "机器人令牌",
+			"botTokenHint": "Telegram Bot API Token",
+			"chatId": "聊天 ID",
+			"chatIdHint": "目标聊天 ID 或频道 ID",
+			"parseMode": "消息格式"
+		},
+		"twitter": {
+			"apiKey": "API 密钥",
+			"apiKeyHint": "Twitter API Key (Consumer Key)",
+			"api*": "API 密钥",
+			"api*Hint": "Twitter API * (Consumer *)",
+			"accessToken": "访问令牌",
+			"accessTokenHint": "Twitter Access Token",
+			"access*": "访问令牌密钥",
+			"access*Hint": "Twitter Access Token *",
+			"userId": "用户 ID（可选）",
+			"userIdHint": "向此用户 ID 发送私信，留空则发推文"
+		},
+		"facebook": {
+			"pageToken": "页面访问令牌",
+			"pageTokenHint": "Facebook 页面访问令牌",
+			"pageId": "页面 ID",
+			"pageIdHint": "Facebook 页面 ID",
+			"app*": "应用密钥（可选）",
+			"app*Hint": "用于 webhook 验证的 Facebook 应用密钥"
+		}
 	}
 }
