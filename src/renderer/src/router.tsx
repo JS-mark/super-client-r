@@ -63,7 +63,7 @@ export const router = createHashRouter([
 		errorElement: <ErrorPage />,
 		handle: { title: "工作区" },
 	},
-	{
+{
 		path: "/settings",
 		element: <Settings />,
 		errorElement: <ErrorPage />,

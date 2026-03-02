@@ -95,7 +95,7 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			enabled: true,
 			action: "navigate",
 		},
-		{
+{
 			id: "settings",
 			label: "settings",
 			path: "/settings",
