@@ -612,6 +612,45 @@ export interface SkillValidationResult {
 	skillType: SkillType;
 }
 
+// ============ Webhook 相关类型 ============
+
+export type WebhookType = "dingtalk" | "feishu" | "telegram" | "twitter" | "facebook" | "custom";
+
+export interface WebhookConfig {
+	id: string;
+	name: string;
+	type: WebhookType;
+	url: string;
+	secret?: string;
+	headers?: Record<string, string>;
+	method?: "GET" | "POST";
+	enabled: boolean;
+	createdAt: number;
+
+	// Telegram 特定字段
+	telegramBotToken?: string;      // Bot API Token
+	telegramChatId?: string;        // 目标 Chat ID
+	telegramParseMode?: "Markdown" | "HTML" | "MarkdownV2"; // 消息格式
+
+	// Twitter 特定字段
+	twitterApiKey?: string;         // API Key
+	"twitterApi*"?: string;      // API *
+	twitterAccessToken?: string;    // Access Token
+	"twitterAccess*"?: string;   // Access Token *
+	twitterUserId?: string;         // 目标用户 ID（DM 用）
+
+	// Facebook 特定字段
+	facebookPageToken?: string;     // Page Access Token
+	facebookPageId?: string;        // 页面 ID
+	"facebookApp*"?: string;     // App *（用于签名验证）
+}
+
+export interface WebhookTestResult {
+	success: boolean;
+	statusCode?: number;
+	message: string;
+}
+
 // ============ IPC 请求/响应类型 ============
 
 export interface IPCRequest<T = unknown> {
