@@ -3,6 +3,7 @@ import { XMarkdown } from "@ant-design/x-markdown";
 import { type FC, useCallback, useMemo, useRef } from "react";
 import "@ant-design/x-markdown/es/XMarkdown/index.css";
 import { cn } from "../lib/utils";
+import { EChartsBlock } from "./EChartsBlock";
 import { MermaidChart } from "./MermaidChart";
 import { CopyButton } from "./markdown/CopyButton";
 import { SyntaxHighlighter } from "./markdown/SyntaxHighlighter";
@@ -40,6 +41,11 @@ const CodeBlock: FC<ComponentProps> = ({
 	if (block && lang === "mermaid") {
 		const code = extractTextContent(domNode);
 		return <MermaidChart code={code} streaming={streamStatus === "loading"} />;
+	}
+
+	if (block && lang === "echarts") {
+		const code = extractTextContent(domNode);
+		return <EChartsBlock code={code} streaming={streamStatus === "loading"} />;
 	}
 
 	if (block) {
