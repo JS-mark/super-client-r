@@ -1,5 +1,6 @@
 import {
 	AppstoreOutlined,
+	BellOutlined,
 	BugOutlined,
 	CloudOutlined,
 	GlobalOutlined,
@@ -31,6 +32,7 @@ import { MenuSettingsWithModal } from "../components/settings/MenuSettings";
 import { PluginConfigPanel } from "../components/settings/PluginConfigPanel";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
+import { WebhookSettings } from "../components/settings/WebhookSettings";
 import { useTitle } from "../hooks/useTitle";
 import { type AppInfo, appService } from "../services/appService";
 import { pluginService } from "../services/pluginService";
@@ -195,6 +197,16 @@ const Settings: React.FC = () => {
 				content: (
 					<Card className="!border-0 !shadow-none !bg-transparent">
 						<ShortcutSettings />
+					</Card>
+				),
+			},
+			{
+				key: "webhook",
+				icon: <BellOutlined />,
+				label: t("webhook.title", "Notifications", { ns: "settings" }),
+				content: (
+					<Card className="!border-0 !shadow-none !bg-transparent">
+						<WebhookSettings />
 					</Card>
 				),
 			},
