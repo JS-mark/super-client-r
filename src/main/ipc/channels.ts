@@ -307,6 +307,14 @@ export const PLUGIN_CHANNELS = {
 	UPDATE_PLUGIN: "plugin:updatePlugin",
 } as const;
 
+// Webhook 通知相关通道
+export const WEBHOOK_CHANNELS = {
+	GET_CONFIGS: "webhook:get-configs",
+	SAVE_CONFIG: "webhook:save-config",
+	DELETE_CONFIG: "webhook:delete-config",
+	TEST_WEBHOOK: "webhook:test",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -326,4 +334,5 @@ export type IPCChannel =
 	| (typeof MODEL_CHANNELS)[keyof typeof MODEL_CHANNELS]
 	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS]
 	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS]
-	| (typeof PLUGIN_CHANNELS)[keyof typeof PLUGIN_CHANNELS];
+	| (typeof PLUGIN_CHANNELS)[keyof typeof PLUGIN_CHANNELS]
+	| (typeof WEBHOOK_CHANNELS)[keyof typeof WEBHOOK_CHANNELS];

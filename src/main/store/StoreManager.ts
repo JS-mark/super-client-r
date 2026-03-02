@@ -9,6 +9,7 @@ import type {
 	McpServerConfig,
 	ModelProvider,
 	ProviderModel,
+	WebhookConfig,
 } from "../ipc/types";
 import { ensureModelDefaults } from "../services/llm/modelNormalizer";
 
@@ -80,6 +81,8 @@ export interface AppConfig {
 		refreshToken?: string;
 		expiresAt?: number;
 	};
+	// Webhook
+	webhookConfigs?: WebhookConfig[];
 }
 
 export interface AppData {
@@ -319,6 +322,30 @@ export class StoreManager {
 		} else {
 			this.configStore.set("activeModelSelection", selection);
 		}
+	}
+
+	// ============ Webhook 配置相关 ============
+
+	getWebhookConfigs(): WebhookConfig[] {
+		return this.configStore.get("webhookConfigs") || [];
+	}
+
+	saveWebhookConfig(config: WebhookConfig): void {
+		const configs = this.getWebhookConfigs();
+		const existingIndex = configs.findIndex((c) => c.id === config.id);
+
+		if (existingIndex >= 0) {
+			configs[existingIndex] = config;
+		} else {
+			configs.push(config);
+		}
+
+		this.configStore.set("webhookConfigs", configs);
+	}
+
+	deleteWebhookConfig(id: string): void {
+		const configs = this.getWebhookConfigs().filter((c) => c.id !== id);
+		this.configStore.set("webhookConfigs", configs);
 	}
 
 	// ============ 清除所有数据 ============

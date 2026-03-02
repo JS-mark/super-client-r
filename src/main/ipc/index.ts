@@ -17,6 +17,7 @@ import { registerMcpHandlers } from "./handlers/mcpHandlers";
 import { registerPluginHandlers } from "./handlers/pluginHandlers";
 import { registerSearchHandlers } from "./handlers/searchHandlers";
 import { registerSkillHandlers } from "./handlers/skillHandlers";
+import { registerWebhookHandlers } from "./handlers/webhookHandlers";
 import { registerWindowControlHandlers } from "./handlers/windowHandlers";
 
 /**
@@ -37,6 +38,7 @@ export function registerIpcHandlers(): void {
 	registerFileHandlers();
 	registerLogHandlers();
 	registerModelHandlers();
+	registerWebhookHandlers();
 	setupAgentHandlers();
 }
 

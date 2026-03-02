@@ -431,6 +431,14 @@ export interface ElectronAPI {
 		) => () => void;
 	};
 
+	// Webhook API
+	webhook: {
+		getConfigs: () => Promise<IPCResponse<WebhookConfig[]>>;
+		saveConfig: (config: WebhookConfig) => Promise<IPCResponse>;
+		deleteConfig: (id: string) => Promise<IPCResponse>;
+		test: (configId: string) => Promise<IPCResponse<WebhookTestResult>>;
+	};
+
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;
@@ -934,6 +942,28 @@ export interface AttachmentInfo {
 	thumbnailPath?: string;
 }
 
+// ============ Webhook 相关类型 ============
+
+export type WebhookType = "dingtalk" | "feishu" | "custom";
+
+export interface WebhookConfig {
+	id: string;
+	name: string;
+	type: WebhookType;
+	url: string;
+	secret?: string;
+	headers?: Record<string, string>;
+	method?: "GET" | "POST";
+	enabled: boolean;
+	createdAt: number;
+}
+
+export interface WebhookTestResult {
+	success: boolean;
+	statusCode?: number;
+	message: string;
+}
+
 // ============ 实现 ============
 
 const electronAPI: ElectronAPI = {
@@ -1356,6 +1386,17 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.on("plugin:showQuickPick", listener);
 			return () => ipcRenderer.off("plugin:showQuickPick", listener);
 		},
+	},
+
+	// Webhook API
+	webhook: {
+		getConfigs: () => ipcRenderer.invoke("webhook:get-configs"),
+		saveConfig: (config: WebhookConfig) =>
+			ipcRenderer.invoke("webhook:save-config", config),
+		deleteConfig: (id: string) =>
+			ipcRenderer.invoke("webhook:delete-config", id),
+		test: (configId: string) =>
+			ipcRenderer.invoke("webhook:test", configId),
 	},
 
 	// 系统信息 API
