@@ -315,6 +315,59 @@ export const WEBHOOK_CHANNELS = {
 	TEST_WEBHOOK: "webhook:test",
 } as const;
 
+// IM Bot 相关通道
+export const IMBOT_CHANNELS = {
+	// 机器人管理
+	LIST_BOTS: "imbot:list",
+	START_BOT: "imbot:start",
+	STOP_BOT: "imbot:stop",
+	GET_BOT_STATUS: "imbot:get-status",
+	// 消息发送
+	SEND_MESSAGE: "imbot:send-message",
+} as const;
+
+// Remote Device 相关通道
+export const REMOTE_DEVICE_CHANNELS = {
+	// 设备管理
+	LIST_DEVICES: "remote-device:list",
+	REGISTER_DEVICE: "remote-device:register",
+	REMOVE_DEVICE: "remote-device:remove",
+	GET_DEVICE: "remote-device:get",
+	// 命令执行
+	EXECUTE_COMMAND: "remote-device:execute-command",
+	// 终止命令
+	KILL_COMMAND: "remote-device:kill-command",
+	// Tab 补全
+	TAB_COMPLETE: "remote-device:tab-complete",
+	// 获取当前工作目录
+	GET_CWD: "remote-device:get-cwd",
+	// 命令输出流式推送 (main → renderer)
+	COMMAND_OUTPUT: "remote-device:command-output",
+} as const;
+
+// Remote Control Events 相关通道
+export const REMOTE_CONTROL_CHANNELS = {
+	// 获取所有事件
+	GET_EVENTS: "remote-control:get-events",
+	// 清空事件
+	CLEAR_EVENTS: "remote-control:clear-events",
+	// 新事件推送 (main → renderer)
+	NEW_EVENT: "remote-control:new-event",
+	// 获取设备连接信息
+	GET_CONNECTION_INFO: "remote-control:get-connection-info",
+} as const;
+
+// Remote Chat Bridge 相关通道
+export const REMOTE_CHAT_CHANNELS = {
+	BIND: "remote-chat:bind",
+	UNBIND: "remote-chat:unbind",
+	GET_BINDING: "remote-chat:get-binding",
+	CHECK_BOT_ONLINE: "remote-chat:check-bot-online",
+	SEND_MESSAGE: "remote-chat:send-message",
+	GET_REMOTE_MESSAGES: "remote-chat:get-remote-messages",
+	IM_MESSAGE: "remote-chat:im-message",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -335,4 +388,8 @@ export type IPCChannel =
 	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS]
 	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS]
 	| (typeof PLUGIN_CHANNELS)[keyof typeof PLUGIN_CHANNELS]
-	| (typeof WEBHOOK_CHANNELS)[keyof typeof WEBHOOK_CHANNELS];
+	| (typeof WEBHOOK_CHANNELS)[keyof typeof WEBHOOK_CHANNELS]
+	| (typeof IMBOT_CHANNELS)[keyof typeof IMBOT_CHANNELS]
+	| (typeof REMOTE_DEVICE_CHANNELS)[keyof typeof REMOTE_DEVICE_CHANNELS]
+	| (typeof REMOTE_CONTROL_CHANNELS)[keyof typeof REMOTE_CONTROL_CHANNELS]
+	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS];

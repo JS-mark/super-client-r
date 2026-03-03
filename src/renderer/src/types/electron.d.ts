@@ -246,6 +246,116 @@ export interface IPCResponse<T = unknown> {
 	error?: string;
 }
 
+// ============ IM Bot 相关类型 ============
+
+export interface IMBotConfig {
+	id: string;
+	type: "dingtalk" | "lark" | "telegram";
+	name: string;
+	enabled: boolean;
+	dingtalk?: {
+		appKey: string;
+		appSecret: string;
+		webhookUrl?: string;
+	};
+	lark?: {
+		appId: string;
+		appSecret: string;
+		verificationToken?: string;
+		encryptKey?: string;
+		chatIds?: string[];
+	};
+	telegram?: {
+		botToken: string;
+		chatId?: string;
+	};
+	allowedUsers?: string[];
+	allowedGroups?: string[];
+	adminUsers?: string[];
+}
+
+export interface BotStatus {
+	id: string;
+	name: string;
+	type: "dingtalk" | "lark" | "telegram";
+	status: "running" | "stopped" | "error";
+	lastError?: string;
+	startedAt?: number;
+}
+
+// ============ Remote Device 相关类型 ============
+
+export interface RemoteDevice {
+	id: string;
+	name: string;
+	platform: "linux" | "windows" | "macos";
+	ipAddress?: string;
+	authentication: {
+		token: string;
+	};
+	status: "online" | "offline" | "error";
+	lastSeen?: number;
+	tags?: string[];
+	description?: string;
+	createdAt: number;
+}
+
+export interface CommandResult {
+	requestId: string;
+	deviceId: string;
+	stdout: string;
+	stderr: string;
+	exitCode: number;
+	duration: number;
+	cwd?: string;
+}
+
+/** Tab 补全结果 */
+export interface TabCompleteResult {
+	matches: string[];
+	wordStart: number;
+}
+
+/** 命令输出流式 chunk */
+export interface CommandOutputChunk {
+	requestId: string;
+	deviceId: string;
+	stream: "stdout" | "stderr";
+	data: string;
+}
+
+// ============ Remote Control Event 类型 ============
+
+export type RemoteControlEventType =
+	| "im_message_received"
+	| "im_message_sent"
+	| "device_command_sent"
+	| "device_command_result"
+	| "device_online"
+	| "device_offline";
+
+export type RemoteControlEventDirection = "incoming" | "outgoing" | "system";
+
+export type RemoteControlEventSourceKind = "bot" | "device";
+
+export interface RemoteControlEvent {
+	id: string;
+	type: RemoteControlEventType;
+	direction: RemoteControlEventDirection;
+	source: {
+		kind: RemoteControlEventSourceKind;
+		id: string;
+		name: string;
+	};
+	content: string;
+	timestamp: number;
+}
+
+export interface DeviceConnectionInfo {
+	wsPort: number;
+	localIPs: string[];
+}
+
 export type SearchProviderType =
 	| "zhipu"
 	| "tavily"
@@ -459,6 +569,34 @@ export interface ChatMessagePersist {
 	};
 }
 
+export type IMPlatform = "dingtalk" | "lark" | "telegram";
+
+export interface RemoteBinding {
+	botId: string;
+	chatId: string;
+	botName: string;
+	platform: IMPlatform;
+	boundAt: number;
+}
+
+export interface RemoteIMMessage {
+	conversationId: string;
+	content: string;
+	sender: { id: string; name: string };
+	platform: IMPlatform;
+	chatId: string;
+	timestamp: number;
+}
+
+export interface RemoteChatMessage {
+	id: string;
+	direction: "incoming" | "outgoing";
+	content: string;
+	sender: { id: string; name: string };
+	platform: IMPlatform;
+	timestamp: number;
+}
+
 export interface ConversationSummary {
 	id: string;
 	name: string;
@@ -466,6 +604,7 @@ export interface ConversationSummary {
 	updatedAt: number;
 	messageCount: number;
 	preview: string;
+	remote?: RemoteBinding;
 }
 
 export interface ElectronAPI {
@@ -885,6 +1024,80 @@ export interface ElectronAPI {
 				responseChannel: string;
 			}) => void,
 		) => () => void;
+	};
+
+	// IM Bot API
+	imbot: {
+		listBots: () => Promise<IPCResponse<BotStatus[]>>;
+		startBot: (config: IMBotConfig) => Promise<IPCResponse<void>>;
+		stopBot: (botId: string) => Promise<IPCResponse<void>>;
+		getBotStatus: (botId: string) => Promise<IPCResponse<BotStatus | null>>;
+		sendMessage: (
+			botId: string,
+			chatId: string,
+			content: string,
+		) => Promise<IPCResponse<void>>;
+	};
+
+	// Remote Device API
+	remoteDevice: {
+		listDevices: () => Promise<IPCResponse<RemoteDevice[]>>;
+		registerDevice: (req: {
+			name: string;
+			platform: "linux" | "windows" | "macos";
+			tags?: string[];
+			description?: string;
+		}) => Promise<IPCResponse<RemoteDevice>>;
+		removeDevice: (deviceId: string) => Promise<IPCResponse<boolean>>;
+		getDevice: (deviceId: string) => Promise<IPCResponse<RemoteDevice | null>>;
+		executeCommand: (
+			deviceId: string,
+			command: string,
+			timeout?: number,
+		) => Promise<IPCResponse<CommandResult>>;
+		onCommandOutput: (
+			callback: (chunk: CommandOutputChunk) => void,
+		) => () => void;
+		killCommand: (
+			deviceId: string,
+			requestId: string,
+		) => Promise<IPCResponse>;
+		tabComplete: (
+			deviceId: string,
+			line: string,
+			cursorPos: number,
+		) => Promise<IPCResponse<TabCompleteResult>>;
+		getCwd: (deviceId: string) => Promise<IPCResponse<string>>;
+	};
+
+	// Remote Control Events API
+	remoteControl: {
+		getEvents: () => Promise<IPCResponse<RemoteControlEvent[]>>;
+		clearEvents: () => Promise<IPCResponse<void>>;
+		getConnectionInfo: () => Promise<IPCResponse<DeviceConnectionInfo>>;
+		onNewEvent: (callback: (event: RemoteControlEvent) => void) => () => void;
+	};
+
+	// Remote Chat Bridge API
+	remoteChat: {
+		bind: (
+			conversationId: string,
+			botId: string,
+			chatId: string,
+		) => Promise<IPCResponse<RemoteBinding>>;
+		unbind: (conversationId: string) => Promise<IPCResponse<void>>;
+		getBinding: (
+			conversationId: string,
+		) => Promise<IPCResponse<RemoteBinding | null>>;
+		checkBotOnline: (botId: string) => Promise<IPCResponse<boolean>>;
+		sendMessage: (
+			conversationId: string,
+			content: string,
+		) => Promise<IPCResponse<void>>;
+		getRemoteMessages: (
+			conversationId: string,
+		) => Promise<IPCResponse<RemoteChatMessage[]>>;
+		onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
 	};
 
 	// Webhook API

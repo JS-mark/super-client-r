@@ -1,0 +1,17 @@
+/* xterm scrollbar — thin, rounded, matches Catppuccin Mocha */
+.xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(88, 91, 112, 0.45);
+  border-radius: 3px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(88, 91, 112, 0.7);
+}
