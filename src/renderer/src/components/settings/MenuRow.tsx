@@ -22,155 +22,158 @@ interface MenuRowProps {
 	onDragEnd: () => void;
 }
 
-export const MenuRow: React.FC<MenuRowProps> = memo(({
-	item,
-	index,
-	isDragging,
-	isDropTarget,
-	dropPosition,
-	onToggle,
-	onEdit,
-	onDragStart,
-	onDragEnter,
-	onDragEnd,
-}) => {
-	const { t } = useTranslation();
-	const { token } = useToken();
-	const rowRef = useRef<HTMLDivElement>(null);
+export const MenuRow: React.FC<MenuRowProps> = memo(
+	({
+		item,
+		index,
+		isDragging,
+		isDropTarget,
+		dropPosition,
+		onToggle,
+		onEdit,
+		onDragStart,
+		onDragEnter,
+		onDragEnd,
+	}) => {
+		const { t } = useTranslation();
+		const { token } = useToken();
+		const rowRef = useRef<HTMLDivElement>(null);
 
-	const handleDragStart = useCallback(
-		(e: React.DragEvent) => {
-			e.dataTransfer.effectAllowed = "move";
-			e.dataTransfer.setData("text/plain", index.toString());
-			onDragStart(index);
-		},
-		[index, onDragStart],
-	);
+		const handleDragStart = useCallback(
+			(e: React.DragEvent) => {
+				e.dataTransfer.effectAllowed = "move";
+				e.dataTransfer.setData("text/plain", index.toString());
+				onDragStart(index);
+			},
+			[index, onDragStart],
+		);
 
-	const handleDragOver = useCallback(
-		(e: React.DragEvent) => {
-			e.preventDefault();
-			e.dataTransfer.dropEffect = "move";
-			if (rowRef.current) {
-				const rect = rowRef.current.getBoundingClientRect();
-				onDragEnter(index, rect, e.clientY);
-			}
-		},
-		[index, onDragEnter],
-	);
+		const handleDragOver = useCallback(
+			(e: React.DragEvent) => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = "move";
+				if (rowRef.current) {
+					const rect = rowRef.current.getBoundingClientRect();
+					onDragEnter(index, rect, e.clientY);
+				}
+			},
+			[index, onDragEnter],
+		);
 
-	return (
-		<div
-			ref={rowRef}
-			className={cn(
-				"relative transition-all duration-150",
-				isDragging && "opacity-30 scale-[0.98]",
-			)}
-			draggable
-			onDragStart={handleDragStart}
-			onDragOver={handleDragOver}
-			onDragEnd={onDragEnd}
-		>
-			{/* Drop indicator line (above) */}
-			{isDropTarget && dropPosition === "above" && (
-				<div className="absolute -top-[1px] left-2 right-2 h-0.5 bg-blue-500 rounded-full z-10" />
-			)}
-
+		return (
 			<div
+				ref={rowRef}
 				className={cn(
-					"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
-					!item.enabled && "opacity-50",
+					"relative transition-all duration-150",
+					isDragging && "opacity-30 scale-[0.98]",
 				)}
-				style={{
-					backgroundColor: "transparent",
-				}}
-				onMouseEnter={(e) => {
-					e.currentTarget.style.backgroundColor = token.colorBgTextHover;
-				}}
-				onMouseLeave={(e) => {
-					e.currentTarget.style.backgroundColor = "transparent";
-				}}
+				draggable
+				onDragStart={handleDragStart}
+				onDragOver={handleDragOver}
+				onDragEnd={onDragEnd}
 			>
-				{/* Drag handle */}
-				<div
-					className="cursor-grab active:cursor-grabbing transition-colors shrink-0"
-					style={{ color: token.colorTextDisabled }}
-					onMouseEnter={(e) => {
-						e.currentTarget.style.color = token.colorTextSecondary;
-					}}
-					onMouseLeave={(e) => {
-						e.currentTarget.style.color = token.colorTextDisabled;
-					}}
-				>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-						<circle cx="8" cy="6" r="2" />
-						<circle cx="8" cy="12" r="2" />
-						<circle cx="8" cy="18" r="2" />
-						<circle cx="16" cy="6" r="2" />
-						<circle cx="16" cy="12" r="2" />
-						<circle cx="16" cy="18" r="2" />
-					</svg>
-				</div>
+				{/* Drop indicator line (above) */}
+				{isDropTarget && dropPosition === "above" && (
+					<div className="absolute -top-[1px] left-2 right-2 h-0.5 bg-blue-500 rounded-full z-10" />
+				)}
 
-				{/* Icon */}
 				<div
 					className={cn(
-						"w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+						"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group",
+						!item.enabled && "opacity-50",
 					)}
 					style={{
-						backgroundColor: token.colorBgContainer,
-						color: item.enabled ? token.colorText : token.colorTextDisabled,
+						backgroundColor: "transparent",
+					}}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.backgroundColor = token.colorBgTextHover;
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.backgroundColor = "transparent";
 					}}
 				>
-					{renderItemIcon(item, "sm")}
+					{/* Drag handle */}
+					<div
+						className="cursor-grab active:cursor-grabbing transition-colors shrink-0"
+						style={{ color: token.colorTextDisabled }}
+						onMouseEnter={(e) => {
+							e.currentTarget.style.color = token.colorTextSecondary;
+						}}
+						onMouseLeave={(e) => {
+							e.currentTarget.style.color = token.colorTextDisabled;
+						}}
+					>
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+							<circle cx="8" cy="6" r="2" />
+							<circle cx="8" cy="12" r="2" />
+							<circle cx="8" cy="18" r="2" />
+							<circle cx="16" cy="6" r="2" />
+							<circle cx="16" cy="12" r="2" />
+							<circle cx="16" cy="18" r="2" />
+						</svg>
+					</div>
+
+					{/* Icon */}
+					<div
+						className={cn(
+							"w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+						)}
+						style={{
+							backgroundColor: token.colorBgContainer,
+							color: item.enabled ? token.colorText : token.colorTextDisabled,
+						}}
+					>
+						{renderItemIcon(item, "sm")}
+					</div>
+
+					{/* Label */}
+					<span
+						className={cn("flex-1 text-sm font-medium select-none")}
+						style={{
+							color: item.enabled ? token.colorText : token.colorTextDisabled,
+						}}
+					>
+						{t(item.label, { ns: "menu" })}
+					</span>
+
+					{/* Actions */}
+					<div className="flex items-center gap-2">
+						<Switch
+							checked={item.enabled}
+							size="small"
+							onChange={() => onToggle(item.id)}
+						/>
+						<Tooltip title={t("edit", { ns: "settings" })}>
+							<button
+								className={cn(
+									"w-7 h-7 rounded-lg flex items-center justify-center transition-all",
+									"opacity-0 group-hover:opacity-100",
+								)}
+								style={{
+									color: token.colorTextDisabled,
+								}}
+								onMouseEnter={(e) => {
+									e.currentTarget.style.backgroundColor =
+										token.colorBgTextHover;
+									e.currentTarget.style.color = token.colorText;
+								}}
+								onMouseLeave={(e) => {
+									e.currentTarget.style.backgroundColor = "";
+									e.currentTarget.style.color = token.colorTextDisabled;
+								}}
+								onClick={() => onEdit(item)}
+							>
+								<EditOutlined className="text-xs" />
+							</button>
+						</Tooltip>
+					</div>
 				</div>
 
-				{/* Label */}
-				<span
-					className={cn("flex-1 text-sm font-medium select-none")}
-					style={{
-						color: item.enabled ? token.colorText : token.colorTextDisabled,
-					}}
-				>
-					{t(item.label, { ns: "menu" })}
-				</span>
-
-				{/* Actions */}
-				<div className="flex items-center gap-2">
-					<Switch
-						checked={item.enabled}
-						size="small"
-						onChange={() => onToggle(item.id)}
-					/>
-					<Tooltip title={t("edit", { ns: "settings" })}>
-						<button
-							className={cn(
-								"w-7 h-7 rounded-lg flex items-center justify-center transition-all",
-								"opacity-0 group-hover:opacity-100",
-							)}
-							style={{
-								color: token.colorTextDisabled,
-							}}
-							onMouseEnter={(e) => {
-								e.currentTarget.style.backgroundColor = token.colorBgTextHover;
-								e.currentTarget.style.color = token.colorText;
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.backgroundColor = "";
-								e.currentTarget.style.color = token.colorTextDisabled;
-							}}
-							onClick={() => onEdit(item)}
-						>
-							<EditOutlined className="text-xs" />
-						</button>
-					</Tooltip>
-				</div>
+				{/* Drop indicator line (below) */}
+				{isDropTarget && dropPosition === "below" && (
+					<div className="absolute -bottom-[1px] left-2 right-2 h-0.5 bg-blue-500 rounded-full z-10" />
+				)}
 			</div>
-
-			{/* Drop indicator line (below) */}
-			{isDropTarget && dropPosition === "below" && (
-				<div className="absolute -bottom-[1px] left-2 right-2 h-0.5 bg-blue-500 rounded-full z-10" />
-			)}
-		</div>
-	);
-});
+		);
+	},
+);

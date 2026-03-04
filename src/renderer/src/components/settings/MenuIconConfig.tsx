@@ -4,6 +4,7 @@ import {
 	CloudOutlined,
 	CodeOutlined,
 	DatabaseOutlined,
+	DesktopOutlined,
 	FileTextOutlined,
 	FolderOutlined,
 	HomeOutlined,
@@ -43,6 +44,7 @@ export const ICON_MAP: Record<
 	FileTextOutlined,
 	CloudOutlined,
 	DatabaseOutlined,
+	DesktopOutlined,
 };
 
 // Icon type options for Segmented - use getter for i18n
@@ -53,8 +55,14 @@ function settingsT(key: string, fallback: string): string {
 }
 
 export const getIconTypeOptions = () => [
-	{ label: settingsT("presetIcons", "预设图标"), value: "default" as MenuItemIconType },
-	{ label: settingsT("emojiIcon", "Emoji"), value: "emoji" as MenuItemIconType },
+	{
+		label: settingsT("presetIcons", "预设图标"),
+		value: "default" as MenuItemIconType,
+	},
+	{
+		label: settingsT("emojiIcon", "Emoji"),
+		value: "emoji" as MenuItemIconType,
+	},
 	{ label: settingsT("imageIcon", "图片"), value: "image" as MenuItemIconType },
 ];
 
@@ -63,16 +71,47 @@ export const ICON_TYPE_OPTIONS = getIconTypeOptions();
 
 // Available preset icons
 export const getAvailableIcons = () => [
-	{ label: `💬 ${settingsT("presetIcon.message", "消息")}`, value: "MessageOutlined" },
-	{ label: `📦 ${settingsT("presetIcon.apps", "应用")}`, value: "AppstoreOutlined" },
-	{ label: `🚀 ${settingsT("presetIcon.rocket", "火箭")}`, value: "RocketOutlined" },
-	{ label: `⚙️ ${settingsT("presetIcon.settings", "设置")}`, value: "SettingOutlined" },
-	{ label: `🏠 ${settingsT("presetIcon.home", "首页")}`, value: "HomeOutlined" },
-	{ label: `👤 ${settingsT("presetIcon.user", "用户")}`, value: "UserOutlined" },
-	{ label: `💻 ${settingsT("presetIcon.code", "代码")}`, value: "CodeOutlined" },
-	{ label: `📄 ${settingsT("presetIcon.document", "文档")}`, value: "FileTextOutlined" },
+	{
+		label: `💬 ${settingsT("presetIcon.message", "消息")}`,
+		value: "MessageOutlined",
+	},
+	{
+		label: `📦 ${settingsT("presetIcon.apps", "应用")}`,
+		value: "AppstoreOutlined",
+	},
+	{
+		label: `🚀 ${settingsT("presetIcon.rocket", "火箭")}`,
+		value: "RocketOutlined",
+	},
+	{
+		label: `⚙️ ${settingsT("presetIcon.settings", "设置")}`,
+		value: "SettingOutlined",
+	},
+	{
+		label: `🏠 ${settingsT("presetIcon.home", "首页")}`,
+		value: "HomeOutlined",
+	},
+	{
+		label: `👤 ${settingsT("presetIcon.user", "用户")}`,
+		value: "UserOutlined",
+	},
+	{
+		label: `💻 ${settingsT("presetIcon.code", "代码")}`,
+		value: "CodeOutlined",
+	},
+	{
+		label: `📄 ${settingsT("presetIcon.document", "文档")}`,
+		value: "FileTextOutlined",
+	},
 	{ label: `☁️ ${settingsT("presetIcon.cloud", "云")}`, value: "CloudOutlined" },
-	{ label: `🗄️ ${settingsT("presetIcon.database", "数据库")}`, value: "DatabaseOutlined" },
+	{
+		label: `🗄️ ${settingsT("presetIcon.database", "数据库")}`,
+		value: "DatabaseOutlined",
+	},
+	{
+		label: `🖥️ ${settingsT("presetIcon.desktop", "桌面")}`,
+		value: "DesktopOutlined",
+	},
 ];
 
 export const AVAILABLE_ICONS = getAvailableIcons();

@@ -564,14 +564,38 @@ export default function Plugins() {
 				isMarkdownTheme && activeMarkdownPluginId === plugin.id;
 
 			const stateConfig: Record<string, { color: string; text: string }> = {
-				installing: { color: "processing", text: t("plugins.state.installing", { ns: "plugins" }) },
-				installed: { color: "default", text: t("plugins.state.installed", { ns: "plugins" }) },
-				activating: { color: "processing", text: t("plugins.state.activating", { ns: "plugins" }) },
-				active: { color: "green", text: t("plugins.state.active", { ns: "plugins" }) },
-				deactivating: { color: "orange", text: t("plugins.state.deactivating", { ns: "plugins" }) },
-				inactive: { color: "default", text: t("plugins.state.inactive", { ns: "plugins" }) },
-				error: { color: "red", text: t("plugins.state.error", { ns: "plugins" }) },
-				uninstalling: { color: "orange", text: t("plugins.state.uninstalling", { ns: "plugins" }) },
+				installing: {
+					color: "processing",
+					text: t("plugins.state.installing", { ns: "plugins" }),
+				},
+				installed: {
+					color: "default",
+					text: t("plugins.state.installed", { ns: "plugins" }),
+				},
+				activating: {
+					color: "processing",
+					text: t("plugins.state.activating", { ns: "plugins" }),
+				},
+				active: {
+					color: "green",
+					text: t("plugins.state.active", { ns: "plugins" }),
+				},
+				deactivating: {
+					color: "orange",
+					text: t("plugins.state.deactivating", { ns: "plugins" }),
+				},
+				inactive: {
+					color: "default",
+					text: t("plugins.state.inactive", { ns: "plugins" }),
+				},
+				error: {
+					color: "red",
+					text: t("plugins.state.error", { ns: "plugins" }),
+				},
+				uninstalling: {
+					color: "orange",
+					text: t("plugins.state.uninstalling", { ns: "plugins" }),
+				},
 			};
 			const stateInfo = stateConfig[plugin.state] || stateConfig.inactive;
 
@@ -632,7 +656,13 @@ export default function Plugins() {
 								</div>
 							</div>
 							<div className="flex items-center gap-2 shrink-0">
-								<Tooltip title={plugin.enabled ? t("plugins.disable", { ns: "plugins" }) : t("plugins.enable", { ns: "plugins" })}>
+								<Tooltip
+									title={
+										plugin.enabled
+											? t("plugins.disable", { ns: "plugins" })
+											: t("plugins.enable", { ns: "plugins" })
+									}
+								>
 									<Switch
 										size="small"
 										checked={plugin.enabled}
@@ -968,8 +998,13 @@ export default function Plugins() {
 											className="flex items-center gap-3 text-xs"
 											style={{ color: token.colorTextQuaternary }}
 										>
-											<span>{plugin.downloads} {t("plugins.downloads", { ns: "plugins" })}</span>
-											<span>{plugin.rating} {t("plugins.rating", { ns: "plugins" })}</span>
+											<span>
+												{plugin.downloads}{" "}
+												{t("plugins.downloads", { ns: "plugins" })}
+											</span>
+											<span>
+												{plugin.rating} {t("plugins.rating", { ns: "plugins" })}
+											</span>
 										</div>
 										{plugin.installed ? (
 											<Tag
