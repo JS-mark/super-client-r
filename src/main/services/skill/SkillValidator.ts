@@ -181,11 +181,7 @@ async function findSkillMd(
 		const entries = await fs.readdir(skillsDir, { withFileTypes: true });
 		for (const entry of entries) {
 			if (entry.isDirectory()) {
-				const candidate = path.join(
-					skillsDir,
-					String(entry.name),
-					"SKILL.md",
-				);
+				const candidate = path.join(skillsDir, String(entry.name), "SKILL.md");
 				if (await fileExists(candidate)) {
 					return { skillMdPath: candidate, skillId: String(entry.name) };
 				}
@@ -290,7 +286,7 @@ async function validateClaudeCodeStructural(
 				"SKILLMD_MISSING_NAME",
 				"error",
 				"structural",
-				"SKILL.md frontmatter is missing \"name\" field",
+				'SKILL.md frontmatter is missing "name" field',
 			),
 		);
 	} else {
@@ -325,7 +321,7 @@ async function validateClaudeCodeStructural(
 				"SKILLMD_MISSING_DESCRIPTION",
 				"error",
 				"structural",
-				"SKILL.md frontmatter is missing \"description\" field",
+				'SKILL.md frontmatter is missing "description" field',
 			),
 		);
 	}
@@ -337,7 +333,7 @@ async function validateClaudeCodeStructural(
 				"SKILLMD_MISSING_TOOLS",
 				"error",
 				"structural",
-				"SKILL.md frontmatter is missing \"allowed-tools\" field",
+				'SKILL.md frontmatter is missing "allowed-tools" field',
 			),
 		);
 	} else {
@@ -447,9 +443,15 @@ async function validateClaudeCodeStructural(
 	const id = fmData.name || skillId;
 	if (id && installedSkillIds.includes(id)) {
 		issues.push(
-			issue("ID_CONFLICT", "error", "structural", `Skill "${id}" is already installed`, {
-				id,
-			}),
+			issue(
+				"ID_CONFLICT",
+				"error",
+				"structural",
+				`Skill "${id}" is already installed`,
+				{
+					id,
+				},
+			),
 		);
 	}
 
@@ -506,7 +508,10 @@ async function validateContent(
 				for (const entry of entries) {
 					const name = String(entry.name);
 					if (entry.isFile() && name.endsWith(".md")) {
-						const content = await fs.readFile(path.join(commandsDir, name), "utf-8");
+						const content = await fs.readFile(
+							path.join(commandsDir, name),
+							"utf-8",
+						);
 						const parsed = parseFrontmatter(content);
 
 						if (!parsed) {
@@ -585,9 +590,15 @@ async function validateContent(
 
 			if (!tool.name || typeof tool.name !== "string") {
 				issues.push(
-					issue("TOOL_MISSING_NAME", "error", "content", `tools[${i}] is missing "name"`, {
-						index: i,
-					}),
+					issue(
+						"TOOL_MISSING_NAME",
+						"error",
+						"content",
+						`tools[${i}] is missing "name"`,
+						{
+							index: i,
+						},
+					),
 				);
 			} else if (!JS_IDENTIFIER.test(tool.name)) {
 				issues.push(
@@ -750,7 +761,9 @@ async function validateConsistency(
 
 // ============ L4: 安全校验（不变） ============
 
-async function validateSecurity(sourcePath: string): Promise<ValidationIssue[]> {
+async function validateSecurity(
+	sourcePath: string,
+): Promise<ValidationIssue[]> {
 	const issues: ValidationIssue[] = [];
 	let totalSize = 0;
 
@@ -919,7 +932,9 @@ export async function validateSkill(
 		allIssues.push(...securityIssues);
 
 		const errorCount = allIssues.filter((i) => i.severity === "error").length;
-		const warningCount = allIssues.filter((i) => i.severity === "warning").length;
+		const warningCount = allIssues.filter(
+			(i) => i.severity === "warning",
+		).length;
 		return {
 			valid: false,
 			issues: allIssues,

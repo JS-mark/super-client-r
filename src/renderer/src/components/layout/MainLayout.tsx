@@ -5,6 +5,7 @@ import {
 	FolderOutlined,
 	MessageOutlined,
 	MoonOutlined,
+	RobotOutlined,
 	RocketOutlined,
 	SettingOutlined,
 	StarOutlined,
@@ -44,6 +45,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
 	ApiOutlined,
 	StarOutlined,
 	FolderOutlined,
+	RobotOutlined,
+	DesktopOutlined,
 	// Alias for legacy persisted configs
 	PluginOutlined: AppstoreOutlined,
 };

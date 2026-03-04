@@ -356,6 +356,14 @@ export interface DeviceConnectionInfo {
 	localIPs: string[];
 }
 
+export type RemoteDeviceMode = "local" | "relay";
+
+export interface RelayConfig {
+	mode: RemoteDeviceMode;
+	relayUrl?: string;
+	relayKey?: string;
+}
+
 export type SearchProviderType =
 	| "zhipu"
 	| "tavily"
@@ -1068,6 +1076,8 @@ export interface ElectronAPI {
 			cursorPos: number,
 		) => Promise<IPCResponse<TabCompleteResult>>;
 		getCwd: (deviceId: string) => Promise<IPCResponse<string>>;
+		getRelayConfig: () => Promise<IPCResponse<RelayConfig | null>>;
+		setRelayConfig: (config: RelayConfig) => Promise<IPCResponse>;
 	};
 
 	// Remote Control Events API

@@ -10,7 +10,11 @@ import type {
 	ModelProvider,
 	ProviderModel,
 	WebhookConfig,
+	IMBotConfig,
+	RemoteDevice,
+	RelayConfig,
 } from "../ipc/types";
+import type { RemoteControlEvent } from "../services/remote/types";
 import { ensureModelDefaults } from "../services/llm/modelNormalizer";
 
 export type SearchProviderType =
@@ -83,11 +87,18 @@ export interface AppConfig {
 	};
 	// Webhook
 	webhookConfigs?: WebhookConfig[];
+	// IM Bot
+	imbotConfigs?: IMBotConfig[];
+	// Remote Device
+	remoteDevices?: RemoteDevice[];
+	// Relay 配置
+	relayConfig?: RelayConfig;
 }
 
 export interface AppData {
 	sessions: string[];
 	lastSessionId?: string;
+	remoteControlEvents?: RemoteControlEvent[];
 }
 
 export class StoreManager {
@@ -346,6 +357,86 @@ export class StoreManager {
 	deleteWebhookConfig(id: string): void {
 		const configs = this.getWebhookConfigs().filter((c) => c.id !== id);
 		this.configStore.set("webhookConfigs", configs);
+	}
+
+	// ============ IM Bot 配置相关 ============
+
+	getIMBotConfigs(): IMBotConfig[] {
+		return this.configStore.get("imbotConfigs") || [];
+	}
+
+	saveIMBotConfig(config: IMBotConfig): void {
+		const configs = this.getIMBotConfigs();
+		const existingIndex = configs.findIndex((c) => c.id === config.id);
+
+		if (existingIndex >= 0) {
+			configs[existingIndex] = config;
+		} else {
+			configs.push(config);
+		}
+
+		this.configStore.set("imbotConfigs", configs);
+	}
+
+	deleteIMBotConfig(id: string): void {
+		const configs = this.getIMBotConfigs().filter((c) => c.id !== id);
+		this.configStore.set("imbotConfigs", configs);
+	}
+
+	// ============ Remote Device 配置相关 ============
+
+	getRemoteDevices(): RemoteDevice[] {
+		return this.configStore.get("remoteDevices") || [];
+	}
+
+	saveRemoteDevice(device: RemoteDevice): void {
+		const devices = this.getRemoteDevices();
+		const existingIndex = devices.findIndex((d) => d.id === device.id);
+
+		if (existingIndex >= 0) {
+			devices[existingIndex] = device;
+		} else {
+			devices.push(device);
+		}
+
+		this.configStore.set("remoteDevices", devices);
+	}
+
+	deleteRemoteDevice(id: string): void {
+		const devices = this.getRemoteDevices().filter((d) => d.id !== id);
+		this.configStore.set("remoteDevices", devices);
+	}
+
+	// ============ Relay 配置相关 ============
+
+	getRelayConfig(): RelayConfig | undefined {
+		return this.configStore.get("relayConfig");
+	}
+
+	setRelayConfig(config: RelayConfig): void {
+		this.configStore.set("relayConfig", config);
+	}
+
+	// ============ Remote Control Events 相关 ============
+
+	private static MAX_EVENTS = 500;
+
+	getRemoteControlEvents(): RemoteControlEvent[] {
+		return this.dataStore.get("remoteControlEvents") || [];
+	}
+
+	appendRemoteControlEvent(event: RemoteControlEvent): void {
+		const events = this.getRemoteControlEvents();
+		events.push(event);
+		// 保持上限
+		if (events.length > StoreManager.MAX_EVENTS) {
+			events.splice(0, events.length - StoreManager.MAX_EVENTS);
+		}
+		this.dataStore.set("remoteControlEvents", events);
+	}
+
+	clearRemoteControlEvents(): void {
+		this.dataStore.set("remoteControlEvents", []);
 	}
 
 	// ============ 清除所有数据 ============

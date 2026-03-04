@@ -74,8 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
 						status="error"
 						title={t("somethingWentWrong", { ns: "error" })}
 						subTitle={
-							this.state.error?.message ||
-							t("unexpectedError", { ns: "error" })
+							this.state.error?.message || t("unexpectedError", { ns: "error" })
 						}
 						extra={[
 							<Button type="primary" key="retry" onClick={this.handleReset}>

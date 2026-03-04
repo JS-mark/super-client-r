@@ -1,4 +1,5 @@
 import {
+	ApiOutlined,
 	CheckOutlined,
 	CloseOutlined,
 	DeleteOutlined,
@@ -151,9 +152,15 @@ export function ConversationItem({
 				) : (
 					<>
 						<div
-							className="text-sm font-medium truncate"
+							className="text-sm font-medium truncate flex items-center gap-1"
 							style={{ color: token.colorText }}
 						>
+							{conversation.remote && (
+								<ApiOutlined
+									className="text-xs shrink-0"
+									style={{ color: token.colorPrimary }}
+								/>
+							)}
 							{conversation.name}
 						</div>
 						{conversation.preview && (

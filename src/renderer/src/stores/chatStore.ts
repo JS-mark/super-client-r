@@ -45,6 +45,9 @@ export interface Message {
 		duration?: number;
 		firstTokenMs?: number;
 		tokensPerSecond?: number;
+		source?: "local" | "remote";
+		remoteSender?: { id: string; name: string };
+		remotePlatform?: string;
 	};
 }
 

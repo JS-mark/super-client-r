@@ -12,7 +12,12 @@ import { useTranslation } from "react-i18next";
 interface ValidationIssue {
 	code: string;
 	severity: "error" | "warning";
-	category: "structural" | "content" | "compatibility" | "consistency" | "security";
+	category:
+		| "structural"
+		| "content"
+		| "compatibility"
+		| "consistency"
+		| "security";
 	messageKey: string;
 	messageParams?: Record<string, string | number>;
 	fallbackMessage: string;
@@ -160,9 +165,7 @@ export const SkillValidationReportModal: React.FC<
 					{valid && !hasWarnings && (
 						<>
 							<CheckCircleOutlined className="text-lg text-green-500" />
-							<span className="text-sm">
-								{t("validation.readyToInstall")}
-							</span>
+							<span className="text-sm">{t("validation.readyToInstall")}</span>
 						</>
 					)}
 					{valid && hasWarnings && (

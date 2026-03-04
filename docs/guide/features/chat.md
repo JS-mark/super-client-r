@@ -2,6 +2,8 @@
 
 Super Client R 提供强大的 AI 聊天功能，支持多种聊天模式和流式响应。
 
+> **扩展功能**：Chat 对话可以与 IM Bot（Telegram/钉钉/飞书）双向桥接，详见 [Remote Chat Bridge](./remote-chat-bridge.md)。
+
 ## 聊天模式
 
 ### Direct 模式（直接对话）

@@ -56,7 +56,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 	};
 
 	const infoItems = [
-		{ label: t("version", { ns: "settings" }), value: appInfo?.version || "N/A" },
+		{
+			label: t("version", { ns: "settings" }),
+			value: appInfo?.version || "N/A",
+		},
 		{ label: "Electron", value: appInfo?.electron || "N/A" },
 		{ label: "Node.js", value: appInfo?.node || "N/A" },
 		{ label: "V8", value: appInfo?.v8 || "N/A" },

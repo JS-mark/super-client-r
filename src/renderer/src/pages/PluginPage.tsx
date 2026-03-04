@@ -19,7 +19,9 @@ export default function PluginPage() {
 	const [html, setHtml] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [pageTitle_, setPageTitle_] = useState<string>(t("plugins.pluginPage", { ns: "plugins" }));
+	const [pageTitle_, setPageTitle_] = useState<string>(
+		t("plugins.pluginPage", { ns: "plugins" }),
+	);
 
 	const pageTitle = useMemo(
 		() => (

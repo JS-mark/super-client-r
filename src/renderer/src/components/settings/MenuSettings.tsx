@@ -70,7 +70,10 @@ export const MenuSettings: React.FC<{
 			}
 			const midY = rect.top + rect.height / 2;
 			const newPosition = clientY < midY ? "above" : "below";
-			if (dropIndexRef.current === index && dropPositionRef.current === newPosition) {
+			if (
+				dropIndexRef.current === index &&
+				dropPositionRef.current === newPosition
+			) {
 				return; // No change, skip re-render
 			}
 			dropIndexRef.current = index;

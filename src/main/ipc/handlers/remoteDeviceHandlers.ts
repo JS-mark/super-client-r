@@ -6,6 +6,7 @@ import type {
 	RegisterDeviceRequest,
 	ExecuteCommandRequest,
 	RemoteDevice,
+	RelayConfig,
 } from "../types";
 import type { CommandResult } from "../../services/remote/types";
 import { storeManager } from "../../store/StoreManager";
@@ -220,6 +221,48 @@ export function registerRemoteDeviceHandlers(): void {
 				return { success: true, data: cwd };
 			} catch (error) {
 				console.error("[IPC] GET_CWD error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 获取 Relay 配置
+	ipcMain.handle(
+		REMOTE_DEVICE_CHANNELS.GET_RELAY_CONFIG,
+		async (): Promise<IPCResponse<RelayConfig | null>> => {
+			try {
+				const config = storeManager.getRelayConfig() || null;
+				return { success: true, data: config };
+			} catch (error) {
+				console.error("[IPC] GET_RELAY_CONFIG error:", error);
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+	);
+
+	// 设置 Relay 配置并切换模式
+	ipcMain.handle(
+		REMOTE_DEVICE_CHANNELS.SET_RELAY_CONFIG,
+		async (
+			_event,
+			request: IPCRequest<RelayConfig>,
+		): Promise<IPCResponse> => {
+			try {
+				const config = request.payload!;
+				storeManager.setRelayConfig(config);
+
+				const remoteDeviceService = getRemoteDeviceService();
+				await remoteDeviceService.switchMode(config);
+
+				return { success: true };
+			} catch (error) {
+				console.error("[IPC] SET_RELAY_CONFIG error:", error);
 				return {
 					success: false,
 					error: error instanceof Error ? error.message : String(error),

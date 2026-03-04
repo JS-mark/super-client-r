@@ -2,6 +2,16 @@
  * 远程设备类型定义
  */
 
+/** 远程设备连接模式 */
+export type RemoteDeviceMode = "local" | "relay";
+
+/** Relay 配置 */
+export interface RelayConfig {
+	mode: RemoteDeviceMode;
+	relayUrl?: string; // "wss://relay.example.com:9099"
+	relayKey?: string; // 共享密钥，作为房间标识
+}
+
 /** 设备平台 */
 export type DevicePlatform = "linux" | "windows" | "macos";
 
@@ -61,7 +71,10 @@ export type WSMessageType =
 	| "tab_complete"
 	| "tab_complete_result"
 	| "get_cwd"
-	| "get_cwd_result";
+	| "get_cwd_result"
+	| "relay_auth"
+	| "relay_auth_ack"
+	| "relay_device_disconnected";
 
 /** WebSocket 消息基础结构 */
 export interface WSMessage {

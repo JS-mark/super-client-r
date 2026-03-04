@@ -478,6 +478,8 @@ export interface ElectronAPI {
 			cursorPos: number,
 		) => Promise<IPCResponse<{ matches: string[]; wordStart: number }>>;
 		getCwd: (deviceId: string) => Promise<IPCResponse<string>>;
+		getRelayConfig: () => Promise<IPCResponse<RelayConfig | null>>;
+		setRelayConfig: (config: RelayConfig) => Promise<IPCResponse>;
 	};
 
 	// Remote Control Events API
@@ -1104,6 +1106,14 @@ export interface DeviceConnectionInfo {
 	localIPs: string[];
 }
 
+export type RemoteDeviceMode = "local" | "relay";
+
+export interface RelayConfig {
+	mode: RemoteDeviceMode;
+	relayUrl?: string;
+	relayKey?: string;
+}
+
 // ============ Remote Chat Bridge 类型 ============
 
 export type IMPlatform = "dingtalk" | "lark" | "telegram";
@@ -1640,6 +1650,12 @@ const electronAPI: ElectronAPI = {
 		getCwd: (deviceId: string) =>
 			ipcRenderer.invoke("remote-device:get-cwd", {
 				payload: { deviceId },
+			}),
+		getRelayConfig: () =>
+			ipcRenderer.invoke("remote-device:get-relay-config"),
+		setRelayConfig: (config: RelayConfig) =>
+			ipcRenderer.invoke("remote-device:set-relay-config", {
+				payload: config,
 			}),
 	},
 

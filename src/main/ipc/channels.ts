@@ -343,6 +343,9 @@ export const REMOTE_DEVICE_CHANNELS = {
 	GET_CWD: "remote-device:get-cwd",
 	// 命令输出流式推送 (main → renderer)
 	COMMAND_OUTPUT: "remote-device:command-output",
+	// Relay 配置
+	GET_RELAY_CONFIG: "remote-device:get-relay-config",
+	SET_RELAY_CONFIG: "remote-device:set-relay-config",
 } as const;
 
 // Remote Control Events 相关通道

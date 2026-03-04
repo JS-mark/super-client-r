@@ -173,12 +173,18 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 		return textResult("Error: command is required and must be a string", true);
 	}
 
-	log.debug("execute_command", { command: command.slice(0, 200), workingDir: args.workingDir });
+	log.debug("execute_command", {
+		command: command.slice(0, 200),
+		workingDir: args.workingDir,
+	});
 
 	// 危险命令检测
 	const danger = checkDangerous(command);
 	if (danger) {
-		log.warn("Dangerous command blocked", { command: command.slice(0, 200), reason: danger });
+		log.warn("Dangerous command blocked", {
+			command: command.slice(0, 200),
+			reason: danger,
+		});
 		return textResult(
 			`Error: command blocked for safety — ${danger}. If you really need this, please run it manually in a terminal.`,
 			true,
@@ -188,7 +194,10 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 	// 删除命令确认
 	const deleteMatch = checkDeleteCommand(command);
 	if (deleteMatch && args.confirmed !== true) {
-		log.info("Delete command requires confirmation", { command: command.slice(0, 200), match: deleteMatch });
+		log.info("Delete command requires confirmation", {
+			command: command.slice(0, 200),
+			match: deleteMatch,
+		});
 		return textResult(
 			`⚠️ This command contains a delete operation (${deleteMatch}). Please confirm with the user before re-calling with confirmed=true.`,
 		);
@@ -255,12 +264,19 @@ const executeCommandHandler: InternalToolHandler = async (args) => {
 			child.on("exit", () => clearTimeout(killTimer));
 		});
 
-		log.debug("Command finished", { exitCode, stdoutLen: stdout.length, stderrLen: stderr.length });
+		log.debug("Command finished", {
+			exitCode,
+			stdoutLen: stdout.length,
+			stderrLen: stderr.length,
+		});
 		const isError = exitCode !== 0 && !stdout && !!stderr;
 		return textResult(formatExecResult(stdout, stderr, exitCode), isError);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
-		log.error("Command execution failed", error instanceof Error ? error : new Error(msg));
+		log.error(
+			"Command execution failed",
+			error instanceof Error ? error : new Error(msg),
+		);
 		return textResult(`Error: ${msg}`, true);
 	}
 };
@@ -275,7 +291,11 @@ const executeScriptHandler: InternalToolHandler = async (args) => {
 		return textResult("Error: script is required and must be a string", true);
 	}
 
-	log.debug("execute_script", { interpreter: args.interpreter, scriptLen: script.length, workingDir: args.workingDir });
+	log.debug("execute_script", {
+		interpreter: args.interpreter,
+		scriptLen: script.length,
+		workingDir: args.workingDir,
+	});
 
 	// 危险命令检测
 	const danger = checkDangerous(script);
@@ -373,12 +393,19 @@ const executeScriptHandler: InternalToolHandler = async (args) => {
 			child.on("exit", () => clearTimeout(killTimer));
 		});
 
-		log.debug("Script finished", { exitCode, stdoutLen: stdout.length, stderrLen: stderr.length });
+		log.debug("Script finished", {
+			exitCode,
+			stdoutLen: stdout.length,
+			stderrLen: stderr.length,
+		});
 		const isError = exitCode !== 0 && !stdout && !!stderr;
 		return textResult(formatExecResult(stdout, stderr, exitCode), isError);
 	} catch (error) {
 		const msg = error instanceof Error ? error.message : String(error);
-		log.error("Script execution failed", error instanceof Error ? error : new Error(msg));
+		log.error(
+			"Script execution failed",
+			error instanceof Error ? error : new Error(msg),
+		);
 		return textResult(`Error: ${msg}`, true);
 	} finally {
 		if (tmpDir) {

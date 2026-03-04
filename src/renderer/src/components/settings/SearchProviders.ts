@@ -54,11 +54,7 @@ export const SEARCH_PROVIDERS: SearchProvider[] = [
 		requiresApiUrl: false,
 		apiKeyLabel: "API Key",
 		get apiKeyPlaceholder() {
-			return providerT(
-				"tavily",
-				"apiKeyPlaceholder",
-				"请输入 Tavily API Key",
-			);
+			return providerT("tavily", "apiKeyPlaceholder", "请输入 Tavily API Key");
 		},
 		helpUrl: "https://tavily.com/",
 		isApiSearch: true,
@@ -186,8 +182,7 @@ export const SEARCH_PROVIDERS: SearchProvider[] = [
 		get apiKeyPlaceholder() {
 			return providerT("bing", "apiKeyPlaceholder", "请输入 Bing API Key");
 		},
-		helpUrl:
-			"https://www.microsoft.com/en-us/bing/apis/bing-web-search-api",
+		helpUrl: "https://www.microsoft.com/en-us/bing/apis/bing-web-search-api",
 		isApiSearch: false,
 	},
 	{

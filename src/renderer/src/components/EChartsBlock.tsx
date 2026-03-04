@@ -1,7 +1,12 @@
 import { theme } from "antd";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import * as echarts from "echarts/core";
-import { BarChart, CandlestickChart, LineChart, PieChart } from "echarts/charts";
+import {
+	BarChart,
+	CandlestickChart,
+	LineChart,
+	PieChart,
+} from "echarts/charts";
 import {
 	DataZoomComponent,
 	GridComponent,

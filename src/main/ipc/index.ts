@@ -19,6 +19,10 @@ import { registerSearchHandlers } from "./handlers/searchHandlers";
 import { registerSkillHandlers } from "./handlers/skillHandlers";
 import { registerWebhookHandlers } from "./handlers/webhookHandlers";
 import { registerWindowControlHandlers } from "./handlers/windowHandlers";
+import { registerIMBotHandlers } from "./handlers/imbotHandlers";
+import { registerRemoteDeviceHandlers } from "./handlers/remoteDeviceHandlers";
+import { registerRemoteControlHandlers } from "./handlers/remoteControlHandlers";
+import { registerRemoteChatHandlers } from "./handlers/remoteChatHandlers";
 
 /**
  * 注册所有 IPC 处理器
@@ -39,6 +43,10 @@ export function registerIpcHandlers(): void {
 	registerLogHandlers();
 	registerModelHandlers();
 	registerWebhookHandlers();
+	registerIMBotHandlers();
+	registerRemoteDeviceHandlers();
+	registerRemoteControlHandlers();
+	registerRemoteChatHandlers();
 	setupAgentHandlers();
 }
 

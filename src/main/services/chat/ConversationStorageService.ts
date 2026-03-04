@@ -314,6 +314,36 @@ export class ConversationStorageService {
 		this.cachedList = null;
 	}
 
+	/**
+	 * Update arbitrary fields on a conversation's metadata.json.
+	 * Used by RemoteChatBridge to persist/remove remote bindings.
+	 */
+	updateConversationMetadata(
+		id: string,
+		updates: Partial<ConversationSummary>,
+	): void {
+		const metadataPath = join(this.chatsDir, id, "metadata.json");
+		if (!existsSync(metadataPath)) {
+			throw new Error(`Conversation not found: ${id}`);
+		}
+
+		const raw = readFileSync(metadataPath, "utf-8");
+		const metadata: ConversationSummary = JSON.parse(raw);
+
+		// Merge updates, allowing undefined values to delete keys
+		for (const [key, value] of Object.entries(updates)) {
+			if (value === undefined) {
+				delete (metadata as any)[key];
+			} else {
+				(metadata as any)[key] = value;
+			}
+		}
+
+		metadata.updatedAt = Date.now();
+		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		this.cachedList = null;
+	}
+
 	// ============ Messages ============
 
 	getMessages(conversationId: string): ChatMessagePersist[] {

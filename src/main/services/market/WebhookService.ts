@@ -81,7 +81,9 @@ function buildTelegramPayload(
 	config: WebhookConfig,
 ): { url: string; body: unknown } {
 	if (!config.telegramBotToken || !config.telegramChatId) {
-		throw new Error("Telegram configuration incomplete: botToken and chatId are required");
+		throw new Error(
+			"Telegram configuration incomplete: botToken and chatId are required",
+		);
 	}
 
 	const url = `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`;
@@ -107,9 +109,15 @@ function buildTwitterPayload(
 	msg: WebhookMessage,
 	config: WebhookConfig,
 ): { url: string; body: unknown; headers?: Record<string, string> } {
-	if (!config.twitterApiKey || !config["twitterApi*"] ||
-		!config.twitterAccessToken || !config["twitterAccess*"]) {
-		throw new Error("Twitter configuration incomplete: all OAuth credentials are required");
+	if (
+		!config.twitterApiKey ||
+		!config["twitterApi*"] ||
+		!config.twitterAccessToken ||
+		!config["twitterAccess*"]
+	) {
+		throw new Error(
+			"Twitter configuration incomplete: all OAuth credentials are required",
+		);
 	}
 
 	// Twitter API v2 - 发送推文
@@ -133,7 +141,10 @@ function buildTwitterPayload(
 		},
 		signature_method: "HMAC-SHA1",
 		hash_function(base_string: string, key: string) {
-			return crypto.createHmac("sha1", key).update(base_string).digest("base64");
+			return crypto
+				.createHmac("sha1", key)
+				.update(base_string)
+				.digest("base64");
 		},
 	});
 
@@ -164,7 +175,9 @@ function buildFacebookPayload(
 	config: WebhookConfig,
 ): { url: string; body: unknown } {
 	if (!config.facebookPageToken || !config.facebookPageId) {
-		throw new Error("Facebook configuration incomplete: pageToken and pageId are required");
+		throw new Error(
+			"Facebook configuration incomplete: pageToken and pageId are required",
+		);
 	}
 
 	// Facebook Graph API - 发布到页面
@@ -204,10 +217,7 @@ export class WebhookService extends EventEmitter {
 			try {
 				await this.sendToWebhook(message, config);
 			} catch (error) {
-				console.error(
-					`Webhook send failed for ${config.name}:`,
-					error,
-				);
+				console.error(`Webhook send failed for ${config.name}:`, error);
 				this.emit("error", config.id, error);
 			}
 		}
@@ -236,8 +246,7 @@ export class WebhookService extends EventEmitter {
 		} catch (error) {
 			return {
 				success: false,
-				message:
-					error instanceof Error ? error.message : "Unknown error",
+				message: error instanceof Error ? error.message : "Unknown error",
 			};
 		}
 	}
@@ -246,7 +255,11 @@ export class WebhookService extends EventEmitter {
 		message: WebhookMessage,
 		config: WebhookConfig,
 	): Promise<number> {
-		let payload: { url: string; body: unknown; headers?: Record<string, string> };
+		let payload: {
+			url: string;
+			body: unknown;
+			headers?: Record<string, string>;
+		};
 
 		switch (config.type as WebhookType) {
 			case "dingtalk":

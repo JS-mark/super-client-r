@@ -11,14 +11,8 @@ import {
 } from "../stores/themeStore";
 
 export function useTheme() {
-	const {
-		mode,
-		actualTheme,
-		systemTheme,
-		setMode,
-		getEffectiveTheme,
-		isDark,
-	} = useThemeStore();
+	const { mode, actualTheme, systemTheme, setMode, getEffectiveTheme, isDark } =
+		useThemeStore();
 
 	// 初始化：从主进程加载主题设置
 	useEffect(() => {

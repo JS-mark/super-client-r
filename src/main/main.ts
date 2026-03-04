@@ -479,6 +479,79 @@ app.whenReady().then(async () => {
 			logger.error("Failed to initialize skill service", error);
 		});
 
+	// 初始化 IM Bot 和 Remote Device 服务
+	try {
+		const { remoteDeviceService } = await import("./services/remote");
+		const { IMBotService } = await import("./services/imbot");
+		const { RemoteControlEventService } = await import(
+			"./services/remote/RemoteControlEventService"
+		);
+		const { setIMBotService } = await import("./ipc/handlers/imbotHandlers");
+		const { setRemoteDeviceService } = await import(
+			"./ipc/handlers/remoteDeviceHandlers"
+		);
+		const { setRemoteControlEventService } = await import(
+			"./ipc/handlers/remoteControlHandlers"
+		);
+
+		// 根据 relay 配置决定启动模式
+		const relayConfig = storeManager.getRelayConfig();
+		const wsPort = 8088;
+		if (
+			relayConfig?.mode === "relay" &&
+			relayConfig.relayUrl &&
+			relayConfig.relayKey
+		) {
+			await remoteDeviceService.startRelay(
+				relayConfig.relayUrl,
+				relayConfig.relayKey,
+			);
+			logger.info(
+				`Remote Device started in relay mode: ${relayConfig.relayUrl}`,
+			);
+		} else {
+			await remoteDeviceService.start(wsPort);
+			logger.info("Remote Device WebSocket server started on port 8088");
+		}
+		setRemoteDeviceService(remoteDeviceService); // 设置到 IPC 处理器
+
+		// 从存储加载设备
+		const devices = storeManager.getRemoteDevices();
+		remoteDeviceService.loadDevices(devices);
+
+		// 创建并初始化 IM Bot 服务
+		const imbotService = new IMBotService(remoteDeviceService);
+		setIMBotService(imbotService); // 设置到 IPC 处理器
+		const imbotConfigs = storeManager.getIMBotConfigs();
+		await imbotService.loadBots(imbotConfigs);
+
+		// 创建 Remote Chat Bridge（桥接 Chat 页面与 IM Bot）
+		const { RemoteChatBridge } = await import(
+			"./services/remote-chat/RemoteChatBridge"
+		);
+		const { setRemoteChatBridge } = await import(
+			"./ipc/handlers/remoteChatHandlers"
+		);
+		const remoteChatBridge = new RemoteChatBridge(imbotService);
+		setRemoteChatBridge(remoteChatBridge);
+		logger.info("Remote Chat Bridge initialized");
+
+		// 创建远程控制事件服务
+		const eventService = new RemoteControlEventService(
+			imbotService,
+			remoteDeviceService,
+			storeManager,
+			wsPort,
+		);
+		setRemoteControlEventService(eventService);
+		logger.info("IM Bot and Remote Control Event services initialized");
+	} catch (error) {
+		logger.error(
+			"Failed to initialize IM Bot / Remote Device services",
+			error instanceof Error ? error : new Error(String(error)),
+		);
+	}
+
 	// 创建窗口
 	createWindow();
 	createFloatingWindow();

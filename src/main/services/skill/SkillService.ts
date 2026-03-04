@@ -99,10 +99,7 @@ export class SkillService extends EventEmitter {
 				}
 
 				// Discover slash commands from commands/*.md
-				manifest.commands = await this.discoverCommands(
-					skillPath,
-					manifest.id,
-				);
+				manifest.commands = await this.discoverCommands(skillPath, manifest.id);
 
 				const config: SkillConfig = {
 					id: manifest.id,
@@ -230,7 +227,11 @@ export class SkillService extends EventEmitter {
 			let pluginIcon: string | undefined;
 			let pluginCategory: string | undefined;
 			let pluginTools: SkillManifest["tools"];
-			const pluginJsonPath = path.join(skillPath, ".claude-plugin", "plugin.json");
+			const pluginJsonPath = path.join(
+				skillPath,
+				".claude-plugin",
+				"plugin.json",
+			);
 			try {
 				const raw = await fs.readFile(pluginJsonPath, "utf-8");
 				const pj = JSON.parse(raw);
@@ -239,7 +240,8 @@ export class SkillService extends EventEmitter {
 					if (pj.author && typeof pj.author.name === "string")
 						pluginAuthor = pj.author.name;
 					if (typeof pj.description === "string") pluginDesc = pj.description;
-					if (typeof pj.displayName === "string") pluginDisplayName = pj.displayName;
+					if (typeof pj.displayName === "string")
+						pluginDisplayName = pj.displayName;
 					if (typeof pj.icon === "string") pluginIcon = pj.icon;
 					if (typeof pj.category === "string") pluginCategory = pj.category;
 					if (Array.isArray(pj.tools)) pluginTools = pj.tools;

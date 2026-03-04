@@ -95,7 +95,16 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			enabled: true,
 			action: "navigate",
 		},
-{
+		{
+			id: "imbot",
+			label: "imbot",
+			path: "/imbot",
+			iconType: "default",
+			iconContent: "DesktopOutlined",
+			enabled: true,
+			action: "navigate",
+		},
+		{
 			id: "settings",
 			label: "settings",
 			path: "/settings",

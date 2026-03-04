@@ -11,6 +11,7 @@ import PluginPage from "./pages/PluginPage";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
 import Workspaces from "./pages/Workspaces";
+import IMBot from "./pages/IMBot";
 
 const LogViewer = lazy(() => import("./pages/LogViewer"));
 
@@ -63,7 +64,13 @@ export const router = createHashRouter([
 		errorElement: <ErrorPage />,
 		handle: { title: "工作区" },
 	},
-{
+	{
+		path: "/imbot",
+		element: <IMBot />,
+		errorElement: <ErrorPage />,
+		handle: { title: "远程控制" },
+	},
+	{
 		path: "/settings",
 		element: <Settings />,
 		errorElement: <ErrorPage />,

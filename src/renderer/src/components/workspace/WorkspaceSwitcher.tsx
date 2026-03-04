@@ -82,7 +82,10 @@ function WorkspaceBadge({
 					</span>
 					{!isSmall && (
 						<span className="text-xs text-slate-500 ">
-							{t("sessionCount", { ns: "workspaces", count: workspace.sessionIds.length })}
+							{t("sessionCount", {
+								ns: "workspaces",
+								count: workspace.sessionIds.length,
+							})}
 						</span>
 					)}
 				</div>
@@ -127,7 +130,12 @@ function CreateWorkspaceModal({
 				<Form.Item
 					name="name"
 					label={t("workspaces.name", "名称", { ns: "workspaces" })}
-					rules={[{ required: true, message: t("nameRequired", { ns: "workspaces" }) }]}
+					rules={[
+						{
+							required: true,
+							message: t("nameRequired", { ns: "workspaces" }),
+						},
+					]}
 				>
 					<Input
 						placeholder={t("workspaces.namePlaceholder", "我的工作区", {

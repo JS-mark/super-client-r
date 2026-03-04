@@ -54,7 +54,12 @@ export function EditWorkspaceModal({
 				<Form.Item
 					name="name"
 					label={t("workspaces.name", "名称", { ns: "workspaces" })}
-					rules={[{ required: true, message: t("nameRequired", { ns: "workspaces" }) }]}
+					rules={[
+						{
+							required: true,
+							message: t("nameRequired", { ns: "workspaces" }),
+						},
+					]}
 				>
 					<Input />
 				</Form.Item>

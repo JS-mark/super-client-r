@@ -252,6 +252,43 @@ export interface ChatMessagePersist {
 	};
 }
 
+export interface RemoteBinding {
+	botId: string;
+	chatId: string;
+	botName: string;
+	platform: IMPlatform;
+	boundAt: number;
+}
+
+export interface BindRemoteRequest {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+}
+
+export interface RemoteIMMessage {
+	conversationId: string;
+	content: string;
+	sender: { id: string; name: string };
+	platform: IMPlatform;
+	chatId: string;
+	timestamp: number;
+}
+
+export interface RemoteChatMessage {
+	id: string;
+	direction: "incoming" | "outgoing";
+	content: string;
+	sender: { id: string; name: string };
+	platform: IMPlatform;
+	timestamp: number;
+}
+
+export interface SendRemoteMessageRequest {
+	conversationId: string;
+	content: string;
+}
+
 export interface ConversationSummary {
 	id: string;
 	name: string;
@@ -259,6 +296,7 @@ export interface ConversationSummary {
 	updatedAt: number;
 	messageCount: number;
 	preview: string;
+	remote?: RemoteBinding;
 }
 
 export interface ConversationData extends ConversationSummary {
@@ -614,7 +652,13 @@ export interface SkillValidationResult {
 
 // ============ Webhook 相关类型 ============
 
-export type WebhookType = "dingtalk" | "feishu" | "telegram" | "twitter" | "facebook" | "custom";
+export type WebhookType =
+	| "dingtalk"
+	| "feishu"
+	| "telegram"
+	| "twitter"
+	| "facebook"
+	| "custom";
 
 export interface WebhookConfig {
 	id: string;
@@ -628,21 +672,21 @@ export interface WebhookConfig {
 	createdAt: number;
 
 	// Telegram 特定字段
-	telegramBotToken?: string;      // Bot API Token
-	telegramChatId?: string;        // 目标 Chat ID
+	telegramBotToken?: string; // Bot API Token
+	telegramChatId?: string; // 目标 Chat ID
 	telegramParseMode?: "Markdown" | "HTML" | "MarkdownV2"; // 消息格式
 
 	// Twitter 特定字段
-	twitterApiKey?: string;         // API Key
-	"twitterApi*"?: string;      // API *
-	twitterAccessToken?: string;    // Access Token
-	"twitterAccess*"?: string;   // Access Token *
-	twitterUserId?: string;         // 目标用户 ID（DM 用）
+	twitterApiKey?: string; // API Key
+	"twitterApi*"?: string; // API *
+	twitterAccessToken?: string; // Access Token
+	"twitterAccess*"?: string; // Access Token *
+	twitterUserId?: string; // 目标用户 ID（DM 用）
 
 	// Facebook 特定字段
-	facebookPageToken?: string;     // Page Access Token
-	facebookPageId?: string;        // 页面 ID
-	"facebookApp*"?: string;     // App *（用于签名验证）
+	facebookPageToken?: string; // Page Access Token
+	facebookPageId?: string; // 页面 ID
+	"facebookApp*"?: string; // App *（用于签名验证）
 }
 
 export interface WebhookTestResult {
@@ -668,3 +712,45 @@ export interface IPCStreamData<T = unknown> {
 	type: string;
 	data: T;
 }
+
+// ============ IM Bot 相关类型 ============
+
+import type { IMBotConfig, BotStatus, IMPlatform } from "../services/imbot/types";
+import type {
+	RemoteDevice,
+	RemoteControlEvent,
+	DeviceConnectionInfo,
+	RelayConfig,
+} from "../services/remote/types";
+
+export type { IMBotConfig, BotStatus };
+export type { RemoteControlEvent, DeviceConnectionInfo };
+
+export interface StartBotRequest {
+	config: IMBotConfig;
+}
+
+export interface SendMessageRequest {
+	botId: string;
+	chatId: string;
+	content: string;
+}
+
+// ============ Remote Device 相关类型 ============
+
+export type { RemoteDevice };
+
+export interface RegisterDeviceRequest {
+	name: string;
+	platform: "linux" | "windows" | "macos";
+	tags?: string[];
+	description?: string;
+}
+
+export interface ExecuteCommandRequest {
+	deviceId: string;
+	command: string;
+	timeout?: number;
+}
+
+export type { RelayConfig };

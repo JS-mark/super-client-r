@@ -14,6 +14,7 @@ import os from "node:os";
 const DEVICE_ID = process.env.DEVICE_ID || "device-001";
 const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
 const SERVER_URL = process.env.SERVER_URL || "ws://localhost:8088";
+const RELAY_KEY = process.env.RELAY_KEY || ""; // 非空时走 relay 模式
 
 interface ServerMessage {
 	type: string;
@@ -45,6 +46,9 @@ class DeviceAgent {
 		console.log("[Agent] 启动中...");
 		console.log(`[Agent] 设备 ID: ${DEVICE_ID}`);
 		console.log(`[Agent] 服务器: ${SERVER_URL}`);
+		if (RELAY_KEY) {
+			console.log(`[Agent] Relay 模式 (key: ${RELAY_KEY.slice(0, 8)}...)`);
+		}
 		this.connect();
 	}
 
@@ -84,6 +88,23 @@ class DeviceAgent {
 	}
 
 	private register(): void {
+		if (RELAY_KEY) {
+			// Relay 模式：先发 relay_auth，等 relay_auth_ack 后再发 register
+			console.log("[Agent] 发送 relay 认证...");
+			this.ws!.send(
+				JSON.stringify({
+					type: "relay_auth",
+					role: "device",
+					relayKey: RELAY_KEY,
+					deviceId: DEVICE_ID,
+				}),
+			);
+		} else {
+			this.sendRegister();
+		}
+	}
+
+	private sendRegister(): void {
 		const msg = {
 			type: "register",
 			deviceId: DEVICE_ID,
@@ -128,6 +149,16 @@ class DeviceAgent {
 
 	private async handleMessage(message: ServerMessage): Promise<void> {
 		switch (message.type) {
+			case "relay_auth_ack":
+				if (message.success) {
+					console.log("[Agent] Relay 认证成功，开始注册设备...");
+					this.sendRegister();
+				} else {
+					console.error("[Agent] Relay 认证失败:", message.error);
+					process.exit(1);
+				}
+				break;
+
 			case "register_ack":
 				if (message.success) {
 					console.log("[Agent] 注册成功!");

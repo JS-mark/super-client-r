@@ -14,21 +14,29 @@ import type {
 	WSCommandOutputChunkMessage,
 	WSTabCompleteResultMessage,
 	WSGetCwdResultMessage,
-	DevicePlatform,
+	RemoteDeviceMode,
+	RelayConfig,
 } from "./types";
 
 /**
  * 远程设备管理服务
  *
- * 功能:
- * - WebSocket 服务器
- * - 设备注册和认证
- * - 心跳管理
- * - 命令执行(异步请求-响应)
- * - 事件发射(device-online, device-offline, device-error)
+ * 支持双模式:
+ * - local: WebSocket 服务器直连（局域网）
+ * - relay: 通过公网中继服务器连接
  */
 export class RemoteDeviceService extends EventEmitter {
+	// Local 模式
 	private wss: WebSocketServer | null = null;
+	// Relay 模式
+	private relayWs: WebSocket | null = null;
+	private relayReconnectTimer: NodeJS.Timeout | null = null;
+
+	// 当前模式
+	private mode: RemoteDeviceMode = "local";
+	private relayConfig: RelayConfig | null = null;
+
+	// 通用
 	private devices: Map<string, RemoteDevice> = new Map();
 	private deviceConnections: Map<string, WebSocket> = new Map();
 	private pendingCommands: Map<
@@ -59,14 +67,27 @@ export class RemoteDeviceService extends EventEmitter {
 		}
 	> = new Map();
 
+	/** 获取当前模式 */
+	getMode(): RemoteDeviceMode {
+		return this.mode;
+	}
+
+	/** 获取当前 relay 配置 */
+	getRelayConfig(): RelayConfig | null {
+		return this.relayConfig;
+	}
+
+	// ============ Local 模式 ============
+
 	/**
-	 * 启动 WebSocket 服务器
+	 * 启动 WebSocket 服务器 (local 模式)
 	 */
 	async start(port = 8088): Promise<void> {
 		if (this.wss) {
 			throw new Error("RemoteDeviceService already started");
 		}
 
+		this.mode = "local";
 		this.wss = new WebSocketServer({ port });
 
 		this.wss.on("connection", (ws: WebSocket, req) => {
@@ -97,7 +118,7 @@ export class RemoteDeviceService extends EventEmitter {
 	}
 
 	/**
-	 * 停止 WebSocket 服务器
+	 * 停止 WebSocket 服务器 (local 模式)
 	 */
 	async stop(): Promise<void> {
 		if (this.wss) {
@@ -105,7 +126,7 @@ export class RemoteDeviceService extends EventEmitter {
 			this.wss = null;
 
 			// 清理所有连接
-			for (const [deviceId, ws] of this.deviceConnections.entries()) {
+			for (const [, ws] of this.deviceConnections.entries()) {
 				ws.close();
 			}
 			this.deviceConnections.clear();
@@ -114,10 +135,184 @@ export class RemoteDeviceService extends EventEmitter {
 		}
 	}
 
+	// ============ Relay 模式 ============
+
+	/**
+	 * 启动 relay 模式
+	 */
+	async startRelay(relayUrl: string, relayKey: string): Promise<void> {
+		this.mode = "relay";
+		this.relayConfig = { mode: "relay", relayUrl, relayKey };
+		this.connectToRelay();
+	}
+
+	/**
+	 * 连接到 relay 服务器
+	 */
+	private connectToRelay(): void {
+		if (!this.relayConfig?.relayUrl || !this.relayConfig?.relayKey) return;
+
+		const { relayUrl, relayKey } = this.relayConfig;
+		console.log(`[RemoteDevice] Connecting to relay: ${relayUrl}`);
+
+		try {
+			this.relayWs = new WebSocket(relayUrl);
+		} catch (error) {
+			console.error("[RemoteDevice] Failed to create relay WebSocket:", error);
+			this.scheduleRelayReconnect();
+			return;
+		}
+
+		this.relayWs.on("open", () => {
+			console.log("[RemoteDevice] Connected to relay, sending auth...");
+			this.relayWs!.send(
+				JSON.stringify({
+					type: "relay_auth",
+					role: "controller",
+					relayKey,
+				}),
+			);
+		});
+
+		this.relayWs.on("message", (data: Buffer) => {
+			try {
+				const message: WSMessage = JSON.parse(data.toString());
+				this.handleRelayMessage(message);
+			} catch (error) {
+				console.error("[RemoteDevice] Failed to parse relay message:", error);
+			}
+		});
+
+		this.relayWs.on("close", () => {
+			console.log("[RemoteDevice] Relay connection closed");
+			this.relayWs = null;
+			if (this.mode === "relay") {
+				this.scheduleRelayReconnect();
+			}
+		});
+
+		this.relayWs.on("error", (error) => {
+			console.error("[RemoteDevice] Relay WebSocket error:", error);
+		});
+	}
+
+	/**
+	 * 处理 relay 消息
+	 */
+	private handleRelayMessage(message: WSMessage): void {
+		switch (message.type) {
+			case "relay_auth_ack":
+				if (message.success) {
+					console.log("[RemoteDevice] Relay auth successful (controller)");
+				} else {
+					console.error("[RemoteDevice] Relay auth failed:", message.error);
+				}
+				break;
+			case "relay_device_disconnected":
+				if (message.deviceId) {
+					console.log(
+						`[RemoteDevice] Relay: device disconnected: ${message.deviceId}`,
+					);
+					this.handleDeviceDisconnect(message.deviceId as string);
+				}
+				break;
+			default:
+				// 来自 device 的消息，按正常逻辑处理
+				this.handleDeviceMessage(null, message);
+				break;
+		}
+	}
+
+	/**
+	 * 停止 relay 连接
+	 */
+	async stopRelay(): Promise<void> {
+		if (this.relayReconnectTimer) {
+			clearTimeout(this.relayReconnectTimer);
+			this.relayReconnectTimer = null;
+		}
+		if (this.relayWs) {
+			this.relayWs.close();
+			this.relayWs = null;
+		}
+		this.relayConfig = null;
+		console.log("[RemoteDevice] Relay connection stopped");
+	}
+
+	/**
+	 * 5s 自动重连 relay
+	 */
+	private scheduleRelayReconnect(): void {
+		if (this.relayReconnectTimer) return;
+		console.log("[RemoteDevice] Scheduling relay reconnect in 5s...");
+		this.relayReconnectTimer = setTimeout(() => {
+			this.relayReconnectTimer = null;
+			if (this.mode === "relay") {
+				this.connectToRelay();
+			}
+		}, 5000);
+	}
+
+	/**
+	 * 切换模式
+	 */
+	async switchMode(config: RelayConfig): Promise<void> {
+		// 停止当前模式
+		await this.stop();
+		await this.stopRelay();
+
+		// 将所有在线设备标记为离线
+		for (const [, device] of this.devices) {
+			if (device.status === "online") {
+				device.status = "offline";
+				this.emit("device-offline", device);
+			}
+		}
+		this.deviceConnections.clear();
+
+		// 启动新模式
+		if (config.mode === "relay" && config.relayUrl && config.relayKey) {
+			await this.startRelay(config.relayUrl, config.relayKey);
+		} else {
+			await this.start(8088);
+		}
+	}
+
+	// ============ 统一发送 ============
+
+	/**
+	 * 向设备发送消息（自动适配 local/relay 模式）
+	 */
+	private sendToDevice(
+		deviceId: string,
+		message: Record<string, unknown>,
+	): void {
+		if (this.mode === "relay") {
+			// relay 模式：注入 deviceId，通过 relayWs 发送
+			if (
+				this.relayWs &&
+				this.relayWs.readyState === WebSocket.OPEN
+			) {
+				this.relayWs.send(
+					JSON.stringify({ ...message, deviceId }),
+				);
+			}
+		} else {
+			// local 模式：通过 deviceConnections 直连发送
+			const ws = this.deviceConnections.get(deviceId);
+			if (ws) {
+				ws.send(JSON.stringify(message));
+			}
+		}
+	}
+
+	// ============ 消息处理 ============
+
 	/**
 	 * 处理设备消息
+	 * ws 参数在 relay 模式下为 null
 	 */
-	private handleDeviceMessage(ws: WebSocket, message: WSMessage): void {
+	private handleDeviceMessage(ws: WebSocket | null, message: WSMessage): void {
 		switch (message.type) {
 			case "register":
 				this.handleDeviceRegister(ws, message as WSRegisterMessage);
@@ -150,7 +345,7 @@ export class RemoteDeviceService extends EventEmitter {
 	 * 设备注册
 	 */
 	private handleDeviceRegister(
-		ws: WebSocket,
+		ws: WebSocket | null,
 		message: WSRegisterMessage,
 	): void {
 		const { deviceId, token, platform, ipAddress } = message;
@@ -159,14 +354,22 @@ export class RemoteDeviceService extends EventEmitter {
 		const device = this.devices.get(deviceId);
 		if (!device || device.authentication.token !== token) {
 			console.warn(`[RemoteDevice] Invalid token for device: ${deviceId}`);
-			ws.send(
-				JSON.stringify({
+			if (this.mode === "relay") {
+				this.sendToDevice(deviceId, {
 					type: "register_ack",
 					success: false,
 					error: "Invalid token",
-				}),
-			);
-			ws.close(4001, "Invalid token");
+				});
+			} else if (ws) {
+				ws.send(
+					JSON.stringify({
+						type: "register_ack",
+						success: false,
+						error: "Invalid token",
+					}),
+				);
+				ws.close(4001, "Invalid token");
+			}
 			return;
 		}
 
@@ -178,16 +381,25 @@ export class RemoteDeviceService extends EventEmitter {
 			device.ipAddress = ipAddress;
 		}
 
-		this.deviceConnections.set(deviceId, ws);
+		if (this.mode === "local" && ws) {
+			this.deviceConnections.set(deviceId, ws);
+		}
 		this.devices.set(deviceId, device);
 
 		// 响应注册成功
-		ws.send(
-			JSON.stringify({
+		if (this.mode === "relay") {
+			this.sendToDevice(deviceId, {
 				type: "register_ack",
 				success: true,
-			}),
-		);
+			});
+		} else if (ws) {
+			ws.send(
+				JSON.stringify({
+					type: "register_ack",
+					success: true,
+				}),
+			);
+		}
 
 		// 触发事件
 		this.emit("device-online", device);
@@ -296,6 +508,8 @@ export class RemoteDeviceService extends EventEmitter {
 		}
 	}
 
+	// ============ 命令操作 ============
+
 	/**
 	 * 执行命令
 	 */
@@ -309,9 +523,20 @@ export class RemoteDeviceService extends EventEmitter {
 			throw new Error("Device not found");
 		}
 
-		const ws = this.deviceConnections.get(deviceId);
-		if (!ws || device.status !== "online") {
+		if (device.status !== "online") {
 			throw new Error("Device not online");
+		}
+
+		// relay 模式下检查 relayWs
+		if (this.mode === "relay") {
+			if (!this.relayWs || this.relayWs.readyState !== WebSocket.OPEN) {
+				throw new Error("Relay connection not available");
+			}
+		} else {
+			const ws = this.deviceConnections.get(deviceId);
+			if (!ws) {
+				throw new Error("Device not online");
+			}
 		}
 
 		const requestId = nanoid();
@@ -331,13 +556,11 @@ export class RemoteDeviceService extends EventEmitter {
 			});
 
 			// 发送命令
-			ws.send(
-				JSON.stringify({
-					type: "execute_command",
-					requestId,
-					command,
-				}),
-			);
+			this.sendToDevice(deviceId, {
+				type: "execute_command",
+				requestId,
+				command,
+			});
 		});
 	}
 
@@ -345,15 +568,10 @@ export class RemoteDeviceService extends EventEmitter {
 	 * 终止正在执行的命令
 	 */
 	killCommand(deviceId: string, requestId: string): void {
-		const ws = this.deviceConnections.get(deviceId);
-		if (!ws) return;
-
-		ws.send(
-			JSON.stringify({
-				type: "kill_command",
-				requestId,
-			}),
-		);
+		this.sendToDevice(deviceId, {
+			type: "kill_command",
+			requestId,
+		});
 	}
 
 	/**
@@ -366,9 +584,7 @@ export class RemoteDeviceService extends EventEmitter {
 	): Promise<{ matches: string[]; wordStart: number }> {
 		const device = this.devices.get(deviceId);
 		if (!device) throw new Error("Device not found");
-
-		const ws = this.deviceConnections.get(deviceId);
-		if (!ws || device.status !== "online") throw new Error("Device not online");
+		if (device.status !== "online") throw new Error("Device not online");
 
 		const requestId = nanoid();
 
@@ -385,14 +601,12 @@ export class RemoteDeviceService extends EventEmitter {
 				timeout: timer,
 			});
 
-			ws.send(
-				JSON.stringify({
-					type: "tab_complete",
-					requestId,
-					line,
-					cursorPos,
-				}),
-			);
+			this.sendToDevice(deviceId, {
+				type: "tab_complete",
+				requestId,
+				line,
+				cursorPos,
+			});
 		});
 	}
 
@@ -417,9 +631,7 @@ export class RemoteDeviceService extends EventEmitter {
 	async getCwd(deviceId: string): Promise<string> {
 		const device = this.devices.get(deviceId);
 		if (!device) throw new Error("Device not found");
-
-		const ws = this.deviceConnections.get(deviceId);
-		if (!ws || device.status !== "online") throw new Error("Device not online");
+		if (device.status !== "online") throw new Error("Device not online");
 
 		const requestId = nanoid();
 
@@ -436,7 +648,7 @@ export class RemoteDeviceService extends EventEmitter {
 				timeout: timer,
 			});
 
-			ws.send(JSON.stringify({ type: "get_cwd", requestId }));
+			this.sendToDevice(deviceId, { type: "get_cwd", requestId });
 		});
 	}
 
@@ -452,6 +664,8 @@ export class RemoteDeviceService extends EventEmitter {
 			this.pendingCwdRequests.delete(requestId);
 		}
 	}
+
+	// ============ 设备管理 ============
 
 	/**
 	 * 注册设备(生成 Token)

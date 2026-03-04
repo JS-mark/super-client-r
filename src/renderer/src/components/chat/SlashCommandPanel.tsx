@@ -107,9 +107,7 @@ export function SlashCommandPanel({
 						const key = isCommand
 							? `cmd-${item.command.skillId}-${item.command.name}`
 							: `skill-${item.skill.id}`;
-						const name = isCommand
-							? `/${item.command.name}`
-							: item.skill.name;
+						const name = isCommand ? `/${item.command.name}` : item.skill.name;
 						const description = isCommand
 							? item.command.description ||
 								t("slashCommand.commandFrom", {
@@ -142,9 +140,7 @@ export function SlashCommandPanel({
 										backgroundColor: isCommand
 											? token.colorInfoBg
 											: token.colorSuccessBg,
-										color: isCommand
-											? token.colorInfo
-											: token.colorSuccess,
+										color: isCommand ? token.colorInfo : token.colorSuccess,
 									}}
 								>
 									{isCommand ? <CodeOutlined /> : <ThunderboltOutlined />}

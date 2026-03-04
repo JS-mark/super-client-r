@@ -68,6 +68,7 @@
 - **Skill 系统**: 可扩展的技能体系
 - **插件系统**: 命令注册、市场安装、内置 Prompt Templates 插件（详见 [PLUGIN_DEVELOPMENT.md](./PLUGIN_DEVELOPMENT.md)）
 - **MCP 支持**: Model Context Protocol 服务器管理
+- **远程聊天桥接**: 将 Chat 对话与 IM Bot（Telegram/钉钉/飞书）[双向桥接](./guide/features/remote-chat-bridge.md)
 - **本地 API**: 内置 HTTP 服务器供外部调用
 
 ## 技术栈

@@ -17,23 +17,32 @@ export function registerWebhookHandlers(): void {
 		} catch (error) {
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to get webhook configs",
+				error:
+					error instanceof Error
+						? error.message
+						: "Failed to get webhook configs",
 			};
 		}
 	});
 
 	// 保存 Webhook 配置
-	ipcMain.handle(WEBHOOK_CHANNELS.SAVE_CONFIG, async (_event, config: WebhookConfig) => {
-		try {
-			storeManager.saveWebhookConfig(config);
-			return { success: true };
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : "Failed to save webhook config",
-			};
-		}
-	});
+	ipcMain.handle(
+		WEBHOOK_CHANNELS.SAVE_CONFIG,
+		async (_event, config: WebhookConfig) => {
+			try {
+				storeManager.saveWebhookConfig(config);
+				return { success: true };
+			} catch (error) {
+				return {
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to save webhook config",
+				};
+			}
+		},
+	);
 
 	// 删除 Webhook 配置
 	ipcMain.handle(WEBHOOK_CHANNELS.DELETE_CONFIG, async (_event, id: string) => {
@@ -43,21 +52,27 @@ export function registerWebhookHandlers(): void {
 		} catch (error) {
 			return {
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to delete webhook config",
+				error:
+					error instanceof Error
+						? error.message
+						: "Failed to delete webhook config",
 			};
 		}
 	});
 
 	// 测试 Webhook
-	ipcMain.handle(WEBHOOK_CHANNELS.TEST_WEBHOOK, async (_event, configId: string) => {
-		try {
-			const result = await webhookService.test(configId);
-			return { success: true, data: result };
-		} catch (error) {
-			return {
-				success: false,
-				error: error instanceof Error ? error.message : "Webhook test failed",
-			};
-		}
-	});
+	ipcMain.handle(
+		WEBHOOK_CHANNELS.TEST_WEBHOOK,
+		async (_event, configId: string) => {
+			try {
+				const result = await webhookService.test(configId);
+				return { success: true, data: result };
+			} catch (error) {
+				return {
+					success: false,
+					error: error instanceof Error ? error.message : "Webhook test failed",
+				};
+			}
+		},
+	);
 }
