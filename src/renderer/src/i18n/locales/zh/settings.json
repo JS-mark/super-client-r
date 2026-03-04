@@ -165,16 +165,49 @@
 	},
 	"userDataPathHint": "应用数据存储路径，不能更改",
 	"searchProviders": {
-		"zhipu": { "name": "智谱 AI", "description": "智谱 AI 搜索 API", "apiKeyPlaceholder": "请输入智谱 AI API Key" },
-		"tavily": { "description": "Tavily AI 搜索引擎", "apiKeyPlaceholder": "请输入 Tavily API Key" },
-		"searxng": { "description": "自建 SearXNG 搜索服务", "apiKeyLabel": "API Key (可选)", "apiKeyPlaceholder": "如有访问限制，请输入 API Key", "apiUrlLabel": "API 地址" },
-		"exa": { "description": "Exa AI 搜索引擎", "apiKeyPlaceholder": "请输入 Exa API Key" },
+		"zhipu": {
+			"name": "智谱 AI",
+			"description": "智谱 AI 搜索 API",
+			"apiKeyPlaceholder": "请输入智谱 AI API Key"
+		},
+		"tavily": {
+			"description": "Tavily AI 搜索引擎",
+			"apiKeyPlaceholder": "请输入 Tavily API Key"
+		},
+		"searxng": {
+			"description": "自建 SearXNG 搜索服务",
+			"apiKeyLabel": "API Key (可选)",
+			"apiKeyPlaceholder": "如有访问限制，请输入 API Key",
+			"apiUrlLabel": "API 地址"
+		},
+		"exa": {
+			"description": "Exa AI 搜索引擎",
+			"apiKeyPlaceholder": "请输入 Exa API Key"
+		},
 		"exa_mcp": { "apiKeyPlaceholder": "请输入 Exa API Key" },
-		"bocha": { "name": "博查", "description": "博查 AI 搜索引擎", "apiKeyPlaceholder": "请输入博查 API Key" },
-		"sogou": { "name": "搜狗", "description": "搜狗搜索 API", "apiKeyPlaceholder": "请输入搜狗 API Key" },
-		"google": { "description": "Google 搜索 (通过 API)", "apiKeyPlaceholder": "请输入 Google API Key 或 CX ID" },
-		"bing": { "description": "必应搜索 (通过 API)", "apiKeyPlaceholder": "请输入 Bing API Key" },
-		"baidu": { "name": "百度", "description": "百度搜索 (通过 API)", "apiKeyPlaceholder": "请输入百度 API Key" }
+		"bocha": {
+			"name": "博查",
+			"description": "博查 AI 搜索引擎",
+			"apiKeyPlaceholder": "请输入博查 API Key"
+		},
+		"sogou": {
+			"name": "搜狗",
+			"description": "搜狗搜索 API",
+			"apiKeyPlaceholder": "请输入搜狗 API Key"
+		},
+		"google": {
+			"description": "Google 搜索 (通过 API)",
+			"apiKeyPlaceholder": "请输入 Google API Key 或 CX ID"
+		},
+		"bing": {
+			"description": "必应搜索 (通过 API)",
+			"apiKeyPlaceholder": "请输入 Bing API Key"
+		},
+		"baidu": {
+			"name": "百度",
+			"description": "百度搜索 (通过 API)",
+			"apiKeyPlaceholder": "请输入百度 API Key"
+		}
 	},
 	"search": {
 		"title": "网络搜索配置",
@@ -214,11 +247,11 @@
 		"apiSearch": "API 搜索",
 		"traditionalSearch": "传统搜索"
 	},
-  "openDevToolsDesc": "打开 Chromium DevTools 进行调试",
+	"openDevToolsDesc": "打开 Chromium DevTools 进行调试",
 	"relaunchDesc": "完全重启应用程序",
 	"clearStorageDesc": "清除 localStorage 和 sessionStorage",
 	"about": {
-    "thanks": "感谢所有贡献者和用户的支持!",
+		"thanks": "感谢所有贡献者和用户的支持!",
 		"features": {
 			"title": "功能特性",
 			"aiChat": {
@@ -313,5 +346,29 @@
 			"app*": "应用密钥（可选）",
 			"app*Hint": "用于 webhook 验证的 Facebook 应用密钥"
 		}
+	},
+	"relay": {
+		"connectionMode": "连接模式",
+		"modeLocal": "局域网",
+		"modeRelay": "中继",
+		"local": "局域网",
+		"relay": "中继",
+		"urlLabel": "Relay 服务器地址",
+		"keyLabel": "Relay Key",
+		"keyPlaceholder": "共享密钥",
+		"saveApply": "保存并应用",
+		"switchToLocal": "切换到局域网模式",
+		"saveSuccess": "配置已保存并生效",
+		"saveFailed": "保存失败",
+		"copied": "已复制到剪贴板",
+		"loading": "加载连接信息中...",
+		"getAgent": "获取 Device Agent",
+		"downloadBinary": "下载预编译文件",
+		"buildFromSource": "从源码构建",
+		"selectAddress": "选择连接地址",
+		"noLocalIP": "未检测到局域网 IP 地址",
+		"startAgent": "启动 Agent",
+		"configRelayFirst": "请先配置并保存 Relay 设置",
+		"selectAddressFirst": "请先在上方选择连接地址"
 	}
 }

@@ -132,7 +132,7 @@
 	"apiKeys": "API Keys",
 	"skillsmpApi": "SkillsMP API",
 	"skillsmpApiKey": "API Key",
-  "aboutTitle": "About",
+	"aboutTitle": "About",
 	"skillsmpApiKeyPlaceholder": "Enter your SkillsMP API Key",
 	"skillsmpApiKeyHint": "Get your API Key from skillsmp.com",
 	"apiKeySaved": "API Key saved successfully",
@@ -165,16 +165,49 @@
 	},
 	"userDataPathHint": "Application data storage path, cannot be changed",
 	"searchProviders": {
-		"zhipu": { "name": "Zhipu AI", "description": "Zhipu AI Search API", "apiKeyPlaceholder": "Enter Zhipu AI API Key" },
-		"tavily": { "description": "Tavily AI Search Engine", "apiKeyPlaceholder": "Enter Tavily API Key" },
-		"searxng": { "description": "Self-hosted SearXNG search service", "apiKeyLabel": "API Key (optional)", "apiKeyPlaceholder": "Enter API Key if access is restricted", "apiUrlLabel": "API URL" },
-		"exa": { "description": "Exa AI Search Engine", "apiKeyPlaceholder": "Enter Exa API Key" },
+		"zhipu": {
+			"name": "Zhipu AI",
+			"description": "Zhipu AI Search API",
+			"apiKeyPlaceholder": "Enter Zhipu AI API Key"
+		},
+		"tavily": {
+			"description": "Tavily AI Search Engine",
+			"apiKeyPlaceholder": "Enter Tavily API Key"
+		},
+		"searxng": {
+			"description": "Self-hosted SearXNG search service",
+			"apiKeyLabel": "API Key (optional)",
+			"apiKeyPlaceholder": "Enter API Key if access is restricted",
+			"apiUrlLabel": "API URL"
+		},
+		"exa": {
+			"description": "Exa AI Search Engine",
+			"apiKeyPlaceholder": "Enter Exa API Key"
+		},
 		"exa_mcp": { "apiKeyPlaceholder": "Enter Exa API Key" },
-		"bocha": { "name": "Bocha", "description": "Bocha AI Search Engine", "apiKeyPlaceholder": "Enter Bocha API Key" },
-		"sogou": { "name": "Sogou", "description": "Sogou Search API", "apiKeyPlaceholder": "Enter Sogou API Key" },
-		"google": { "description": "Google Search (via API)", "apiKeyPlaceholder": "Enter Google API Key or CX ID" },
-		"bing": { "description": "Bing Search (via API)", "apiKeyPlaceholder": "Enter Bing API Key" },
-		"baidu": { "name": "Baidu", "description": "Baidu Search (via API)", "apiKeyPlaceholder": "Enter Baidu API Key" }
+		"bocha": {
+			"name": "Bocha",
+			"description": "Bocha AI Search Engine",
+			"apiKeyPlaceholder": "Enter Bocha API Key"
+		},
+		"sogou": {
+			"name": "Sogou",
+			"description": "Sogou Search API",
+			"apiKeyPlaceholder": "Enter Sogou API Key"
+		},
+		"google": {
+			"description": "Google Search (via API)",
+			"apiKeyPlaceholder": "Enter Google API Key or CX ID"
+		},
+		"bing": {
+			"description": "Bing Search (via API)",
+			"apiKeyPlaceholder": "Enter Bing API Key"
+		},
+		"baidu": {
+			"name": "Baidu",
+			"description": "Baidu Search (via API)",
+			"apiKeyPlaceholder": "Enter Baidu API Key"
+		}
 	},
 	"search": {
 		"title": "Web Search Configuration",
@@ -214,7 +247,7 @@
 		"apiSearch": "API Search",
 		"traditionalSearch": "Traditional Search"
 	},
-  "openDevToolsDesc": "Open Chromium DevTools for debugging",
+	"openDevToolsDesc": "Open Chromium DevTools for debugging",
 	"relaunchDesc": "Completely restart the application",
 	"clearStorageDesc": "Clear localStorage and sessionStorage",
 	"about": {
@@ -258,7 +291,7 @@
 		"recentUpdates": "Recent Updates",
 		"team": "Team",
 		"achievements": "Achievements",
-    "thanks": "Thanks to all contributors and users for their support"
+		"thanks": "Thanks to all contributors and users for their support"
 	},
 	"webhook": {
 		"title": "Notifications",
@@ -313,5 +346,29 @@
 			"app*": "App * (Optional)",
 			"app*Hint": "Facebook App * for webhook verification"
 		}
+	},
+	"relay": {
+		"connectionMode": "Connection Mode",
+		"modeLocal": "Local",
+		"modeRelay": "Relay",
+		"local": "Local",
+		"relay": "Relay",
+		"urlLabel": "Relay Server URL",
+		"keyLabel": "Relay Key",
+		"keyPlaceholder": "Shared secret key",
+		"saveApply": "Save & Apply",
+		"switchToLocal": "Switch to Local Mode",
+		"saveSuccess": "Configuration saved and applied",
+		"saveFailed": "Failed to save",
+		"copied": "Copied to clipboard",
+		"loading": "Loading connection info...",
+		"getAgent": "Get Device Agent",
+		"downloadBinary": "Download Pre-built Binary",
+		"buildFromSource": "Build from Source",
+		"selectAddress": "Select Connection Address",
+		"noLocalIP": "No local IP addresses detected",
+		"startAgent": "Start Agent",
+		"configRelayFirst": "Please configure and save Relay settings first",
+		"selectAddressFirst": "Please select a connection address above"
 	}
 }
