@@ -167,7 +167,16 @@
       "Bash(for blob in 81a4ad75d841344d00b49cf3140825ebe41ebb61 944591f4fefdeff92c1ebb0e94eafedd1bb1bbab 98652118b6862120fb1a693020ad8654fe85851d cee51a5087bfd1c658df99fae557a7c832692f42 1fe6434c14fb948b3b10513351f30c394c4f3304 75665b7a4afd8e4706b1adecfdd6fcb6bbb372ac 81465ea631b36fb56427797fcfe171a9442bc753 c2468ae6ff6b406b78e19f3e92c51b3c785cb204 1c071700e696c9ddf0df10c0f158c6a563a687b0 6487de53beaad9b451a94e1272cc538cc49eb68b)",
       "Bash(while read _ _ hash)",
       "Bash(do if git cat-file -p \"$hash\")",
-      "Bash(then)"
+      "Bash(then)",
+      "WebFetch(domain:open.dingtalk.com)",
+      "WebFetch(domain:open.feishu.cn)",
+      "Bash(bun:*)",
+      "Bash(DEVICE_TOKEN=test-token SERVER_URL=ws://localhost:9999 timeout 2 ./device-agent/dist/device-agent-macos-arm64:*)",
+      "Bash(DEVICE_TOKEN=test-token SERVER_URL=ws://localhost:9999 gtimeout 2:*)",
+      "Bash(gh release:*)",
+      "Bash(brew:*)",
+      "Bash(/opt/homebrew/opt/gh/bin/gh:*)",
+      "mcp__plugin_claude-mem_mcp-search__search"
     ]
   }
 }
