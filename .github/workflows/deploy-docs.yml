@@ -25,6 +25,7 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
+        # Version from package.json packageManager field
 
       - name: Setup Node
         uses: actions/setup-node@v4
