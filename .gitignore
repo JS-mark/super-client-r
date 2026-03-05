@@ -28,3 +28,6 @@ release
 .userdata/*
 **/.vitepress/cache
 tsconfig.*.tsbuildinfo
+
+# Claude Code
+.claude/settings.local.json
