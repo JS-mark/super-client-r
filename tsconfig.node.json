@@ -14,7 +14,12 @@
 		"allowSyntheticDefaultImports": true,
 		"experimentalDecorators": true,
 		"emitDecoratorMetadata": true,
-		"strictPropertyInitialization": false
+		"strictPropertyInitialization": false,
+		"baseUrl": ".",
+		"paths": {
+			"@super-client/shared-types": ["./packages/shared-types/src"],
+			"@super-client/shared-types/*": ["./packages/shared-types/src/*"]
+		}
 	},
-	"include": ["src/main", "src/preload", "electron.vite.config.ts"]
+	"include": ["src/main", "src/preload", "electron.vite.config.ts", "packages/shared-types/src"]
 }

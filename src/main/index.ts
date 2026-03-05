@@ -4,6 +4,6 @@
 
 export * from "./ipc";
 export * from "./server";
-export * from "./services";
+export { AgentService, agentService } from "./services";
 export * from "./store";
 export * from "./utils";

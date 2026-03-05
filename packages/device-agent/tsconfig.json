@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"types": ["bun-types"],
+		"baseUrl": "..",
+		"paths": {
+			"@super-client/shared-types": ["./shared-types/src"],
+			"@super-client/shared-types/*": ["./shared-types/src/*"]
+		}
+	},
+	"include": ["*.ts"]
+}

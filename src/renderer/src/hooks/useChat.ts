@@ -255,7 +255,7 @@ function parseCustomParams(
 }
 
 // 缓存环境信息（静态数据，应用生命周期内不变）
-let cachedEnvInfo: EnvInfo | null = null;
+let cachedEnvInfo: EnvInfo | undefined;
 
 async function getEnvInfo(): Promise<EnvInfo | undefined> {
 	if (cachedEnvInfo) return cachedEnvInfo;

@@ -1,184 +1,78 @@
 /**
  * Electron API 类型声明
  * 与 preload/index.ts 中的类型保持一致
+ *
+ * 共享类型从 @super-client/shared-types 重新导出
  */
 
-export interface AgentConfig {
-	apiKey: string;
-	model: string;
-	maxTokens?: number;
-	systemPrompt?: string;
-	tools?: any[];
-}
+// ============ 重新导出共享类型 ============
 
-export interface AgentSession {
-	id: string;
-	name: string;
-	model: string;
-	createdAt: number;
-	status: "idle" | "running" | "stopped" | "error";
-}
+export type {
+	// Agent
+	AgentConfig,
+	AgentSession,
+	AgentMessage,
+	ToolUse,
+	AgentStreamEvent,
+} from "@super-client/shared-types/agent";
 
-export interface AgentMessage {
-	id: string;
-	sessionId: string;
-	role: "user" | "assistant" | "system";
-	content: string;
-	timestamp: number;
-	toolUse?: ToolUse[];
-}
+export type {
+	// Skill
+	SkillCommand,
+	SkillManifest,
+	SkillTool,
+	SkillExecutionResult,
+	ValidationIssue,
+	ValidationSeverity,
+	ValidationCategory,
+	SkillType,
+	SkillValidationResult,
+} from "@super-client/shared-types/skill";
 
-export interface ToolUse {
-	id: string;
-	name: string;
-	input: Record<string, unknown>;
-	result?: unknown;
-	status: "pending" | "success" | "error";
-}
+export type {
+	// MCP
+	McpServerType,
+	McpTransportType,
+	McpServerConfig,
+	McpServerStatus,
+	McpTool,
+	McpMarketItem,
+	BuiltinMcpDefinition,
+} from "@super-client/shared-types/mcp";
 
-export interface AgentStreamEvent {
-	type: "text" | "tool_use" | "tool_result" | "error" | "done";
-	sessionId: string;
-	data: unknown;
-}
+export type {
+	// Chat
+	ChatMessagePersist,
+	RemoteBinding,
+	RemoteIMMessage,
+	RemoteChatMessage,
+	ConversationSummary,
+	IMPlatform,
+} from "@super-client/shared-types/chat";
 
-export interface SkillCommand {
-	name: string;
-	skillId: string;
-	description: string;
-	prompt: string;
-	allowedTools?: string[];
-}
+export type {
+	// IPC
+	IPCResponse,
+} from "@super-client/shared-types/ipc";
 
-export interface SkillManifest {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	author: string;
-	category?: string;
-	icon?: string;
-	permissions?: string[];
-	tools?: SkillTool[];
-	systemPrompt?: string;
-	commands?: SkillCommand[];
-}
+export type {
+	// Remote Protocol
+	RemoteDevice,
+	CommandResult,
+	TabCompleteResult,
+	CommandOutputChunk,
+	RemoteControlEventType,
+	RemoteControlEventDirection,
+	RemoteControlEventSourceKind,
+	RemoteControlEvent,
+	DeviceConnectionInfo,
+	RemoteDeviceMode,
+	RelayConfig,
+} from "@super-client/shared-types/remote-protocol";
 
-export interface SkillTool {
-	name: string;
-	description: string;
-	inputSchema: Record<string, unknown>;
-}
+// ============ Renderer 进程独有的类型 ============
 
-export interface SkillExecutionResult {
-	success: boolean;
-	output?: unknown;
-	error?: string;
-}
-
-export type ValidationSeverity = "error" | "warning";
-export type ValidationCategory =
-	| "structural"
-	| "content"
-	| "compatibility"
-	| "consistency"
-	| "security";
-
-export type SkillType = "claude-code";
-
-export interface ValidationIssue {
-	code: string;
-	severity: ValidationSeverity;
-	category: ValidationCategory;
-	messageKey: string;
-	messageParams?: Record<string, string | number>;
-	fallbackMessage: string;
-}
-
-export interface SkillValidationResult {
-	valid: boolean;
-	issues: ValidationIssue[];
-	errorCount: number;
-	warningCount: number;
-	manifest: SkillManifest | null;
-	skillType: SkillType;
-}
-
-export type McpServerType = "builtin" | "third-party" | "market" | "internal";
-export type McpTransportType = "stdio" | "sse" | "http" | "internal";
-
-export interface McpServerConfig {
-	id: string;
-	name: string;
-	type: McpServerType;
-	transport: McpTransportType;
-	// stdio transport
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-	// sse/http transport (for third-party)
-	url?: string;
-	headers?: Record<string, string>;
-	// metadata
-	description?: string;
-	version?: string;
-	author?: string;
-	icon?: string;
-	enabled?: boolean;
-}
-
-export interface McpServerStatus {
-	id: string;
-	status: "connected" | "disconnected" | "connecting" | "error";
-	type?: McpServerType;
-	transport?: McpTransportType;
-	tools?: McpTool[];
-	error?: string;
-}
-
-export interface McpTool {
-	name: string;
-	description: string;
-	inputSchema: Record<string, unknown>;
-}
-
-export interface BuiltinMcpDefinition {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	icon?: string;
-	tags: string[];
-	transport: McpTransportType;
-	command: string;
-	args: string[];
-	env?: Record<string, string>;
-	configSchema?: Record<string, unknown>;
-}
-
-export interface McpMarketItem {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	author: string;
-	icon?: string;
-	tags: string[];
-	rating: number;
-	downloads: number;
-	installCount?: number;
-	transport: McpTransportType;
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-	url?: string;
-	headers?: Record<string, string>;
-	readmeUrl?: string;
-	repositoryUrl?: string;
-	license?: string;
-	createdAt?: string;
-	updatedAt?: string;
-}
+// ============ Log 相关类型 ============
 
 export interface LogRecord {
 	id: number;
@@ -232,18 +126,14 @@ export interface RendererLogEntry {
 	error_stack?: string;
 }
 
+// ============ Auth 相关类型 ============
+
 export interface AuthUser {
 	id: string;
 	name: string;
 	email?: string;
 	avatar?: string;
 	provider: "google" | "github";
-}
-
-export interface IPCResponse<T = unknown> {
-	success: boolean;
-	data?: T;
-	error?: string;
 }
 
 // ============ IM Bot 相关类型 ============
@@ -283,139 +173,7 @@ export interface BotStatus {
 	startedAt?: number;
 }
 
-// ============ Remote Device 相关类型 ============
-
-export interface RemoteDevice {
-	id: string;
-	name: string;
-	platform: "linux" | "windows" | "macos";
-	ipAddress?: string;
-	authentication: {
-		token: string;
-	};
-	status: "online" | "offline" | "error";
-	lastSeen?: number;
-	tags?: string[];
-	description?: string;
-	createdAt: number;
-}
-
-export interface CommandResult {
-	requestId: string;
-	deviceId: string;
-	stdout: string;
-	stderr: string;
-	exitCode: number;
-	duration: number;
-	cwd?: string;
-}
-
-/** Tab 补全结果 */
-export interface TabCompleteResult {
-	matches: string[];
-	wordStart: number;
-}
-
-/** 命令输出流式 chunk */
-export interface CommandOutputChunk {
-	requestId: string;
-	deviceId: string;
-	stream: "stdout" | "stderr";
-	data: string;
-}
-
-// ============ Remote Control Event 类型 ============
-
-export type RemoteControlEventType =
-	| "im_message_received"
-	| "im_message_sent"
-	| "device_command_sent"
-	| "device_command_result"
-	| "device_online"
-	| "device_offline";
-
-export type RemoteControlEventDirection = "incoming" | "outgoing" | "system";
-
-export type RemoteControlEventSourceKind = "bot" | "device";
-
-export interface RemoteControlEvent {
-	id: string;
-	type: RemoteControlEventType;
-	direction: RemoteControlEventDirection;
-	source: {
-		kind: RemoteControlEventSourceKind;
-		id: string;
-		name: string;
-	};
-	content: string;
-	timestamp: number;
-}
-
-export interface DeviceConnectionInfo {
-	wsPort: number;
-	localIPs: string[];
-}
-
-export type RemoteDeviceMode = "local" | "relay";
-
-export interface RelayConfig {
-	mode: RemoteDeviceMode;
-	relayUrl?: string;
-	relayKey?: string;
-}
-
-export type SearchProviderType =
-	| "zhipu"
-	| "tavily"
-	| "searxng"
-	| "exa"
-	| "exa_mcp"
-	| "bocha"
-	| "sogou"
-	| "google"
-	| "bing"
-	| "baidu";
-
-export interface SearchConfig {
-	id: string;
-	provider: SearchProviderType;
-	name: string;
-	apiKey: string;
-	apiUrl?: string;
-	enabled: boolean;
-	isDefault?: boolean;
-	config?: Record<string, unknown>;
-}
-
-export interface SearchExecuteRequest {
-	provider: string;
-	query: string;
-	apiKey: string;
-	apiUrl?: string;
-	maxResults?: number;
-	config?: Record<string, unknown>;
-}
-
-export interface SearchExecuteResponse {
-	results: { title: string; url: string; snippet: string }[];
-	provider: string;
-	query: string;
-	searchTimeMs: number;
-}
-
-export interface AttachmentInfo {
-	id: string;
-	name: string;
-	originalName: string;
-	path: string;
-	size: number;
-	mimeType: string;
-	type: "image" | "document" | "code" | "audio" | "video" | "archive" | "other";
-	createdAt: string;
-	conversationId?: string;
-	messageId?: string;
-	thumbnailPath?: string;
-}
+// ============ Model Provider 相关类型 ============
 
 export type ModelProviderPreset =
 	| "dashscope"
@@ -551,69 +309,64 @@ export interface ChatStreamEvent {
 	};
 }
 
-export interface ChatMessagePersist {
+// ============ Search 相关类型 ============
+
+export type SearchProviderType =
+	| "zhipu"
+	| "tavily"
+	| "searxng"
+	| "exa"
+	| "exa_mcp"
+	| "bocha"
+	| "sogou"
+	| "google"
+	| "bing"
+	| "baidu";
+
+export interface SearchConfig {
 	id: string;
-	role: "user" | "assistant" | "system" | "tool";
-	content: string;
-	timestamp: number;
-	type?: "text" | "tool_use" | "tool_result" | "error";
-	toolCall?: {
-		id: string;
-		name: string;
-		input: Record<string, unknown>;
-		status: "pending" | "awaiting_approval" | "success" | "error";
-		result?: unknown;
-		error?: string;
-		duration?: number;
-	};
-	metadata?: {
-		model?: string;
-		tokens?: number;
-		inputTokens?: number;
-		outputTokens?: number;
-		duration?: number;
-		firstTokenMs?: number;
-		tokensPerSecond?: number;
-	};
+	provider: SearchProviderType;
+	name: string;
+	apiKey: string;
+	apiUrl?: string;
+	enabled: boolean;
+	isDefault?: boolean;
+	config?: Record<string, unknown>;
 }
 
-export type IMPlatform = "dingtalk" | "lark" | "telegram";
-
-export interface RemoteBinding {
-	botId: string;
-	chatId: string;
-	botName: string;
-	platform: IMPlatform;
-	boundAt: number;
+export interface SearchExecuteRequest {
+	provider: string;
+	query: string;
+	apiKey: string;
+	apiUrl?: string;
+	maxResults?: number;
+	config?: Record<string, unknown>;
 }
 
-export interface RemoteIMMessage {
-	conversationId: string;
-	content: string;
-	sender: { id: string; name: string };
-	platform: IMPlatform;
-	chatId: string;
-	timestamp: number;
+export interface SearchExecuteResponse {
+	results: { title: string; url: string; snippet: string }[];
+	provider: string;
+	query: string;
+	searchTimeMs: number;
 }
 
-export interface RemoteChatMessage {
-	id: string;
-	direction: "incoming" | "outgoing";
-	content: string;
-	sender: { id: string; name: string };
-	platform: IMPlatform;
-	timestamp: number;
-}
+// ============ Attachment 相关类型 ============
 
-export interface ConversationSummary {
+export interface AttachmentInfo {
 	id: string;
 	name: string;
-	createdAt: number;
-	updatedAt: number;
-	messageCount: number;
-	preview: string;
-	remote?: RemoteBinding;
+	originalName: string;
+	path: string;
+	size: number;
+	mimeType: string;
+	type: "image" | "document" | "code" | "audio" | "video" | "archive" | "other";
+	createdAt: string;
+	conversationId?: string;
+	messageId?: string;
+	thumbnailPath?: string;
 }
+
+// ============ ElectronAPI 声明 ============
 
 export interface ElectronAPI {
 	// 窗口控制

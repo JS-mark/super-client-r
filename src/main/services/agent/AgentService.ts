@@ -7,16 +7,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { MessageParam, Tool } from "@anthropic-ai/sdk/resources/messages";
 import { EventEmitter } from "events";
 import type {
+	AgentConfig as BaseAgentConfig,
 	AgentMessage,
 	AgentSession,
 	AgentStreamEvent,
 } from "../../ipc/types";
 
-export interface AgentConfig {
-	apiKey: string;
-	model: string;
-	maxTokens?: number;
-	systemPrompt?: string;
+/** Agent 配置（扩展 SDK Tool 类型） */
+export interface AgentConfig extends Omit<BaseAgentConfig, "tools"> {
 	tools?: Tool[];
 }
 

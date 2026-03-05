@@ -6,6 +6,11 @@ import { resolve } from "path";
 
 export default defineConfig({
 	main: {
+		resolve: {
+			alias: {
+				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
+			},
+		},
 		build: {
 			rollupOptions: {
 				input: resolve(__dirname, "src/main/main.ts"),
@@ -14,9 +19,18 @@ export default defineConfig({
 				exclude: ["**/node_modules/**", "**/out/**", "**/dist/**"],
 			},
 		},
-		plugins: [externalizeDepsPlugin()],
+		plugins: [
+			externalizeDepsPlugin({
+				exclude: ["@super-client/shared-types"],
+			}),
+		],
 	},
 	preload: {
+		resolve: {
+			alias: {
+				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
+			},
+		},
 		build: {
 			rollupOptions: {
 				input: resolve(__dirname, "src/preload/index.ts"),
@@ -25,12 +39,17 @@ export default defineConfig({
 				exclude: ["**/node_modules/**", "**/out/**", "**/dist/**"],
 			},
 		},
-		plugins: [externalizeDepsPlugin()],
+		plugins: [
+			externalizeDepsPlugin({
+				exclude: ["@super-client/shared-types"],
+			}),
+		],
 	},
 	renderer: {
 		resolve: {
 			alias: {
 				"@": resolve("src/renderer/src"),
+				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
 			},
 		},
 		plugins: [

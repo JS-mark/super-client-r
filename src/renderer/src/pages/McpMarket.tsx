@@ -51,6 +51,7 @@ import type {
 	McpMarketItem,
 	McpServer,
 	BuiltinMcpDefinition,
+	McpServerConfig,
 } from "../types/mcp";
 
 const PAGE_SIZE = 12;
@@ -139,11 +140,11 @@ const McpMarket: React.FC = () => {
 		window.electron.mcp.listServers().then((res) => {
 			if (res.success && res.data) {
 				const { servers: storeServers, setServers } = useMcpStore.getState();
-				const internalConfigs = res.data.filter((c) => c.type === "internal");
+				const internalConfigs = res.data.filter((c: McpServerConfig) => c.type === "internal");
 				if (internalConfigs.length > 0) {
 					// 移除 store 中旧的 internal 服务器，用主进程最新的替换
 					const nonInternal = storeServers.filter((s) => s.type !== "internal");
-					const internalServers: McpServer[] = internalConfigs.map((c) => ({
+					const internalServers: McpServer[] = internalConfigs.map((c: McpServerConfig) => ({
 						...c,
 						status: "connected" as const,
 						enabled: true,

@@ -29,11 +29,14 @@
 		"test": "vitest",
 		"test:ui": "vitest --ui",
 		"test:run": "vitest run",
-		"docs:dev": "vitepress dev docs",
-		"docs:build": "vitepress build docs",
-		"docs:preview": "vitepress preview docs",
-		"agent:build": "bun device-agent/build.ts current",
-		"agent:build:all": "bun device-agent/build.ts"
+		"docs:dev": "pnpm --filter @super-client/docs dev",
+		"docs:build": "pnpm --filter @super-client/docs build",
+		"docs:preview": "pnpm --filter @super-client/docs preview",
+		"agent:build": "pnpm --filter @super-client/device-agent build",
+		"agent:build:all": "pnpm --filter @super-client/device-agent build:all",
+		"relay:build": "pnpm --filter @super-client/relay-server build",
+		"relay:build:all": "pnpm --filter @super-client/relay-server build:all",
+		"relay:start": "pnpm --filter @super-client/relay-server start"
 	},
 	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^4.0.63",
@@ -72,6 +75,7 @@
 		"@milkdown/react": "^7.18.0",
 		"@modelcontextprotocol/sdk": "^1.26.0",
 		"@openrouter/ai-sdk-provider": "^2.2.3",
+		"@super-client/shared-types": "workspace:*",
 		"@uiw/codemirror-extensions-langs": "^4.25.4",
 		"@uiw/codemirror-theme-vscode": "^4.25.4",
 		"@xterm/addon-fit": "^0.11.0",
@@ -143,6 +147,7 @@
 		"@vitest/ui": "^4.0.18",
 		"autoprefixer": "^10.4.21",
 		"babel-plugin-react-dev-locator": "^1.0.6",
+		"bun": "^1.3.10",
 		"chalk": "^5.6.2",
 		"code-inspector-plugin": "^1.4.2",
 		"dotenv": "^17.3.1",
@@ -161,7 +166,6 @@
 		"vite": "^7.3.1",
 		"vite-plugin-trae-solo-badge": "^1.0.0",
 		"vite-tsconfig-paths": "^6.1.1",
-		"vitepress": "^1.6.4",
 		"vitest": "^4.0.18"
 	},
 	"build": {

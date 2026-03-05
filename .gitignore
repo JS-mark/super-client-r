@@ -26,5 +26,5 @@ release
 *.sln
 *.sw?
 .userdata/*
-docs/.vitepress/cache
+**/.vitepress/cache
 tsconfig.*.tsbuildinfo

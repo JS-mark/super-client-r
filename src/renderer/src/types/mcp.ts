@@ -1,4 +1,4 @@
-import type { McpServerType, McpTransportType, McpTool } from "./electron";
+import type { McpServerConfig, McpServerType, McpTransportType, McpTool } from "./electron";
 
 export interface McpServer {
 	id: string;
@@ -69,4 +69,4 @@ export interface McpMarketSearchResult {
 	limit: number;
 }
 
-export type { McpServerType, McpTransportType, McpTool };
+export type { McpServerConfig, McpServerType, McpTransportType, McpTool };

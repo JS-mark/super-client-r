@@ -18,8 +18,10 @@
 		"composite": true,
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/renderer/src/*"]
+			"@/*": ["src/renderer/src/*"],
+			"@super-client/shared-types": ["./packages/shared-types/src"],
+			"@super-client/shared-types/*": ["./packages/shared-types/src/*"]
 		}
 	},
-	"include": ["src/renderer/src", "src/renderer/vite-env.d.ts"]
+	"include": ["src/renderer/src", "src/renderer/vite-env.d.ts", "packages/shared-types/src"]
 }

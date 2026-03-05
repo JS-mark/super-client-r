@@ -1,0 +1,14 @@
+{
+	"name": "@super-client/relay-server",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "bun build.ts current",
+		"build:all": "bun build.ts",
+		"start": "bun index.ts"
+	},
+	"devDependencies": {
+		"bun-types": "^1.2.9"
+	}
+}

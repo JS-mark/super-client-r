@@ -1,200 +1,106 @@
 /**
  * IPC 通信类型定义
+ *
+ * 共享类型从 @super-client/shared-types 重新导出
  */
 
-// ============ Agent 相关类型 ============
+// ============ 重新导出共享类型 ============
 
-export interface AgentSession {
-	id: string;
-	name: string;
-	model: string;
-	createdAt: number;
-	status: "idle" | "running" | "stopped" | "error";
-}
+export type {
+	// Agent
+	AgentConfig,
+	AgentSession,
+	AgentMessage,
+	ToolUse,
+	AgentStreamEvent,
+} from "@super-client/shared-types/agent";
 
-export interface AgentMessage {
-	id: string;
-	sessionId: string;
-	role: "user" | "assistant" | "system";
-	content: string;
-	timestamp: number;
-	toolUse?: ToolUse[];
-}
+export type {
+	// Skill
+	SkillCommand,
+	SkillManifest,
+	SkillTool,
+	SkillExecutionResult,
+	ValidationIssue,
+	SkillValidationResult,
+	SkillType,
+	ValidationSeverity,
+	ValidationCategory,
+} from "@super-client/shared-types/skill";
 
-export interface ToolUse {
-	id: string;
-	name: string;
-	input: Record<string, unknown>;
-	result?: unknown;
-	status: "pending" | "success" | "error";
-}
+export type {
+	// MCP
+	McpServerType,
+	McpTransportType,
+	McpServerConfig,
+	McpServerStatus,
+	McpTool,
+	McpToolCallRequest,
+	McpToolCallResponse,
+	McpMarketItem,
+	McpMarketSearchParams,
+	McpMarketSearchResult,
+	ThirdPartyMcpRequest,
+	ThirdPartyMcpResponse,
+	BuiltinMcpDefinition,
+} from "@super-client/shared-types/mcp";
 
-export interface AgentStreamEvent {
-	type: "text" | "tool_use" | "tool_result" | "error" | "done";
-	sessionId: string;
-	data: unknown;
-}
+export type {
+	// Chat
+	ChatMessage,
+	ChatHistory,
+	ChatMessagePersist,
+	RemoteBinding,
+	BindRemoteRequest,
+	RemoteIMMessage,
+	RemoteChatMessage,
+	SendRemoteMessageRequest,
+	ConversationSummary,
+	ConversationData,
+	AppendMessageRequest,
+	UpdateMessageRequest,
+	SaveMessagesRequest,
+	RenameConversationRequest,
+	IMPlatform,
+} from "@super-client/shared-types/chat";
 
-// ============ Skill 相关类型 ============
+export type {
+	// IPC
+	IPCRequest,
+	IPCResponse,
+	IPCStreamData,
+} from "@super-client/shared-types/ipc";
 
-export interface SkillCommand {
-	name: string;
-	skillId: string;
-	description: string;
-	prompt: string;
-	allowedTools?: string[];
-}
+export type {
+	// Remote Protocol
+	RemoteDeviceMode,
+	RelayConfig,
+	DevicePlatform,
+	DeviceStatus,
+	RemoteDevice,
+	CommandRequest,
+	CommandResult,
+	WSMessageType,
+	WSMessage,
+	WSRegisterMessage,
+	WSRegisterAckMessage,
+	WSHeartbeatMessage,
+	WSExecuteCommandMessage,
+	WSCommandOutputChunkMessage,
+	WSCommandResultMessage,
+	WSTabCompleteMessage,
+	WSTabCompleteResultMessage,
+	WSGetCwdResultMessage,
+	RemoteControlEventType,
+	RemoteControlEventDirection,
+	RemoteControlEventSourceKind,
+	RemoteControlEvent,
+	DeviceConnectionInfo,
+	TabCompleteResult,
+	CommandOutputChunk,
+} from "@super-client/shared-types/remote-protocol";
 
-export interface SkillManifest {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	author: string;
-	category?: string;
-	icon?: string;
-	permissions?: string[];
-	tools?: SkillTool[];
-	systemPrompt?: string;
-	commands?: SkillCommand[];
-}
-
-export interface SkillTool {
-	name: string;
-	description: string;
-	inputSchema: Record<string, unknown>;
-}
-
-export interface SkillExecutionResult {
-	success: boolean;
-	output?: unknown;
-	error?: string;
-}
-
-// ============ MCP 相关类型 ============
-
-export type McpServerType = "builtin" | "third-party" | "market" | "internal";
-
-export type McpTransportType = "stdio" | "sse" | "http" | "internal";
-
-export interface McpServerConfig {
-	id: string;
-	name: string;
-	type: McpServerType;
-	transport: McpTransportType;
-	// stdio transport
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-	// sse/http transport (for third-party)
-	url?: string;
-	headers?: Record<string, string>;
-	// metadata
-	description?: string;
-	version?: string;
-	author?: string;
-	icon?: string;
-	enabled?: boolean;
-}
-
-export interface McpServerStatus {
-	id: string;
-	status: "connected" | "disconnected" | "connecting" | "error";
-	type?: McpServerType;
-	transport?: McpTransportType;
-	tools?: McpTool[];
-	error?: string;
-}
-
-export interface McpTool {
-	name: string;
-	description: string;
-	inputSchema: Record<string, unknown>;
-}
-
-export interface McpToolCallRequest {
-	serverId: string;
-	toolName: string;
-	args: Record<string, unknown>;
-}
-
-export interface McpToolCallResponse {
-	success: boolean;
-	data?: unknown;
-	error?: string;
-}
-
-// MCP Market types
-export interface McpMarketItem {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	author: string;
-	icon?: string;
-	tags: string[];
-	rating: number;
-	downloads: number;
-	installCount?: number;
-	transport: McpTransportType;
-	// For stdio servers
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-	// For remote servers
-	url?: string;
-	headers?: Record<string, string>;
-	readmeUrl?: string;
-	repositoryUrl?: string;
-	license?: string;
-	createdAt?: string;
-	updatedAt?: string;
-}
-
-export interface McpMarketSearchParams {
-	query?: string;
-	tags?: string[];
-	sortBy?: "downloads" | "rating" | "newest";
-	page?: number;
-	limit?: number;
-}
-
-export interface McpMarketSearchResult {
-	items: McpMarketItem[];
-	total: number;
-	page: number;
-	limit: number;
-}
-
-// Third-party MCP proxy types
-export interface ThirdPartyMcpRequest {
-	endpoint: string;
-	method: "GET" | "POST" | "PUT" | "DELETE";
-	body?: unknown;
-	headers?: Record<string, string>;
-}
-
-export interface ThirdPartyMcpResponse {
-	success: boolean;
-	data?: unknown;
-	error?: string;
-	statusCode?: number;
-}
-
-// Built-in MCP server definitions
-export interface BuiltinMcpDefinition {
-	id: string;
-	name: string;
-	description: string;
-	version: string;
-	icon?: string;
-	tags: string[];
-	transport: McpTransportType;
-	command: string;
-	args: string[];
-	env?: Record<string, string>;
-	configSchema?: Record<string, unknown>;
-}
+// ============ Main 进程独有的类型 ============
 
 // ============ Tool Permission 相关类型 ============
 
@@ -207,121 +113,6 @@ export type ToolPermissionMode =
 export interface ToolPermissionConfig {
 	mode: ToolPermissionMode;
 	authorizedTools?: string[];
-}
-
-// ============ Chat 相关类型 ============
-
-export interface ChatMessage {
-	id: string;
-	role: "user" | "assistant" | "system";
-	content: string;
-	timestamp: number;
-	model?: string;
-}
-
-export interface ChatHistory {
-	sessionId: string;
-	messages: ChatMessage[];
-	createdAt: number;
-	updatedAt: number;
-}
-
-export interface ChatMessagePersist {
-	id: string;
-	role: "user" | "assistant" | "system" | "tool";
-	content: string;
-	timestamp: number;
-	type?: "text" | "tool_use" | "tool_result" | "error";
-	toolCall?: {
-		id: string;
-		name: string;
-		input: Record<string, unknown>;
-		status: "pending" | "awaiting_approval" | "success" | "error";
-		result?: unknown;
-		error?: string;
-		duration?: number;
-	};
-	metadata?: {
-		model?: string;
-		tokens?: number;
-		inputTokens?: number;
-		outputTokens?: number;
-		duration?: number;
-		firstTokenMs?: number;
-		tokensPerSecond?: number;
-	};
-}
-
-export interface RemoteBinding {
-	botId: string;
-	chatId: string;
-	botName: string;
-	platform: IMPlatform;
-	boundAt: number;
-}
-
-export interface BindRemoteRequest {
-	conversationId: string;
-	botId: string;
-	chatId: string;
-}
-
-export interface RemoteIMMessage {
-	conversationId: string;
-	content: string;
-	sender: { id: string; name: string };
-	platform: IMPlatform;
-	chatId: string;
-	timestamp: number;
-}
-
-export interface RemoteChatMessage {
-	id: string;
-	direction: "incoming" | "outgoing";
-	content: string;
-	sender: { id: string; name: string };
-	platform: IMPlatform;
-	timestamp: number;
-}
-
-export interface SendRemoteMessageRequest {
-	conversationId: string;
-	content: string;
-}
-
-export interface ConversationSummary {
-	id: string;
-	name: string;
-	createdAt: number;
-	updatedAt: number;
-	messageCount: number;
-	preview: string;
-	remote?: RemoteBinding;
-}
-
-export interface ConversationData extends ConversationSummary {
-	messages: ChatMessagePersist[];
-}
-
-export interface AppendMessageRequest {
-	conversationId: string;
-	message: ChatMessagePersist;
-}
-
-export interface UpdateMessageRequest {
-	conversationId: string;
-	messageId: string;
-	updates: Partial<ChatMessagePersist>;
-}
-
-export interface SaveMessagesRequest {
-	conversationId: string;
-	messages: ChatMessagePersist[];
-}
-
-export interface RenameConversationRequest {
-	conversationId: string;
-	name: string;
 }
 
 // ============ Log 相关类型 ============
@@ -620,36 +411,6 @@ export interface SearchExecuteResponse {
 	searchTimeMs: number;
 }
 
-// ============ Skill Validation 相关类型 ============
-
-export type ValidationSeverity = "error" | "warning";
-export type ValidationCategory =
-	| "structural"
-	| "content"
-	| "compatibility"
-	| "consistency"
-	| "security";
-
-export interface ValidationIssue {
-	code: string;
-	severity: ValidationSeverity;
-	category: ValidationCategory;
-	messageKey: string;
-	messageParams?: Record<string, string | number>;
-	fallbackMessage: string;
-}
-
-export type SkillType = "claude-code";
-
-export interface SkillValidationResult {
-	valid: boolean;
-	issues: ValidationIssue[];
-	errorCount: number;
-	warningCount: number;
-	manifest: SkillManifest | null;
-	skillType: SkillType;
-}
-
 // ============ Webhook 相关类型 ============
 
 export type WebhookType =
@@ -695,36 +456,11 @@ export interface WebhookTestResult {
 	message: string;
 }
 
-// ============ IPC 请求/响应类型 ============
-
-export interface IPCRequest<T = unknown> {
-	id?: string;
-	payload?: T;
-}
-
-export interface IPCResponse<T = unknown> {
-	success: boolean;
-	data?: T;
-	error?: string;
-}
-
-export interface IPCStreamData<T = unknown> {
-	type: string;
-	data: T;
-}
-
 // ============ IM Bot 相关类型 ============
 
-import type { IMBotConfig, BotStatus, IMPlatform } from "../services/imbot/types";
-import type {
-	RemoteDevice,
-	RemoteControlEvent,
-	DeviceConnectionInfo,
-	RelayConfig,
-} from "../services/remote/types";
+import type { IMBotConfig, BotStatus } from "../services/imbot/types";
 
 export type { IMBotConfig, BotStatus };
-export type { RemoteControlEvent, DeviceConnectionInfo };
 
 export interface StartBotRequest {
 	config: IMBotConfig;
@@ -738,8 +474,6 @@ export interface SendMessageRequest {
 
 // ============ Remote Device 相关类型 ============
 
-export type { RemoteDevice };
-
 export interface RegisterDeviceRequest {
 	name: string;
 	platform: "linux" | "windows" | "macos";
@@ -752,5 +486,3 @@ export interface ExecuteCommandRequest {
 	command: string;
 	timeout?: number;
 }
-
-export type { RelayConfig };
