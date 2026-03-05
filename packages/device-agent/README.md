@@ -146,17 +146,37 @@ launchctl load ~/Library/LaunchAgents/com.super-client.device-agent.plist
 
 ## 从源码构建
 
-需要 [Bun](https://bun.sh) 运行时：
+Device Agent 位于 `packages/device-agent/`，使用 Bun 编译为独立二进制。
 
 ```bash
 # 编译当前平台
-bun device-agent/build.ts current
+pnpm agent:build
 
 # 编译全部平台
-bun device-agent/build.ts
+pnpm agent:build:all
 
-# 产物在 device-agent/dist/
+# 产物在 packages/device-agent/dist/
+ls packages/device-agent/dist/
+# device-agent-linux-x64
+# device-agent-linux-arm64
+# device-agent-macos-x64
+# device-agent-macos-arm64
+# device-agent-windows-x64.exe
 ```
+
+### 中继模式（跨网络访问）
+
+如果 Electron 应用和设备不在同一网络，需要通过 Relay Server 中转：
+
+```bash
+DEVICE_ID=my-device \
+DEVICE_TOKEN=你的Token \
+SERVER_URL=wss://relay.example.com:443 \
+RELAY_KEY=your-relay-key \
+./device-agent-linux-x64
+```
+
+详见 [Relay Server 文档](../features/relay-server.md)。
 
 ## 安全注意事项
 
