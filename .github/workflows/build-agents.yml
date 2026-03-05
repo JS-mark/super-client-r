@@ -41,10 +41,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build relay-server (all platforms)
-        run: pnpm relay:build:all
+        run: pnpm --filter @super-client/relay-server build:all
 
       - name: Build device-agent (all platforms)
-        run: pnpm agent:build:all
+        run: pnpm --filter @super-client/device-agent build:all
 
       - name: Get short SHA
         id: sha
