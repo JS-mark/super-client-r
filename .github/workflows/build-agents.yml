@@ -1,0 +1,131 @@
+name: Build Agents
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/relay-server/**'
+      - 'packages/device-agent/**'
+      - 'packages/shared-types/**'
+      - '.github/workflows/build-agents.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build relay-server (all platforms)
+        run: pnpm relay:build:all
+
+      - name: Build device-agent (all platforms)
+        run: pnpm agent:build:all
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Upload relay-server artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-server-${{ steps.sha.outputs.short }}
+          path: packages/relay-server/dist/*
+          retention-days: 30
+
+      - name: Upload device-agent artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-agent-${{ steps.sha.outputs.short }}
+          path: packages/device-agent/dist/*
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Download relay-server artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: relay-server-${{ steps.sha.outputs.short }}
+          path: ./release/relay-server
+
+      - name: Download device-agent artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: device-agent-${{ steps.sha.outputs.short }}
+          path: ./release/device-agent
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: agents-${{ steps.sha.outputs.short }}
+          name: Agents Build ${{ steps.sha.outputs.short }}
+          body: |
+            ## Relay Server & Device Agent Build
+
+            **Commit**: ${{ github.sha }}
+            **Branch**: main
+
+            ### Downloads
+
+            #### Relay Server
+            | Platform | File |
+            |----------|------|
+            | Linux x64 | `relay-server-linux-x64` |
+            | Linux arm64 | `relay-server-linux-arm64` |
+            | macOS Intel | `relay-server-macos-x64` |
+            | macOS Apple Silicon | `relay-server-macos-arm64` |
+            | Windows x64 | `relay-server-windows-x64.exe` |
+
+            #### Device Agent
+            | Platform | File |
+            |----------|------|
+            | Linux x64 | `device-agent-linux-x64` |
+            | Linux arm64 | `device-agent-linux-arm64` |
+            | macOS Intel | `device-agent-macos-x64` |
+            | macOS Apple Silicon | `device-agent-macos-arm64` |
+            | Windows x64 | `device-agent-windows-x64.exe` |
+
+            ### Usage
+
+            See [Device Agent README](https://github.com/${{ github.repository }}/blob/main/packages/device-agent/README.md) and [Relay Server Docs](https://github.com/${{ github.repository }}/blob/main/packages/docs/guide/features/relay-server.md) for usage instructions.
+          files: |
+            ./release/relay-server/*
+            ./release/device-agent/*
+          draft: false
+          prerelease: false
