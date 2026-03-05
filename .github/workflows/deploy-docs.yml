@@ -33,7 +33,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile --ignore-scripts --filter @super/client/docs...
+        run: pnpm install --frozen-lockfile --filter @super-client/docs...
 
       - name: Build docs
         run: pnpm docs:build
