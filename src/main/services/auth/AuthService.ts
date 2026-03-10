@@ -1,6 +1,10 @@
 /**
  * OAuth 认证服务
  * 支持 Google 和 GitHub OAuth 登录
+ *
+ * 安全改进:
+ * - GitHub: 通过代理服务进行 token exchange，client_secret 不存储在客户端
+ * - Google: 使用 PKCE 流程，无需 client_secret
  */
 
 import crypto from "crypto";
@@ -10,6 +14,13 @@ import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
 
 const REDIRECT_URI = "https://app.nexo-ai.top/auth/callback";
+
+// 配置 API 基础地址（从环境变量读取）
+const CONFIG_API_BASE_URL =
+	import.meta.env.MAIN_VITE_CONFIG_API_BASE_URL || "https://api.nexo-ai.top";
+
+// 默认 GitHub token exchange URL
+const DEFAULT_GITHUB_TOKEN_EXCHANGE_URL = `${CONFIG_API_BASE_URL}/auth/github/token`;
 
 function base64URLEncode(buffer: Buffer): string {
 	return buffer
@@ -25,6 +36,16 @@ function sha256(buffer: string): Buffer {
 
 export class AuthService {
 	private authWindow: BrowserWindow | null = null;
+	private tokenExchangeUrl: string = DEFAULT_GITHUB_TOKEN_EXCHANGE_URL;
+
+	/**
+	 * 设置 GitHub token exchange 代理 URL
+	 * 通常从服务端初始化配置获取
+	 */
+	setTokenExchangeUrl(url: string): void {
+		this.tokenExchangeUrl = url;
+		logger.info(`GitHub token exchange URL set to: ${url}`);
+	}
 
 	async login(provider: AuthProvider): Promise<AuthUser> {
 		if (provider === "google") {
@@ -34,8 +55,8 @@ export class AuthService {
 	}
 
 	async logout(): Promise<void> {
-		storeManager.setConfig("authUser", undefined as any);
-		storeManager.setConfig("authTokens", undefined as any);
+		storeManager.setConfig("authUser", undefined as never);
+		storeManager.setConfig("authTokens", undefined as never);
 		logger.info("User logged out");
 	}
 
@@ -51,7 +72,7 @@ export class AuthService {
 			);
 		}
 
-		// PKCE flow
+		// PKCE flow - 无需 client_secret
 		const codeVerifier = base64URLEncode(crypto.randomBytes(32));
 		const codeChallenge = base64URLEncode(sha256(codeVerifier));
 		const state = crypto.randomBytes(16).toString("hex");
@@ -71,7 +92,7 @@ export class AuthService {
 		const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 		const code = await this.openAuthWindow(authUrl, state);
 
-		// Exchange code for tokens
+		// Exchange code for tokens using PKCE (no client_secret needed)
 		const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
 			method: "POST",
 			headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -140,10 +161,9 @@ export class AuthService {
 
 	private async loginWithGitHub(): Promise<AuthUser> {
 		const clientId = storeManager.getConfig("githubClientId");
-		const clientSecret = storeManager.getConfig("githubClientSecret");
-		if (!clientId || !clientSecret) {
+		if (!clientId) {
 			throw new Error(
-				"GitHub OAuth credentials not configured. Please set Client ID and Client Secret in Settings → API Keys.",
+				"GitHub Client ID not configured. Please set it in Settings → API Keys.",
 			);
 		}
 
@@ -159,23 +179,19 @@ export class AuthService {
 		const authUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
 		const code = await this.openAuthWindow(authUrl, state);
 
-		// Exchange code for tokens
-		const tokenResponse = await fetch(
-			"https://github.com/login/oauth/access_token",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-				},
-				body: JSON.stringify({
-					client_id: clientId,
-					client_secret: clientSecret,
-					code,
-					redirect_uri: REDIRECT_URI,
-				}),
+		// Exchange code for tokens via proxy service (client_secret stored on server)
+		logger.info(`Exchanging GitHub code via proxy: ${this.tokenExchangeUrl}`);
+		const tokenResponse = await fetch(this.tokenExchangeUrl, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
 			},
-		);
+			body: JSON.stringify({
+				code,
+				redirect_uri: REDIRECT_URI,
+			}),
+		});
 
 		if (!tokenResponse.ok) {
 			const err = await tokenResponse.text();
@@ -321,12 +337,12 @@ export class AuthService {
 			};
 
 			// Intercept navigation to the redirect URI
-			this.authWindow.webContents.on("will-redirect", (_event, url) => {
-				handleRedirect(url);
+			this.authWindow.webContents.on("will-redirect", (_event, navUrl) => {
+				handleRedirect(navUrl);
 			});
 
-			this.authWindow.webContents.on("will-navigate", (_event, url) => {
-				handleRedirect(url);
+			this.authWindow.webContents.on("will-navigate", (_event, navUrl) => {
+				handleRedirect(navUrl);
 			});
 
 			// Also intercept via webRequest for cases where will-redirect doesn't fire
