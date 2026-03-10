@@ -23,6 +23,7 @@ import { registerIMBotHandlers } from "./handlers/imbotHandlers";
 import { registerRemoteDeviceHandlers } from "./handlers/remoteDeviceHandlers";
 import { registerRemoteControlHandlers } from "./handlers/remoteControlHandlers";
 import { registerRemoteChatHandlers } from "./handlers/remoteChatHandlers";
+import { registerAppConfigHandlers } from "./handlers/appConfigHandler";
 
 /**
  * 注册所有 IPC 处理器
@@ -47,6 +48,7 @@ export function registerIpcHandlers(): void {
 	registerRemoteDeviceHandlers();
 	registerRemoteControlHandlers();
 	registerRemoteChatHandlers();
+	registerAppConfigHandlers();
 	setupAgentHandlers();
 }
 

@@ -486,3 +486,36 @@ export interface ExecuteCommandRequest {
 	command: string;
 	timeout?: number;
 }
+
+// ============ App Config 相关类型 ============
+
+export interface AppInitConfig {
+	version: string;
+	updatedAt: number;
+	forceUpdate?: {
+		fields: string[];
+		reason?: string;
+	};
+	oauth: {
+		google: { clientId: string };
+		github: { clientId: string; tokenExchangeUrl: string };
+	};
+	featureFlags: Record<string, boolean>;
+	announcements: Array<{
+		id: string;
+		type: string;
+		title: string;
+		titleZh: string;
+		content: string;
+		contentZh: string;
+		dismissible: boolean;
+		startAt: number;
+		endAt: number;
+		priority: number;
+	}>;
+	meta: {
+		links: Record<string, string>;
+		endpoints: Record<string, string>;
+	};
+}
+

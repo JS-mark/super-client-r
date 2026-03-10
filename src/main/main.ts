@@ -37,6 +37,7 @@ import { updateService } from "./services/updateService";
 import { logger } from "./utils/logger";
 import { internalMcpService } from "./services/mcp/internal";
 import { mcpService } from "./services/mcp/McpService";
+import { appConfigService } from "./services/config/AppConfigService";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
 // 生产环境启用沙箱以提高安全性
@@ -440,6 +441,11 @@ app.whenReady().then(async () => {
 
 	logger.info("App is ready");
 
+	// Initialize app config from remote server (OAuth URLs, feature flags, etc.)
+	appConfigService.initialize().catch((error) => {
+		logger.warn("Failed to initialize app config, using defaults", error);
+	});
+
 	// Initialize per-conversation storage (runs migration from legacy chat-history.json)
 	conversationStorage.initialize();
 
@@ -618,6 +624,10 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
 	isQuitting = true;
 	logger.info("App is quitting");
+
+	// 停止配置定期检查
+	appConfigService.stopPeriodicCheck();
+
 	internalMcpService.cleanup().catch((error) => {
 		logger.error("Failed to cleanup internal MCP servers", error);
 	});

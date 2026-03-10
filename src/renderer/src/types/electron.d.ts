@@ -72,6 +72,38 @@ export type {
 
 // ============ Renderer 进程独有的类型 ============
 
+// ============ App Config 相关类型 ============
+
+export interface AppInitConfig {
+	version: string;
+	updatedAt: number;
+	forceUpdate?: {
+		fields: string[];
+		reason?: string;
+	};
+	oauth: {
+		google: { clientId: string };
+		github: { clientId: string; tokenExchangeUrl: string };
+	};
+	featureFlags: Record<string, boolean>;
+	announcements: Array<{
+		id: string;
+		type: string;
+		title: string;
+		titleZh: string;
+		content: string;
+		contentZh: string;
+		dismissible: boolean;
+		startAt: number;
+		endAt: number;
+		priority: number;
+	}>;
+	meta: {
+		links: Record<string, string>;
+		endpoints: Record<string, string>;
+	};
+}
+
 // ============ Log 相关类型 ============
 
 export interface LogRecord {
@@ -869,6 +901,13 @@ export interface ElectronAPI {
 		saveConfig: (config: unknown) => Promise<IPCResponse>;
 		deleteConfig: (id: string) => Promise<IPCResponse>;
 		test: (configId: string) => Promise<IPCResponse>;
+	};
+
+	// App Config API
+	appConfig: {
+		getConfig: () => Promise<IPCResponse<AppInitConfig | null>>;
+		refresh: () => Promise<IPCResponse<AppInitConfig | null>>;
+		onConfigUpdated: (callback: (config: AppInitConfig) => void) => () => void;
 	};
 
 	// 系统信息 API

@@ -10,6 +10,7 @@ export const SERVER_CONFIG = {
 		"/api-docs",
 		"/swagger.json",
 		"/swagger-ui/",
+		"/v1/app/init-config",
 	],
 };
 

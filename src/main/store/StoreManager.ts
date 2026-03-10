@@ -68,10 +68,9 @@ export interface AppConfig {
 	pluginPermissions?: Record<string, string[]>;
 	// Silicon Flow API
 	siliconFlowApiKey?: string;
-	// OAuth credentials
+	// OAuth credentials (client_id only, secret stored on server)
 	googleClientId?: string;
 	githubClientId?: string;
-	githubClientSecret?: string;
 	// Auth user data
 	authUser?: {
 		id: string;
@@ -93,6 +92,12 @@ export interface AppConfig {
 	remoteDevices?: RemoteDevice[];
 	// Relay 配置
 	relayConfig?: RelayConfig;
+	// App Config 缓存
+	appInitConfigCache?: {
+		config: any;
+		cachedAt: number;
+		version: string;
+	};
 }
 
 export interface AppData {

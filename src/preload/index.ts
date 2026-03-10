@@ -520,6 +520,13 @@ export interface ElectronAPI {
 		test: (configId: string) => Promise<IPCResponse<WebhookTestResult>>;
 	};
 
+	// App Config API
+	appConfig: {
+		getConfig: () => Promise<IPCResponse<AppInitConfig | null>>;
+		refresh: () => Promise<IPCResponse<AppInitConfig | null>>;
+		onConfigUpdated: (callback: (config: AppInitConfig) => void) => () => void;
+	};
+
 	// 系统信息 API
 	system: {
 		getHomedir: () => Promise<IPCResponse<string>>;
@@ -1166,6 +1173,36 @@ export interface WebhookTestResult {
 	message: string;
 }
 
+export interface AppInitConfig {
+	version: string;
+	updatedAt: number;
+	forceUpdate?: {
+		fields: string[];
+		reason?: string;
+	};
+	oauth: {
+		google: { clientId: string };
+		github: { clientId: string; tokenExchangeUrl: string };
+	};
+	featureFlags: Record<string, boolean>;
+	announcements: Array<{
+		id: string;
+		type: string;
+		title: string;
+		titleZh: string;
+		content: string;
+		contentZh: string;
+		dismissible: boolean;
+		startAt: number;
+		endAt: number;
+		priority: number;
+	}>;
+	meta: {
+		links: Record<string, string>;
+		endpoints: Record<string, string>;
+	};
+}
+
 // ============ 实现 ============
 
 const electronAPI: ElectronAPI = {
@@ -1715,6 +1752,18 @@ const electronAPI: ElectronAPI = {
 		deleteConfig: (id: string) =>
 			ipcRenderer.invoke("webhook:delete-config", id),
 		test: (configId: string) => ipcRenderer.invoke("webhook:test", configId),
+	},
+
+	// App Config API
+	appConfig: {
+		getConfig: () => ipcRenderer.invoke("app-config:get-config"),
+		refresh: () => ipcRenderer.invoke("app-config:refresh"),
+		onConfigUpdated: (callback) => {
+			const listener = (_event: unknown, config: AppInitConfig) =>
+				callback(config);
+			ipcRenderer.on("app-config:config-updated", listener);
+			return () => ipcRenderer.off("app-config:config-updated", listener);
+		},
 	},
 
 	// 系统信息 API

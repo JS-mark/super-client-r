@@ -371,6 +371,16 @@ export const REMOTE_CHAT_CHANNELS = {
 	IM_MESSAGE: "remote-chat:im-message",
 } as const;
 
+// App Config 相关通道
+export const APP_CONFIG_CHANNELS = {
+	// 获取当前配置
+	GET_CONFIG: "app-config:get-config",
+	// 刷新配置
+	REFRESH: "app-config:refresh",
+	// 配置更新事件 (main → renderer)
+	CONFIG_UPDATED: "app-config:config-updated",
+} as const;
+
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
@@ -395,4 +405,5 @@ export type IPCChannel =
 	| (typeof IMBOT_CHANNELS)[keyof typeof IMBOT_CHANNELS]
 	| (typeof REMOTE_DEVICE_CHANNELS)[keyof typeof REMOTE_DEVICE_CHANNELS]
 	| (typeof REMOTE_CONTROL_CHANNELS)[keyof typeof REMOTE_CONTROL_CHANNELS]
-	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS];
+	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS]
+	| (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];

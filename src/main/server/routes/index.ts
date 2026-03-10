@@ -3,6 +3,7 @@ import { swaggerConfig } from "../middlewares/swagger";
 import { HealthController } from "./health";
 import { SkillsController } from "./proxy";
 import { McpController } from "./mcp";
+import { AppConfigController } from "./appConfig";
 
 export const setupRoutes = () => {
 	const router = new SwaggerRouter({}, swaggerConfig);
@@ -12,6 +13,7 @@ export const setupRoutes = () => {
 	router.map(HealthController, {});
 	router.map(SkillsController, {});
 	router.map(McpController, {});
+	router.map(AppConfigController, {});
 
 	// 注册 Swagger 路由（必须在 map 之后调用）
 	router.swagger(swaggerConfig);
