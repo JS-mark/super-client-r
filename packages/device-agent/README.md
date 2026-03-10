@@ -6,13 +6,13 @@
 
 前往 [GitHub Releases](https://github.com/JS-mark/super-client-r/releases) 下载对应平台的可执行文件：
 
-| 平台 | 文件名 |
-|------|--------|
-| Linux x64 | `device-agent-linux-x64` |
-| Linux arm64 | `device-agent-linux-arm64` |
-| macOS Intel | `device-agent-macos-x64` |
-| macOS Apple Silicon | `device-agent-macos-arm64` |
-| Windows x64 | `device-agent-windows-x64.exe` |
+| 平台                | 文件名                         |
+|---------------------|--------------------------------|
+| Linux x64           | `device-agent-linux-x64`       |
+| Linux arm64         | `device-agent-linux-arm64`     |
+| macOS Intel         | `device-agent-macos-x64`       |
+| macOS Apple Silicon | `device-agent-macos-arm64`     |
+| Windows x64         | `device-agent-windows-x64.exe` |
 
 **无需安装 Node.js**，下载即可运行。
 
@@ -61,17 +61,17 @@ device-agent-windows-x64.exe
 
 ### 3. 配置参数
 
-| 环境变量 | 说明 | 默认值 |
-|---------|------|--------|
-| `DEVICE_ID` | 设备 ID（注册时生成） | device-001 |
-| `DEVICE_TOKEN` | 认证 Token（注册时生成） | （必须提供） |
-| `SERVER_URL` | WebSocket 服务器地址 | ws://localhost:8088 |
+| 环境变量       | 说明                   | 默认值              |
+|----------------|------------------------|---------------------|
+| `DEVICE_ID`    | 设备 ID（注册时生成）    | device-001          |
+| `DEVICE_TOKEN` | 认证 Token（注册时生成） | （必须提供）          |
+| `SERVER_URL`   | WebSocket 服务器地址   | ws://localhost:8088 |
 
 ## 通过 IM 机器人控制设备
 
 设备连接后，可在 Telegram 中使用：
 
-```
+```bash
 /device list                    # 查看所有设备
 /device status my-device        # 查看设备状态
 /exec my-device "ls -la"        # 执行命令
@@ -187,9 +187,9 @@ RELAY_KEY=your-relay-key \
 
 ## 故障排除
 
-| 问题 | 排查 |
-|------|------|
-| 无法连接 | 检查网络、确认 SERVER_URL 正确、检查防火墙 |
-| 认证失败 | 确认 DEVICE_TOKEN 和 DEVICE_ID 正确 |
-| 命令执行失败 | 检查命令语法、确认设备有执行权限 |
+| 问题               | 排查                                                        |
+|--------------------|-------------------------------------------------------------|
+| 无法连接           | 检查网络、确认 SERVER_URL 正确、检查防火墙                    |
+| 认证失败           | 确认 DEVICE_TOKEN 和 DEVICE_ID 正确                         |
+| 命令执行失败       | 检查命令语法、确认设备有执行权限                             |
 | macOS 提示无法打开 | 运行 `xattr -d com.apple.quarantine ./device-agent-macos-*` |
