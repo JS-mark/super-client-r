@@ -1,6 +1,6 @@
 # Super Client R - 产品需求文档（PRD）
 
-> 最后更新：2026-02-18
+> 最后更新：2026-03-11
 
 ---
 
@@ -29,22 +29,29 @@ Super Client R 是一个基于 Electron 的桌面端 AI 客户端，集成 Claud
 | # | 功能模块 | 状态 | 完成度 | 阻塞项 |
 |---|---------|------|--------|--------|
 | 1 | 页面路由与导航 | ✅ 完成 | 100% | - |
-| 2 | AI 对话（Chat） | 🟡 部分 | 80% | 消息持久化、会话ID管理 |
+| 2 | AI 对话（Chat） | ✅ 完成 | 95% | 附件关联、滚动定位、工具栏功能 |
 | 3 | MCP 服务器管理 | ✅ 完成 | 100% | - |
-| 4 | Skill 系统 | 🟡 部分 | 70% | Skill 下载执行未实现 |
-| 5 | 插件系统 | 🟡 部分 | 80% | 远程下载(zip/tgz)、市场后端、沙箱 |
+| 4 | Skill 系统 | 🟡 部分 | 70% | URL 下载、沙箱执行 |
+| 5 | 插件系统 | 🟡 部分 | 85% | 远程下载、市场后端、沙箱 |
 | 6 | 设置系统 | ✅ 完成 | 100% | - |
 | 7 | 工作区管理 | ✅ 完成 | 95% | 导出消息关联 |
 | 8 | 文件附件系统 | ✅ 完成 | 100% | - |
-| 9 | 快捷键系统 | ✅ 完成 | 100% | - |
-| 10 | HTTP API Server | 🟡 部分 | 40% | 仅 health + MCP 端点 |
+| 9 | 快捷键系统 | ✅ 完成 | 95% | 2 个快捷键 handler 为空 |
+| 10 | HTTP API Server | 🟡 部分 | 50% | JWT 集成、业务端点 |
 | 11 | 悬浮窗 | ✅ 完成 | 100% | - |
 | 12 | 国际化 (i18n) | ✅ 完成 | 100% | - |
 | 13 | 主题/暗色模式 | ✅ 完成 | 100% | - |
 | 14 | 菜单自定义 | ✅ 完成 | 100% | - |
 | 15 | 消息管理增强 | ✅ 完成 | 100% | - |
+| 16 | OAuth 认证 | ✅ 完成 | 100% | - |
+| 17 | IMBot 服务 | ✅ 完成 | 100% | - |
+| 18 | 远程设备管理 | ✅ 完成 | 100% | - |
+| 19 | 远程聊天桥接 | ✅ 完成 | 100% | - |
+| 20 | Webhook 通知 | ✅ 完成 | 100% | - |
+| 21 | LLM/模型管理 | ✅ 完成 | 100% | - |
+| 22 | 应用初始化配置 | ✅ 完成 | 100% | - |
 
-**整体完成度：约 87%**
+**整体完成度：约 93%**
 
 ---
 
@@ -185,16 +192,16 @@ src/renderer/src/components/settings/
 |------|------|------|
 | 基本对话发送/接收 | ✅ | Claude SDK 流式对话 |
 | 流式响应显示 | ✅ | 逐块渲染 |
-| 多会话管理 | ✅ | 创建/切换/删除/重命名 |
+| 多会话管理 | ✅ | 创建/切换/删除/重命名，动态 ID |
 | 消息搜索 | ✅ | 全文检索 + 高亮 |
 | 消息收藏/书签 | ✅ | 收藏 + 标签系统 |
 | 消息导出 | ✅ | Markdown/JSON |
 | 右键上下文菜单 | ✅ | 复制/收藏/删除 |
 | 工具调用渲染 | ✅ | ToolCallCard 展示 |
+| 消息持久化 | ✅ | ConversationStorageService，基于文件系统 JSON |
+| 会话ID管理 | ✅ | `conv_{timestamp}_{random}`，多用户隔离 |
+| 消息删除 | ✅ | `deleteMessage` + `deleteMessagesFrom`，持久化 |
 | 附件集成 | 🟡 | UI 存在，消息关联未完成 |
-| 消息持久化 | 🔴 | 当前仅内存，重启丢失 |
-| 会话ID管理 | 🔴 | 硬编码为 "default" |
-| 消息删除 | 🔴 | TODO 未实现 |
 | 滚动到指定消息 | 🔴 | TODO 未实现 |
 
 #### 交互设计要点
@@ -207,11 +214,9 @@ src/renderer/src/components/settings/
 
 #### 待完成事项
 
-1. **消息持久化**：接入 IndexedDB 或 SQLite（通过 MCP），确保消息重启不丢失
-2. **会话ID**：每次新建会话生成唯一 UUID，关联到工作区
-3. **消息删除**：实现 `deleteMessage` 方法，带确认弹窗
-4. **附件消息关联**：发送消息时将 attachmentIds 写入消息 metadata
-5. **滚动定位**：实现 `scrollToMessage(messageId)` 方法
+1. **附件消息关联**：发送消息时将 attachmentIds 写入消息 metadata
+2. **滚动定位**：实现 `scrollToMessage(messageId)` 方法
+3. **聊天工具栏功能**：doc/quote/prompt/tools/tags/translate 当前均为 toast 占位
 
 ---
 
@@ -272,9 +277,11 @@ src/renderer/src/components/settings/
 | 内置插件市场 | ✅ | Prompt Templates 插件，一键安装 |
 | 插件市场 UI | ✅ | 市场浏览 + 已安装管理 + 命令执行 |
 | 插件持久化 | ✅ | 重启后自动恢复已安装插件 |
+| 插件权限管理 | ✅ | PermissionService + IPC 通道 |
+| 插件更新检查 | ✅ | CHECK_UPDATES/UPDATE_PLUGIN IPC |
 | 远程下载安装 (zip/tgz) | 🔴 | TODO 未实现 |
 | 插件市场后端 | 🔴 | 无后端服务 |
-| 插件权限沙箱 | 🔴 | 未实现 |
+| 插件沙箱执行 | 🔴 | 未实现 |
 
 > 插件开发详细文档：[PLUGIN_DEVELOPMENT.md](./PLUGIN_DEVELOPMENT.md)
 
@@ -294,26 +301,29 @@ src/renderer/src/components/settings/
 |------|------|------|
 | Koa Server 框架 | ✅ | 端口自动检测 |
 | Health Check | ✅ | GET /health |
-| MCP API 端点 | ✅ | CRUD |
+| MCP API 端点 | ✅ | 17 个端点，完整 CRUD |
+| Skills Proxy 端点 | ✅ | 代理到 skillsmp.com |
+| AppConfig Proxy 端点 | ✅ | 代理到 node-auth |
 | Swagger 文档 | ✅ | 自动生成 |
 | CORS 中间件 | ✅ | - |
-| JWT 认证 | 🔴 | 未实现 |
+| Bearer Token 认证 | ✅ | 简单模式 |
+| JWT 认证 | 🟡 | 代码已写（server/auth.ts），未集成到路由 |
 | API Key 管理 | 🔴 | 未实现 |
 | Chat API | 🔴 | 未实现 |
 | Agent API | 🔴 | 未实现 |
 | Skill API | 🔴 | 未实现 |
-| 代理转发 | 🔴 | 未实现 |
+| 速率限制 | 🔴 | 未实现 |
 
 #### 待完成事项
 
-1. **JWT 认证**：集成 `koa-jwt`，实现 token 签发和验证
+1. **JWT 认证集成**：将已有的 `server/auth.ts` JWT 模块集成到路由中间件
 2. **API Key**：生成、撤销、权限管理
 3. **业务端点**：
    - `POST /api/v1/chat` - 发送消息并返回流式响应
    - `POST /api/v1/agent/execute` - 执行 Agent 任务
    - `POST /api/v1/skill/execute` - 执行 Skill
    - `GET /api/v1/sessions` - 会话管理
-4. **代理转发**：将外部 API 请求转发到内部 Claude SDK
+4. **速率限制**：防止 API 滥用
 
 ---
 
@@ -349,47 +359,40 @@ src/renderer/src/components/settings/
 
 | 位置 | 描述 | 优先级 |
 |------|------|--------|
-| `Chat.tsx:382` | `conversationId = "default"` 硬编码 | P0 |
-| `Chat.tsx:609` | 附件与消息关联未完成 | P1 |
-| `Chat.tsx:729` | 消息删除功能缺失 | P1 |
-| `Chat.tsx:873` | 滚动到指定消息未实现 | P2 |
-| `SkillService.ts:117` | URL 下载未实现 | P1 |
-| `SkillService.ts:299` | 动态加载执行未实现 | P1 |
-| `pluginHandlers.ts` | 远程 zip/tgz 插件下载未实现 | P2 |
+| `SkillService.ts:381` | URL 下载未实现 | P1 |
+| `useAppShortcuts.ts:38` | 快速搜索 (Cmd+K) handler 为空 | P2 |
+| `useAppShortcuts.ts:41` | 侧边栏切换 (Cmd+B) handler 为空 | P2 |
+| `ChatInputArea.tsx` | 工具栏 doc/quote/prompt/tools/tags/translate 为 toast 占位 | P2 |
+| `server/auth.ts` | JWT 模块已写未集成到路由 | P1 |
+
+> **已解决（2026-03-11 审计确认）：**
+> - ~~`conversationId = "default"` 硬编码~~ → ConversationStorageService 动态管理
+> - ~~消息持久化缺失~~ → 基于文件系统 JSON 持久化
+> - ~~消息删除功能缺失~~ → `deleteMessage` + `deleteMessagesFrom` 已实现
 
 ### 5.2 开发阶段规划
 
-#### Phase 1：架构治理
+#### Phase 1：快速补全（投入小、价值大）
 
-**目标**：组件拆分，消除臃肿文件
+- [ ] 快捷键 handler 补全（Cmd+K、Cmd+B）
+- [ ] 集成 JWT 认证到 HTTP 路由
+- [ ] 清理生产代码 console.log
 
-- [ ] 拆分 `Settings.tsx` → 11 个独立组件
-- [ ] 拆分 `McpMarket.tsx` → 5 个独立组件
-- [ ] 拆分 `Chat.tsx` → 5 个独立组件
-- [ ] 拆分 `MenuSettings.tsx` → 3 个独立组件
-- [ ] 拆分 Priority 2 文件
-- [ ] Logo/Icon 统一管理
+#### Phase 2：功能补全
 
-#### Phase 2：核心功能补全
-
-**目标**：消除所有 P0/P1 TODO
-
-- [ ] 实现消息持久化（IndexedDB / better-sqlite3）
-- [ ] 会话 ID 管理（UUID 生成 + 工作区关联）
-- [ ] 消息删除功能
+- [ ] 聊天工具栏功能（doc/quote/prompt/tools/tags/translate）
+- [ ] Skill URL 下载和安装
+- [ ] HTTP API 扩展（Chat/Agent 端点）
 - [ ] 附件与消息关联
-- [ ] Skill 下载和执行引擎
-- [ ] 插件远程 zip/tgz 安装流程
+- [ ] 滚动到指定消息
 
-#### Phase 3：API Server 完善
+#### Phase 3：扩展能力
 
-**目标**：HTTP API 达到可用状态
-
-- [ ] JWT 认证中间件
+- [ ] 插件远程 zip/tgz 安装
+- [ ] 插件市场后端对接
+- [ ] 沙箱执行环境（参考 SANDBOX_SOLUTION.md）
 - [ ] API Key CRUD
-- [ ] Chat/Agent/Skill API 端点
-- [ ] 请求速率限制
-- [ ] API 文档完善
+- [ ] 速率限制
 
 #### Phase 4：高级功能
 
@@ -397,19 +400,18 @@ src/renderer/src/components/settings/
 
 - [ ] 命令面板（Cmd+Shift+P）
 - [ ] 全局搜索（跨会话搜索消息）
-- [ ] 插件市场后端对接
-- [ ] 性能监控仪表盘
 - [ ] 自动更新机制
+- [ ] 性能监控仪表盘
 
 #### Phase 5：质量保障
 
 **目标**：生产级质量
 
-- [ ] 单元测试覆盖率 > 80%
+- [ ] 核心服务单元测试
+- [ ] 大文件拆分重构（Settings.tsx、McpMarket.tsx、Chat.tsx 等）
 - [ ] E2E 测试关键流程
 - [ ] 性能优化（虚拟列表、懒加载）
 - [ ] 安全审计
-- [ ] 文档完善
 
 ---
 
