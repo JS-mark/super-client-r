@@ -4,14 +4,14 @@
  */
 
 import { app } from "electron";
+import { broadcastConfigUpdate } from "../../ipc/handlers/appConfigHandler";
+import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
 import { authService } from "../auth/AuthService";
-import { storeManager } from "../../store/StoreManager";
-import { broadcastConfigUpdate } from "../../ipc/handlers/appConfigHandler";
 
 // 配置 API 基础地址（从环境变量读取，支持开发/生产环境切换）
 const CONFIG_API_BASE_URL =
-	import.meta.env.MAIN_VITE_CONFIG_API_BASE_URL || "https://api.nexo-ai.top";
+	import.meta.env.MAIN_VITE_CONFIG_API_BASE_URL || "https://app.nexo-ai.top";
 
 // 完整的配置接口地址
 const CONFIG_API_URL = `${CONFIG_API_BASE_URL}/v1/app/init-config`;
@@ -103,7 +103,10 @@ class AppConfigService {
 			// 7. 启动定期检查
 			this.startPeriodicCheck();
 		} catch (error) {
-			logger.error("[AppConfigService] Failed to fetch server config", error as Error);
+			logger.error(
+				"[AppConfigService] Failed to fetch server config",
+				error as Error,
+			);
 
 			// 降级：使用本地缓存
 			const cached = this.loadCachedConfig();
@@ -250,9 +253,7 @@ class AppConfigService {
 
 		// 如果没有强制更新字段，使用缓存
 		if (!server.forceUpdate?.fields || server.forceUpdate.fields.length === 0) {
-			logger.info(
-				"[AppConfigService] Using cached config (no force update)",
-			);
+			logger.info("[AppConfigService] Using cached config (no force update)");
 			return cached.config;
 		}
 
@@ -323,7 +324,10 @@ class AppConfigService {
 			try {
 				await this.refresh();
 			} catch (error) {
-				logger.error("[AppConfigService] Periodic check failed", error as Error);
+				logger.error(
+					"[AppConfigService] Periodic check failed",
+					error as Error,
+				);
 			}
 		}, CHECK_INTERVAL);
 	}
@@ -367,7 +371,10 @@ class AppConfigService {
 			);
 			return cached;
 		} catch (error) {
-			logger.error("[AppConfigService] Failed to load cached config", error as Error);
+			logger.error(
+				"[AppConfigService] Failed to load cached config",
+				error as Error,
+			);
 			return null;
 		}
 	}

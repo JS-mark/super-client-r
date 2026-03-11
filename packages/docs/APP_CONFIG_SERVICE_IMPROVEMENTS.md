@@ -179,7 +179,7 @@ pnpm dev
     },
     "github": {
       "clientId": "Ov23lixxx",
-      "tokenExchangeUrl": "https://api.nexo-ai.top/auth/github/token"
+      "tokenExchangeUrl": "https://app.nexo-ai.top/auth/github/token"
     }
   },
   "featureFlags": {
@@ -192,7 +192,7 @@ pnpm dev
       "homepage": "https://nexo-ai.top"
     },
     "endpoints": {
-      "api": "https://api.nexo-ai.top"
+      "api": "https://app.nexo-ai.top"
     }
   }
 }
@@ -217,7 +217,7 @@ pnpm dev
     },
     "github": {
       "clientId": "Ov23linew123",
-      "tokenExchangeUrl": "https://api.nexo-ai.top/v2/auth/github/token"
+      "tokenExchangeUrl": "https://app.nexo-ai.top/v2/auth/github/token"
     }
   },
   "featureFlags": {
@@ -230,7 +230,7 @@ pnpm dev
       "homepage": "https://nexo-ai.top"
     },
     "endpoints": {
-      "api": "https://api.nexo-ai.top"
+      "api": "https://app.nexo-ai.top"
     }
   }
 }

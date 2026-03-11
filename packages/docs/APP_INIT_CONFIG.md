@@ -16,7 +16,7 @@
 ### 接口地址
 
 ```
-GET https://api.nexo-ai.top/v1/app/init-config
+GET https://app.nexo-ai.top/v1/app/init-config
 ```
 
 ### 请求头
@@ -99,7 +99,7 @@ interface OAuthConfig {
     },
     "github": {
       "clientId": "Iv1.abc123def456",
-      "tokenExchangeUrl": "https://api.nexo-ai.top/v1/auth/github/token"
+      "tokenExchangeUrl": "https://app.nexo-ai.top/v1/auth/github/token"
     }
   }
 }
@@ -481,7 +481,7 @@ interface AppMeta {
       "email": "support@nexo-ai.top"
     },
     "endpoints": {
-      "api": "https://api.nexo-ai.top",
+      "api": "https://app.nexo-ai.top",
       "skillsMarket": "https://skillsmp.com/api/v1"
     },
     "legal": {
@@ -563,7 +563,7 @@ function mergeConfig(remote: Partial<AppInitConfig>, local: AppInitConfig): AppI
     },
     "github": {
       "clientId": "Iv1.abc123def456",
-      "tokenExchangeUrl": "https://api.nexo-ai.top/v1/auth/github/token"
+      "tokenExchangeUrl": "https://app.nexo-ai.top/v1/auth/github/token"
     }
   },
 
@@ -629,7 +629,7 @@ function mergeConfig(remote: Partial<AppInitConfig>, local: AppInitConfig): AppI
       "github": "https://github.com/js-mark/super-client-r"
     },
     "endpoints": {
-      "api": "https://api.nexo-ai.top",
+      "api": "https://app.nexo-ai.top",
       "skillsMarket": "https://skillsmp.com/api/v1"
     }
   }
@@ -656,12 +656,12 @@ function mergeConfig(remote: Partial<AppInitConfig>, local: AppInitConfig): AppI
 
 #### 服务端 (node-auth)
 
-| 文件 | 说明 |
-|------|------|
-| `src/types/app-config.ts` | 完整的 TypeScript 类型定义 |
+| 文件                         | 说明                                                     |
+|------------------------------|----------------------------------------------------------|
+| `src/types/app-config.ts`    | 完整的 TypeScript 类型定义                               |
 | `src/services/app-config.ts` | 配置数据（24 个模型提供商、8 个搜索提供商、6 个 MCP 市场源） |
-| `src/routes/app-config.ts` | 配置下发 API 路由 |
-| `src/routes/auth.ts` | OAuth token exchange 代理接口 |
+| `src/routes/app-config.ts`   | 配置下发 API 路由                                        |
+| `src/routes/auth.ts`         | OAuth token exchange 代理接口                            |
 
 **API 端点：**
 
@@ -674,11 +674,11 @@ POST /auth/google/token    # Google token exchange 代理
 
 #### 客户端 (super-client-r)
 
-| 文件 | 说明 |
-|------|------|
+| 文件                                           | 说明                              |
+|------------------------------------------------|-----------------------------------|
 | `src/main/services/config/AppConfigService.ts` | 配置加载服务（本地缓存 + 远程获取） |
-| `src/main/services/auth/AuthService.ts` | OAuth 服务（已移除 client_secret） |
-| `src/main/main.ts` | 启动时初始化配置服务 |
+| `src/main/services/auth/AuthService.ts`        | OAuth 服务（已移除 client_secret）  |
+| `src/main/main.ts`                             | 启动时初始化配置服务              |
 
 **关键改动：**
 
@@ -705,7 +705,7 @@ POST /auth/google/token    # Google token exchange 代理
 PORT=3001
 
 # API Base URL（用于生成 tokenExchangeUrl，生产环境填写实际域名）
-API_BASE_URL=https://api.nexo-ai.top
+API_BASE_URL=https://app.nexo-ai.top
 
 # OAuth credentials (存储在服务端，不下发)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -727,14 +727,14 @@ pnpm start
 
 ```bash
 # 验证配置下发
-curl https://api.nexo-ai.top/v1/app/init-config | jq '.oauth'
+curl https://app.nexo-ai.top/v1/app/init-config | jq '.oauth'
 
 # 预期输出
 {
   "google": { "clientId": "xxx.apps.googleusercontent.com" },
   "github": {
     "clientId": "Ov23lixxx",
-    "tokenExchangeUrl": "https://api.nexo-ai.top/auth/github/token"
+    "tokenExchangeUrl": "https://app.nexo-ai.top/auth/github/token"
   }
 }
 ```
@@ -747,15 +747,15 @@ curl https://api.nexo-ai.top/v1/app/init-config | jq '.oauth'
 # .env
 # App Config API 基础地址（用于获取初始化配置）
 # 开发环境可指向本地: http://localhost:3001
-# 生产环境: https://api.nexo-ai.top
-MAIN_VITE_CONFIG_API_BASE_URL=https://api.nexo-ai.top
+# 生产环境: https://app.nexo-ai.top
+MAIN_VITE_CONFIG_API_BASE_URL=https://app.nexo-ai.top
 ```
 
 2. 环境变量说明：
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `MAIN_VITE_CONFIG_API_BASE_URL` | 配置 API 基础地址 | `https://api.nexo-ai.top` |
+| 变量                            | 说明              | 默认值                    |
+|---------------------------------|-------------------|---------------------------|
+| `MAIN_VITE_CONFIG_API_BASE_URL` | 配置 API 基础地址 | `https://app.nexo-ai.top` |
 
 3. 工作流程：
 
@@ -791,12 +791,12 @@ MAIN_VITE_CONFIG_API_BASE_URL=https://api.nexo-ai.top
 
 4. 关键文件：
 
-| 文件 | 说明 |
-|------|------|
-| `src/main/env.d.ts` | 主进程环境变量类型声明 |
-| `src/main/services/config/AppConfigService.ts` | 配置加载服务 |
-| `src/main/services/auth/AuthService.ts` | OAuth 服务（使用代理） |
-| `.env` / `.env.example` | 环境变量配置 |
+| 文件                                           | 说明                   |
+|------------------------------------------------|------------------------|
+| `src/main/env.d.ts`                            | 主进程环境变量类型声明 |
+| `src/main/services/config/AppConfigService.ts` | 配置加载服务           |
+| `src/main/services/auth/AuthService.ts`        | OAuth 服务（使用代理）   |
+| `.env` / `.env.example`                        | 环境变量配置           |
 
 ---
 

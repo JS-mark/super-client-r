@@ -26,7 +26,7 @@
     },
     "github": {
       "clientId": "new-github-client-id",
-      "tokenExchangeUrl": "https://api.nexo-ai.top/auth/github/token"
+      "tokenExchangeUrl": "https://app.nexo-ai.top/auth/github/token"
     }
   },
   "featureFlags": {},
@@ -203,7 +203,7 @@ interface CachedConfig {
 [AppConfigService] Force updated field: oauth.github.clientId
 [AppConfigService] Applied Google OAuth client ID: xxx
 [AppConfigService] Applied GitHub OAuth client ID: xxx
-[AppConfigService] Applied GitHub token exchange URL: https://api.nexo-ai.top/auth/github/token
+[AppConfigService] Applied GitHub token exchange URL: https://app.nexo-ai.top/auth/github/token
 [AppConfigService] Config applied successfully
 [AppConfigService] Initialized successfully
 [AppConfigService] Starting periodic check (interval: 60 minutes)

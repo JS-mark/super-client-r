@@ -17,7 +17,7 @@ const REDIRECT_URI = "https://app.nexo-ai.top/auth/callback";
 
 // 配置 API 基础地址（从环境变量读取）
 const CONFIG_API_BASE_URL =
-	import.meta.env.MAIN_VITE_CONFIG_API_BASE_URL || "https://api.nexo-ai.top";
+	import.meta.env.MAIN_VITE_CONFIG_API_BASE_URL || "https://app.nexo-ai.top";
 
 // 默认 GitHub token exchange URL
 const DEFAULT_GITHUB_TOKEN_EXCHANGE_URL = `${CONFIG_API_BASE_URL}/auth/github/token`;
@@ -307,7 +307,7 @@ export class AuthService {
 						reject(
 							new Error(
 								parsed.searchParams.get("error_description") ||
-									`OAuth error: ${error}`,
+								`OAuth error: ${error}`,
 							),
 						);
 						this.closeAuthWindow();
