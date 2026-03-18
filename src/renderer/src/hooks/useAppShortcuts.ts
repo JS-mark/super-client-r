@@ -36,10 +36,10 @@ export function useAppShortcuts() {
 				navigate("/chat");
 			},
 			"quick-search": () => {
-				// Feature not yet built
+				window.dispatchEvent(new Event("chat:toggle-search"));
 			},
 			"toggle-sidebar": () => {
-				// Feature not yet built
+				window.dispatchEvent(new Event("chat:toggle-sidebar"));
 			},
 			"open-settings": () => {
 				navigate("/settings");

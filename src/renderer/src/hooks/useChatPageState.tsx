@@ -128,6 +128,18 @@ export function useChatPageState({
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Listen for global shortcut events (dispatched from useAppShortcuts)
+  useEffect(() => {
+    const handleToggleSearch = () => setIsSearchOpen((v) => !v);
+    const handleToggleSidebar = () => setSidebarVisible((v) => !v);
+    window.addEventListener("chat:toggle-search", handleToggleSearch);
+    window.addEventListener("chat:toggle-sidebar", handleToggleSidebar);
+    return () => {
+      window.removeEventListener("chat:toggle-search", handleToggleSearch);
+      window.removeEventListener("chat:toggle-sidebar", handleToggleSidebar);
+    };
+  }, []);
+
   // Scroll to message after search modal closes
   useEffect(() => {
     if (isSearchOpen || !pendingScrollKeyRef.current) return;
