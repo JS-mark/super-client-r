@@ -43,6 +43,7 @@ export interface ChatMessagePersist {
 		duration?: number;
 		firstTokenMs?: number;
 		tokensPerSecond?: number;
+		attachmentIds?: string[];
 	};
 }
 

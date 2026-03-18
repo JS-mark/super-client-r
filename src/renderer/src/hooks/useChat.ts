@@ -38,6 +38,7 @@ export interface ChatOptions {
 	commandName?: string;
 	searchEngine?: string;
 	searchConfigs?: SearchConfig[];
+	attachmentIds?: string[];
 }
 
 /**
@@ -1194,6 +1195,9 @@ export function useChat() {
 				role: "user",
 				content,
 				timestamp: Date.now(),
+				metadata: options?.attachmentIds?.length
+					? { attachmentIds: options.attachmentIds }
+					: undefined,
 			};
 			addMessage(userMessage);
 			setInput("");

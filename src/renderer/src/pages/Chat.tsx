@@ -104,7 +104,7 @@ const Chat: React.FC = () => {
 
   // ── Send handler (AI chat) ──
   const handleSend = useCallback(
-    (value: string) => {
+    (value: string, attachmentIds?: string[]) => {
       // Safety guard: prevent send when slash command panel is open
       if (slash.slashStateRef.current.open) return;
       if (value.trim() && !isStreaming) {
@@ -118,6 +118,7 @@ const Chat: React.FC = () => {
               : undefined,
           searchEngine: selectedEngine || undefined,
           searchConfigs: searchConfigs,
+          attachmentIds,
         });
       }
     },

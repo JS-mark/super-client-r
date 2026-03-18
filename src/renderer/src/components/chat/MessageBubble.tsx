@@ -5,7 +5,9 @@ import type * as React from "react";
 import { useCallback, useMemo } from "react";
 import type { Message } from "../../stores/chatStore";
 import { useMessageStore } from "../../stores/messageStore";
+import { useAttachmentStore } from "../../stores/attachmentStore";
 import { Markdown } from "../Markdown";
+import { AttachmentList } from "../attachment";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ToolCallCard } from "./ToolCallCard";
 
@@ -31,6 +33,14 @@ export const MessageBubble: React.FC<{
 		isAssistant && isStreaming && isLast ? streamingContent : msg.content;
 	const { isBookmarked } = useMessageStore();
 	const isCurrentlyStreaming = isAssistant && isStreaming && isLast;
+
+	// Get attachments for this message
+	const attachments = useAttachmentStore((s) => s.attachments);
+	const messageAttachments = useMemo(() => {
+		const attachmentIds = msg.metadata?.attachmentIds;
+		if (!attachmentIds?.length) return [];
+		return attachments.filter((a) => attachmentIds.includes(a.id));
+	}, [msg.metadata?.attachmentIds, attachments]);
 
 	if (isTool && msg.toolCall) {
 		return <ToolCallCard toolCall={msg.toolCall} />;
@@ -114,7 +124,15 @@ export const MessageBubble: React.FC<{
 			conversationId={conversationId}
 			onDelete={onDelete ? () => onDelete(msg.id) : undefined}
 		>
-			<div>{bubble}</div>
+			<div>
+				{/* Attachments preview */}
+				{messageAttachments.length > 0 && (
+					<div className="mb-2">
+						<AttachmentList attachments={messageAttachments} />
+					</div>
+				)}
+				{bubble}
+			</div>
 		</MessageContextMenu>
 	);
 };

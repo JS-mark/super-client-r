@@ -48,6 +48,7 @@ export interface Message {
 		source?: "local" | "remote";
 		remoteSender?: { id: string; name: string };
 		remotePlatform?: string;
+		attachmentIds?: string[];
 	};
 }
 
