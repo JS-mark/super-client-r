@@ -1,6 +1,6 @@
 # Super Client R - 产品需求文档（PRD）
 
-> 最后更新：2026-03-11
+> 最后更新：2026-03-18
 
 ---
 
@@ -29,14 +29,14 @@ Super Client R 是一个基于 Electron 的桌面端 AI 客户端，集成 Claud
 | # | 功能模块 | 状态 | 完成度 | 阻塞项 |
 |---|---------|------|--------|--------|
 | 1 | 页面路由与导航 | ✅ 完成 | 100% | - |
-| 2 | AI 对话（Chat） | ✅ 完成 | 95% | 附件关联、滚动定位、工具栏功能 |
+| 2 | AI 对话（Chat） | ✅ 完成 | 98% | 工具栏功能 |
 | 3 | MCP 服务器管理 | ✅ 完成 | 100% | - |
 | 4 | Skill 系统 | 🟡 部分 | 70% | URL 下载、沙箱执行 |
 | 5 | 插件系统 | 🟡 部分 | 85% | 远程下载、市场后端、沙箱 |
 | 6 | 设置系统 | ✅ 完成 | 100% | - |
 | 7 | 工作区管理 | ✅ 完成 | 95% | 导出消息关联 |
 | 8 | 文件附件系统 | ✅ 完成 | 100% | - |
-| 9 | 快捷键系统 | ✅ 完成 | 95% | 2 个快捷键 handler 为空 |
+| 9 | 快捷键系统 | ✅ 完成 | 100% | - |
 | 10 | HTTP API Server | 🟡 部分 | 50% | JWT 集成、业务端点 |
 | 11 | 悬浮窗 | ✅ 完成 | 100% | - |
 | 12 | 国际化 (i18n) | ✅ 完成 | 100% | - |
@@ -201,8 +201,8 @@ src/renderer/src/components/settings/
 | 消息持久化 | ✅ | ConversationStorageService，基于文件系统 JSON |
 | 会话ID管理 | ✅ | `conv_{timestamp}_{random}`，多用户隔离 |
 | 消息删除 | ✅ | `deleteMessage` + `deleteMessagesFrom`，持久化 |
-| 附件集成 | 🟡 | UI 存在，消息关联未完成 |
-| 滚动到指定消息 | 🔴 | TODO 未实现 |
+| 附件集成 | ✅ | 消息关联已完成，气泡展示附件 |
+| 滚动到指定消息 | ✅ | `useChatPageState` 实现，搜索后平滑滚动 + 高亮 |
 
 #### 交互设计要点
 
@@ -214,9 +214,7 @@ src/renderer/src/components/settings/
 
 #### 待完成事项
 
-1. **附件消息关联**：发送消息时将 attachmentIds 写入消息 metadata
-2. **滚动定位**：实现 `scrollToMessage(messageId)` 方法
-3. **聊天工具栏功能**：doc/quote/prompt/tools/tags/translate 当前均为 toast 占位
+1. **聊天工具栏功能**：doc/tags/translate 仍为 toast 占位（prompt/quote/tools 已实现）
 
 ---
 
@@ -360,21 +358,23 @@ src/renderer/src/components/settings/
 | 位置 | 描述 | 优先级 |
 |------|------|--------|
 | `SkillService.ts:381` | URL 下载未实现 | P1 |
-| `useAppShortcuts.ts:38` | 快速搜索 (Cmd+K) handler 为空 | P2 |
-| `useAppShortcuts.ts:41` | 侧边栏切换 (Cmd+B) handler 为空 | P2 |
 | `ChatInputArea.tsx` | 工具栏 doc/quote/prompt/tools/tags/translate 为 toast 占位 | P2 |
 | `server/auth.ts` | JWT 模块已写未集成到路由 | P1 |
 
-> **已解决（2026-03-11 审计确认）：**
+> **已解决（2026-03-18 确认）：**
 > - ~~`conversationId = "default"` 硬编码~~ → ConversationStorageService 动态管理
 > - ~~消息持久化缺失~~ → 基于文件系统 JSON 持久化
 > - ~~消息删除功能缺失~~ → `deleteMessage` + `deleteMessagesFrom` 已实现
+> - ~~快速搜索 (Cmd+K) handler 为空~~ → 通过自定义事件触发搜索弹窗
+> - ~~侧边栏切换 (Cmd+B) handler 为空~~ → 通过自定义事件切换侧边栏
+> - ~~滚动到指定消息未实现~~ → `useChatPageState` 已实现平滑滚动 + 高亮
+> - ~~附件与消息关联未实现~~ → `ChatOptions.attachmentIds` + `Message.metadata.attachmentIds` + 气泡展示
 
 ### 5.2 开发阶段规划
 
 #### Phase 1：快速补全（投入小、价值大）
 
-- [ ] 快捷键 handler 补全（Cmd+K、Cmd+B）
+- [x] 快捷键 handler 补全（Cmd+K、Cmd+B）— 2026-03-18 完成
 - [ ] 集成 JWT 认证到 HTTP 路由
 - [ ] 清理生产代码 console.log
 
@@ -383,8 +383,7 @@ src/renderer/src/components/settings/
 - [ ] 聊天工具栏功能（doc/quote/prompt/tools/tags/translate）
 - [ ] Skill URL 下载和安装
 - [ ] HTTP API 扩展（Chat/Agent 端点）
-- [ ] 附件与消息关联
-- [ ] 滚动到指定消息
+- [x] 附件与消息关联 — 2026-03-18 完成
 
 #### Phase 3：扩展能力
 
