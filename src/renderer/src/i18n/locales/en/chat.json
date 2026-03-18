@@ -25,10 +25,20 @@
 		"more": "More",
 		"collapse": "Collapse",
 		"docComingSoon": "Document feature coming soon",
+		"promptTitle": "Prompt Templates",
+		"noTemplates": "No templates available. Install the Prompt Templates plugin.",
+		"quoteTitle": "Quote Message",
+		"noMessages": "No messages to quote",
+		"toolsTitle": "MCP Tools",
+		"noTools": "No MCP tools available. Connect an MCP server first.",
 		"search": "Search",
 		"searchMessages": "Search Messages",
 		"export": "Export",
 		"clear": "Clear"
+	},
+	"quote": {
+		"you": "You",
+		"assistant": "AI"
 	},
 	"searchEngine": {
 		"title": "Select Search Engine",

@@ -25,10 +25,20 @@
 		"more": "更多",
 		"collapse": "收起",
 		"docComingSoon": "文档功能即将推出",
+		"promptTitle": "提示词模板",
+		"noTemplates": "暂无可用模板，请安装 Prompt Templates 插件",
+		"quoteTitle": "引用消息",
+		"noMessages": "暂无可引用的消息",
+		"toolsTitle": "MCP 工具",
+		"noTools": "暂无可用工具，请先连接 MCP 服务器",
 		"search": "搜索",
 		"searchMessages": "搜索消息",
 		"export": "导出",
 		"clear": "清空"
+	},
+	"quote": {
+		"you": "你",
+		"assistant": "AI"
 	},
 	"searchEngine": {
 		"title": "选择搜索引擎",

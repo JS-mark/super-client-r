@@ -1,19 +1,10 @@
 import {
-  BulbOutlined,
-  FileTextOutlined,
-  LeftOutlined,
   PauseCircleOutlined,
-  PlusOutlined,
-  RightOutlined,
   RobotOutlined,
-  SearchOutlined,
-  TagsOutlined,
   ThunderboltOutlined,
-  ToolOutlined,
-  TranslationOutlined,
 } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
-import { App, Button, Flex, Tooltip, theme } from "antd";
+import { Button, Flex, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,45 +15,23 @@ import {
   useShortcutStore,
 } from "../../stores/shortcutStore";
 import { AttachmentList } from "../attachment";
-import { FileUploadButton } from "../attachment/FileUpload";
 import type { ChatModeSelection } from "./ChatModePanel";
 import { ChatModePanel } from "./ChatModePanel";
 import type { ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
 import type { SlashItem } from "./SlashCommandPanel";
 import { SlashCommandPanel } from "./SlashCommandPanel";
+import { ChatToolbar } from "./toolbar/ChatToolbar";
+import type { PromptTemplate } from "./toolbar/PromptTemplatePanel";
+import type { ToolItem } from "./toolbar/ToolsPanel";
+import type { Message } from "../../stores/chatStore";
 
 const { useToken } = theme;
-
-// Toolbar item definition
-interface ToolbarItem {
-  id: string;
-  icon: React.ReactNode;
-  label: string;
-}
-
-// Primary toolbar items - always visible
-const PRIMARY_TOOLBAR_ITEMS: ToolbarItem[] = [
-  { id: "quote", icon: <PlusOutlined />, label: "toolbar.quote" },
-  { id: "prompt", icon: <BulbOutlined />, label: "toolbar.prompt" },
-  { id: "doc", icon: <FileTextOutlined />, label: "toolbar.doc" },
-  { id: "tools", icon: <ToolOutlined />, label: "toolbar.tools" },
-];
-
-// Extra toolbar items - shown when "More" is expanded
-const EXTRA_TOOLBAR_ITEMS: ToolbarItem[] = [
-  { id: "tags", icon: <TagsOutlined />, label: "toolbar.tags" },
-  {
-    id: "translate",
-    icon: <TranslationOutlined />,
-    label: "toolbar.translate",
-  },
-];
 
 interface ChatInputAreaProps {
   input: string;
   onInputChange: (value: string) => void;
-  onSend: (value: string) => void;
+  onSend: (value: string, attachmentIds?: string[]) => void;
   isStreaming: boolean;
   onStopStream: () => void;
   chatMode: ChatMode;
@@ -111,9 +80,7 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const { t } = useTranslation();
   const { token } = useToken();
-  const { message } = App.useApp();
   const senderWrapperRef = useRef<HTMLDivElement>(null);
-  const [toolbarExpanded, setToolbarExpanded] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
   const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
   const [modePanelOpen, setModePanelOpen] = useState(false);
@@ -132,22 +99,6 @@ export function ChatInputArea({
     [onModeSelect],
   );
 
-  const handleToolbarClick = useCallback(
-    (itemId: string) => {
-      switch (itemId) {
-        case "doc":
-          message.info(
-            t("toolbar.docComingSoon", "文档功能即将推出", { ns: "chat" }),
-          );
-          break;
-        default:
-          message.info(t(`toolbar.${itemId}`, { ns: "chat" }));
-          break;
-      }
-    },
-    [t, message],
-  );
-
   const handleSenderChange = useCallback(
     (val: string) => {
       onInputChange(val);
@@ -159,11 +110,45 @@ export function ChatInputArea({
   const handleSend = useCallback(
     (value: string) => {
       if ((value.trim() || attachedFiles.length > 0) && !isStreaming) {
-        onSend(value);
+        const attachmentIds = attachedFiles.map((f) => f.id);
+        onSend(value, attachmentIds);
         setAttachedFiles([]);
       }
     },
-    [attachedFiles.length, isStreaming, onSend],
+    [attachedFiles, isStreaming, onSend],
+  );
+
+  const handlePromptSelect = useCallback(
+    (template: PromptTemplate) => {
+      // Insert template into input, replacing {{placeholders}} with selection hints
+      const text = template.template.replace(
+        /\{\{(\w+)\}\}/g,
+        (_match, key: string) => `[${key}]`,
+      );
+      onInputChange(text);
+    },
+    [onInputChange],
+  );
+
+  const handleQuoteSelect = useCallback(
+    (msg: Message) => {
+      const role = msg.role === "user" ? "You" : "AI";
+      const preview =
+        msg.content.length > 200
+          ? `${msg.content.slice(0, 200)}...`
+          : msg.content;
+      const quote = `> **${role}**: ${preview}\n\n`;
+      onInputChange(input ? `${input}\n${quote}` : quote);
+    },
+    [onInputChange, input],
+  );
+
+  const handleToolSelect = useCallback(
+    (tool: ToolItem) => {
+      const hint = `Please use the "${tool.name}" tool to `;
+      onInputChange(input ? `${input}\n${hint}` : hint);
+    },
+    [onInputChange, input],
   );
 
   return (
@@ -329,117 +314,24 @@ export function ChatInputArea({
                     }}
                   />
 
-                  {/* File upload */}
-                  <FileUploadButton
+                  {/* Toolbar (file upload, prompt, quote, doc, tools, search, etc.) */}
+                  <ChatToolbar
+                    conversationId={conversationId}
+                    selectedEngine={selectedEngine}
+                    onSelectEngine={onSelectEngine}
+                    hasSearchEngines={hasSearchEngines}
+                    currentEngine={currentEngine}
+                    searchPopoverOpen={searchPopoverOpen}
+                    onSearchPopoverToggle={() =>
+                      setSearchPopoverOpen(!searchPopoverOpen)
+                    }
                     onUploadComplete={(attachments) => {
                       setAttachedFiles((prev) => [...prev, ...attachments]);
                     }}
-                    conversationId={conversationId}
+                    onPromptSelect={handlePromptSelect}
+                    onQuoteSelect={handleQuoteSelect}
+                    onToolSelect={handleToolSelect}
                   />
-
-                  {/* Primary toolbar items */}
-                  {PRIMARY_TOOLBAR_ITEMS.map((item) => (
-                    <Tooltip
-                      key={item.id}
-                      title={t(item.label, {
-                        ns: "chat",
-                      })}
-                    >
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={item.icon}
-                        onClick={() => handleToolbarClick(item.id)}
-                      />
-                    </Tooltip>
-                  ))}
-
-                  {/* Search engine - only show when engines are configured */}
-                  {hasSearchEngines && (
-                    <Tooltip
-                      title={t("chat.toolbar.search", "搜索", {
-                        ns: "chat",
-                      })}
-                    >
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={currentEngine?.icon ?? <SearchOutlined />}
-                        onClick={() =>
-                          setSearchPopoverOpen(!searchPopoverOpen)
-                        }
-                        style={
-                          searchPopoverOpen
-                            ? {
-                                backgroundColor: token.colorBgTextHover,
-                              }
-                            : selectedEngine
-                              ? { color: token.colorPrimary }
-                              : undefined
-                        }
-                      />
-                    </Tooltip>
-                  )}
-
-                  {/* Extra items - visible when expanded */}
-                  {toolbarExpanded && (
-                    <>
-                      <div
-                        className="w-px h-3 opacity-25"
-                        style={{
-                          backgroundColor: token.colorBorder,
-                        }}
-                      />
-                      {EXTRA_TOOLBAR_ITEMS.map((item) => (
-                        <Tooltip
-                          key={item.id}
-                          title={t(item.label, {
-                            ns: "chat",
-                          })}
-                        >
-                          <Button
-                            type="text"
-                            size="small"
-                            icon={item.icon}
-                            onClick={() => handleToolbarClick(item.id)}
-                          />
-                        </Tooltip>
-                      ))}
-                    </>
-                  )}
-
-                  <div
-                    className="w-px h-3 opacity-25"
-                    style={{
-                      backgroundColor: token.colorBorder,
-                    }}
-                  />
-
-                  {/* More / Collapse toggle */}
-                  <Tooltip
-                    title={
-                      toolbarExpanded
-                        ? t("toolbar.collapse", "收起", {
-                            ns: "chat",
-                          })
-                        : t("toolbar.more", "更多", {
-                            ns: "chat",
-                          })
-                    }
-                  >
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={
-                        toolbarExpanded ? (
-                          <LeftOutlined />
-                        ) : (
-                          <RightOutlined />
-                        )
-                      }
-                      onClick={() => setToolbarExpanded((prev) => !prev)}
-                    />
-                  </Tooltip>
                 </Flex>
 
                 {/* Send or Stop button */}
