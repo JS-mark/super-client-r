@@ -151,7 +151,7 @@ export const InstalledMcpCard: React.FC<{
 				<div className="flex items-center gap-1.5">
 					<Tag
 						bordered={false}
-						className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						className="text-xs! px-1.5! py-0! m-0! rounded!"
 					>
 						{server.transport}
 					</Tag>
@@ -159,7 +159,7 @@ export const InstalledMcpCard: React.FC<{
 						<Tag
 							bordered={false}
 							color="blue"
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							{t("internal.label", { ns: "mcp" })}
 						</Tag>
@@ -168,7 +168,7 @@ export const InstalledMcpCard: React.FC<{
 						<Tag
 							bordered={false}
 							color="purple"
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							<ToolOutlined className="mr-0.5" style={{ fontSize: 10 }} />
 							{toolCount}

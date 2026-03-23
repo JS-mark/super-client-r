@@ -940,7 +940,7 @@ export default function RemoteControlPage() {
 					}}
 					footer={null}
 					width={720}
-					destroyOnClose
+          destroyOnHidden
 				>
 					{selectedDevice && (
 						<Tabs

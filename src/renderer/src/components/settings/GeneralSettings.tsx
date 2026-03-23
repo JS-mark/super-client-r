@@ -112,16 +112,17 @@ export const GeneralSettings: React.FC = () => {
 							<Input
 								value={userDataPath}
 								readOnly
-								className="!rounded-l-xl"
+								className="rounded-l-xl!"
 								placeholder={t(
-									"settings.userDataPathPlaceholder",
+									"userDataPathPlaceholder",
 									"User data directory path",
+									{ ns: "settings" },
 								)}
 							/>
 							<Button
 								icon={<FolderOpenOutlined />}
 								onClick={handleOpenPath}
-								className="!rounded-r-xl"
+								className="rounded-r-xl!"
 							>
 								{t("open", "Open", { ns: "settings" })}
 							</Button>

@@ -61,7 +61,7 @@ export const BuiltinSkillCard: React.FC<{
 					<div className="flex items-center gap-1.5 mt-1">
 						<Tag
 							variant="filled"
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							v{skill.version}
 						</Tag>
@@ -69,7 +69,7 @@ export const BuiltinSkillCard: React.FC<{
 							<Tag
 								variant="filled"
 								color="orange"
-								className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+								className="text-xs! px-1.5! py-0! m-0! rounded!"
 							>
 								{skill.category}
 							</Tag>
@@ -106,7 +106,7 @@ export const BuiltinSkillCard: React.FC<{
 						<Tag
 							variant="filled"
 							color="purple"
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							<ToolOutlined className="mr-0.5" style={{ fontSize: 10 }} />
 							{toolCount} {toolCount === 1 ? "tool" : "tools"}
@@ -116,7 +116,7 @@ export const BuiltinSkillCard: React.FC<{
 						<Tag
 							variant="filled"
 							color="blue"
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							<ThunderboltOutlined
 								className="mr-0.5"

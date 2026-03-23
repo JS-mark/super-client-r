@@ -78,7 +78,7 @@ export const LogViewerTable: React.FC = () => {
 				render: (level: string) => (
 					<Tag
 						color={LEVEL_COLORS[level] || "default"}
-						className="!text-xs !rounded-full !px-2 !m-0"
+						className="text-xs! rounded-full! px-2! m-0!"
 						bordered={false}
 					>
 						{level}
@@ -93,7 +93,7 @@ export const LogViewerTable: React.FC = () => {
 				render: (process: string) => (
 					<Tag
 						color={process === "main" ? "geekblue" : "purple"}
-						className="!text-xs !rounded-full !px-2 !m-0"
+						className="text-xs! rounded-full! px-2! m-0!"
 						bordered={false}
 					>
 						{process}
@@ -173,7 +173,7 @@ export const LogViewerTable: React.FC = () => {
 									{t("noLogs")}
 								</span>
 							}
-							className="!my-16"
+							className="my-16!"
 						/>
 					),
 				}}

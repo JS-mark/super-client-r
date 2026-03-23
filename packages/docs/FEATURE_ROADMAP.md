@@ -1,6 +1,6 @@
 # Super Client R 功能开发路线图
 
-> 最后更新：2026-03-18
+> 最后更新：2026-03-21
 
 ## 概述
 
@@ -8,7 +8,7 @@
 
 详细 PRD 和交互设计请参阅 [PRD.md](./PRD.md)。
 
-> **注意**：本文档基于 2026-03-11 对实际代码库的全面审计更新，修正了此前多处与代码不符的状态标注。
+> **注意**：本文档基于 2026-03-21 对实际代码库的全面审计更新，修正了此前多处与代码不符的状态标注。
 
 ---
 
@@ -17,12 +17,12 @@
 | # | 功能模块 | 状态 | 完成度 | 阻塞项 |
 |---|---------|------|--------|--------|
 | 1 | 页面路由与导航 | ✅ 完成 | 100% | - |
-| 2 | AI 对话（Chat） | ✅ 完成 | 98% | 工具栏功能 |
+| 2 | AI 对话（Chat） | ✅ 完成 | 98% | 工具栏 doc/tags/translate 占位 |
 | 3 | MCP 服务器管理 | ✅ 完成 | 100% | - |
 | 4 | Skill 系统 | 🟡 部分 | 70% | URL 下载、沙箱执行 |
 | 5 | 插件系统 | 🟡 部分 | 85% | 远程下载、市场后端、沙箱 |
 | 6 | 设置系统 | ✅ 完成 | 100% | - |
-| 7 | 工作区管理 | ✅ 完成 | 95% | 导出消息关联 |
+| 7 | 工作区管理 | ✅ 完成 | 100% | - |
 | 8 | 文件附件系统 | ✅ 完成 | 100% | - |
 | 9 | 快捷键系统 | ✅ 完成 | 100% | - |
 | 10 | HTTP API Server | 🟡 部分 | 50% | JWT 集成、业务端点 |
@@ -39,7 +39,7 @@
 | 21 | LLM/模型管理 | ✅ 完成 | 100% | - |
 | 22 | 应用初始化配置 | ✅ 完成 | 100% | - |
 
-**整体完成度：约 93%**
+**整体完成度：约 95%**
 
 ---
 
@@ -78,7 +78,6 @@
 - [x] 工作区级设置（模型/温度/系统提示词）
 - [x] 导入/导出/复制
 - [x] 切换器 UI
-- [ ] 导出消息关联（需对接 ConversationStorageService）
 
 ### 5. 文件附件系统 ✅ 已完成
 
@@ -86,6 +85,7 @@
 - [x] 类型分类（图片/文档/代码/音频/视频/压缩包）
 - [x] 图片画廊预览
 - [x] 多选/删除/系统打开
+- [x] 附件与消息元数据关联（`790977a`）
 
 ### 6. MCP 服务器管理 ✅ 已完成
 
@@ -238,8 +238,7 @@
 | 位置 | 描述 | 优先级 |
 |------|------|--------|
 | `SkillService.ts:381` | `// TODO: 实现从 URL 下载` + throw | P1 |
-| `ChatInputArea.tsx` | 文档功能仅显示 "coming soon" toast | P2 |
-| `ChatInputArea.tsx` | 工具栏 tags/translate 仍为 toast 占位（prompt/quote/tools 已实现） | P3 |
+| `ChatToolbar.tsx` | 工具栏 doc/tags/translate 仍为 "coming soon" toast 占位 | P3 |
 
 ### 架构层面缺失
 
@@ -280,7 +279,7 @@
 
 ### 代码清理
 
-- 生产代码中有 **30+ 个 `console.log`** 未清理（集中在 proxy.ts、RemoteDeviceService、IMBotService、pluginHandlers）
+- 生产代码中有 **232 个 `console.*`** 未清理（main/ 164 个、renderer/ 68 个，集中在 proxy.ts、RemoteDeviceService、IMBotService、pluginHandlers 等）
 - 4 个 `@ts-expect-error`（合理，用于 `WebkitAppRegion` CSS 属性）
 - 3 个 ESLint 抑制
 
@@ -288,16 +287,16 @@
 
 详见 [PRD.md - 第3节](./PRD.md#3-代码架构治理组件拆分计划)。
 
-| 文件 | 行数 | 优先级 |
-|------|------|--------|
-| Settings.tsx | 1,686 | 🔴 Critical |
-| McpMarket.tsx | 1,095 | 🔴 Critical |
-| Chat.tsx | 889 | 🔴 Critical |
-| MenuSettings.tsx | 802 | 🔴 Critical |
-| Workspaces.tsx | 693 | 🟠 High |
-| SearchSettings.tsx | 626 | 🟠 High |
-| Skills.tsx | 582 | 🟠 High |
-| ShortcutSettings.tsx | 455 | 🟠 High |
+| 文件 | 行数 | 优先级 | 备注 |
+|------|------|--------|------|
+| McpMarket.tsx | 1,055 | 🔴 Critical | 需拆分 |
+| MenuSettings.tsx | 802 | 🔴 Critical | 需拆分 |
+| Workspaces.tsx | 693 | 🟠 High | 需拆分 |
+| SearchSettings.tsx | 626 | 🟠 High | 需拆分 |
+| Skills.tsx | 582 | 🟠 High | 需拆分 |
+| ShortcutSettings.tsx | 455 | 🟠 High | 需拆分 |
+| ~~Chat.tsx~~ | ~~889~~ → 448 | ✅ 已拆分 | 提取 ChatToolbar（287 行） |
+| ~~Settings.tsx~~ | ~~1,686~~ → 340 | ✅ 已拆分 | 大幅重构完成 |
 
 ---
 
@@ -306,21 +305,22 @@
 ### 第一优先：快速补全（投入小、价值大）
 
 1. ~~快捷键 handler 补全（Cmd+K 搜索、Cmd+B 侧边栏）~~ ✅ 2026-03-18 完成
-2. 集成已有的 JWT 认证到 HTTP 路由
-3. 清理生产代码中的 console.log
+2. ~~聊天工具栏功能（prompt/quote/tools 面板 + ChatToolbar 提取）~~ ✅ 2026-03-21 完成
+3. ~~附件与消息元数据关联~~ ✅ 2026-03-21 完成
+4. 集成已有的 JWT 认证到 HTTP 路由
+5. 清理生产代码中的 console.*（232 处）
 
 ### 第二优先：功能补全
 
-4. 聊天工具栏功能（quote/prompt/tools 等）
-5. Skill URL 安装
-6. HTTP API 扩展（Chat/Agent 端点）
-7. 附件与消息关联
+6. Skill URL 下载安装
+7. HTTP API 扩展（Chat/Agent/Skill 端点）
+8. 聊天工具栏剩余功能（doc/tags/translate）
 
 ### 第三优先：质量提升
 
-8. 核心服务单元测试
-9. 大文件拆分重构
-10. 沙箱执行环境实现
+9. 核心服务单元测试（当前仅 2 个测试文件）
+10. 大文件拆分重构（McpMarket.tsx 1055 行、MenuSettings.tsx 802 行等）
+11. 沙箱执行环境实现
 
 ---
 
@@ -339,4 +339,4 @@
 ---
 
 *创建日期：2026-02-11*
-*最后更新：2026-03-18*
+*最后更新：2026-03-21*

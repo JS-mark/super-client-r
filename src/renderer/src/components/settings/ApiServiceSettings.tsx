@@ -174,7 +174,7 @@ export const ApiServiceSettings: React.FC = () => {
 								`http://localhost:${apiStatus.port}/api-docs`,
 							);
 						}}
-						className="!rounded-lg"
+						className="rounded-lg!"
 					>
 						{t("apiDocs", "API Docs", { ns: "settings" })}
 					</Button>
@@ -234,7 +234,7 @@ export const ApiServiceSettings: React.FC = () => {
 							<Form.Item
 								name="port"
 								rules={[{ validator: validatePort }]}
-								className="!mb-0 flex-1"
+								className="mb-0! flex-1"
 							>
 								<InputNumber
 									min={PORT_MIN}
@@ -243,7 +243,7 @@ export const ApiServiceSettings: React.FC = () => {
 									prefix={
 										<span className="text-slate-400 text-xs mr-1">Port</span>
 									}
-									className="!w-full"
+									className="w-full!"
 									size="middle"
 								/>
 							</Form.Item>
@@ -257,7 +257,7 @@ export const ApiServiceSettings: React.FC = () => {
 									icon={<PlayCircleOutlined />}
 									onClick={() => handleApiAction("start")}
 									loading={apiLoading}
-									className="!rounded-lg"
+									className="rounded-lg!"
 								>
 									{t("start", "Start", { ns: "settings" })}
 								</Button>
@@ -272,7 +272,7 @@ export const ApiServiceSettings: React.FC = () => {
 											icon={<ReloadOutlined />}
 											onClick={() => handleApiAction("restart")}
 											loading={apiLoading}
-											className="!rounded-lg"
+											className="rounded-lg!"
 										>
 											{t("restart", "Restart", { ns: "settings" })}
 										</Button>
@@ -282,7 +282,7 @@ export const ApiServiceSettings: React.FC = () => {
 										icon={<PoweroffOutlined />}
 										onClick={() => handleApiAction("stop")}
 										loading={apiLoading}
-										className="!rounded-lg"
+										className="rounded-lg!"
 									>
 										{t("stop", "Stop", { ns: "settings" })}
 									</Button>

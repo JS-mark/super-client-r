@@ -101,7 +101,7 @@ export const ApiKeysConfig: React.FC = () => {
 				onClick={handleSave}
 				loading={loading}
 				size="large"
-				className="!rounded-xl"
+				className="rounded-xl!"
 			>
 				{saved
 					? t("saved", "Saved", { ns: "common" })

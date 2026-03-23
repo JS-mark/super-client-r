@@ -96,7 +96,7 @@ export const LogStatsPanel: React.FC = () => {
 							<Tag
 								key={level}
 								color={LEVEL_COLORS[level] || "default"}
-								className="!text-xs !rounded-full !px-2 !m-0"
+								className="text-xs! rounded-full! px-2! m-0!"
 								bordered={false}
 							>
 								{level} {count}
@@ -162,7 +162,7 @@ export const LogStatsPanel: React.FC = () => {
 									<Tag
 										key={proc}
 										color="cyan"
-										className="!text-xs !rounded-full !px-2 !m-0"
+										className="text-xs! rounded-full! px-2! m-0!"
 										bordered={false}
 									>
 										{proc} {count}

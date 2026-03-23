@@ -168,7 +168,7 @@ const Home = () => {
 								size="large"
 								icon={<MessageOutlined />}
 								onClick={() => navigate("/chat")}
-								className="!bg-white !text-slate-900 hover:!bg-slate-100 !border-0 !rounded-xl !h-12 !px-6"
+								className="bg-white! text-slate-900! hover:bg-slate-100! border-0! rounded-xl! h-12! px-6!"
 							>
 								{t("startChat", "Start Chatting", { ns: "home" })}
 							</Button>
@@ -176,7 +176,7 @@ const Home = () => {
 								size="large"
 								icon={<SettingOutlined />}
 								onClick={() => navigate("/settings")}
-								className="!bg-white/10 !text-white !border-white/20 hover:!bg-white/20 !rounded-xl !h-12 !px-6"
+								className="bg-white/10! text-white! border-white/20! hover:bg-white/20! rounded-xl! h-12! px-6!"
 							>
 								{t("settings", "Settings", { ns: "home" })}
 							</Button>
@@ -187,7 +187,7 @@ const Home = () => {
 				{/* Stats Overview */}
 				<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 					<Card
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{
 							background: `linear-gradient(to bottom right, ${token.colorPrimaryBg}, ${token.colorInfoBg})`,
 							borderColor: token.colorPrimaryBorder,
@@ -206,7 +206,7 @@ const Home = () => {
 					</Card>
 
 					<Card
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{
 							background: `linear-gradient(to bottom right, #f3e8ff, #e9d5ff)`,
 							borderColor: "#c084fc",
@@ -225,7 +225,7 @@ const Home = () => {
 					</Card>
 
 					<Card
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{
 							background: `linear-gradient(to bottom right, #ffedd5, #fed7aa)`,
 							borderColor: "#fb923c",
@@ -244,7 +244,7 @@ const Home = () => {
 					</Card>
 
 					<Card
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{
 							background: `linear-gradient(to bottom right, #cffafe, #a5f3fc)`,
 							borderColor: "#22d3ee",
@@ -308,7 +308,7 @@ const Home = () => {
 								</span>
 							</div>
 						}
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{ borderColor: token.colorBorder }}
 					>
 						<div className="flex items-center justify-between">
@@ -327,7 +327,7 @@ const Home = () => {
 								</span>
 							</div>
 							{apiStatus.status === "running" && (
-								<Tag color="success" className="!rounded-lg">
+								<Tag color="success" className="rounded-lg!">
 									Port {apiStatus.port}
 								</Tag>
 							)}
@@ -336,7 +336,7 @@ const Home = () => {
 							<Button
 								type="primary"
 								size="small"
-								className="mt-4 !rounded-lg"
+								className="mt-4 rounded-lg!"
 								onClick={() => apiService.start()}
 							>
 								{t("apiStatus.start", "Start Service", { ns: "home" })}
@@ -353,7 +353,7 @@ const Home = () => {
 								</span>
 							</div>
 						}
-						className="!rounded-2xl"
+						className="rounded-2xl!"
 						style={{ borderColor: token.colorBorder }}
 					>
 						<div className="space-y-3">

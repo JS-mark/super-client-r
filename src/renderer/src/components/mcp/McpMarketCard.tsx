@@ -99,7 +99,7 @@ export const McpMarketCard: React.FC<{
 					<div className="flex items-center gap-1.5 mt-1">
 						<Tag
 							bordered={false}
-							className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+							className="text-xs! px-1.5! py-0! m-0! rounded!"
 						>
 							v{item.version}
 						</Tag>

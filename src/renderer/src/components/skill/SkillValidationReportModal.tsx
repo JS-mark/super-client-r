@@ -137,7 +137,7 @@ export const SkillValidationReportModal: React.FC<
 				<Button
 					key="install"
 					type="primary"
-					className="!bg-orange-500 !border-orange-500 hover:!bg-orange-600"
+					className="bg-orange-500! border-orange-500! hover:bg-orange-600!"
 					loading={installing}
 					onClick={onConfirmInstall}
 				>

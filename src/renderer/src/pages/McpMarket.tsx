@@ -899,7 +899,7 @@ function MarketSourcesTab() {
 										{isZh ? source.nameZh : source.name}
 									</span>
 									{source.official && (
-										<Tag color="blue" className="!text-xs !px-1 !py-0 !m-0">
+										<Tag color="blue" className="text-xs! px-1! py-0! m-0!">
 											<StarFilled className="mr-0.5" />
 											{t("sourcesOfficial", { ns: "mcp" })}
 										</Tag>

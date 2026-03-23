@@ -135,7 +135,7 @@ export const LogViewerToolbar: React.FC = () => {
 					allowClear
 					onChange={handleKeywordChange}
 					defaultValue={filters.keyword}
-					className="!w-52"
+					className="w-52!"
 					size="small"
 					variant="filled"
 				/>
@@ -148,7 +148,7 @@ export const LogViewerToolbar: React.FC = () => {
 					options={LEVEL_OPTIONS}
 					maxTagCount={1}
 					allowClear
-					className="!min-w-[120px]"
+					className="min-w-[120px]!"
 					size="small"
 					variant="filled"
 				/>
@@ -161,7 +161,7 @@ export const LogViewerToolbar: React.FC = () => {
 					options={modules.map((m) => ({ value: m, label: m }))}
 					maxTagCount={1}
 					allowClear
-					className="!min-w-[120px]"
+					className="min-w-[120px]!"
 					size="small"
 					variant="filled"
 				/>
@@ -177,7 +177,7 @@ export const LogViewerToolbar: React.FC = () => {
 					]}
 					maxTagCount={1}
 					allowClear
-					className="!min-w-[110px]"
+					className="min-w-[110px]!"
 					size="small"
 					variant="filled"
 				/>

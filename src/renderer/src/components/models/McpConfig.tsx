@@ -306,7 +306,7 @@ export const McpConfig: React.FC = () => {
 				</Empty>
 			) : (
 				<List
-					className="!rounded-xl"
+					className="rounded-xl!"
 					dataSource={servers}
 					renderItem={(item) => {
 						const isConnected = item.status === "connected";
@@ -316,7 +316,7 @@ export const McpConfig: React.FC = () => {
 						return (
 							<List.Item
 								key={item.id}
-								className="!px-4 !py-3"
+								className="px-4! py-3!"
 								actions={[
 									isConnected ? (
 										<Tooltip
@@ -397,7 +397,7 @@ export const McpConfig: React.FC = () => {
 													{item.name}
 												</span>
 											</Tooltip>
-											<Tag className="!text-xs !m-0 shrink-0">
+											<Tag className="text-xs! m-0! shrink-0">
 												{item.transport}
 											</Tag>
 											<span className="shrink-0">

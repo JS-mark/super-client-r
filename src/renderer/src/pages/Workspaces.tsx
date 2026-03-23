@@ -416,7 +416,7 @@ export default function Workspaces() {
 									<Radio.Button
 										key={type.value}
 										value={type.value}
-										className="!h-auto"
+										className="h-auto!"
 									>
 										<div className="flex items-center gap-2 py-1">
 											<span>{type.icon}</span>

@@ -2,6 +2,7 @@ import {
 	ApiOutlined,
 	AppstoreOutlined,
 	CloudOutlined,
+	ClusterOutlined,
 	CodeOutlined,
 	DatabaseOutlined,
 	DesktopOutlined,
@@ -45,6 +46,7 @@ export const ICON_MAP: Record<
 	CloudOutlined,
 	DatabaseOutlined,
 	DesktopOutlined,
+	ClusterOutlined,
 };
 
 // Icon type options for Segmented - use getter for i18n
@@ -111,6 +113,10 @@ export const getAvailableIcons = () => [
 	{
 		label: `🖥️ ${settingsT("presetIcon.desktop", "桌面")}`,
 		value: "DesktopOutlined",
+	},
+	{
+		label: `🔗 ${settingsT("presetIcon.cluster", "集群")}`,
+		value: "ClusterOutlined",
 	},
 ];
 

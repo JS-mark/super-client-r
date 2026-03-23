@@ -95,18 +95,18 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 					<div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 shadow-md mb-2">
 						<RocketOutlined className="text-lg text-white" />
 					</div>
-					<Title level={5} className="!text-white !mb-1 !text-base">
+					<Title level={5} className="text-white! mb-1! text-base!">
 						{appInfo?.name || "Super Client"}
 					</Title>
 					<div className="flex items-center justify-center gap-2 mb-1">
-						<Tag className="!bg-white/20 !text-white !border-0 !rounded-full !px-2 !py-0 !text-xs">
+						<Tag className="bg-white/20! text-white! border-0! rounded-full! px-2! py-0! text-xs!">
 							v{appInfo?.version || "0.0.1"}
 						</Tag>
-						<Tag className="!bg-green-500/20 !text-green-400 !border-green-500/30 !rounded-full !px-2 !py-0 !text-xs">
+						<Tag className="bg-green-500/20! text-green-400! border-green-500/30! rounded-full! px-2! py-0! text-xs!">
 							GPL-2.0
 						</Tag>
 					</div>
-					<Paragraph className="!text-slate-400 !text-xs !mb-0">
+					<Paragraph className="text-slate-400! text-xs! mb-0!">
 						{t(
 							"aboutDescription",
 							"A powerful AI desktop client for seamless interaction with multiple AI services.",
@@ -208,7 +208,7 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 						<span>{t("license", "License", { ns: "settings" })}</span>
 					</span>
 				}
-				className="!rounded-lg !mt-[10px]"
+				className="rounded-lg! mt-[10px]!"
 				style={{ borderColor: token.colorBorder }}
 			>
 				<div className="text-xs" style={{ color: token.colorTextSecondary }}>
@@ -233,21 +233,21 @@ const TeamTab: React.FC<Omit<AboutSectionProps, "appInfo" | "onOpenModal">> = ({
 				<Button
 					icon={<GithubOutlined />}
 					onClick={onOpenGitHub}
-					className="!rounded-md"
+					className="rounded-md!"
 				>
 					GitHub
 				</Button>
 				<Button
 					icon={<BugOutlined />}
 					onClick={onReportBug}
-					className="!rounded-md"
+					className="rounded-md!"
 				>
 					{t("reportBug", "Report", { ns: "settings" })}
 				</Button>
 				<Button
 					icon={<FileTextOutlined />}
 					onClick={onOpenLicense}
-					className="!rounded-md"
+					className="rounded-md!"
 				>
 					{t("license", "License", { ns: "settings" })}
 				</Button>

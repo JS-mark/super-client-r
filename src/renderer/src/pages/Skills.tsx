@@ -176,7 +176,7 @@ const Skills: React.FC = () => {
 							className="py-20"
 						/>
 					) : (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+						<div className="grid gap-4 pb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
 							{builtinSkills.map((skill) => (
 								<BuiltinSkillCard
 									key={skill.id}
@@ -229,7 +229,7 @@ const Skills: React.FC = () => {
 								className="py-20"
 							/>
 						) : (
-							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+							<div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
 								{marketSkills.map((item) => (
 									<SkillCard
 										key={item.id}
@@ -277,7 +277,7 @@ const Skills: React.FC = () => {
 							className="py-20"
 						/>
 					) : (
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+						<div className="grid gap-4 pb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
 							{filterInstalledSkills(installedSkills).map((item) => (
 								<SkillCard
 									key={item.id}

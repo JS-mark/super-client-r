@@ -63,7 +63,7 @@ const Login: React.FC = () => {
 					<div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
 						<span className="text-white font-bold text-2xl">S</span>
 					</div>
-					<Title level={2} className="!mb-2">
+					<Title level={2} className="mb-2!">
 						{t("loginTitle", { ns: "app" })}
 					</Title>
 					<Text type="secondary" className="text-base">
@@ -91,7 +91,7 @@ const Login: React.FC = () => {
 						onClick={() => handleOAuthLogin("google")}
 						loading={isLoading && loginProvider === "google"}
 						disabled={isLoading}
-						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-blue-300 hover:!shadow-md transition-all"
+						className="h-12! rounded-xl! font-medium! border-gray-200! hover:border-blue-300! hover:shadow-md! transition-all"
 					>
 						{t("signInGoogle", { ns: "app" })}
 					</Button>
@@ -102,7 +102,7 @@ const Login: React.FC = () => {
 						onClick={() => handleOAuthLogin("github")}
 						loading={isLoading && loginProvider === "github"}
 						disabled={isLoading}
-						className="!h-12 !rounded-xl !font-medium !border-gray-200 hover:!border-purple-300 hover:!shadow-md transition-all"
+						className="h-12! rounded-xl! font-medium! border-gray-200! hover:border-purple-300! hover:shadow-md! transition-all"
 					>
 						{t("signInGithub", { ns: "app" })}
 					</Button>
@@ -132,7 +132,7 @@ const Login: React.FC = () => {
 								type="dashed"
 								onClick={handleMockLogin}
 								disabled={isLoading}
-								className="!h-12 !rounded-xl !font-medium"
+								className="h-12! rounded-xl! font-medium!"
 							>
 								{t("mockLogin", { ns: "app" })}
 							</Button>

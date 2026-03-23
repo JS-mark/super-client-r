@@ -150,7 +150,7 @@ export const ThirdPartyMcpCard: React.FC<{
 					<Tag
 						bordered={false}
 						color="green"
-						className="!text-xs !px-1.5 !py-0 !m-0 !rounded"
+						className="text-xs! px-1.5! py-0! m-0! rounded!"
 					>
 						{server.transport}
 					</Tag>

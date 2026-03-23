@@ -132,7 +132,7 @@ export const McpServerDetailModal: React.FC<McpServerDetailModalProps> = ({
 									)}
 								</div>
 							}
-							className="!my-4"
+							className="my-4!"
 						/>
 					) : (
 						<Collapse
@@ -187,7 +187,7 @@ export const McpServerDetailModal: React.FC<McpServerDetailModalProps> = ({
 									</div>
 								),
 							}))}
-							className="[&_.ant-collapse-header]:!py-2"
+							className="[&_.ant-collapse-header]:py-2!"
 						/>
 					)}
 				</div>

@@ -148,7 +148,7 @@ const QuickActionsTab: React.FC = () => {
 							okText={t("confirm", "确定", { ns: "common" })}
 							cancelText={t("cancel", "取消", { ns: "common" })}
 						>
-							<Button danger={action.danger} className="!rounded-lg">
+							<Button danger={action.danger} className="rounded-lg!">
 								{action.label}
 							</Button>
 						</Popconfirm>
@@ -156,7 +156,7 @@ const QuickActionsTab: React.FC = () => {
 						<Button
 							danger={action.danger}
 							onClick={action.onClick}
-							className="!rounded-lg"
+							className="rounded-lg!"
 						>
 							{action.label}
 						</Button>
@@ -518,7 +518,7 @@ const PerformanceMonitorTab: React.FC = () => {
 								{t("memoryUsage", "内存使用", { ns: "settings" })}
 							</span>
 						}
-						className="!rounded-xl"
+						className="rounded-xl!"
 						style={{ borderColor: token.colorBorder }}
 					>
 						<div className="space-y-5">

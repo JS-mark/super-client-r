@@ -22,15 +22,25 @@
 | Home page dashboard UI | ✅ Completed | `2152b5b` |
 | i18n translations | ✅ Completed | `7f6033a` |
 | Vitest testing framework | ✅ Completed | `bd907ca` |
+| Cmd+K search & Cmd+B sidebar | ✅ Completed | `c946c15` |
+| Attachments-message association | ✅ Completed | `790977a` |
+| ChatToolbar extraction + prompt/quote/tools panels | ✅ Completed | `fd93cbf` |
 
 ### Next Steps / Backlog
-- [ ] API Server routes implementation (聊天/Agent/Skill/MCP 端点)
-- [ ] WebSocket support for real-time chat
-- [ ] Agent session management persistence
-- [ ] MCP server auto-reconnection
-- [ ] Skill execution sandbox
-- [ ] Settings page API key management UI
-- [ ] Dark mode polish
+
+**P1 — 快速补全（代码已就绪，接入即可）**
+- [ ] JWT 认证集成到 HTTP 路由（`server/auth.ts` 已写好，仅需接入）
+- [ ] 清理生产代码 console.*（232 处）
+
+**P2 — 功能补全**
+- [ ] Skill URL 下载安装（`SkillService.ts:381` TODO）
+- [ ] API Server 业务端点（Chat/Agent/Skill 端点）
+- [ ] 聊天工具栏剩余功能（doc/tags/translate 仍为 toast 占位）
+
+**P3 — 质量提升**
+- [ ] 核心服务单元测试（当前仅 2 个测试文件）
+- [ ] 大文件拆分（McpMarket.tsx 1055 行、MenuSettings.tsx 802 行）
+- [ ] Skill/Plugin 沙箱执行环境
 - [ ] E2E testing with Playwright
 
 ---

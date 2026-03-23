@@ -130,7 +130,7 @@ export function ShortcutItem({
 							type="primary"
 							icon={<CheckOutlined />}
 							onClick={onStopRecording}
-							className="!h-7 !w-7 !min-w-0"
+							className="h-7! w-7! min-w-0!"
 						/>
 					</div>
 				) : (
@@ -156,7 +156,7 @@ export function ShortcutItem({
 									size="small"
 									icon={<ReloadOutlined />}
 									onClick={() => onReset(shortcut.id)}
-									className="!h-7 !w-7 !min-w-0"
+									className="h-7! w-7! min-w-0!"
 									style={{ color: token.colorTextTertiary }}
 									disabled={disabled}
 								/>

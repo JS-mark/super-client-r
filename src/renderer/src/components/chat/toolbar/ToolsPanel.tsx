@@ -96,7 +96,7 @@ export function ToolsPanel({ onSelect, onClose }: ToolsPanelProps) {
 					split={false}
 					renderItem={(tool) => (
 						<List.Item
-							className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 !px-3 !py-2"
+							className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 px-3! py-2!"
 							onClick={() => handleSelect(tool)}
 						>
 							<List.Item.Meta

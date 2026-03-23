@@ -287,7 +287,7 @@ export const MenuEditModal: React.FC<MenuEditModalProps> = ({
 						<Switch
 							checked={editingItem.enabled}
 							onChange={(v) => setEditingItem({ ...editingItem, enabled: v })}
-							size="default"
+							size="medium"
 						/>
 					</div>
 				</div>
