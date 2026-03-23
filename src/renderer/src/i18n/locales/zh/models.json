@@ -112,6 +112,17 @@
 		"embedding": "嵌入",
 		"reranking": "重排"
 	},
+	"claudeCode": {
+		"title": "Claude Code / 智能体",
+		"useForAgent": "用于 Claude Code",
+		"useForAgentHint": "使用此服务商的凭证运行智能体模式",
+		"incompatible": "此服务商不支持 Agent 模式所需的 Claude API",
+		"willReplace": "将替换：{{name}}",
+		"testFirst": "请先测试连接后再启用",
+		"agentModel": "智能体模型",
+		"modelPlaceholder": "选择用于智能体模式的模型",
+		"modelHint": "通过此服务商运行智能体查询时使用的模型"
+	},
 	"categories": {
 		"chat": "对话",
 		"embedding": "嵌入",

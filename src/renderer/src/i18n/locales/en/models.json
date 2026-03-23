@@ -112,6 +112,17 @@
 		"embedding": "Embedding",
 		"reranking": "Reranking"
 	},
+	"claudeCode": {
+		"title": "Claude Code / Agent",
+		"useForAgent": "Use for Claude Code",
+		"useForAgentHint": "Use this provider's credentials for Agent mode",
+		"incompatible": "This provider does not support Claude API required for Agent mode",
+		"willReplace": "Will replace: {{name}}",
+		"testFirst": "Test connection before enabling",
+		"agentModel": "Agent Model",
+		"modelPlaceholder": "Select model for Agent mode",
+		"modelHint": "Model used when running Agent queries via this provider"
+	},
 	"categories": {
 		"chat": "Chat",
 		"embedding": "Embedding",

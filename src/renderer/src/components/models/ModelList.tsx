@@ -6,6 +6,7 @@ import {
 	LinkOutlined,
 	LoadingOutlined,
 	PlusOutlined,
+	RobotOutlined,
 	SearchOutlined,
 	ThunderboltOutlined,
 } from "@ant-design/icons";
@@ -36,6 +37,7 @@ import type {
 import { ModelManageModal } from "./ModelManageModal";
 import {
 	getPresetProvider,
+	isClaudeCodeCompatible,
 	PRESET_PROVIDERS,
 	type PresetProviderInfo,
 } from "./ModelProviders";
@@ -54,6 +56,10 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const { token } = useToken();
 	const providers = useModelStore((s) => s.providers);
 	const loadProviders = useModelStore((s) => s.loadProviders);
+	const activeSelection = useModelStore((s) => s.activeSelection);
+	const setActiveModel = useModelStore((s) => s.setActiveModel);
+	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
+	const getAllEnabledModels = useModelStore((s) => s.getAllEnabledModels);
 	const saveProvider = useModelStore((s) => s.saveProvider);
 	const deleteProvider = useModelStore((s) => s.deleteProvider);
 
@@ -73,12 +79,16 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
 	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
 	const [manageModalOpen, setManageModalOpen] = useState(false);
+	const [claudeCodeEnabled, setClaudeCodeEnabled] = useState(false);
+	const [claudeCodeModel, setClaudeCodeModel] = useState<string | undefined>(undefined);
+	const watchedPreset = Form.useWatch("preset", form) as ModelProviderPreset | undefined;
 
 	const isZh = i18n.language?.startsWith("zh");
 
 	useEffect(() => {
 		loadProviders();
-	}, [loadProviders]);
+		loadActiveModel();
+	}, [loadProviders, loadActiveModel]);
 
 	// Auto-select first provider when list loads
 	useEffect(() => {
@@ -102,6 +112,8 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			setSelectedModelIds(
 				selectedProvider.models.filter((m) => m.enabled).map((m) => m.id),
 			);
+			setClaudeCodeEnabled(!!selectedProvider.claudeCodeEnabled);
+			setClaudeCodeModel(selectedProvider.claudeCodeModel);
 			form.setFieldsValue({
 				preset: selectedProvider.preset,
 				name: selectedProvider.name,
@@ -111,12 +123,58 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 		}
 	}, [selectedProvider, isAdding, form]);
 
+	// Default model selector logic
+	const handleModelChange = useCallback(
+		async (value: string | undefined) => {
+			if (!value) {
+				await setActiveModel(null);
+				return;
+			}
+			const [providerId, modelId] = value.split("||");
+			await setActiveModel({ providerId, modelId });
+			message.success(t("messages.activeModelSet", { ns: "models" }));
+		},
+		[setActiveModel, message, t],
+	);
+
+	const enabledModels = getAllEnabledModels();
+	const activeValue = activeSelection
+		? `${activeSelection.providerId}||${activeSelection.modelId}`
+		: undefined;
+
+	const modelSelectOptions = useMemo(() => {
+		const grouped = enabledModels.reduce<
+			Record<
+				string,
+				{
+					providerName: string;
+					models: { label: string; value: string }[];
+				}
+			>
+		>((acc, { provider, model }) => {
+			if (!acc[provider.id]) {
+				acc[provider.id] = { providerName: provider.name, models: [] };
+			}
+			acc[provider.id].models.push({
+				label: model.name,
+				value: `${provider.id}||${model.id}`,
+			});
+			return acc;
+		}, {});
+		return Object.entries(grouped).map(([, group]) => ({
+			label: group.providerName,
+			options: group.models,
+		}));
+	}, [enabledModels]);
+
 	const handleAdd = useCallback(() => {
 		setIsAdding(true);
 		setSelectedProviderId(null);
 		setTestResult(null);
 		setFetchedModels([]);
 		setSelectedModelIds([]);
+		setClaudeCodeEnabled(false);
+		setClaudeCodeModel(undefined);
 		form.resetFields();
 	}, [form]);
 
@@ -250,6 +308,8 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				models,
 				createdAt: selectedProvider?.createdAt ?? now,
 				updatedAt: now,
+				claudeCodeEnabled,
+				claudeCodeModel,
 			};
 
 			try {
@@ -272,6 +332,8 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			message,
 			t,
 			isAdding,
+			claudeCodeEnabled,
+			claudeCodeModel,
 		],
 	);
 
@@ -324,10 +386,39 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 
 	return (
 		<div className="animate-fade-in">
+			{/* Default Model Selector */}
+			<div
+				className="flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-xl border"
+				style={{
+					borderColor: token.colorBorderSecondary,
+					background: token.colorBgContainer,
+				}}
+			>
+				<div className="flex items-center gap-1.5 shrink-0">
+					<ThunderboltOutlined className="text-amber-500" />
+					<Text strong className="text-[13px]">
+						{t("activeModel", { ns: "models" })}
+					</Text>
+				</div>
+				<Select
+					size="small"
+					variant="borderless"
+					className="flex-1 max-w-[360px]"
+					placeholder={t("selectActiveModel", { ns: "models" })}
+					value={activeValue}
+					onChange={handleModelChange}
+					allowClear
+					showSearch
+					optionFilterProp="label"
+					options={modelSelectOptions}
+					popupMatchSelectWidth={false}
+				/>
+			</div>
+
 			{/* Split Panel Layout */}
 			<div
 				className="flex rounded-xl border overflow-hidden"
-				style={{ minHeight: 520, borderColor: token.colorBorderSecondary }}
+				style={{ height: "calc(100vh - 180px)", minHeight: 400, borderColor: token.colorBorderSecondary }}
 			>
 				{/* Left Panel - Provider List */}
 				<div
@@ -395,10 +486,16 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 											{getPresetName(provider.preset)}
 										</div>
 									</div>
+									{provider.claudeCodeEnabled && (
+										<RobotOutlined
+											className="text-[11px]"
+											style={{ color: token.colorPrimary }}
+										/>
+									)}
 									{provider.enabled && (
 										<Tag
 											color="green"
-											className="!text-xs !leading-tight !px-1.5 !py-0 !m-0 !rounded"
+											className="text-xs! leading-tight! px-1.5! py-0! m-0! rounded!"
 										>
 											ON
 										</Tag>
@@ -443,11 +540,12 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 
 				{/* Right Panel - Provider Detail */}
 				<div
-					className="flex-1 overflow-y-auto"
+					className="flex-1 flex flex-col"
 					style={{ background: token.colorBgContainer }}
 				>
 					{showRightPanel ? (
-						<div className="p-6">
+						<>
+						<div className="flex-1 overflow-y-auto p-6">
 							{/* Header */}
 							<div className="flex items-center justify-between mb-6">
 								<h3
@@ -585,74 +683,92 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 									)}
 								</div>
 
-								{/* Models Section */}
-								{testResult?.success && (
-									<>
-										<Divider className="!my-4" />
-										<div className="mb-3 flex items-center justify-between">
-											<Text strong className="text-sm">
-												{t("manageModels", { ns: "models" })}
-											</Text>
-											<Space>
-												<Button
-													icon={
-														isFetchingModels ? (
-															<LoadingOutlined />
-														) : (
-															<ThunderboltOutlined />
-														)
-													}
-													onClick={handleFetchModels}
-													loading={isFetchingModels}
-													size="small"
-												>
-													{t("fetchModels", { ns: "models" })}
-												</Button>
-												{(fetchedModels.length > 0 ||
-													(selectedProvider &&
-														selectedProvider.models.length > 0)) && (
-													<Button
-														icon={<AppstoreOutlined />}
-														onClick={() => setManageModalOpen(true)}
-														size="small"
-														type="primary"
-														ghost
-													>
-														{t("manageModels", { ns: "models" })}
-													</Button>
-												)}
-											</Space>
-										</div>
-									</>
-								)}
+								{/* Claude Code / Agent Section */}
+								<ClaudeCodeSection
+									preset={watchedPreset}
+									claudeCodeEnabled={claudeCodeEnabled}
+									onClaudeCodeChange={setClaudeCodeEnabled}
+									claudeCodeModel={claudeCodeModel}
+									onClaudeCodeModelChange={setClaudeCodeModel}
+									models={
+										fetchedModels.length > 0
+											? fetchedModels
+											: selectedProvider?.models ?? []
+									}
+									testPassed={testResult?.success === true}
+									currentProviderId={selectedProvider?.id}
+									providers={providers}
+									token={token}
+								/>
 
-								{/* Save Button */}
-								<Divider className="!my-4" />
-								<div className="flex justify-end gap-2">
-									{isAdding && (
-										<Button
-											onClick={() => {
-												setIsAdding(false);
-												if (providers.length > 0) {
-													setSelectedProviderId(providers[0].id);
-												}
-											}}
-										>
-											{t("cancel", { ns: "models" })}
-										</Button>
-									)}
-									<Button type="primary" htmlType="submit">
-										{t("save", { ns: "models" })}
-									</Button>
-								</div>
-							</Form>
+								</Form>
 						</div>
+
+						{/* Fixed bottom bar */}
+						<div
+							className="shrink-0 px-6 py-3 border-t flex items-center justify-between"
+							style={{ borderColor: token.colorBorderSecondary }}
+						>
+							{/* Left: model management buttons */}
+							<div>
+								{testResult?.success && (
+									<Space>
+										<Button
+											icon={
+												isFetchingModels ? (
+													<LoadingOutlined />
+												) : (
+													<ThunderboltOutlined />
+												)
+											}
+											onClick={handleFetchModels}
+											loading={isFetchingModels}
+											size="small"
+										>
+											{t("fetchModels", { ns: "models" })}
+										</Button>
+										{(fetchedModels.length > 0 ||
+											(selectedProvider &&
+												selectedProvider.models.length > 0)) && (
+											<Button
+												icon={<AppstoreOutlined />}
+												onClick={() => setManageModalOpen(true)}
+												size="small"
+												type="primary"
+												ghost
+											>
+												{t("manageModels", { ns: "models" })}
+											</Button>
+										)}
+									</Space>
+								)}
+							</div>
+							{/* Right: save/cancel */}
+							<Space>
+								{isAdding && (
+									<Button
+										onClick={() => {
+											setIsAdding(false);
+											if (providers.length > 0) {
+												setSelectedProviderId(providers[0].id);
+											}
+										}}
+									>
+										{t("cancel", { ns: "models" })}
+									</Button>
+								)}
+								<Button type="primary" onClick={() => form.submit()}>
+									{t("save", { ns: "models" })}
+								</Button>
+							</Space>
+						</div>
+						</>
 					) : (
 						<div className="flex flex-col items-center justify-center h-full text-center px-8">
 							<ProviderIcon
 								preset="custom"
 								size={56}
-								className="mb-4 !opacity-30"
+								className="mb-4 opacity-30!"
 							/>
 							<Text type="secondary" className="text-sm">
 								{t("noProviderSelected", { ns: "models" })}
@@ -689,3 +805,139 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 		</div>
 	);
 };
+
+/* ------------------------------------------------------------------ */
+/*  ClaudeCodeSection                                                   */
+/* ------------------------------------------------------------------ */
+function ClaudeCodeSection({
+	preset,
+	claudeCodeEnabled,
+	onClaudeCodeChange,
+	claudeCodeModel,
+	onClaudeCodeModelChange,
+	models,
+	testPassed,
+	currentProviderId,
+	providers,
+	token,
+}: {
+	preset: ModelProviderPreset | undefined;
+	claudeCodeEnabled: boolean;
+	onClaudeCodeChange: (v: boolean) => void;
+	claudeCodeModel: string | undefined;
+	onClaudeCodeModelChange: (model: string | undefined) => void;
+	models: ProviderModel[];
+	testPassed: boolean;
+	currentProviderId: string | undefined;
+	providers: ModelProvider[];
+	token: ReturnType<typeof useToken>["token"];
+}) {
+	const { t } = useTranslation();
+	const isCompatible = preset ? isClaudeCodeCompatible(preset) : false;
+
+	// Find if another provider already has claudeCodeEnabled
+	const existingCCProvider = useMemo(
+		() =>
+			providers.find(
+				(p) => p.claudeCodeEnabled && p.id !== currentProviderId,
+			),
+		[providers, currentProviderId],
+	);
+
+	return (
+		<>
+			<Divider className="my-4!" />
+			<div className="mb-3">
+				<Text strong className="text-sm flex items-center gap-1.5">
+					<RobotOutlined />
+					{t("claudeCode.title", { ns: "models" })}
+				</Text>
+			</div>
+
+			{isCompatible ? (
+				<div
+					className="py-2 px-3 rounded-lg"
+					style={{ backgroundColor: token.colorFillQuaternary }}
+				>
+					<div className="flex items-center justify-between">
+						<div>
+							<div
+								className="text-[13px]"
+								style={{ color: token.colorText }}
+							>
+								{t("claudeCode.useForAgent", { ns: "models" })}
+							</div>
+							<div
+								className="text-[11px] mt-0.5"
+								style={{ color: token.colorTextQuaternary }}
+							>
+								{!testPassed
+									? t("claudeCode.testFirst", { ns: "models" })
+									: t("claudeCode.useForAgentHint", { ns: "models" })}
+							</div>
+						</div>
+						<Switch
+							checked={claudeCodeEnabled}
+							onChange={onClaudeCodeChange}
+							size="small"
+							disabled={!testPassed}
+						/>
+					</div>
+					{claudeCodeEnabled && (
+					<div className="mt-2">
+						<div
+							className="text-[11px] mb-1"
+							style={{ color: token.colorTextSecondary }}
+						>
+							{t("claudeCode.agentModel", { ns: "models" })}
+						</div>
+						<Select
+							size="small"
+							variant="borderless"
+							placeholder={t("claudeCode.modelPlaceholder", { ns: "models" })}
+							value={claudeCodeModel}
+							onChange={onClaudeCodeModelChange}
+							allowClear
+							showSearch
+							options={models
+								.filter((m) => m.enabled)
+								.map((m) => ({
+									label: m.name || m.id,
+									value: m.id,
+								}))}
+							className="w-full"
+						/>
+						<div
+							className="text-[11px] mt-0.5"
+							style={{ color: token.colorTextQuaternary }}
+						>
+							{t("claudeCode.modelHint", { ns: "models" })}
+						</div>
+					</div>
+				)}
+				{claudeCodeEnabled && existingCCProvider && (
+						<div
+							className="text-[11px] mt-1.5"
+							style={{ color: token.colorWarning }}
+						>
+							{t("claudeCode.willReplace", {
+								ns: "models",
+								name: existingCCProvider.name,
+							})}
+						</div>
+					)}
+				</div>
+			) : (
+				<div
+					className="text-center py-3 text-[11px] rounded-lg"
+					style={{
+						color: token.colorTextQuaternary,
+						backgroundColor: token.colorFillQuaternary,
+					}}
+				>
+					{t("claudeCode.incompatible", { ns: "models" })}
+				</div>
+			)}
+		</>
+	);
+}

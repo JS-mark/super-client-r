@@ -132,6 +132,7 @@ export function ModelConfigPanel({
 			open={open}
 			onClose={onClose}
 			size={520}
+			styles={{ header: { paddingBlock: 7 } }}
 			extra={
 				<Button type="primary" onClick={() => form.submit()}>
 					{t("modelConfig.save", { ns: "models" })}
@@ -223,7 +224,7 @@ export function ModelConfigPanel({
 								name="maxTokens"
 								label={t("modelConfig.maxTokens", { ns: "models" })}
 							>
-								<InputNumber min={1} className="!w-full" />
+								<InputNumber min={1} className="w-full!" />
 							</Form.Item>
 						</Col>
 						<Col span={8}>
@@ -231,7 +232,7 @@ export function ModelConfigPanel({
 								name="contextWindow"
 								label={t("modelConfig.contextWindow", { ns: "models" })}
 							>
-								<InputNumber min={1} className="!w-full" />
+								<InputNumber min={1} className="w-full!" />
 							</Form.Item>
 						</Col>
 					</Row>
@@ -252,7 +253,7 @@ export function ModelConfigPanel({
 									<InputNumber
 										min={0}
 										step={0.01}
-										className="!w-full"
+										className="w-full!"
 										placeholder={t("modelConfig.inputPrice", {
 											ns: "models",
 										})}
@@ -265,7 +266,7 @@ export function ModelConfigPanel({
 									<InputNumber
 										min={0}
 										step={0.01}
-										className="!w-full"
+										className="w-full!"
 										placeholder={t("modelConfig.outputPrice", {
 											ns: "models",
 										})}
