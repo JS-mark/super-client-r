@@ -17,6 +17,26 @@ export type {
 } from "@super-client/shared-types/agent";
 
 export type {
+	// Agent SDK
+	AgentSDKQueryRequest,
+	AgentSDKSessionInfo,
+	AgentSDKStreamEvent,
+	AgentSDKStreamEventType,
+	AgentSDKResultData,
+	AgentSDKUsage,
+	AgentSDKPermissionRequest,
+	AgentSDKEffort,
+	AgentSDKThinkingConfig,
+	AgentSDKPermissionMode,
+	AgentSDKAgentDefinition,
+	AgentSDKSessionMessage,
+	AgentSDKConfig,
+	// Multi-Agent
+	AgentProfile,
+	AgentTeam,
+} from "@super-client/shared-types/agent-sdk";
+
+export type {
 	// Skill
 	SkillCommand,
 	SkillManifest,
@@ -284,6 +304,8 @@ export interface ModelProvider {
 	models: ProviderModel[];
 	createdAt: number;
 	updatedAt: number;
+	claudeCodeEnabled?: boolean;
+	claudeCodeModel?: string;
 }
 
 export interface ActiveModelSelection {
@@ -380,6 +402,33 @@ export interface SearchExecuteResponse {
 	provider: string;
 	query: string;
 	searchTimeMs: number;
+}
+
+// ============ Network 相关类型（代理 + 请求日志）============
+
+export interface ProxyConfig {
+	enabled: boolean;
+	protocols: ("http" | "https")[];
+	host: string;
+	port: number;
+	auth?: boolean;
+	username?: string;
+	password?: string;
+	bypassList?: string;
+}
+
+export interface RequestLogEntry {
+	id: string;
+	timestamp: number;
+	method: string;
+	url: string;
+	requestHeaders?: Record<string, string>;
+	requestBodyPreview?: string;
+	responseStatus?: number;
+	responseStatusText?: string;
+	durationMs: number;
+	error?: string;
+	source: "fetch" | "axios";
 }
 
 // ============ Attachment 相关类型 ============
@@ -562,6 +611,10 @@ export interface ElectronAPI {
 		setLastConversation: (id: string) => Promise<IPCResponse>;
 		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
 		getWorkspaceDir: (id: string) => Promise<IPCResponse<string>>;
+		updateConversationMetadata: (
+			id: string,
+			updates: Partial<ConversationSummary>,
+		) => Promise<IPCResponse>;
 	};
 
 	// 主题 API
@@ -692,6 +745,60 @@ export interface ElectronAPI {
 		setActiveModel: (
 			selection: ActiveModelSelection | null,
 		) => Promise<IPCResponse>;
+	};
+
+	// Agent SDK API
+	agentSDK: {
+		createQuery: (
+			requestId: string,
+			request: AgentSDKQueryRequest,
+		) => Promise<IPCResponse<{ requestId: string }>>;
+		interrupt: (requestId: string) => Promise<IPCResponse<boolean>>;
+		close: (requestId: string) => Promise<IPCResponse<boolean>>;
+		listSessions: (
+			dir?: string,
+		) => Promise<IPCResponse<AgentSDKSessionInfo[]>>;
+		getSessionInfo: (
+			sessionId: string,
+		) => Promise<IPCResponse<AgentSDKSessionInfo | null>>;
+		setModel: (
+			requestId: string,
+			model: string,
+		) => Promise<IPCResponse<boolean>>;
+		resolvePermission: (
+			toolUseId: string,
+			allowed: boolean,
+		) => Promise<IPCResponse<boolean>>;
+		onStreamEvent: (
+			callback: (event: AgentSDKStreamEvent) => void,
+		) => () => void;
+		// Session 操作
+		forkSession: (
+			sessionId: string,
+			dir?: string,
+		) => Promise<IPCResponse<{ sessionId: string } | null>>;
+		renameSession: (
+			sessionId: string,
+			title: string,
+			dir?: string,
+		) => Promise<IPCResponse<boolean>>;
+		tagSession: (
+			sessionId: string,
+			tag: string,
+			dir?: string,
+		) => Promise<IPCResponse<boolean>>;
+		getSessionMessages: (
+			sessionId: string,
+			dir?: string,
+		) => Promise<IPCResponse<AgentSDKSessionMessage[]>>;
+		// 配置
+		getConfig: () => Promise<IPCResponse<AgentSDKConfig>>;
+		setConfig: (config: AgentSDKConfig) => Promise<IPCResponse<boolean>>;
+		// Multi-Agent 角色和团队
+		getProfiles: () => Promise<IPCResponse<AgentProfile[]>>;
+		setProfiles: (profiles: AgentProfile[]) => Promise<IPCResponse<boolean>>;
+		getTeams: () => Promise<IPCResponse<AgentTeam[]>>;
+		setTeams: (teams: AgentTeam[]) => Promise<IPCResponse<boolean>>;
 	};
 
 	// LLM API
@@ -893,6 +1000,24 @@ export interface ElectronAPI {
 			conversationId: string,
 		) => Promise<IPCResponse<RemoteChatMessage[]>>;
 		onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
+	};
+
+	// Network API（代理 + 请求日志）
+	network: {
+		getProxyConfig: () => Promise<IPCResponse<ProxyConfig | null>>;
+		setProxyConfig: (config: ProxyConfig) => Promise<IPCResponse>;
+		testProxy: (
+			config: ProxyConfig,
+		) => Promise<
+			IPCResponse<{ success: boolean; latencyMs: number; error?: string }>
+		>;
+		getLogEnabled: () => Promise<IPCResponse<boolean>>;
+		setLogEnabled: (enabled: boolean) => Promise<IPCResponse>;
+		getRequestLog: () => Promise<IPCResponse<RequestLogEntry[]>>;
+		clearRequestLog: () => Promise<IPCResponse>;
+		onRequestLogEntry: (
+			callback: (entry: RequestLogEntry) => void,
+		) => () => void;
 	};
 
 	// Webhook API

@@ -125,6 +125,7 @@
     "swagger-ui-dist": "^5.32.1",
     "tailwind-merge": "^3.5.0",
     "tinyglobby": "^0.2.15",
+    "undici": "^7.24.5",
     "ws": "^8.19.0",
     "zustand": "^5.0.12"
   },

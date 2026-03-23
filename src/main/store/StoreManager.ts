@@ -6,8 +6,12 @@
 import Store from "electron-store";
 import type {
 	ActiveModelSelection,
+	AgentSDKConfig,
+	AgentProfile,
+	AgentTeam,
 	McpServerConfig,
 	ModelProvider,
+	ProxyConfig,
 	ProviderModel,
 	WebhookConfig,
 	IMBotConfig,
@@ -92,6 +96,15 @@ export interface AppConfig {
 	remoteDevices?: RemoteDevice[];
 	// Relay 配置
 	relayConfig?: RelayConfig;
+	// Agent SDK 配置
+	agentSDKConfig?: AgentSDKConfig;
+	// Multi-Agent 角色和团队
+	agentProfiles?: AgentProfile[];
+	agentTeams?: AgentTeam[];
+	builtinAgentVersion?: number;
+	// Network proxy
+	proxyConfig?: ProxyConfig;
+	requestLogEnabled?: boolean;
 	// App Config 缓存
 	appInitConfigCache?: {
 		config: any;
@@ -282,6 +295,16 @@ export class StoreManager {
 
 	saveModelProvider(provider: ModelProvider): void {
 		const providers = this.getModelProviders();
+
+		// Enforce single-select: only one provider can have claudeCodeEnabled
+		if (provider.claudeCodeEnabled) {
+			for (const p of providers) {
+				if (p.id !== provider.id) {
+					p.claudeCodeEnabled = false;
+				}
+			}
+		}
+
 		const existingIndex = providers.findIndex((p) => p.id === provider.id);
 
 		if (existingIndex >= 0) {
@@ -442,6 +465,72 @@ export class StoreManager {
 
 	clearRemoteControlEvents(): void {
 		this.dataStore.set("remoteControlEvents", []);
+	}
+
+	// ============ Agent SDK 配置相关 ============
+
+	getAgentSDKConfig(): AgentSDKConfig {
+		return this.configStore.get("agentSDKConfig") || {};
+	}
+
+	setAgentSDKConfig(config: AgentSDKConfig): void {
+		this.configStore.set("agentSDKConfig", config);
+	}
+
+	// ============ Agent Profiles & Teams 相关 ============
+
+	getAgentProfiles(): AgentProfile[] {
+		return this.configStore.get("agentProfiles") || [];
+	}
+
+	setAgentProfiles(profiles: AgentProfile[]): void {
+		this.configStore.set("agentProfiles", profiles);
+	}
+
+	getAgentTeams(): AgentTeam[] {
+		return this.configStore.get("agentTeams") || [];
+	}
+
+	setAgentTeams(teams: AgentTeam[]): void {
+		this.configStore.set("agentTeams", teams);
+	}
+
+	getBuiltinAgentVersion(): number {
+		return (this.configStore.get("builtinAgentVersion") as number) || 0;
+	}
+
+	setBuiltinAgentVersion(version: number): void {
+		this.configStore.set("builtinAgentVersion", version);
+	}
+
+	// ============ Network Proxy 配置相关 ============
+
+	getProxyConfig(): ProxyConfig | undefined {
+		const raw = this.configStore.get("proxyConfig") as
+			| (Record<string, unknown> & { protocol?: string; protocols?: string[] })
+			| undefined;
+		if (!raw) return undefined;
+
+		// 迁移旧配置: protocol (string) → protocols (string[])
+		if (typeof raw.protocol === "string" && !raw.protocols) {
+			const { protocol: _, ...rest } = raw;
+			const migrated = { ...rest, protocols: ["http", "https"] } as unknown as ProxyConfig;
+			this.configStore.set("proxyConfig", migrated);
+			return migrated;
+		}
+		return raw as unknown as ProxyConfig;
+	}
+
+	setProxyConfig(config: ProxyConfig): void {
+		this.configStore.set("proxyConfig", config);
+	}
+
+	getRequestLogEnabled(): boolean {
+		return this.configStore.get("requestLogEnabled") ?? false;
+	}
+
+	setRequestLogEnabled(enabled: boolean): void {
+		this.configStore.set("requestLogEnabled", enabled);
 	}
 
 	// ============ 清除所有数据 ============

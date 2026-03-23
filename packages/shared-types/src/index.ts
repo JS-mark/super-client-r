@@ -10,6 +10,9 @@
 // ============ Agent 相关类型 ============
 export * from "./agent";
 
+// ============ Agent SDK 相关类型 ============
+export * from "./agent-sdk";
+
 // ============ Skill 相关类型 ============
 export * from "./skill";
 

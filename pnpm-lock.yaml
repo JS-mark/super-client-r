@@ -266,6 +266,9 @@ importers:
       tinyglobby:
         specifier: ^0.2.15
         version: 0.2.15
+      undici:
+        specifier: ^7.24.5
+        version: 7.24.5
       ws:
         specifier: ^8.19.0
         version: 8.19.0

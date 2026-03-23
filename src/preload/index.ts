@@ -169,6 +169,10 @@ export interface ElectronAPI {
 		setLastConversation: (id: string) => Promise<IPCResponse>;
 		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
 		getWorkspaceDir: (id: string) => Promise<IPCResponse<string>>;
+		updateConversationMetadata: (
+			id: string,
+			updates: Partial<ConversationSummary>,
+		) => Promise<IPCResponse>;
 	};
 
 	// 主题 API
@@ -299,6 +303,60 @@ export interface ElectronAPI {
 		setActiveModel: (
 			selection: ActiveModelSelection | null,
 		) => Promise<IPCResponse>;
+	};
+
+	// Agent SDK API
+	agentSDK: {
+		createQuery: (
+			requestId: string,
+			request: AgentSDKQueryRequest,
+		) => Promise<IPCResponse<{ requestId: string }>>;
+		interrupt: (requestId: string) => Promise<IPCResponse<boolean>>;
+		close: (requestId: string) => Promise<IPCResponse<boolean>>;
+		listSessions: (
+			dir?: string,
+		) => Promise<IPCResponse<AgentSDKSessionInfo[]>>;
+		getSessionInfo: (
+			sessionId: string,
+		) => Promise<IPCResponse<AgentSDKSessionInfo | null>>;
+		setModel: (
+			requestId: string,
+			model: string,
+		) => Promise<IPCResponse<boolean>>;
+		resolvePermission: (
+			toolUseId: string,
+			allowed: boolean,
+		) => Promise<IPCResponse<boolean>>;
+		onStreamEvent: (
+			callback: (event: AgentSDKStreamEvent) => void,
+		) => () => void;
+		// Session 操作
+		forkSession: (
+			sessionId: string,
+			dir?: string,
+		) => Promise<IPCResponse<{ sessionId: string } | null>>;
+		renameSession: (
+			sessionId: string,
+			title: string,
+			dir?: string,
+		) => Promise<IPCResponse<boolean>>;
+		tagSession: (
+			sessionId: string,
+			tag: string,
+			dir?: string,
+		) => Promise<IPCResponse<boolean>>;
+		getSessionMessages: (
+			sessionId: string,
+			dir?: string,
+		) => Promise<IPCResponse<AgentSDKSessionMessage[]>>;
+		// 配置
+		getConfig: () => Promise<IPCResponse<AgentSDKConfig>>;
+		setConfig: (config: AgentSDKConfig) => Promise<IPCResponse<boolean>>;
+		// Multi-Agent 角色和团队
+		getProfiles: () => Promise<IPCResponse<AgentProfile[]>>;
+		setProfiles: (profiles: AgentProfile[]) => Promise<IPCResponse<boolean>>;
+		getTeams: () => Promise<IPCResponse<AgentTeam[]>>;
+		setTeams: (teams: AgentTeam[]) => Promise<IPCResponse<boolean>>;
 	};
 
 	// LLM API
@@ -512,6 +570,22 @@ export interface ElectronAPI {
 		onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
 	};
 
+	// Network API（代理 + 请求日志）
+	network: {
+		getProxyConfig: () => Promise<IPCResponse<ProxyConfig | null>>;
+		setProxyConfig: (config: ProxyConfig) => Promise<IPCResponse>;
+		testProxy: (config: ProxyConfig) => Promise<
+			IPCResponse<{ success: boolean; latencyMs: number; error?: string }>
+		>;
+		getLogEnabled: () => Promise<IPCResponse<boolean>>;
+		setLogEnabled: (enabled: boolean) => Promise<IPCResponse>;
+		getRequestLog: () => Promise<IPCResponse<RequestLogEntry[]>>;
+		clearRequestLog: () => Promise<IPCResponse>;
+		onRequestLogEntry: (
+			callback: (entry: RequestLogEntry) => void,
+		) => () => void;
+	};
+
 	// Webhook API
 	webhook: {
 		getConfigs: () => Promise<IPCResponse<WebhookConfig[]>>;
@@ -609,6 +683,150 @@ export interface AgentStreamEvent {
 	type: "text" | "tool_use" | "tool_result" | "error" | "done";
 	sessionId: string;
 	data: unknown;
+}
+
+// ============ Agent SDK 类型 ============
+
+export type AgentSDKEffort = "low" | "medium" | "high" | "max";
+
+export type AgentSDKThinkingConfig =
+	| { type: "adaptive" }
+	| { type: "enabled"; budgetTokens: number }
+	| { type: "disabled" };
+
+export type AgentSDKPermissionMode =
+	| "default"
+	| "acceptEdits"
+	| "bypassPermissions"
+	| "plan"
+	| "dontAsk";
+
+export interface AgentSDKAgentDefinition {
+	description: string;
+	prompt: string;
+	tools?: string[];
+	disallowedTools?: string[];
+	model?: string;
+	maxTurns?: number;
+}
+
+export interface AgentSDKQueryRequest {
+	prompt: string;
+	sessionId?: string;
+	resumeSessionId?: string;
+	cwd?: string;
+	model?: string;
+	effort?: AgentSDKEffort;
+	thinking?: AgentSDKThinkingConfig;
+	maxTurns?: number;
+	maxBudgetUsd?: number;
+	permissionMode?: AgentSDKPermissionMode;
+	persistSession?: boolean;
+	includePartialMessages?: boolean;
+	mcpServerNames?: string[];
+	agents?: Record<string, AgentSDKAgentDefinition>;
+	systemPrompt?: string;
+}
+
+export interface AgentSDKUsage {
+	inputTokens: number;
+	outputTokens: number;
+	cacheCreationInputTokens?: number;
+	cacheReadInputTokens?: number;
+}
+
+export interface AgentSDKResultData {
+	success: boolean;
+	text: string;
+	durationMs: number;
+	numTurns: number;
+	totalCostUsd: number;
+	stopReason: string | null;
+	usage: AgentSDKUsage;
+}
+
+export interface AgentSDKPermissionRequest {
+	toolName: string;
+	toolUseId: string;
+	toolInput: Record<string, unknown>;
+	title?: string;
+	description?: string;
+	displayName?: string;
+}
+
+export type AgentSDKStreamEventType =
+	| "init"
+	| "chunk"
+	| "assistant"
+	| "tool_use_summary"
+	| "status"
+	| "permission_request"
+	| "rate_limit"
+	| "result"
+	| "error";
+
+export interface AgentSDKStreamEvent {
+	requestId: string;
+	type: AgentSDKStreamEventType;
+	sessionId?: string;
+	content?: string;
+	error?: string;
+	toolSummary?: string;
+	result?: AgentSDKResultData;
+	permissionRequest?: AgentSDKPermissionRequest;
+	status?: string;
+	usage?: AgentSDKUsage;
+}
+
+export interface AgentSDKSessionInfo {
+	sessionId: string;
+	summary: string;
+	lastModified: number;
+	createdAt?: number;
+	cwd?: string;
+	tag?: string;
+	customTitle?: string;
+}
+
+export interface AgentSDKSessionMessage {
+	type: "user" | "assistant";
+	uuid: string;
+	sessionId: string;
+	message: unknown;
+}
+
+export interface AgentSDKConfig {
+	apiKeyOverride?: string;
+	baseUrlOverride?: string;
+	defaultModel?: string;
+	smallFastModel?: string;
+	defaultEffort?: AgentSDKEffort;
+	defaultThinking?: AgentSDKThinkingConfig;
+	defaultMaxTurns?: number;
+	defaultMaxBudgetUsd?: number;
+	defaultPermissionMode?: AgentSDKPermissionMode;
+	customEnvVars?: Record<string, string>;
+}
+
+export interface AgentProfile {
+	id: string;
+	name: string;
+	description: string;
+	prompt: string;
+	tools?: string[];
+	disallowedTools?: string[];
+	model?: string;
+	maxTurns?: number;
+	icon?: string;
+	color?: string;
+}
+
+export interface AgentTeam {
+	id: string;
+	name: string;
+	description: string;
+	agents: string[];
+	isBuiltin?: boolean;
 }
 
 export interface SkillManifest {
@@ -1151,6 +1369,33 @@ export interface RemoteChatMessage {
 	timestamp: number;
 }
 
+// ============ Network 相关类型 ============
+
+export interface ProxyConfig {
+	enabled: boolean;
+	protocols: ("http" | "https")[];
+	host: string;
+	port: number;
+	auth?: boolean;
+	username?: string;
+	password?: string;
+	bypassList?: string;
+}
+
+export interface RequestLogEntry {
+	id: string;
+	timestamp: number;
+	method: string;
+	url: string;
+	requestHeaders?: Record<string, string>;
+	requestBodyPreview?: string;
+	responseStatus?: number;
+	responseStatusText?: string;
+	durationMs: number;
+	error?: string;
+	source: "fetch" | "axios";
+}
+
 // ============ Webhook 相关类型 ============
 
 export type WebhookType = "dingtalk" | "feishu" | "custom";
@@ -1342,6 +1587,14 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.invoke("chat:get-conversation-dir", id),
 		getWorkspaceDir: (id: string) =>
 			ipcRenderer.invoke("chat:get-workspace-dir", id),
+		updateConversationMetadata: (
+			id: string,
+			updates: Partial<ConversationSummary>,
+		) =>
+			ipcRenderer.invoke("chat:update-conversation-metadata", {
+				id,
+				updates,
+			}),
 	},
 
 	// 主题 API
@@ -1486,6 +1739,64 @@ const electronAPI: ElectronAPI = {
 		getActiveModel: () => ipcRenderer.invoke("model:get-active-model"),
 		setActiveModel: (selection: ActiveModelSelection | null) =>
 			ipcRenderer.invoke("model:set-active-model", selection),
+	},
+
+	// Agent SDK API
+	agentSDK: {
+		createQuery: (requestId: string, request: AgentSDKQueryRequest) =>
+			ipcRenderer.invoke("agent-sdk:create-query", { requestId, request }),
+		interrupt: (requestId: string) =>
+			ipcRenderer.invoke("agent-sdk:interrupt", { requestId }),
+		close: (requestId: string) =>
+			ipcRenderer.invoke("agent-sdk:close", { requestId }),
+		listSessions: (dir?: string) =>
+			ipcRenderer.invoke("agent-sdk:list-sessions", { dir }),
+		getSessionInfo: (sessionId: string) =>
+			ipcRenderer.invoke("agent-sdk:get-session-info", { sessionId }),
+		setModel: (requestId: string, model: string) =>
+			ipcRenderer.invoke("agent-sdk:set-model", { requestId, model }),
+		resolvePermission: (toolUseId: string, allowed: boolean) =>
+			ipcRenderer.invoke("agent-sdk:permission-response", {
+				toolUseId,
+				allowed,
+			}),
+		onStreamEvent: (callback: (event: AgentSDKStreamEvent) => void) => {
+			const listener = (_event: unknown, data: AgentSDKStreamEvent) =>
+				callback(data);
+			ipcRenderer.on("agent-sdk:stream-event", listener);
+			return () => ipcRenderer.off("agent-sdk:stream-event", listener);
+		},
+		// Session 操作
+		forkSession: (sessionId: string, dir?: string) =>
+			ipcRenderer.invoke("agent-sdk:fork-session", { sessionId, dir }),
+		renameSession: (sessionId: string, title: string, dir?: string) =>
+			ipcRenderer.invoke("agent-sdk:rename-session", {
+				sessionId,
+				title,
+				dir,
+			}),
+		tagSession: (sessionId: string, tag: string, dir?: string) =>
+			ipcRenderer.invoke("agent-sdk:tag-session", {
+				sessionId,
+				tag,
+				dir,
+			}),
+		getSessionMessages: (sessionId: string, dir?: string) =>
+			ipcRenderer.invoke("agent-sdk:get-session-messages", {
+				sessionId,
+				dir,
+			}),
+		// 配置
+		getConfig: () => ipcRenderer.invoke("agent-sdk:get-config"),
+		setConfig: (config: AgentSDKConfig) =>
+			ipcRenderer.invoke("agent-sdk:set-config", { config }),
+		// Multi-Agent 角色和团队
+		getProfiles: () => ipcRenderer.invoke("agent-sdk:get-profiles"),
+		setProfiles: (profiles: AgentProfile[]) =>
+			ipcRenderer.invoke("agent-sdk:set-profiles", { profiles }),
+		getTeams: () => ipcRenderer.invoke("agent-sdk:get-teams"),
+		setTeams: (teams: AgentTeam[]) =>
+			ipcRenderer.invoke("agent-sdk:set-teams", { teams }),
 	},
 
 	// LLM API
@@ -1741,6 +2052,30 @@ const electronAPI: ElectronAPI = {
 				callback(data);
 			ipcRenderer.on("remote-chat:im-message", listener);
 			return () => ipcRenderer.off("remote-chat:im-message", listener);
+		},
+	},
+
+	// Network API（代理 + 请求日志）
+	network: {
+		getProxyConfig: () =>
+			ipcRenderer.invoke("network:get-proxy-config"),
+		setProxyConfig: (config: ProxyConfig) =>
+			ipcRenderer.invoke("network:set-proxy-config", config),
+		testProxy: (config: ProxyConfig) =>
+			ipcRenderer.invoke("network:test-proxy", config),
+		getLogEnabled: () =>
+			ipcRenderer.invoke("network:get-log-enabled"),
+		setLogEnabled: (enabled: boolean) =>
+			ipcRenderer.invoke("network:set-log-enabled", enabled),
+		getRequestLog: () =>
+			ipcRenderer.invoke("network:get-request-log"),
+		clearRequestLog: () =>
+			ipcRenderer.invoke("network:clear-request-log"),
+		onRequestLogEntry: (callback: (entry: RequestLogEntry) => void) => {
+			const listener = (_event: unknown, entry: RequestLogEntry) =>
+				callback(entry);
+			ipcRenderer.on("network:request-log-entry", listener);
+			return () => ipcRenderer.off("network:request-log-entry", listener);
 		},
 	},
 

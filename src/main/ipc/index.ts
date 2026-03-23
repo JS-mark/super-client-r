@@ -3,8 +3,8 @@
  * 统一注册所有 IPC 处理器
  */
 
-import { setupAgentHandlers } from "../services/agent";
 import { registerAgentHandlers } from "./handlers/agentHandlers";
+import { registerAgentSDKHandlers } from "./handlers/agentSDKHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
 import { registerAuthHandlers } from "./handlers/authHandlers";
@@ -23,6 +23,7 @@ import { registerIMBotHandlers } from "./handlers/imbotHandlers";
 import { registerRemoteDeviceHandlers } from "./handlers/remoteDeviceHandlers";
 import { registerRemoteControlHandlers } from "./handlers/remoteControlHandlers";
 import { registerRemoteChatHandlers } from "./handlers/remoteChatHandlers";
+import { registerNetworkHandlers } from "./handlers/networkHandlers";
 import { registerAppConfigHandlers } from "./handlers/appConfigHandler";
 
 /**
@@ -30,6 +31,7 @@ import { registerAppConfigHandlers } from "./handlers/appConfigHandler";
  */
 export function registerIpcHandlers(): void {
 	registerAgentHandlers();
+	registerAgentSDKHandlers();
 	registerAuthHandlers();
 	registerChatHandlers();
 	registerSkillHandlers();
@@ -48,8 +50,8 @@ export function registerIpcHandlers(): void {
 	registerRemoteDeviceHandlers();
 	registerRemoteControlHandlers();
 	registerRemoteChatHandlers();
+	registerNetworkHandlers();
 	registerAppConfigHandlers();
-	setupAgentHandlers();
 }
 
 export * from "./channels";

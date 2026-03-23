@@ -3,7 +3,42 @@
  * 定义主进程和渲染进程之间的通信通道
  */
 
-// Agent 相关通道
+// Agent SDK 相关通道（基于 @anthropic-ai/claude-agent-sdk）
+export const AGENT_SDK_CHANNELS = {
+	// 创建查询（启动 agent）
+	CREATE_QUERY: "agent-sdk:create-query",
+	// 中断当前查询
+	INTERRUPT: "agent-sdk:interrupt",
+	// 关闭查询
+	CLOSE: "agent-sdk:close",
+	// 恢复会话
+	RESUME_SESSION: "agent-sdk:resume-session",
+	// 列出 SDK sessions
+	LIST_SESSIONS: "agent-sdk:list-sessions",
+	// 获取 session 信息
+	GET_SESSION_INFO: "agent-sdk:get-session-info",
+	// 切换模型
+	SET_MODEL: "agent-sdk:set-model",
+	// 流式事件 (main → renderer)
+	STREAM_EVENT: "agent-sdk:stream-event",
+	// 权限审批响应 (renderer → main)
+	PERMISSION_RESPONSE: "agent-sdk:permission-response",
+	// Session 操作
+	FORK_SESSION: "agent-sdk:fork-session",
+	RENAME_SESSION: "agent-sdk:rename-session",
+	TAG_SESSION: "agent-sdk:tag-session",
+	GET_SESSION_MESSAGES: "agent-sdk:get-session-messages",
+	// 配置
+	GET_CONFIG: "agent-sdk:get-config",
+	SET_CONFIG: "agent-sdk:set-config",
+	// Multi-Agent 角色和团队
+	GET_PROFILES: "agent-sdk:get-profiles",
+	SET_PROFILES: "agent-sdk:set-profiles",
+	GET_TEAMS: "agent-sdk:get-teams",
+	SET_TEAMS: "agent-sdk:set-teams",
+} as const;
+
+// Agent 相关通道（旧版，待清理）
 export const AGENT_CHANNELS = {
 	// 创建 agent 会话
 	CREATE_SESSION: "agent:create-session",
@@ -59,6 +94,8 @@ export const CHAT_CHANNELS = {
 	GET_CONVERSATION_DIR: "chat:get-conversation-dir",
 	// 工作目录
 	GET_WORKSPACE_DIR: "chat:get-workspace-dir",
+	// 更新对话元数据
+	UPDATE_METADATA: "chat:update-conversation-metadata",
 } as const;
 
 // MCP 相关通道
@@ -371,6 +408,21 @@ export const REMOTE_CHAT_CHANNELS = {
 	IM_MESSAGE: "remote-chat:im-message",
 } as const;
 
+// Network 相关通道（代理 + 请求日志）
+export const NETWORK_CHANNELS = {
+	// 代理配置
+	GET_PROXY_CONFIG: "network:get-proxy-config",
+	SET_PROXY_CONFIG: "network:set-proxy-config",
+	TEST_PROXY: "network:test-proxy",
+	// 请求日志
+	GET_REQUEST_LOG: "network:get-request-log",
+	SET_LOG_ENABLED: "network:set-log-enabled",
+	GET_LOG_ENABLED: "network:get-log-enabled",
+	CLEAR_REQUEST_LOG: "network:clear-request-log",
+	// 实时推送 (main → renderer)
+	REQUEST_LOG_ENTRY: "network:request-log-entry",
+} as const;
+
 // App Config 相关通道
 export const APP_CONFIG_CHANNELS = {
 	// 获取当前配置
@@ -383,6 +435,7 @@ export const APP_CONFIG_CHANNELS = {
 
 // 所有通道的联合类型
 export type IPCChannel =
+	| (typeof AGENT_SDK_CHANNELS)[keyof typeof AGENT_SDK_CHANNELS]
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
 	| (typeof SKILL_CHANNELS)[keyof typeof SKILL_CHANNELS]
 	| (typeof CHAT_CHANNELS)[keyof typeof CHAT_CHANNELS]
@@ -406,4 +459,5 @@ export type IPCChannel =
 	| (typeof REMOTE_DEVICE_CHANNELS)[keyof typeof REMOTE_DEVICE_CHANNELS]
 	| (typeof REMOTE_CONTROL_CHANNELS)[keyof typeof REMOTE_CONTROL_CHANNELS]
 	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS]
+	| (typeof NETWORK_CHANNELS)[keyof typeof NETWORK_CHANNELS]
 	| (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];

@@ -91,10 +91,10 @@ function getAppIconPath(): string {
  */
 function createWindow(): void {
 	mainWindow = new BrowserWindow({
-		width: 1000,
-		height: 700,
-		minWidth: 600,
-		minHeight: 400,
+		width: 1024,
+		height: 750,
+    minWidth: 1024,
+    minHeight: 750,
 		show: false, // 延迟显示，避免闪烁
 		icon: getAppIconPath(),
 		frame: false, // 隐藏默认标题栏，使用自定义标题栏
@@ -438,6 +438,14 @@ function registerWindowHandlers(): void {
 app.whenReady().then(async () => {
 	// Initialize log database before anything else
 	logDatabaseService.initialize();
+
+	// Initialize network proxy & request log (must be before any HTTP requests)
+	const { proxyService } = await import("./services/network/ProxyService");
+	const { requestLogService } = await import(
+		"./services/network/RequestLogService"
+	);
+	proxyService.initialize();
+	requestLogService.initialize();
 
 	logger.info("App is ready");
 

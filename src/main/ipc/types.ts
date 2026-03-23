@@ -16,6 +16,28 @@ export type {
 } from "@super-client/shared-types/agent";
 
 export type {
+	// Agent SDK
+	AgentSDKQueryRequest,
+	AgentSDKEffort,
+	AgentSDKThinkingConfig,
+	AgentSDKPermissionMode,
+	AgentSDKAgentDefinition,
+	AgentSDKStreamEvent,
+	AgentSDKStreamEventType,
+	AgentSDKResultData,
+	AgentSDKUsage,
+	AgentSDKPermissionRequest,
+	AgentSDKSessionInfo,
+	AgentSDKListSessionsOptions,
+	AgentSDKTaskType,
+	AgentSDKSessionMessage,
+	AgentSDKConfig,
+	// Multi-Agent
+	AgentProfile,
+	AgentTeam,
+} from "@super-client/shared-types/agent-sdk";
+
+export type {
 	// Skill
 	SkillCommand,
 	SkillManifest,
@@ -270,6 +292,8 @@ export interface ModelProvider {
 	models: ProviderModel[];
 	createdAt: number;
 	updatedAt: number;
+	claudeCodeEnabled?: boolean;
+	claudeCodeModel?: string;
 }
 
 export interface ActiveModelSelection {
@@ -485,6 +509,33 @@ export interface ExecuteCommandRequest {
 	deviceId: string;
 	command: string;
 	timeout?: number;
+}
+
+// ============ Network 相关类型（代理 + 请求日志）============
+
+export interface ProxyConfig {
+	enabled: boolean;
+	protocols: ("http" | "https")[]; // 多选：覆盖哪些流量类型
+	host: string;
+	port: number;
+	auth?: boolean;
+	username?: string;
+	password?: string;
+	bypassList?: string; // 逗号分隔: "localhost,127.0.0.1,*.internal.com"
+}
+
+export interface RequestLogEntry {
+	id: string;
+	timestamp: number;
+	method: string;
+	url: string;
+	requestHeaders?: Record<string, string>;
+	requestBodyPreview?: string; // 截取前 1KB
+	responseStatus?: number;
+	responseStatusText?: string;
+	durationMs: number;
+	error?: string;
+	source: "fetch" | "axios";
 }
 
 // ============ App Config 相关类型 ============

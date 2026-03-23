@@ -98,6 +98,10 @@ export interface ConversationSummary {
 	messageCount: number;
 	preview: string;
 	remote?: RemoteBinding;
+	/** 关联的 Agent SDK session ID */
+	agentSDKSessionId?: string;
+	/** 会话绑定的聊天模式，首次发送后锁定 */
+	chatMode?: "direct" | "agent";
 }
 
 /** 对话数据 */
