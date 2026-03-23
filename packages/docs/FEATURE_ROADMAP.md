@@ -14,32 +14,33 @@
 
 ## 功能完成度总览
 
-| # | 功能模块 | 状态 | 完成度 | 阻塞项 |
-|---|---------|------|--------|--------|
-| 1 | 页面路由与导航 | ✅ 完成 | 100% | - |
-| 2 | AI 对话（Chat） | ✅ 完成 | 98% | 工具栏 doc/tags/translate 占位 |
-| 3 | MCP 服务器管理 | ✅ 完成 | 100% | - |
-| 4 | Skill 系统 | 🟡 部分 | 70% | URL 下载、沙箱执行 |
-| 5 | 插件系统 | 🟡 部分 | 85% | 远程下载、市场后端、沙箱 |
-| 6 | 设置系统 | ✅ 完成 | 100% | - |
-| 7 | 工作区管理 | ✅ 完成 | 100% | - |
-| 8 | 文件附件系统 | ✅ 完成 | 100% | - |
-| 9 | 快捷键系统 | ✅ 完成 | 100% | - |
-| 10 | HTTP API Server | 🟡 部分 | 50% | JWT 集成、业务端点 |
-| 11 | 悬浮窗 | ✅ 完成 | 100% | - |
-| 12 | 国际化 (i18n) | ✅ 完成 | 100% | - |
-| 13 | 主题/暗色模式 | ✅ 完成 | 100% | - |
-| 14 | 菜单自定义 | ✅ 完成 | 100% | - |
-| 15 | 消息管理增强 | ✅ 完成 | 100% | - |
-| 16 | OAuth 认证 | ✅ 完成 | 100% | - |
-| 17 | IMBot 服务 | ✅ 完成 | 100% | - |
-| 18 | 远程设备管理 | ✅ 完成 | 100% | - |
-| 19 | 远程聊天桥接 | ✅ 完成 | 100% | - |
-| 20 | Webhook 通知 | ✅ 完成 | 100% | - |
-| 21 | LLM/模型管理 | ✅ 完成 | 100% | - |
-| 22 | 应用初始化配置 | ✅ 完成 | 100% | - |
+| #  | 功能模块              | 状态      | 完成度 | 阻塞项                         |
+|----|-----------------------|-----------|--------|--------------------------------|
+| 1  | 页面路由与导航        | ✅ 完成    | 100%   | -                              |
+| 2  | AI 对话（Chat）         | ✅ 完成    | 98%    | 工具栏 doc/tags/translate 占位 |
+| 3  | MCP 服务器管理        | ✅ 完成    | 100%   | -                              |
+| 4  | Skill 系统            | 🟡 部分   | 70%    | URL 下载、沙箱执行              |
+| 5  | 插件系统              | 🟡 部分   | 85%    | 远程下载、市场后端、沙箱         |
+| 6  | 设置系统              | ✅ 完成    | 100%   | -                              |
+| 7  | 工作区管理            | ✅ 完成    | 100%   | -                              |
+| 8  | 文件附件系统          | ✅ 完成    | 100%   | -                              |
+| 9  | 快捷键系统            | ✅ 完成    | 100%   | -                              |
+| 10 | HTTP API Server       | 🟡 部分   | 50%    | JWT 集成、业务端点              |
+| 11 | 悬浮窗                | ✅ 完成    | 100%   | -                              |
+| 12 | 国际化 (i18n)         | ✅ 完成    | 100%   | -                              |
+| 13 | 主题/暗色模式         | ✅ 完成    | 100%   | -                              |
+| 14 | 菜单自定义            | ✅ 完成    | 100%   | -                              |
+| 15 | 消息管理增强          | ✅ 完成    | 100%   | -                              |
+| 16 | OAuth 认证            | ✅ 完成    | 100%   | -                              |
+| 17 | IMBot 服务            | ✅ 完成    | 100%   | -                              |
+| 18 | 远程设备管理          | ✅ 完成    | 100%   | -                              |
+| 19 | 远程聊天桥接          | ✅ 完成    | 100%   | -                              |
+| 20 | Webhook 通知          | ✅ 完成    | 100%   | -                              |
+| 21 | LLM/模型管理          | ✅ 完成    | 100%   | -                              |
+| 22 | 应用初始化配置        | ✅ 完成    | 100%   | -                              |
+| 23 | Claude Agent SDK 集成 | 🟡 进行中 | 25%    | Phase 1 完成，Phase 2 待开始   |
 
-**整体完成度：约 95%**
+**整体完成度：约 93%**
 
 ---
 
@@ -178,6 +179,7 @@
 ### 18. 插件系统 🟡 85% 完成 ⭐ 优先级：高
 
 **已完成：**
+
 - [x] PluginManager 生命周期管理
 - [x] 插件扫描/发现/启停
 - [x] 插件隔离存储 API（Memento）
@@ -191,6 +193,7 @@
 - [x] 更新检查（`CHECK_UPDATES`/`UPDATE_PLUGIN` IPC）
 
 **待完成：**
+
 - [ ] 远程 zip/tgz 插件包下载
 - [ ] 市场后端服务对接
 - [ ] 插件沙箱执行环境
@@ -198,12 +201,14 @@
 ### 19. Skill 系统 🟡 70% 完成 ⭐ 优先级：高
 
 **已完成：**
+
 - [x] 市场浏览/搜索/筛选
 - [x] 安装/卸载/更新检查
 - [x] 详情弹窗
 - [x] Skill 验证器（`SkillValidator.ts`）
 
 **待完成：**
+
 - [ ] URL 下载 Skill 包（`SkillService.ts:381` — `// TODO: 实现从 URL 下载`）
 - [ ] 动态加载和沙箱执行
 - [ ] 权限声明和授权
@@ -212,6 +217,7 @@
 ### 20. HTTP API Server 🟡 50% 完成 ⭐ 优先级：中
 
 **已完成：**
+
 - [x] Koa 框架 + 端口自动检测
 - [x] Health Check 端点
 - [x] MCP API 端点（17 个端点，完整 CRUD）
@@ -222,6 +228,7 @@
 - [x] JWT 认证模块（`server/auth.ts`，代码已写但未集成到路由）
 
 **待完成：**
+
 - [ ] 集成 JWT 认证中间件到路由
 - [ ] API Key CRUD 端点
 - [ ] Chat API 端点
@@ -235,30 +242,73 @@
 
 ### 代码中明确标记为未实现的
 
-| 位置 | 描述 | 优先级 |
-|------|------|--------|
-| `SkillService.ts:381` | `// TODO: 实现从 URL 下载` + throw | P1 |
-| `ChatToolbar.tsx` | 工具栏 doc/tags/translate 仍为 "coming soon" toast 占位 | P3 |
+| 位置                  | 描述                                                    | 优先级 |
+|-----------------------|---------------------------------------------------------|--------|
+| `SkillService.ts:381` | `// TODO: 实现从 URL 下载` + throw                      | P1     |
+| `ChatToolbar.tsx`     | 工具栏 doc/tags/translate 仍为 "coming soon" toast 占位 | P3     |
 
 ### 架构层面缺失
 
-| 功能 | 状态 | 优先级 | 备注 |
-|------|------|--------|------|
-| 沙箱执行环境 | 仅设计文档 | P1 | `SANDBOX_SOLUTION.md` 有详细方案，零代码实现 |
-| JWT 认证集成 | 代码已写未接入 | P1 | `server/auth.ts` 完整 JWT 实现，路由仍用简单 Bearer 比对 |
+| 功能         | 状态           | 优先级 | 备注                                                    |
+|--------------|----------------|--------|---------------------------------------------------------|
+| 沙箱执行环境 | 仅设计文档     | P1     | `SANDBOX_SOLUTION.md` 有详细方案，零代码实现             |
+| JWT 认证集成 | 代码已写未接入 | P1     | `server/auth.ts` 完整 JWT 实现，路由仍用简单 Bearer 比对 |
+
+---
+
+### 23. Claude Agent SDK 集成 🟡 25% 完成 ⭐ 优先级：高
+
+**目标**：用 `@anthropic-ai/claude-agent-sdk` 的 `query()` API 替代现有手动 Anthropic SDK 调用，获得完整 agent loop、memory、session 持久化、自动配置等能力。
+
+**架构决策**：双引擎模式 — Agent SDK（agent 模式）+ LLMService（direct 多模型模式）并行
+
+**Phase 1 — 基础层 ✅ 已完成：**
+
+- [x] `AgentSDKService` — 封装 `query()` 全生命周期（创建/流式/中断/resume）
+- [x] `AgentAutoConfig` — 根据任务类型自动选择最佳 model/effort/thinking 配置
+- [x] IPC 层（channels + handlers + preload + renderer client）— 6 步法
+- [x] 共享类型定义（`packages/shared-types/src/agent-sdk.ts`）
+- [x] 清理废弃代码（删除 `agent.ts` unstable API、`agentClient.ts`）
+- [x] TypeScript 类型检查通过
+
+**Phase 2 — 自动配置：**
+
+- [ ] 任务类型推断（coding/analysis/chat/creative/tool-heavy）
+- [ ] 工作区级别配置继承
+- [ ] `useChat` hook `mode=agent` 接入
+
+**Phase 3 — Memory 系统：**
+
+- [ ] Session 持久化 + resume/fork
+- [ ] `AgentMemoryService`（跨会话长期记忆）
+- [ ] Session 标签/搜索
+- [ ] 自动 compact 策略
+
+**Phase 4 — 工具生态：**
+
+- [ ] MCP Tools Bridge（MCP ↔ Agent SDK `mcpServers` 格式转换）
+- [ ] 权限审批 UI（`canUseTool` + `permissionMode`）
+- [ ] 子代理（Subagent）定义与管理
+- [ ] Hook 系统对接（PreToolUse / PostToolUse 等）
+
+**Phase 5 — UI 增强：**
+
+- [ ] Agent 会话管理面板
+- [ ] 会话分支可视化
+- [ ] 工具执行过程展示
 
 ---
 
 ## 未来功能（Phase 4+）
 
-| 功能 | 优先级 | 说明 |
-|------|--------|------|
-| 命令面板 | 中 | Cmd+Shift+P 全局命令入口 |
-| 全局搜索 | 中 | 跨会话搜索消息 |
-| 自动更新 | 高 | electron-updater 集成 |
-| 性能监控仪表盘 | 低 | 内存/CPU 可视化 |
-| 多语言扩展 | 低 | 日语/韩语等更多语言 |
-| 团队协作 | 低 | 共享工作区/消息 |
+| 功能           | 优先级 | 说明                     |
+|----------------|--------|--------------------------|
+| 命令面板       | 中     | Cmd+Shift+P 全局命令入口 |
+| 全局搜索       | 中     | 跨会话搜索消息           |
+| 自动更新       | 高     | electron-updater 集成    |
+| 性能监控仪表盘 | 低     | 内存/CPU 可视化          |
+| 多语言扩展     | 低     | 日语/韩语等更多语言      |
+| 团队协作       | 低     | 共享工作区/消息          |
 
 ---
 
@@ -267,10 +317,12 @@
 ### 测试覆盖（严重不足）
 
 当前仅 **2 个测试文件**：
+
 - `src/renderer/src/stores/__tests__/chatStore.test.ts`
 - `src/renderer/src/stores/__tests__/skillStore.test.ts`
 
 以下模块 **零测试**：
+
 - 所有 Main Process 服务（AgentService、McpService、SkillService、PluginManager、AuthService、IMBotService、RemoteDeviceService 等）
 - 所有 IPC Handlers（21 个 handler 模块）
 - 所有 HTTP 路由
@@ -287,16 +339,16 @@
 
 详见 [PRD.md - 第3节](./PRD.md#3-代码架构治理组件拆分计划)。
 
-| 文件 | 行数 | 优先级 | 备注 |
-|------|------|--------|------|
-| McpMarket.tsx | 1,055 | 🔴 Critical | 需拆分 |
-| MenuSettings.tsx | 802 | 🔴 Critical | 需拆分 |
-| Workspaces.tsx | 693 | 🟠 High | 需拆分 |
-| SearchSettings.tsx | 626 | 🟠 High | 需拆分 |
-| Skills.tsx | 582 | 🟠 High | 需拆分 |
-| ShortcutSettings.tsx | 455 | 🟠 High | 需拆分 |
-| ~~Chat.tsx~~ | ~~889~~ → 448 | ✅ 已拆分 | 提取 ChatToolbar（287 行） |
-| ~~Settings.tsx~~ | ~~1,686~~ → 340 | ✅ 已拆分 | 大幅重构完成 |
+| 文件                 | 行数            | 优先级      | 备注                     |
+|----------------------|-----------------|-------------|--------------------------|
+| McpMarket.tsx        | 1,055           | 🔴 Critical | 需拆分                   |
+| MenuSettings.tsx     | 802             | 🔴 Critical | 需拆分                   |
+| Workspaces.tsx       | 693             | 🟠 High     | 需拆分                   |
+| SearchSettings.tsx   | 626             | 🟠 High     | 需拆分                   |
+| Skills.tsx           | 582             | 🟠 High     | 需拆分                   |
+| ShortcutSettings.tsx | 455             | 🟠 High     | 需拆分                   |
+| ~~Chat.tsx~~         | ~~889~~ → 448   | ✅ 已拆分    | 提取 ChatToolbar（287 行） |
+| ~~Settings.tsx~~     | ~~1,686~~ → 340 | ✅ 已拆分    | 大幅重构完成             |
 
 ---
 
@@ -312,15 +364,15 @@
 
 ### 第二优先：功能补全
 
-6. Skill URL 下载安装
-7. HTTP API 扩展（Chat/Agent/Skill 端点）
-8. 聊天工具栏剩余功能（doc/tags/translate）
+1. Skill URL 下载安装
+2. HTTP API 扩展（Chat/Agent/Skill 端点）
+3. 聊天工具栏剩余功能（doc/tags/translate）
 
 ### 第三优先：质量提升
 
-9. 核心服务单元测试（当前仅 2 个测试文件）
-10. 大文件拆分重构（McpMarket.tsx 1055 行、MenuSettings.tsx 802 行等）
-11. 沙箱执行环境实现
+1. 核心服务单元测试（当前仅 2 个测试文件）
+2. 大文件拆分重构（McpMarket.tsx 1055 行、MenuSettings.tsx 802 行等）
+3. 沙箱执行环境实现
 
 ---
 
