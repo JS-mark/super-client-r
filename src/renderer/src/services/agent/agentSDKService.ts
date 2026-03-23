@@ -99,10 +99,12 @@ export async function setModel(
 export async function resolvePermission(
 	toolUseId: string,
 	allowed: boolean,
+	updatedInput?: Record<string, unknown>,
 ): Promise<boolean> {
 	const response = await window.electron.agentSDK.resolvePermission(
 		toolUseId,
 		allowed,
+		updatedInput,
 	);
 	if (!response.success) {
 		throw new Error(response.error || "Failed to resolve permission");

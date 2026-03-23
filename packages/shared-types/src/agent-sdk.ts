@@ -220,3 +220,25 @@ export interface AgentTeam {
 	/** 是否内置预设 */
 	isBuiltin?: boolean;
 }
+
+// ============ AskUserQuestion 工具类型 ============
+
+/** AskUserQuestion 工具的 input 结构 */
+export interface AskUserQuestionInput {
+	questions: AskUserQuestionItem[];
+}
+
+/** 单个问题项 */
+export interface AskUserQuestionItem {
+	question: string;
+	header: string;
+	options: AskUserQuestionOption[];
+	multiSelect: boolean;
+}
+
+/** 问题选项 */
+export interface AskUserQuestionOption {
+	label: string;
+	description: string;
+	preview?: string;
+}

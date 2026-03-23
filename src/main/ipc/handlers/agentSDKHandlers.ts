@@ -208,12 +208,14 @@ export function registerAgentSDKHandlers(): void {
 			{
 				toolUseId,
 				allowed,
-			}: { toolUseId: string; allowed: boolean },
+				updatedInput,
+			}: { toolUseId: string; allowed: boolean; updatedInput?: Record<string, unknown> },
 		) => {
 			try {
 				const result = agentSDKService.resolvePermission(
 					toolUseId,
 					allowed,
+					updatedInput,
 				);
 				return { success: true, data: result };
 			} catch (error) {

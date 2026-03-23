@@ -683,12 +683,12 @@ export class AgentSDKService extends EventEmitter {
   /**
    * 解决权限请求（由 renderer 调用）
    */
-  resolvePermission(toolUseId: string, allowed: boolean): boolean {
+  resolvePermission(toolUseId: string, allowed: boolean, updatedInput?: Record<string, unknown>): boolean {
     const pending = this.pendingPermissions.get(toolUseId);
     if (!pending) return false;
 
     if (allowed) {
-      pending.resolve({ behavior: "allow" });
+      pending.resolve(updatedInput ? { behavior: "allow", updatedInput } : { behavior: "allow" });
     } else {
       pending.resolve({ behavior: "deny", message: "User denied" });
     }

@@ -34,6 +34,10 @@ export type {
 	// Multi-Agent
 	AgentProfile,
 	AgentTeam,
+	// AskUserQuestion
+	AskUserQuestionInput,
+	AskUserQuestionItem,
+	AskUserQuestionOption,
 } from "@super-client/shared-types/agent-sdk";
 
 export type {
@@ -768,6 +772,7 @@ export interface ElectronAPI {
 		resolvePermission: (
 			toolUseId: string,
 			allowed: boolean,
+			updatedInput?: Record<string, unknown>,
 		) => Promise<IPCResponse<boolean>>;
 		onStreamEvent: (
 			callback: (event: AgentSDKStreamEvent) => void,

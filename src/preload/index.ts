@@ -326,6 +326,7 @@ export interface ElectronAPI {
 		resolvePermission: (
 			toolUseId: string,
 			allowed: boolean,
+			updatedInput?: Record<string, unknown>,
 		) => Promise<IPCResponse<boolean>>;
 		onStreamEvent: (
 			callback: (event: AgentSDKStreamEvent) => void,
@@ -1755,10 +1756,11 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.invoke("agent-sdk:get-session-info", { sessionId }),
 		setModel: (requestId: string, model: string) =>
 			ipcRenderer.invoke("agent-sdk:set-model", { requestId, model }),
-		resolvePermission: (toolUseId: string, allowed: boolean) =>
+		resolvePermission: (toolUseId: string, allowed: boolean, updatedInput?: Record<string, unknown>) =>
 			ipcRenderer.invoke("agent-sdk:permission-response", {
 				toolUseId,
 				allowed,
+				updatedInput,
 			}),
 		onStreamEvent: (callback: (event: AgentSDKStreamEvent) => void) => {
 			const listener = (_event: unknown, data: AgentSDKStreamEvent) =>
