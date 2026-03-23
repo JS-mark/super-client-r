@@ -12,6 +12,7 @@
 	"conflictWarning": "Conflicts with \"{{name}}\" shortcut",
 	"conflictDetected": "Shortcut conflict!",
 	"recording": "Press keys...",
+	"maxKeysExceeded": "Max {{max}} keys allowed",
 	"editShortcut": "Edit shortcut",
 	"globalEnabled": "Enable Shortcuts",
 	"globalEnabledDesc": "When disabled, all keyboard shortcuts will be inactive",

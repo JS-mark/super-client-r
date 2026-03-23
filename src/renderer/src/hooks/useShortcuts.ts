@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { ShortcutScope } from "../stores/shortcutStore";
 import {
+	MAX_SHORTCUT_KEYS,
 	getShortcutFromEvent,
+	isModifierKey,
 	normalizeShortcut,
 	useShortcutStore,
 } from "../stores/shortcutStore";
@@ -63,28 +65,38 @@ export function useGlobalShortcuts(
 			if (isRecording && recordingShortcutId) {
 				event.preventDefault();
 				const shortcutKey = getShortcutFromEvent(event);
-				if (shortcutKey) {
-					const { updateShortcut, checkConflict } = useShortcutStore.getState();
+				if (!shortcutKey) return;
 
-					// 检查冲突
-					const conflict = checkConflict(shortcutKey, recordingShortcutId);
-					if (conflict) {
-						// 触发冲突事件，让 UI 显示警告
-						window.dispatchEvent(
-							new CustomEvent("shortcut-conflict", {
-								detail: {
-									shortcutId: recordingShortcutId,
-									conflictWith: conflict,
-								},
-							}),
-						);
-						// 不保存冲突的快捷键，保持录制状态让用户重试
-						return;
-					}
+				const parts = shortcutKey.split("+");
+				const hasNonModifier = parts.some((part) => !isModifierKey(part));
+				const { setRecordingKeys, updateShortcut, checkConflict } =
+					useShortcutStore.getState();
 
-					updateShortcut(recordingShortcutId, shortcutKey);
-					stopRecording();
+				// 实时更新按键显示
+				setRecordingKeys(shortcutKey);
+
+				// 仅修饰键（如单独按 ⌘/Ctrl/Shift）时不保存，等待用户按下组合键
+				if (!hasNonModifier) return;
+
+				// 超过最大键数限制，不保存
+				if (parts.length > MAX_SHORTCUT_KEYS) return;
+
+				// 检查冲突
+				const conflict = checkConflict(shortcutKey, recordingShortcutId);
+				if (conflict) {
+					window.dispatchEvent(
+						new CustomEvent("shortcut-conflict", {
+							detail: {
+								shortcutId: recordingShortcutId,
+								conflictWith: conflict,
+							},
+						}),
+					);
+					return;
 				}
+
+				updateShortcut(recordingShortcutId, shortcutKey);
+				stopRecording();
 				return;
 			}
 

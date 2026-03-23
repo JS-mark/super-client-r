@@ -9,7 +9,9 @@ import {
 import { Button, Switch, Tooltip, theme } from "antd";
 import { useTranslation } from "react-i18next";
 import {
+	MAX_SHORTCUT_KEYS,
 	formatShortcut,
+	isModifierKey,
 	type Shortcut,
 	type ShortcutScope,
 } from "../../stores/shortcutStore";
@@ -47,6 +49,7 @@ interface ShortcutItemProps {
 	shortcut: Shortcut;
 	isRecording: boolean;
 	recordingId: string | null;
+	recordingKeys: string;
 	onStartRecording: (id: string) => void;
 	onStopRecording: () => void;
 	onToggle: (id: string) => void;
@@ -59,6 +62,7 @@ export function ShortcutItem({
 	shortcut,
 	isRecording,
 	recordingId,
+	recordingKeys,
 	onStartRecording,
 	onStopRecording,
 	onToggle,
@@ -75,6 +79,17 @@ export function ShortcutItem({
 	const dimmed = disabled || !shortcut.enabled;
 
 	const displayKey = formatShortcut(shortcut.currentKey, isMac);
+
+	// 录制状态：实时按键显示 + 超限检测
+	const recordingDisplay = isThisRecording && recordingKeys
+		? formatShortcut(recordingKeys, isMac)
+		: "";
+	const recordingExceeded = isThisRecording && recordingKeys
+		? recordingKeys.split("+").length > MAX_SHORTCUT_KEYS
+		: false;
+	const recordingOnlyModifiers = isThisRecording && recordingKeys
+		? recordingKeys.split("+").every((part) => isModifierKey(part))
+		: true;
 
 	return (
 		<div
@@ -112,18 +127,31 @@ export function ShortcutItem({
 				{isThisRecording ? (
 					<div className="flex items-center gap-2">
 						<div
-							className="h-7 px-3 flex items-center rounded-md text-xs font-medium animate-pulse"
+							className={`h-7 px-3 flex items-center rounded-md text-xs font-medium ${
+								recordingDisplay ? "" : "animate-pulse"
+							}`}
 							style={{
-								backgroundColor: hasConflict
+								backgroundColor: hasConflict || recordingExceeded
 									? token.colorErrorBg
 									: token.colorPrimaryBg,
-								color: hasConflict ? token.colorError : token.colorPrimary,
-								border: `1px solid ${hasConflict ? token.colorError : token.colorPrimary}`,
+								color: hasConflict || recordingExceeded
+									? token.colorError
+									: token.colorPrimary,
+								border: `1px solid ${
+									hasConflict || recordingExceeded
+										? token.colorError
+										: token.colorPrimary
+								}`,
 							}}
 						>
 							{hasConflict
 								? t("conflictDetected", { ns: "shortcuts" })
-								: t("recording", { ns: "shortcuts" })}
+								: recordingExceeded
+									? t("maxKeysExceeded", {
+											ns: "shortcuts",
+											max: MAX_SHORTCUT_KEYS,
+										})
+									: recordingDisplay || t("recording", { ns: "shortcuts" })}
 						</div>
 						<Button
 							size="small"
@@ -131,6 +159,7 @@ export function ShortcutItem({
 							icon={<CheckOutlined />}
 							onClick={onStopRecording}
 							className="h-7! w-7! min-w-0!"
+							disabled={!recordingDisplay || recordingOnlyModifiers || recordingExceeded}
 						/>
 					</div>
 				) : (

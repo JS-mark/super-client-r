@@ -34,6 +34,7 @@ export function ShortcutSettings() {
 		globalEnabled,
 		isRecording,
 		recordingShortcutId,
+		recordingKeys,
 		initDefaultShortcuts,
 		startRecording,
 		stopRecording,
@@ -252,6 +253,7 @@ export function ShortcutSettings() {
 											shortcut={shortcut}
 											isRecording={isRecording}
 											recordingId={recordingShortcutId}
+											recordingKeys={recordingKeys}
 											onStartRecording={handleStartRecording}
 											onStopRecording={handleStopRecording}
 											onToggle={toggleShortcut}

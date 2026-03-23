@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// 最多支持的组合键数量
+export const MAX_SHORTCUT_KEYS = 3;
+
 // 快捷键作用域
 export type ShortcutScope = "global" | "chat" | "navigation" | "input";
 
@@ -23,6 +26,7 @@ interface ShortcutState {
 	globalEnabled: boolean;
 	isRecording: boolean;
 	recordingShortcutId: string | null;
+	recordingKeys: string; // 录制时实时显示的按键
 }
 
 // 快捷键动作
@@ -45,6 +49,8 @@ interface ShortcutActions {
 	startRecording: (shortcutId: string) => void;
 	// 停止录制快捷键
 	stopRecording: () => void;
+	// 更新录制中的按键（实时显示）
+	setRecordingKeys: (keys: string) => void;
 	// 获取快捷键
 	getShortcut: (id: string) => Shortcut | undefined;
 	// 获取指定作用域的快捷键
@@ -294,6 +300,7 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			globalEnabled: true,
 			isRecording: false,
 			recordingShortcutId: null,
+			recordingKeys: "",
 
 			initDefaultShortcuts: () => {
 				const currentShortcuts = get().shortcuts;
@@ -356,11 +363,15 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			},
 
 			startRecording: (shortcutId) => {
-				set({ isRecording: true, recordingShortcutId: shortcutId });
+				set({ isRecording: true, recordingShortcutId: shortcutId, recordingKeys: "" });
 			},
 
 			stopRecording: () => {
-				set({ isRecording: false, recordingShortcutId: null });
+				set({ isRecording: false, recordingShortcutId: null, recordingKeys: "" });
+			},
+
+			setRecordingKeys: (keys) => {
+				set({ recordingKeys: keys });
 			},
 
 			getShortcut: (id) => {

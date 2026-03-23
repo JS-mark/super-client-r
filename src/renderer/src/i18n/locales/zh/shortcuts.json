@@ -12,6 +12,7 @@
 	"conflictWarning": "与「{{name}}」快捷键冲突",
 	"conflictDetected": "快捷键冲突!",
 	"recording": "按下快捷键...",
+	"maxKeysExceeded": "最多支持 {{max}} 个键",
 	"editShortcut": "修改快捷键",
 	"globalEnabled": "启用快捷键",
 	"globalEnabledDesc": "关闭后所有键盘快捷键将停用",
