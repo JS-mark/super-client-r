@@ -513,7 +513,8 @@
 		"duration": "Duration",
 		"source": "Source",
 		"requestHeaders": "Request Headers",
-		"requestBody": "Request Body Preview",
+		"requestBody": "Request Body",
+		"responseBody": "Response Body",
 		"noEntries": "No request log entries",
 		"error": "Error"
 	}

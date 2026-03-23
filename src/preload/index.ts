@@ -1392,6 +1392,7 @@ export interface RequestLogEntry {
 	requestBodyPreview?: string;
 	responseStatus?: number;
 	responseStatusText?: string;
+	responseBodyPreview?: string;
 	durationMs: number;
 	error?: string;
 	source: "fetch" | "axios";

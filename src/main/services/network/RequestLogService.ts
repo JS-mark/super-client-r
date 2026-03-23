@@ -94,6 +94,16 @@ export class RequestLogService extends EventEmitter {
 				entry.durationMs = Math.round(performance.now() - startTime);
 				entry.responseStatus = response.status;
 				entry.responseStatusText = response.statusText;
+
+				// 克隆 response 读取 body（不影响原始消费）
+				try {
+					const cloned = response.clone();
+					const text = await cloned.text();
+					entry.responseBodyPreview = self.truncateBody(text);
+				} catch {
+					// 某些 response 无法读取 body
+				}
+
 				self.pushEntry(entry);
 				return response;
 			} catch (error) {
@@ -147,6 +157,7 @@ export class RequestLogService extends EventEmitter {
 					entry.durationMs = Math.round(performance.now() - startTime);
 					entry.responseStatus = response.status;
 					entry.responseStatusText = response.statusText;
+					entry.responseBodyPreview = self.truncateBody(response.data);
 					self.pushEntry(entry);
 				}
 				return response;
@@ -160,6 +171,7 @@ export class RequestLogService extends EventEmitter {
 					entry.durationMs = Math.round(performance.now() - startTime);
 					entry.responseStatus = error?.response?.status;
 					entry.responseStatusText = error?.response?.statusText;
+					entry.responseBodyPreview = self.truncateBody(error?.response?.data);
 					entry.error = error instanceof Error ? error.message : String(error);
 					self.pushEntry(entry);
 				}

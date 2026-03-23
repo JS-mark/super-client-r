@@ -513,7 +513,8 @@
 		"duration": "耗时",
 		"source": "来源",
 		"requestHeaders": "请求头",
-		"requestBody": "请求体预览",
+		"requestBody": "请求体",
+		"responseBody": "响应体",
 		"noEntries": "暂无请求日志",
 		"error": "错误"
 	}

@@ -533,6 +533,7 @@ export interface RequestLogEntry {
 	requestBodyPreview?: string; // 截取前 1KB
 	responseStatus?: number;
 	responseStatusText?: string;
+	responseBodyPreview?: string;
 	durationMs: number;
 	error?: string;
 	source: "fetch" | "axios";

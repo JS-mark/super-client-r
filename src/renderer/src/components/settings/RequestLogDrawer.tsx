@@ -198,6 +198,17 @@ export function RequestLogDrawer({ open, onClose }: RequestLogDrawerProps) {
 						</pre>
 					</div>
 				)}
+				{record.responseBodyPreview && (
+					<div>
+						<Text strong>{t("network.responseBody")}:</Text>
+						<pre
+							className="mt-1 p-2 rounded text-[11px] overflow-x-auto max-h-40"
+							style={{ backgroundColor: token.colorFillTertiary }}
+						>
+							{record.responseBodyPreview}
+						</pre>
+					</div>
+				)}
 			</div>
 		),
 		[token, t],
