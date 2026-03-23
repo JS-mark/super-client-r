@@ -348,11 +348,14 @@ export function useChat() {
 	>([]);
 
 	const respondToApproval = useCallback(
-		async (toolCallId: string, approved: boolean) => {
+		async (toolCallId: string, approved: boolean, updatedInput?: Record<string, unknown>) => {
 			// Optimistic update: immediately reflect in UI
 			const toolMsgId = `tool_${toolCallId}`;
 			if (approved) {
-				updateMessageToolCall(toolMsgId, { status: "pending" });
+				updateMessageToolCall(toolMsgId, {
+					status: "pending",
+					...(updatedInput ? { result: updatedInput } : {}),
+				});
 			} else {
 				updateMessageToolCall(toolMsgId, {
 					status: "error",
@@ -361,7 +364,7 @@ export function useChat() {
 			}
 			try {
 				if (isAgentSDKRequestRef.current) {
-					await agentSDKClient.resolvePermission(toolCallId, approved);
+					await agentSDKClient.resolvePermission(toolCallId, approved, updatedInput);
 				} else {
 					await window.electron.llm.toolApprovalResponse(
 						toolCallId,

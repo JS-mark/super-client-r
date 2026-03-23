@@ -309,5 +309,14 @@
   "agentTeam": {
     "selectTeam": "团队",
     "noTeam": "单 Agent"
+  },
+  "askUserQuestion": {
+    "title": "模型需要您的输入",
+    "submit": "提交回答",
+    "skip": "跳过",
+    "other": "其他",
+    "otherPlaceholder": "请描述...",
+    "answered": "已回答",
+    "skipped": "已跳过"
   }
 }

@@ -24,6 +24,7 @@ import { Markdown } from "../Markdown";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ToolCallCard } from "./ToolCallCard";
 
 const { useToken } = theme;
@@ -38,7 +39,7 @@ interface ChatMessageListProps {
   retryMessage: (messageId: string) => void;
   editMessage: (messageId: string) => void;
   deleteMessage: (messageId: string) => void;
-  respondToApproval: (toolCallId: string, approved: boolean) => void;
+  respondToApproval: (toolCallId: string, approved: boolean, updatedInput?: Record<string, unknown>) => void;
 }
 
 export function ChatMessageList({
@@ -466,13 +467,23 @@ export function ChatMessageList({
               );
             }
           } else if (m.role === "tool" && m.toolCall) {
-            parts.push(
-              <ToolCallCard
-                key={m.id}
-                toolCall={m.toolCall}
-                onApproval={respondToApproval}
-              />,
-            );
+            if (m.toolCall.name === "AskUserQuestion") {
+              parts.push(
+                <AskUserQuestionCard
+                  key={m.id}
+                  toolCall={m.toolCall}
+                  onSubmit={respondToApproval}
+                />,
+              );
+            } else {
+              parts.push(
+                <ToolCallCard
+                  key={m.id}
+                  toolCall={m.toolCall}
+                  onApproval={respondToApproval}
+                />,
+              );
+            }
           }
         }
         if (parts.length === 0 && !isStreamingTurn) return null;

@@ -309,5 +309,14 @@
   "agentTeam": {
     "selectTeam": "Team",
     "noTeam": "Solo Agent"
+  },
+  "askUserQuestion": {
+    "title": "Model Needs Your Input",
+    "submit": "Submit Answer",
+    "skip": "Skip",
+    "other": "Other",
+    "otherPlaceholder": "Please describe...",
+    "answered": "Answered",
+    "skipped": "Skipped"
   }
 }
