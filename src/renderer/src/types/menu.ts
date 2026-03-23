@@ -100,7 +100,7 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 			label: "imbot",
 			path: "/imbot",
 			iconType: "default",
-			iconContent: "DesktopOutlined",
+			iconContent: "ClusterOutlined",
 			enabled: true,
 			action: "navigate",
 		},

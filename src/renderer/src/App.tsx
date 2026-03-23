@@ -225,7 +225,7 @@ function App() {
 		>
 			<MarkdownThemeStyle />
 			<TitleProvider>
-				<AntdApp className="h-full w-full">
+				<AntdApp className="h-full w-full" message={{ maxCount: 3, top: 48 }}>
 					<PluginWindowHandler />
 					<ErrorBoundary>
 						<RouterProvider router={router} />

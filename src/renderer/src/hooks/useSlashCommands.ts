@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SlashItem } from "../components/chat/SlashCommandPanel";
-import type { ChatMode } from "./useChat";
 
 interface UseSlashCommandsParams {
-  setChatMode: (mode: ChatMode) => void;
   setSelectedSkillId: (id: string | null) => void;
   setSelectedCommandName: (name: string | null) => void;
   setInput: (value: string) => void;
 }
 
 export function useSlashCommands({
-  setChatMode,
   setSelectedSkillId,
   setSelectedCommandName,
   setInput,
@@ -72,10 +69,9 @@ export function useSlashCommands({
     setSlashHighlight(0);
   }, [slashQuery]);
 
-  // Slash command item selection
+  // Slash command item selection — sets skill independently (no mode change)
   const handleSlashSelect = useCallback(
     (item: SlashItem) => {
-      setChatMode("skill");
       if (item.type === "command") {
         setSelectedSkillId(item.command.skillId);
         setSelectedCommandName(item.command.name);
@@ -87,7 +83,7 @@ export function useSlashCommands({
       setSlashPanelOpen(false);
       setSlashQuery("");
     },
-    [setChatMode, setSelectedSkillId, setSelectedCommandName, setInput],
+    [setSelectedSkillId, setSelectedCommandName, setInput],
   );
 
   // Use refs so the native capture listener always sees fresh values

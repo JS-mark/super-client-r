@@ -10,5 +10,7 @@
 	"settings": "设置",
 	"home": "首页",
 	"help": "帮助",
-	"about": "关于"
+	"about": "关于",
+	"minimize": "最小化",
+	"maximize": "最大化"
 }

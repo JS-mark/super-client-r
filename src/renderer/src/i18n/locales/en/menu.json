@@ -10,5 +10,7 @@
 	"settings": "Settings",
 	"home": "Home",
 	"help": "Help",
-	"about": "About"
+	"about": "About",
+	"minimize": "Minimize",
+	"maximize": "Maximize"
 }

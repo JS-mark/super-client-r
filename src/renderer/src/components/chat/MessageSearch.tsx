@@ -105,7 +105,9 @@ export function MessageSearch({
 			<div className="space-y-4">
 				{/* 搜索输入 */}
 				<Input
-					prefix={<SearchOutlined className="text-slate-400" />}
+					prefix={
+						<SearchOutlined style={{ color: token.colorTextQuaternary }} />
+					}
 					placeholder={t("chat.searchPlaceholder", "搜索聊天记录...", {
 						ns: "chat",
 					})}
@@ -120,7 +122,10 @@ export function MessageSearch({
 				{!query && searchHistory.length > 0 && (
 					<div>
 						<div className="flex items-center justify-between mb-2">
-							<span className="text-sm text-slate-500">
+							<span
+								className="text-sm"
+								style={{ color: token.colorTextTertiary }}
+							>
 								{t("chat.searchHistory", "搜索历史", { ns: "chat" })}
 							</span>
 							<Button type="link" size="small" onClick={clearSearchHistory}>
@@ -145,7 +150,10 @@ export function MessageSearch({
 				{/* 搜索结果 */}
 				{query && (
 					<div>
-						<div className="text-sm text-slate-500 mb-2">
+						<div
+							className="text-sm mb-2"
+							style={{ color: token.colorTextTertiary }}
+						>
 							{isSearching
 								? t("chat.searching", "搜索中...", { ns: "chat" })
 								: t("chat.searchResults", "找到 {{count}} 条结果", {
@@ -184,7 +192,10 @@ export function MessageSearch({
 														? t("chat.user", "用户")
 														: t("chat.assistant", "助手", { ns: "chat" })}
 												</Tag>
-												<span className="text-xs text-slate-400">
+												<span
+													className="text-xs"
+													style={{ color: token.colorTextQuaternary }}
+												>
 													{new Date(msg.timestamp).toLocaleString()}
 												</span>
 											</div>
