@@ -236,4 +236,28 @@ export function registerChatHandlers(): void {
 			}
 		},
 	);
+
+	// ============ Update Metadata ============
+
+	ipcMain.handle(
+		CHAT_CHANNELS.UPDATE_METADATA,
+		async (
+			_event,
+			{
+				id,
+				updates,
+			}: { id: string; updates: Partial<ConversationSummary> },
+		): Promise<IPCResponse> => {
+			try {
+				conversationStorage.updateConversationMetadata(id, updates);
+				return { success: true };
+			} catch (error: unknown) {
+				const message =
+					error instanceof Error
+						? error.message
+						: "Failed to update conversation metadata";
+				return { success: false, error: message };
+			}
+		},
+	);
 }

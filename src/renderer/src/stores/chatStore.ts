@@ -49,6 +49,9 @@ export interface Message {
 		remoteSender?: { id: string; name: string };
 		remotePlatform?: string;
 		attachmentIds?: string[];
+		agentSDKSessionId?: string;
+		totalCostUsd?: number;
+		numTurns?: number;
 	};
 }
 
@@ -68,6 +71,10 @@ interface ChatState {
 	// Pending skill selection (from Skills page, etc.)
 	pendingSkillId: string | null;
 	setPendingSkillId: (id: string | null) => void;
+
+	// Multi-Agent team selection
+	selectedTeamId: string | null;
+	setSelectedTeamId: (id: string | null) => void;
 
 	// Conversations
 	conversations: ConversationSummary[];
@@ -96,7 +103,7 @@ interface ChatState {
 
 	// Conversation actions
 	loadConversations: () => Promise<void>;
-	createConversation: (name?: string) => Promise<string | null>;
+	createConversation: (name?: string, chatMode?: "direct" | "agent") => Promise<string | null>;
 	switchConversation: (conversationId: string) => Promise<void>;
 	deleteConversation: (conversationId: string) => Promise<void>;
 	renameConversation: (conversationId: string, name: string) => Promise<void>;
@@ -116,6 +123,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	setPendingAutoSend: (value) => set({ pendingAutoSend: value }),
 	pendingSkillId: null,
 	setPendingSkillId: (id) => set({ pendingSkillId: id }),
+	selectedTeamId: null,
+	setSelectedTeamId: (id) => set({ selectedTeamId: id }),
 	conversations: [],
 	currentConversationId: null,
 	isLoadingConversations: false,
@@ -251,19 +260,28 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 	},
 
-	createConversation: async (name) => {
+	createConversation: async (name, chatMode) => {
 		try {
 			const res = await chatHistoryService.createConversation(
 				name || "New Chat",
 			);
 			if (res.success && res.data) {
+				const conv = chatMode
+					? { ...res.data, chatMode }
+					: res.data;
 				set((state) => ({
-					conversations: [res.data!, ...state.conversations],
-					currentConversationId: res.data!.id,
+					conversations: [conv, ...state.conversations],
+					currentConversationId: conv.id,
 					messages: [],
 				}));
-				chatHistoryService.setLastConversation(res.data.id).catch(() => {});
-				return res.data.id;
+				chatHistoryService.setLastConversation(conv.id).catch(() => {});
+				// Persist chatMode to metadata immediately so it survives restart
+				if (chatMode) {
+					chatHistoryService
+						.updateConversationMetadata(conv.id, { chatMode })
+						.catch(() => {});
+				}
+				return conv.id;
 			}
 		} catch (error) {
 			console.error("[chatStore] Failed to create conversation:", error);

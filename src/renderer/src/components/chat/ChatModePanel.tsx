@@ -8,25 +8,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 import { mcpClient } from "../../services/mcp/mcpService";
-import { skillClient } from "../../services/skill/skillService";
 import type { ChatMode } from "../../hooks/useChat";
-import type { SkillManifest } from "../../types/electron";
 
 export interface ChatModeSelection {
 	mode: ChatMode;
-	skillId?: string;
 }
 
 export interface ChatModePanelProps {
 	chatMode: ChatMode;
-	selectedSkillId: string | null;
 	onSelect: (selection: ChatModeSelection) => void;
 	onClose: () => void;
 }
 
 export function ChatModePanel({
 	chatMode,
-	selectedSkillId,
 	onSelect,
 	onClose,
 }: ChatModePanelProps) {
@@ -34,19 +29,12 @@ export function ChatModePanel({
 	const { token } = theme.useToken();
 	const panelRef = useRef<HTMLDivElement>(null);
 
-	// Skill state
-	const [skills, setSkills] = useState<SkillManifest[]>([]);
-
 	// MCP tools count for status indicator
 	const [mcpToolCount, setMcpToolCount] = useState(0);
 	const [mcpServerCount, setMcpServerCount] = useState(0);
 
-	// Load installed skills and MCP status on mount
+	// Load MCP status on mount
 	useEffect(() => {
-		skillClient
-			.listSkills()
-			.then(setSkills)
-			.catch(() => setSkills([]));
 		mcpClient
 			.getAllTools()
 			.then((tools) => {
@@ -87,15 +75,12 @@ export function ChatModePanel({
 		return () => document.removeEventListener("keydown", handleKeyDown);
 	}, [onClose]);
 
-	const handleSelectSkill = useCallback(
-		(skillId: string) => {
-			onSelect({ mode: "skill", skillId });
-		},
-		[onSelect],
-	);
-
 	const handleSelectDirect = useCallback(() => {
 		onSelect({ mode: "direct" });
+	}, [onSelect]);
+
+	const handleSelectAgent = useCallback(() => {
+		onSelect({ mode: "agent" });
 	}, [onSelect]);
 
 	return (
@@ -183,124 +168,54 @@ export function ChatModePanel({
 						/>
 					)}
 				</button>
-			</div>
 
-			{/* Skill section */}
-			{skills.length > 0 && (
-				<div className="py-1 max-h-[240px] overflow-y-auto">
-					{/* Divider */}
-					<div
-						className="mx-3 my-1"
-						style={{ borderTop: `1px solid ${token.colorBorderSecondary}` }}
-					/>
-
-					<button
-						type="button"
-						onClick={() => {}}
-						className={cn(
-							"w-full flex items-center gap-3 px-3 py-2.5 transition-colors",
-							chatMode === "skill"
-								? "bg-[var(--mode-active-bg)]"
-								: "hover:bg-[var(--mode-hover-bg)]",
-						)}
+				{/* Agent mode */}
+				<button
+					type="button"
+					onClick={handleSelectAgent}
+					className={cn(
+						"w-full flex items-center gap-3 px-3 py-2.5 transition-colors",
+						chatMode === "agent"
+							? "bg-[var(--mode-active-bg)]"
+							: "hover:bg-[var(--mode-hover-bg)]",
+					)}
+					style={{
+						// @ts-expect-error CSS custom properties
+						"--mode-active-bg": token.colorPrimaryBg,
+						"--mode-hover-bg": token.colorFillTertiary,
+					}}
+				>
+					<span
+						className="w-7 h-7 flex items-center justify-center rounded-md"
 						style={{
-							// @ts-expect-error CSS custom properties
-							"--mode-active-bg": token.colorPrimaryBg,
-							"--mode-hover-bg": token.colorFillTertiary,
+							backgroundColor: token.colorWarningBg,
+							color: token.colorWarning,
 						}}
 					>
+						<ThunderboltOutlined />
+					</span>
+					<div className="flex flex-col items-start">
 						<span
-							className="w-7 h-7 flex items-center justify-center rounded-md"
-							style={{
-								backgroundColor: token.colorSuccessBg,
-								color: token.colorSuccess,
-							}}
+							className="text-[13px] font-medium"
+							style={{ color: token.colorText }}
 						>
-							<ThunderboltOutlined />
+							{t("chatMode.agent", "Agent", { ns: "chat" })}
 						</span>
-						<div className="flex flex-col items-start">
-							<span
-								className="text-[13px] font-medium"
-								style={{ color: token.colorText }}
-							>
-								{t("chatMode.skill", "技能", { ns: "chat" })}
-							</span>
-						</div>
-						{chatMode === "skill" && (
-							<span
-								className="ml-auto w-1.5 h-1.5 rounded-full"
-								style={{ backgroundColor: token.colorPrimary }}
-							/>
-						)}
-					</button>
-
-					<div className="pl-5 pr-2">
-						{skills.map((skill) => (
-							<button
-								key={skill.id}
-								type="button"
-								onClick={() => handleSelectSkill(skill.id)}
-								className="w-full flex items-center gap-2 px-2 py-2 rounded transition-colors"
-								style={{
-									color: token.colorText,
-									backgroundColor:
-										selectedSkillId === skill.id
-											? token.colorPrimaryBg
-											: "transparent",
-								}}
-								onMouseEnter={(e) => {
-									if (selectedSkillId !== skill.id) {
-										e.currentTarget.style.backgroundColor =
-											token.colorFillTertiary;
-									}
-								}}
-								onMouseLeave={(e) => {
-									if (selectedSkillId !== skill.id) {
-										e.currentTarget.style.backgroundColor = "transparent";
-									}
-								}}
-							>
-								<ThunderboltOutlined
-									className="text-xs flex-shrink-0"
-									style={{
-										color:
-											selectedSkillId === skill.id
-												? token.colorPrimary
-												: token.colorTextTertiary,
-									}}
-								/>
-								<div className="flex flex-col min-w-0 items-start">
-									<span
-										className="text-xs truncate"
-										style={{
-											color:
-												selectedSkillId === skill.id
-													? token.colorPrimary
-													: token.colorText,
-										}}
-									>
-										{skill.name}
-									</span>
-									{skill.description && (
-										<span
-											className="text-[10px] truncate max-w-[200px]"
-											style={{ color: token.colorTextQuaternary }}
-										>
-											{skill.description}
-										</span>
-									)}
-								</div>
-								{selectedSkillId === skill.id && (
-									<span
-										className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-										style={{ backgroundColor: token.colorPrimary }}
-									/>
-								)}
-							</button>
-						))}
+						<span
+							className="text-[10px]"
+							style={{ color: token.colorTextQuaternary }}
+						>
+							{t("chatMode.agentDesc", "Claude Agent SDK", { ns: "chat" })}
+						</span>
 					</div>
-				</div>
-			)}
+					{chatMode === "agent" && (
+						<span
+							className="ml-auto w-1.5 h-1.5 rounded-full"
+							style={{ backgroundColor: token.colorPrimary }}
+						/>
+					)}
+				</button>
+			</div>
 
 			{/* Footer */}
 			<div

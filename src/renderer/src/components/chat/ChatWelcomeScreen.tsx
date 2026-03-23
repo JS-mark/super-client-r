@@ -88,55 +88,57 @@ export function ChatWelcomeScreen({
   );
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full px-4 sm:px-6">
-      <Welcome
-        icon={
-          <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl">
-            <StarOutlined className="text-2xl sm:text-3xl text-white" />
-          </div>
-        }
-        title={t("welcomeTitle", { ns: "chat" })}
-        description={t("welcomeSubtitle", {
-          ns: "chat",
-        })}
-        variant="borderless"
-        styles={{
-          title: {
-            fontSize: "1.75rem",
-            fontWeight: 700,
-          },
-          description: {
-            color: token.colorTextSecondary,
-            fontSize: "1rem",
-          },
-        }}
-      />
-      {/* Model selector prompt when no model is active */}
-      {!hasActiveModel && !isModelLoading && (
-        <ModelSelectPrompt
-          token={token}
-          t={t}
-          getAllEnabledModels={getAllEnabledModels}
-          setActiveModel={setActiveModel}
-          navigate={navigate}
-          messageApi={messageApi}
+    <div className="flex flex-col items-center justify-center h-full w-full overflow-y-auto px-4 sm:px-6">
+      <div className="w-full flex flex-col items-center">
+        <Welcome
+          icon={
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-2xl">
+              <StarOutlined className="text-2xl sm:text-3xl text-white" />
+            </div>
+          }
+          title={t("welcomeTitle", { ns: "chat" })}
+          description={t("welcomeSubtitle", {
+            ns: "chat",
+          })}
+          variant="borderless"
+          styles={{
+            title: {
+              fontSize: "1.75rem",
+              fontWeight: 700,
+            },
+            description: {
+              color: token.colorTextSecondary,
+              fontSize: "1rem",
+            },
+          }}
         />
-      )}
-      {hasActiveModel && (
-        <div className="mt-6">
-          <Prompts
-            items={suggestionItems}
-            onItemClick={handlePromptClick}
-            wrap
-            styles={{
-              item: {
-                flex: "1 1 calc(50% - 8px)",
-                minWidth: 200,
-              },
-            }}
+        {/* Model selector prompt when no model is active */}
+        {!hasActiveModel && !isModelLoading && (
+          <ModelSelectPrompt
+            token={token}
+            t={t}
+            getAllEnabledModels={getAllEnabledModels}
+            setActiveModel={setActiveModel}
+            navigate={navigate}
+            messageApi={messageApi}
           />
-        </div>
-      )}
+        )}
+        {hasActiveModel && (
+          <div className="mt-6 w-full">
+            <Prompts
+              items={suggestionItems}
+              onItemClick={handlePromptClick}
+              wrap
+              styles={{
+                item: {
+                  flex: "1 1 calc(50% - 8px)",
+                  minWidth: 200,
+                },
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -162,114 +164,113 @@ const ModelSelectPrompt: React.FC<{
   navigate,
   messageApi,
 }) => {
-  const enabledModels = getAllEnabledModels();
+    const enabledModels = getAllEnabledModels();
 
-  const handleSelect = useCallback(
-    async (value: string) => {
-      const [providerId, modelId] = value.split("||");
-      await setActiveModel({ providerId, modelId });
-      messageApi.success(t("modelSelected", "Model selected", { ns: "chat" }));
-    },
-    [setActiveModel, messageApi, t],
-  );
+    const handleSelect = useCallback(
+      async (value: string) => {
+        const [providerId, modelId] = value.split("||");
+        await setActiveModel({ providerId, modelId });
+        messageApi.success(t("modelSelected", "Model selected", { ns: "chat" }));
+      },
+      [setActiveModel, messageApi, t],
+    );
 
-  if (enabledModels.length === 0) {
+    if (enabledModels.length === 0) {
+      return (
+        <div
+          className="mt-6 p-6 rounded-xl border text-center"
+          style={{
+            borderColor: token.colorWarningBorder,
+            backgroundColor: token.colorWarningBg,
+          }}
+        >
+          <SettingOutlined
+            className="text-3xl mb-3"
+            style={{ color: token.colorWarning }}
+          />
+          <div
+            className="text-sm font-medium mb-2"
+            style={{ color: token.colorText }}
+          >
+            {t("noModelsConfigured", "No models configured", { ns: "chat" })}
+          </div>
+          <Text type="secondary" className="text-xs block mb-4">
+            {t(
+              "noModelsConfiguredDesc",
+              "Please add and enable a model provider in settings first.",
+              { ns: "chat" },
+            )}
+          </Text>
+          <Button
+            type="primary"
+            icon={<SettingOutlined />}
+            onClick={() => navigate("/settings?tab=models")}
+          >
+            {t("goToModelSettings", "Go to Model Settings", { ns: "chat" })}
+          </Button>
+        </div>
+      );
+    }
+
+    // Group models by provider
+    const groupedOptions = enabledModels.reduce<
+      Record<
+        string,
+        {
+          providerName: string;
+          preset: ModelProviderPreset;
+          models: { label: React.ReactNode; value: string }[];
+        }
+      >
+    >((acc, { provider, model }) => {
+      if (!acc[provider.id]) {
+        acc[provider.id] = {
+          providerName: provider.name,
+          preset: provider.preset,
+          models: [],
+        };
+      }
+      acc[provider.id].models.push({
+        label: model.name,
+        value: `${provider.id}||${model.id}`,
+      });
+      return acc;
+    }, {});
+
+    const selectOptions = Object.entries(groupedOptions).map(([, group]) => ({
+      label: (
+        <span className="flex items-center gap-2">
+          <ProviderIcon preset={group.preset} size={16} />
+          {group.providerName}
+        </span>
+      ),
+      options: group.models,
+    }));
+
     return (
       <div
-        className="mt-6 p-6 rounded-xl border text-center"
+        className="mt-6 p-6 rounded-xl border w-full"
         style={{
-          borderColor: token.colorWarningBorder,
-          backgroundColor: token.colorWarningBg,
+          borderColor: token.colorPrimaryBorder,
+          backgroundColor: token.colorPrimaryBg,
         }}
       >
-        <SettingOutlined
-          className="text-3xl mb-3"
-          style={{ color: token.colorWarning }}
-        />
         <div
-          className="text-sm font-medium mb-2"
+          className="text-sm font-medium mb-3"
           style={{ color: token.colorText }}
         >
-          {t("noModelsConfigured", "No models configured", { ns: "chat" })}
+          {t("selectModelToStart", "Select a model to start chatting", {
+            ns: "chat",
+          })}
         </div>
-        <Text type="secondary" className="text-xs block mb-4">
-          {t(
-            "noModelsConfiguredDesc",
-            "Please add and enable a model provider in settings first.",
-            { ns: "chat" },
-          )}
-        </Text>
-        <Button
-          type="primary"
-          icon={<SettingOutlined />}
-          onClick={() => navigate("/settings?tab=models")}
-        >
-          {t("goToModelSettings", "Go to Model Settings", { ns: "chat" })}
-        </Button>
+        <Select
+          className="w-full"
+          size="large"
+          placeholder={t("selectModel", "Select a model...", { ns: "chat" })}
+          onChange={handleSelect}
+          showSearch={{ optionFilterProp: 'label' }}
+          options={selectOptions}
+        />
       </div>
     );
-  }
-
-  // Group models by provider
-  const groupedOptions = enabledModels.reduce<
-    Record<
-      string,
-      {
-        providerName: string;
-        preset: ModelProviderPreset;
-        models: { label: React.ReactNode; value: string }[];
-      }
-    >
-  >((acc, { provider, model }) => {
-    if (!acc[provider.id]) {
-      acc[provider.id] = {
-        providerName: provider.name,
-        preset: provider.preset,
-        models: [],
-      };
-    }
-    acc[provider.id].models.push({
-      label: model.name,
-      value: `${provider.id}||${model.id}`,
-    });
-    return acc;
-  }, {});
-
-  const selectOptions = Object.entries(groupedOptions).map(([, group]) => ({
-    label: (
-      <span className="flex items-center gap-2">
-        <ProviderIcon preset={group.preset} size={16} />
-        {group.providerName}
-      </span>
-    ),
-    options: group.models,
-  }));
-
-  return (
-    <div
-      className="mt-6 p-6 rounded-xl border max-w-md w-full"
-      style={{
-        borderColor: token.colorPrimaryBorder,
-        backgroundColor: token.colorPrimaryBg,
-      }}
-    >
-      <div
-        className="text-sm font-medium mb-3"
-        style={{ color: token.colorText }}
-      >
-        {t("selectModelToStart", "Select a model to start chatting", {
-          ns: "chat",
-        })}
-      </div>
-      <Select
-        className="w-full"
-        size="large"
-        placeholder={t("selectModel", "Select a model...", { ns: "chat" })}
-        onChange={handleSelect}
-        showSearch
-        optionFilterProp="label"
-        options={selectOptions}
-      />
-    </div>
-  );
-};
+  };

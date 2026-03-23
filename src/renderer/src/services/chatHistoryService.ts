@@ -4,6 +4,8 @@ import type {
 	IPCResponse,
 } from "../types/electron";
 
+export type { ConversationSummary };
+
 export const chatHistoryService = {
 	listConversations: (): Promise<IPCResponse<ConversationSummary[]>> =>
 		window.electron.chat.listConversations(),
@@ -57,4 +59,10 @@ export const chatHistoryService = {
 
 	getConversationDir: (id: string): Promise<IPCResponse<string>> =>
 		window.electron.chat.getConversationDir(id),
+
+	updateConversationMetadata: (
+		id: string,
+		updates: Partial<ConversationSummary>,
+	): Promise<IPCResponse> =>
+		window.electron.chat.updateConversationMetadata(id, updates),
 };

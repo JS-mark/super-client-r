@@ -9,6 +9,7 @@ import { ChatInputArea } from "../components/chat/ChatInputArea";
 import { ChatMessageList } from "../components/chat/ChatMessageList";
 import { ChatModals } from "../components/chat/ChatModals";
 import { ChatPageTitle } from "../components/chat/ChatPageTitle";
+import { ChatNewSession } from "../components/chat/ChatNewSession";
 import { ChatWelcomeScreen } from "../components/chat/ChatWelcomeScreen";
 import { RemoteChatPane } from "../components/chat/RemoteChatPane";
 import { useSearchEngine } from "../components/chat/SearchEnginePanel";
@@ -42,6 +43,7 @@ const Chat: React.FC = () => {
     editMessage,
     deleteMessage,
     chatMode,
+    isModeLocked,
     setChatMode,
     selectedSkillId,
     setSelectedSkillId,
@@ -96,7 +98,6 @@ const Chat: React.FC = () => {
 
   // Slash commands
   const slash = useSlashCommands({
-    setChatMode,
     setSelectedSkillId,
     setSelectedCommandName,
     setInput,
@@ -110,12 +111,9 @@ const Chat: React.FC = () => {
       if (value.trim() && !isStreaming) {
         sendMessage({
           mode: chatMode,
-          skillId:
-            chatMode === "skill" ? (selectedSkillId ?? undefined) : undefined,
-          commandName:
-            chatMode === "skill"
-              ? (selectedCommandName ?? undefined)
-              : undefined,
+          // Skill is independent of mode — always pass through
+          skillId: selectedSkillId ?? undefined,
+          commandName: selectedCommandName ?? undefined,
           searchEngine: selectedEngine || undefined,
           searchConfigs: searchConfigs,
           attachmentIds,
@@ -149,12 +147,15 @@ const Chat: React.FC = () => {
   const handleModeSelect = useCallback(
     (selection: ChatModeSelection) => {
       setChatMode(selection.mode);
-      if (selection.mode === "skill" && selection.skillId) {
-        setSelectedSkillId(selection.skillId);
-      }
     },
-    [setChatMode, setSelectedSkillId],
+    [setChatMode],
   );
+
+  // ── Skill clear ──
+  const handleClearSkill = useCallback(() => {
+    setSelectedSkillId(null);
+    setSelectedCommandName(null);
+  }, [setSelectedSkillId, setSelectedCommandName]);
 
   // ── Switch to remote conversation ──
   const handleSwitchToRemote = useCallback(
@@ -170,6 +171,7 @@ const Chat: React.FC = () => {
       <ChatPageTitle
         hasMessages={messages.length > 0}
         isStreaming={isStreaming}
+        conversationId={pageState.currentConversationId}
         remoteBinding={remoteBinding}
         unreadRemoteCount={pageState.unreadRemoteCount}
         viewMode={pageState.viewMode}
@@ -178,22 +180,27 @@ const Chat: React.FC = () => {
         onSearch={() => pageState.setIsSearchOpen(true)}
         onExport={() => pageState.setIsExportOpen(true)}
         onClear={clearMessages}
-        onNewChat={() => useChatStore.getState().createConversation()}
+        onNewChat={pageState.handleNewChat}
+        onNewAgentChat={pageState.handleNewAgentChat}
+        onNewRemoteChat={pageState.handleNewRemoteChat}
         onToggleSidebar={() => pageState.setSidebarVisible((v) => !v)}
         onOpenSettings={() => pageState.setSettingsOpen(true)}
-        onBindRemote={() => pageState.setRemoteBindModalOpen(true)}
         onUnbindRemote={unbindRemote}
       />
     ),
     [
       messages.length,
       isStreaming,
+      pageState.currentConversationId,
       remoteBinding,
       pageState.unreadRemoteCount,
       pageState.viewMode,
       pageState.sidebarVisible,
       pageState.setViewMode,
       clearMessages,
+      pageState.handleNewChat,
+      pageState.handleNewAgentChat,
+      pageState.handleNewRemoteChat,
       unbindRemote,
       pageState.setIsSearchOpen,
       pageState.setIsExportOpen,
@@ -205,15 +212,10 @@ const Chat: React.FC = () => {
   useTitle(pageTitle);
 
   // ── Remote bind handler ──
-  // If pendingNewRemoteRef is set, create a new conversation first then bind.
+  // Conversation is already created by handleNewRemoteChat before modal opens.
   const handleRemoteBind = useCallback(
     async (botId: string, chatId: string) => {
       try {
-        // New remote session flow: create conversation before binding
-        if (pageState.pendingNewRemoteRef.current) {
-          pageState.pendingNewRemoteRef.current = false;
-          await useChatStore.getState().createConversation();
-        }
         await bindToBot(botId, chatId);
         message.success(
           t("remoteChat.bindSuccess", "Bot bound successfully", {
@@ -233,7 +235,6 @@ const Chat: React.FC = () => {
       bindToBot,
       message,
       t,
-      pageState.pendingNewRemoteRef,
       pageState.setSidebarTab,
       pageState.setViewMode,
     ],
@@ -261,15 +262,14 @@ const Chat: React.FC = () => {
   return (
     <MainLayout>
       <div className="flex h-full">
-        {/* Inline Collapsible Sidebar */}
+        {/* Drawer Sidebar (right) */}
         <ChatSidebar
           visible={pageState.sidebarVisible}
+          onClose={() => pageState.setSidebarVisible(false)}
           onNewChat={pageState.handleNewChat}
+          onNewAgentChat={pageState.handleNewAgentChat}
           onNewRemoteChat={pageState.handleNewRemoteChat}
-          newChatDisabled={
-            isStreaming ||
-            (!!pageState.currentConversationId && messages.length === 0)
-          }
+          newChatDisabled={isStreaming}
           activeTab={pageState.sidebarTab}
           onTabChange={pageState.setSidebarTab}
           unreadRemoteCount={pageState.unreadRemoteCount}
@@ -284,7 +284,7 @@ const Chat: React.FC = () => {
           >
             {pageState.viewMode === "local" ? (
               <>
-                {/* Session tip */}
+                {/* Session tip — only when there are messages */}
                 {messages.length > 0 && (
                   <div className="px-4 sm:px-6 pt-2 shrink-0">
                     <Alert
@@ -317,7 +317,9 @@ const Chat: React.FC = () => {
 
                 {/* Chat Area */}
                 <div className="flex-1 overflow-hidden w-full px-4 sm:px-6">
-                  {messages.length === 0 ? (
+                  {!pageState.currentConversationId ? (
+                    <ChatNewSession chatMode={chatMode} />
+                  ) : messages.length === 0 ? (
                     <ChatWelcomeScreen
                       hasActiveModel={hasActiveModel}
                       isModelLoading={isModelLoading}
@@ -340,7 +342,8 @@ const Chat: React.FC = () => {
                   )}
                 </div>
 
-                {/* Input Area */}
+                {/* Input Area — hidden when no conversation (app-level empty state) */}
+                {pageState.currentConversationId && (
                 <ChatInputArea
                   input={input}
                   onInputChange={setInput}
@@ -348,7 +351,10 @@ const Chat: React.FC = () => {
                   isStreaming={isStreaming}
                   onStopStream={stopCurrentStream}
                   chatMode={chatMode}
+                  isModeLocked={isModeLocked}
                   onModeSelect={handleModeSelect}
+                  selectedSkillId={selectedSkillId}
+                  onClearSkill={handleClearSkill}
                   selectedEngine={selectedEngine}
                   onSelectEngine={setSelectedEngine}
                   hasSearchEngines={hasSearchEngines}
@@ -366,6 +372,7 @@ const Chat: React.FC = () => {
                   onSlashInputChange={slash.handleSlashInputChange}
                   registerKeydownHandler={slash.registerKeydownHandler}
                 />
+                )}
               </>
             ) : (
               <>
@@ -389,7 +396,10 @@ const Chat: React.FC = () => {
                   isStreaming={false}
                   onStopStream={stopCurrentStream}
                   chatMode={chatMode}
+                  isModeLocked={isModeLocked}
                   onModeSelect={handleModeSelect}
+                  selectedSkillId={null}
+                  onClearSkill={handleClearSkill}
                   selectedEngine={selectedEngine}
                   onSelectEngine={setSelectedEngine}
                   hasSearchEngines={hasSearchEngines}
@@ -436,7 +446,6 @@ const Chat: React.FC = () => {
         remoteBindModalOpen={pageState.remoteBindModalOpen}
         onRemoteBindClose={() => {
           pageState.setRemoteBindModalOpen(false);
-          pageState.pendingNewRemoteRef.current = false;
         }}
         onBind={handleRemoteBind}
         checkBotOnline={checkBotOnline}

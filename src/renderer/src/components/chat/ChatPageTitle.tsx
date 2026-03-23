@@ -8,8 +8,9 @@ import {
   RobotOutlined,
   SearchOutlined,
   SettingOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Badge, Button, Tooltip, theme } from "antd";
+import { Badge, Button, Dropdown, Tooltip, theme } from "antd";
 import { useTranslation } from "react-i18next";
 import type { RemoteBinding } from "../../types/electron";
 import type { ViewMode } from "../../hooks/useChatPageState";
@@ -21,6 +22,7 @@ const { useToken } = theme;
 interface ChatPageTitleProps {
   hasMessages: boolean;
   isStreaming: boolean;
+  conversationId: string | null;
   remoteBinding: RemoteBinding | null;
   unreadRemoteCount: number;
   viewMode: ViewMode;
@@ -30,15 +32,17 @@ interface ChatPageTitleProps {
   onExport: () => void;
   onClear: () => void;
   onNewChat: () => void;
+  onNewAgentChat: () => void;
+  onNewRemoteChat: () => void;
   onToggleSidebar: () => void;
   onOpenSettings: () => void;
-  onBindRemote: () => void;
   onUnbindRemote: () => void;
 }
 
 export function ChatPageTitle({
   hasMessages,
   isStreaming,
+  conversationId,
   remoteBinding,
   unreadRemoteCount,
   viewMode,
@@ -48,9 +52,10 @@ export function ChatPageTitle({
   onExport,
   onClear,
   onNewChat,
+  onNewAgentChat,
+  onNewRemoteChat,
   onToggleSidebar,
   onOpenSettings,
-  onBindRemote,
   onUnbindRemote,
 }: ChatPageTitleProps) {
   const { t } = useTranslation();
@@ -92,23 +97,8 @@ export function ChatPageTitle({
         {remoteBinding && (
           <RemoteBadge binding={remoteBinding} onUnbind={onUnbindRemote} />
         )}
-        {/* Bind Bot Button */}
-        {!remoteBinding && (
-          <Tooltip
-            title={t("remoteChat.bindBot", "Bind Bot", {
-              ns: "chat",
-            })}
-          >
-            <Button
-              type="text"
-              icon={<ApiOutlined />}
-              onClick={onBindRemote}
-              className="rounded-lg"
-            />
-          </Tooltip>
-        )}
         <Tooltip
-          title={t("chat.toolbar.searchMessages", "Search Messages", {
+          title={t("toolbar.searchMessages", "Search Messages", {
             ns: "chat",
           })}
         >
@@ -120,7 +110,7 @@ export function ChatPageTitle({
             className="rounded-lg"
           />
         </Tooltip>
-        <Tooltip title={t("chat.toolbar.export", "Export", { ns: "chat" })}>
+        <Tooltip title={t("toolbar.export", "Export", { ns: "chat" })}>
           <Button
             type="text"
             icon={<ExportOutlined />}
@@ -129,7 +119,7 @@ export function ChatPageTitle({
             className="rounded-lg"
           />
         </Tooltip>
-        <Tooltip title={t("chat.toolbar.clear", "Clear", { ns: "chat" })}>
+        <Tooltip title={t("toolbar.clear", "Clear", { ns: "chat" })}>
           <Button
             type="text"
             icon={<ClearOutlined />}
@@ -138,19 +128,41 @@ export function ChatPageTitle({
             className="rounded-lg"
           />
         </Tooltip>
-        <Tooltip
-          title={t("chat.toolbar.newChat", "New Chat", { ns: "chat" })}
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: "direct",
+                icon: <PlusOutlined />,
+                label: t("newChat", "New Chat", { ns: "chat" }),
+                onClick: onNewChat,
+              },
+              {
+                key: "agent",
+                icon: <ThunderboltOutlined />,
+                label: t("sidebar.newAgentChat", "Agent Chat", { ns: "chat" }),
+                onClick: onNewAgentChat,
+              },
+              {
+                key: "remote",
+                icon: <ApiOutlined />,
+                label: t("remoteChat.newRemoteSession", "New Remote Session", { ns: "chat" }),
+                onClick: onNewRemoteChat,
+              },
+            ],
+          }}
+          trigger={["click"]}
+          disabled={isStreaming}
         >
           <Button
             type="text"
             icon={<PlusOutlined />}
-            onClick={onNewChat}
-            disabled={isStreaming || !hasMessages}
+            disabled={isStreaming}
             className="rounded-lg"
           />
-        </Tooltip>
+        </Dropdown>
 
-        <Tooltip title={t("chat.chatHistory", "Chat History", { ns: "chat" })}>
+        <Tooltip title={t("chatHistory", "Chat History", { ns: "chat" })}>
           <Badge dot={unreadRemoteCount > 0 && viewMode !== "remote" && !sidebarVisible} offset={[-4, 4]}>
             <Button
               type="text"

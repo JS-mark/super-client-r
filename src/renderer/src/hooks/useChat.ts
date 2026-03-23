@@ -12,11 +12,14 @@ import {
 	TOOLS_INSTRUCTIONS,
 	USER_CONFIG_INSTRUCTIONS,
 } from "../prompt";
+import { agentSDKClient } from "../services/agent/agentSDKService";
+import { chatHistoryService } from "../services/chatHistoryService";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
 import { searchService } from "../services/search/searchService";
 import { skillClient } from "../services/skill/skillService";
 import { type Message, useChatStore } from "../stores/chatStore";
+import { useMcpStore } from "../stores/mcpStore";
 import { useModelStore } from "../stores/modelStore";
 import type { ActiveModelSelection } from "../types/models";
 import type { SearchConfig } from "../types/search";
@@ -29,7 +32,7 @@ export type {
 } from "../components/chat/ChatSettingsModal";
 export { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 
-export type ChatMode = "direct" | "agent" | "skill";
+export type ChatMode = "direct" | "agent";
 
 export interface ChatOptions {
 	mode?: ChatMode;
@@ -357,7 +360,14 @@ export function useChat() {
 				});
 			}
 			try {
-				await window.electron.llm.toolApprovalResponse(toolCallId, approved);
+				if (isAgentSDKRequestRef.current) {
+					await agentSDKClient.resolvePermission(toolCallId, approved);
+				} else {
+					await window.electron.llm.toolApprovalResponse(
+						toolCallId,
+						approved,
+					);
+				}
 			} catch (err) {
 				console.error("[useChat] toolApprovalResponse failed:", err);
 			}
@@ -405,12 +415,34 @@ export function useChat() {
 	}, [selectedSkillId]);
 
 	const currentRequestIdRef = useRef<string | null>(null);
+	const agentSDKSessionIdRef = useRef<string | null>(null);
+	const isAgentSDKRequestRef = useRef(false);
 	const streamContentRef = useRef("");
 	const currentModelInfoRef = useRef<{
 		model: string;
 		providerPreset: string;
 		providerName: string;
 	} | null>(null);
+
+	// Restore Agent SDK session when conversation changes
+	const currentConversationId = useChatStore(
+		(s) => s.currentConversationId,
+	);
+	useEffect(() => {
+		// 从 ConversationSummary 恢复 agentSDKSessionId 和 chatMode
+		const conv = useChatStore
+			.getState()
+			.conversations.find((c) => c.id === currentConversationId);
+		agentSDKSessionIdRef.current = conv?.agentSDKSessionId ?? null;
+		isAgentSDKRequestRef.current = false;
+		// Only restore chatMode when the conversation has a persisted mode.
+		// New conversations have no chatMode yet — the caller (handleNewChat /
+		// handleNewAgentChat) already sets the desired mode, so we must not
+		// overwrite it with a "direct" fallback.
+		if (conv?.chatMode) {
+			setChatMode(conv.chatMode);
+		}
+	}, [currentConversationId, setChatMode]);
 
 	/**
 	 * Get the effective model for the current session.
@@ -582,6 +614,229 @@ export function useChat() {
 		setStreamingContent,
 		updateLastMessage,
 		updateMessageToolCall,
+		updateMessageMetadata,
+		message,
+	]);
+
+	// Subscribe to Agent SDK stream events (separate channel from LLM events)
+	useEffect(() => {
+		const unsubscribe = agentSDKClient.onStreamEvent((event) => {
+			// Only process events for the current request
+			if (event.requestId !== currentRequestIdRef.current) return;
+			// Only handle events when the current request is an Agent SDK request
+			if (!isAgentSDKRequestRef.current) return;
+
+			switch (event.type) {
+				case "init": {
+					if (event.sessionId) {
+						agentSDKSessionIdRef.current = event.sessionId;
+						// Tag the current assistant message with the session ID
+						const msgs = useChatStore.getState().messages;
+						const lastAssistant = msgs[msgs.length - 1];
+						if (lastAssistant?.role === "assistant") {
+							updateMessageMetadata(lastAssistant.id, {
+								agentSDKSessionId: event.sessionId,
+							});
+						}
+						// 持久化到 conversation metadata
+						const convId =
+							useChatStore.getState().currentConversationId;
+						if (convId) {
+							chatHistoryService
+								.updateConversationMetadata(convId, {
+									agentSDKSessionId: event.sessionId,
+								})
+								.catch(() => {});
+						}
+					}
+					setSessionStatus("streaming");
+					break;
+				}
+
+				case "chunk": {
+					if (event.content) {
+						if (useChatStore.getState().sessionStatus === "preparing") {
+							setSessionStatus("streaming");
+						}
+						streamContentRef.current += event.content;
+						appendStreamingContent(event.content);
+					}
+					break;
+				}
+
+				case "assistant": {
+					// Full assistant message — update the last message with complete content
+					if (event.content) {
+						updateLastMessage(event.content);
+						streamContentRef.current = "";
+						setStreamingContent("");
+					}
+					// Update usage metadata if provided
+					if (event.usage) {
+						const msgs = useChatStore.getState().messages;
+						const lastAssistant = msgs[msgs.length - 1];
+						if (lastAssistant?.role === "assistant") {
+							updateMessageMetadata(lastAssistant.id, {
+								inputTokens: event.usage.inputTokens,
+								outputTokens: event.usage.outputTokens,
+							});
+						}
+					}
+					break;
+				}
+
+				case "tool_use_summary": {
+					// Finalize any accumulated streaming content
+					if (streamContentRef.current) {
+						updateLastMessage(streamContentRef.current);
+						streamContentRef.current = "";
+						setStreamingContent("");
+					}
+
+					setSessionStatus("tool_calling");
+
+					// Add a tool message showing the summary
+					const toolId = `agent_tool_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+					const toolMessage: Message = {
+						id: `tool_${toolId}`,
+						role: "tool",
+						content: event.toolSummary || "Tool execution",
+						timestamp: Date.now(),
+						type: "tool_use",
+						toolCall: {
+							id: toolId,
+							name: event.toolSummary?.split("(")[0]?.trim() || "tool",
+							input: {},
+							status: "success",
+						},
+					};
+					addMessage(toolMessage);
+
+					// Add a new empty assistant message for the next stream
+					const modelInfo = currentModelInfoRef.current;
+					const nextAssistant: Message = {
+						id: `assistant_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+						role: "assistant",
+						content: "",
+						timestamp: Date.now(),
+						metadata: modelInfo
+							? {
+									model: modelInfo.model,
+									providerPreset: modelInfo.providerPreset,
+									providerName: modelInfo.providerName,
+								}
+							: undefined,
+					};
+					addMessage(nextAssistant);
+					setSessionStatus("streaming");
+					break;
+				}
+
+				case "permission_request": {
+					if (!event.permissionRequest) break;
+
+					// Finalize any accumulated streaming content
+					if (streamContentRef.current) {
+						updateLastMessage(streamContentRef.current);
+						streamContentRef.current = "";
+						setStreamingContent("");
+					}
+
+					setSessionStatus("tool_calling");
+
+					const perm = event.permissionRequest;
+					// Add a tool message with awaiting_approval status
+					const permToolMessage: Message = {
+						id: `tool_${perm.toolUseId}`,
+						role: "tool",
+						content: `Permission required: ${perm.displayName || perm.toolName}`,
+						timestamp: Date.now(),
+						type: "tool_use",
+						toolCall: {
+							id: perm.toolUseId,
+							name: perm.toolName,
+							input: perm.toolInput || {},
+							status: "awaiting_approval",
+						},
+					};
+					addMessage(permToolMessage);
+					break;
+				}
+
+				case "result": {
+					// Finalize streaming content
+					if (streamContentRef.current) {
+						updateLastMessage(streamContentRef.current);
+					}
+
+					// Update metadata with final result data
+					if (event.result) {
+						const msgs = useChatStore.getState().messages;
+						const lastAssistant = [...msgs]
+							.reverse()
+							.find((m) => m.role === "assistant");
+						if (lastAssistant) {
+							updateMessageMetadata(lastAssistant.id, {
+								duration: event.result.durationMs,
+								totalCostUsd: event.result.totalCostUsd,
+								numTurns: event.result.numTurns,
+								inputTokens: event.result.usage?.inputTokens,
+								outputTokens: event.result.usage?.outputTokens,
+								tokens:
+									(event.result.usage?.inputTokens || 0) +
+									(event.result.usage?.outputTokens || 0),
+							});
+						}
+					}
+
+					// Persist messages
+					const { currentConversationId: convId, persistMessages } =
+						useChatStore.getState();
+					if (convId) persistMessages();
+
+					// Reset state
+					setSessionStatus("idle");
+					setStreamingContent("");
+					streamContentRef.current = "";
+					currentRequestIdRef.current = null;
+					isAgentSDKRequestRef.current = false;
+					break;
+				}
+
+				case "error": {
+					message.error(`Agent error: ${event.error}`);
+					// Finalize any partial content
+					if (streamContentRef.current) {
+						updateLastMessage(streamContentRef.current);
+					}
+					setSessionStatus("idle");
+					setStreamingContent("");
+					streamContentRef.current = "";
+					currentRequestIdRef.current = null;
+					isAgentSDKRequestRef.current = false;
+					break;
+				}
+
+				case "rate_limit": {
+					message.warning(
+						`Rate limited: ${event.error || "Please wait..."}`,
+					);
+					break;
+				}
+
+				case "status": {
+					console.debug("[useChat] Agent SDK status:", event.status);
+					break;
+				}
+			}
+		});
+		return unsubscribe;
+	}, [
+		addMessage,
+		appendStreamingContent,
+		setSessionStatus,
+		setStreamingContent,
+		updateLastMessage,
 		updateMessageMetadata,
 		message,
 	]);
@@ -783,26 +1038,13 @@ export function useChat() {
 	);
 
 	/**
-	 * Send message using Agent mode
-	 * Uses the active model with MCP tools and an agentic system prompt.
-	 * The LLM service handles multi-round tool execution automatically.
+	 * Send message using Agent mode (via Agent SDK)
+	 * Delegates to AgentSDKService which handles multi-turn tool execution,
+	 * session management, and streaming internally.
 	 */
 	const sendAgentMessage = useCallback(
-		async (_content: string, _agentId?: string) => {
-			const active = getEffectiveModel();
-			if (!active) {
-				message.error(
-					"No active model selected. Please configure a model in Settings → Models.",
-				);
-				return;
-			}
-
-			const { provider, model } = active;
-			currentModelInfoRef.current = {
-				model: model.id,
-				providerPreset: provider.preset,
-				providerName: provider.name,
-			};
+		async (content: string, _agentId?: string) => {
+			isAgentSDKRequestRef.current = true;
 
 			setSessionStatus("preparing");
 			setStreamingContent("");
@@ -812,97 +1054,94 @@ export function useChat() {
 			currentRequestIdRef.current = requestId;
 
 			try {
-				const currentMessages = useChatStore.getState().messages;
-				let chatHistory = currentMessages
-					.filter(
-						(m) =>
-							(m.role === "user" || m.role === "assistant") &&
-							m.content.length > 0,
-					)
-					.map((m) => ({
-						role: m.role as "user" | "assistant",
-						content: m.content,
-					}));
-
-				// Apply context count limit
-				if (
-					sessionSettings.contextCount !== -1 &&
-					chatHistory.length > sessionSettings.contextCount
-				) {
-					chatHistory = chatHistory.slice(-sessionSettings.contextCount);
+				// Get workspace cwd for the current conversation
+				const convId = useChatStore.getState().currentConversationId;
+				let cwd: string | undefined;
+				if (convId) {
+					try {
+						const res = await window.electron.chat.getWorkspaceDir(convId);
+						if (res.success && res.data) cwd = res.data;
+					} catch {
+						// non-fatal
+					}
 				}
 
-				const history: {
-					role: "user" | "assistant" | "system";
-					content: string;
-				}[] = chatHistory;
+				// Gather connected MCP server IDs
+				const connectedServers = useMcpStore.getState().getConnectedServers();
+				const mcpServerNames = connectedServers.map((s) => s.id);
 
-				// Build agentic system prompt
-				const envInfo = await getEnvInfoForPrompt();
-				const baseAgentPrompt = sessionSettings.systemPrompt
-					? sessionSettings.systemPrompt
-					: model.systemPrompt;
-				const basePrompt = buildSystemPrompt(baseAgentPrompt, envInfo);
-				const agentPrompt = `${basePrompt}\n\n--- Agent Mode ---\nYou are operating in Agent mode. You have access to tools and should proactively use them to accomplish the user's task. Break down complex tasks into steps, use available tools as needed, and provide comprehensive results. Think step by step and take action autonomously.`;
+				// Agent SDK uses its own model config chain — do NOT pass chat model
+				currentModelInfoRef.current = {
+					model: "agent",
+					providerPreset: "anthropic",
+					providerName: "Agent SDK",
+				};
 
-				history.unshift({
-					role: "system",
-					content: agentPrompt,
-				});
+				// Optional custom system prompt
+				const customSystemPrompt = sessionSettings.systemPrompt || undefined;
 
-				// Fetch MCP tools for function calling (skip if permission mode is "none")
-				const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
-				const mcpResult = isToolsDisabled
-					? { toolHint: "" }
-					: await fetchMcpTools();
-
-				// Fetch all enabled skill tools and merge with MCP tools
-				const skillResult = isToolsDisabled
-					? { tools: [], toolMapping: {} }
-					: await fetchAllSkillTools();
-
-				const tools = isToolsDisabled
-					? undefined
-					: [...(mcpResult.tools || []), ...skillResult.tools];
-				const toolMapping = isToolsDisabled
-					? undefined
-					: { ...(mcpResult.toolMapping || {}), ...skillResult.toolMapping };
-				if (mcpResult.toolHint) {
-					history[0].content += mcpResult.toolHint;
+				// Build agents map from selected team (Multi-Agent)
+				let agents:
+					| Record<
+							string,
+							{
+								description: string;
+								prompt: string;
+								tools?: string[];
+								disallowedTools?: string[];
+								model?: string;
+								maxTurns?: number;
+							}
+					  >
+					| undefined;
+				const teamId = useChatStore.getState().selectedTeamId;
+				if (teamId) {
+					try {
+						const [profiles, teams] = await Promise.all([
+							agentSDKClient.getAgentProfiles(),
+							agentSDKClient.getAgentTeams(),
+						]);
+						const team = teams.find((t) => t.id === teamId);
+						if (team && team.agents.length > 0) {
+							agents = {};
+							for (const profileId of team.agents) {
+								const profile = profiles.find(
+									(p) => p.id === profileId,
+								);
+								if (profile) {
+									agents[profile.name] = {
+										description: profile.description,
+										prompt: profile.prompt,
+										tools: profile.tools,
+										disallowedTools:
+											profile.disallowedTools,
+										model: profile.model,
+										maxTurns: profile.maxTurns,
+									};
+								}
+							}
+							if (Object.keys(agents).length === 0)
+								agents = undefined;
+						}
+					} catch {
+						// non-fatal: proceed without agents
+					}
 				}
 
-				const toolPermission = isToolsDisabled
-					? undefined
-					: {
-							mode: sessionSettings.toolPermissionMode,
-							authorizedTools: sessionSettings.authorizedTools,
-						};
-
-				await modelService.chatCompletion({
-					requestId,
-					baseUrl: provider.baseUrl,
-					apiKey: provider.apiKey,
-					model: model.id,
-					messages: history,
-					tools: tools && tools.length > 0 ? tools : undefined,
-					toolMapping:
-						toolMapping && Object.keys(toolMapping).length > 0
-							? toolMapping
-							: undefined,
-					toolPermission,
-					toolCallMode:
-						sessionSettings.toolCallMode === "prompt" ? "prompt" : "function",
-					temperature: sessionSettings.temperatureEnabled
-						? sessionSettings.temperature
+				await agentSDKClient.createQuery(requestId, {
+					prompt: content,
+					cwd,
+					systemPrompt: customSystemPrompt,
+					resumeSessionId: agentSDKSessionIdRef.current ?? undefined,
+					persistSession: true,
+					includePartialMessages: true,
+					mcpServerNames:
+						mcpServerNames.length > 0 ? mcpServerNames : undefined,
+					maxTurns: sessionSettings.maxTokens
+						? undefined
 						: undefined,
-					maxTokens: sessionSettings.maxTokens,
-					topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
-					stream: sessionSettings.streamingEnabled,
-					providerPreset: provider.preset,
-					extraParams: parseCustomParams(sessionSettings.customParams),
-					conversationId:
-						useChatStore.getState().currentConversationId ?? undefined,
-					toolTimeout: sessionSettings.toolTimeout,
+					permissionMode: "default",
+					agents,
 				});
 			} catch (error: unknown) {
 				console.error("[useChat] Failed to send agent message:", error);
@@ -912,15 +1151,10 @@ export function useChat() {
 				setStreamingContent("");
 				streamContentRef.current = "";
 				currentRequestIdRef.current = null;
+				isAgentSDKRequestRef.current = false;
 			}
 		},
-		[
-			message,
-			setSessionStatus,
-			setStreamingContent,
-			getEffectiveModel,
-			sessionSettings,
-		],
+		[message, setSessionStatus, setStreamingContent, sessionSettings],
 	);
 
 	/**
@@ -1145,9 +1379,39 @@ export function useChat() {
 			};
 			addMessage(assistantMessage);
 
-			await sendDirectMessage(userContent);
+			// Dispatch to the correct send function based on chat mode
+			switch (chatMode) {
+				case "agent":
+					await sendAgentMessage(userContent);
+					break;
+				case "direct":
+				default: {
+					// Skill overlay on retry
+					const skillId = selectedSkillId || undefined;
+					if (skillId) {
+						await sendSkillMessage(
+							userContent,
+							skillId,
+							selectedCommandName || undefined,
+						);
+					} else {
+						await sendDirectMessage(userContent);
+					}
+					break;
+				}
+			}
 		},
-		[addMessage, deleteMessagesFrom, sendDirectMessage, getEffectiveModel],
+		[
+			addMessage,
+			deleteMessagesFrom,
+			sendDirectMessage,
+			sendAgentMessage,
+			sendSkillMessage,
+			getEffectiveModel,
+			chatMode,
+			selectedSkillId,
+			selectedCommandName,
+		],
 	);
 
 	/**
@@ -1182,12 +1446,23 @@ export function useChat() {
 				editingMessageIdRef.current = null;
 			}
 
-			// Auto-create conversation if none exists
-			const { currentConversationId, createConversation } =
-				useChatStore.getState();
-			if (!currentConversationId) {
-				const name = content.slice(0, 50);
-				await createConversation(name);
+			// Guard: conversation must exist (eager-created by handleNewConversation)
+			const { currentConversationId: convId } = useChatStore.getState();
+			if (!convId) return;
+
+			// Persist chatMode to conversation metadata if changed
+			const conv = useChatStore
+				.getState()
+				.conversations.find((c) => c.id === convId);
+			if (conv?.chatMode !== mode) {
+				chatHistoryService
+					.updateConversationMetadata(convId, { chatMode: mode })
+					.catch(() => {});
+				useChatStore.setState((state) => ({
+					conversations: state.conversations.map((c) =>
+						c.id === convId ? { ...c, chatMode: mode } : c,
+					),
+				}));
 			}
 
 			const userMessage: Message = {
@@ -1208,13 +1483,20 @@ export function useChat() {
 				role: "assistant",
 				content: "",
 				timestamp: Date.now(),
-				metadata: activeForMeta
-					? {
-							model: activeForMeta.model.id,
-							providerPreset: activeForMeta.provider.preset,
-							providerName: activeForMeta.provider.name,
-						}
-					: undefined,
+				metadata:
+					mode === "agent"
+						? {
+								model: "agent",
+								providerPreset: "anthropic",
+								providerName: "Agent SDK",
+							}
+						: activeForMeta
+							? {
+									model: activeForMeta.model.id,
+									providerPreset: activeForMeta.provider.preset,
+									providerName: activeForMeta.provider.name,
+								}
+							: undefined,
 			};
 			addMessage(assistantMessage);
 
@@ -1225,20 +1507,27 @@ export function useChat() {
 						options?.agentId || selectedAgentId || undefined,
 					);
 					break;
-				case "skill":
-					await sendSkillMessage(
-						content,
-						options?.skillId || selectedSkillId || undefined,
-						options?.commandName || selectedCommandName || undefined,
-					);
-					break;
 				case "direct":
-				default:
-					await sendDirectMessage(content, {
-						searchEngine: options?.searchEngine,
-						searchConfigs: options?.searchConfigs,
-					});
+				default: {
+					// Skill overlay: if a skill is selected, use sendSkillMessage; otherwise direct
+					const skillId =
+						options?.skillId || selectedSkillId || undefined;
+					if (skillId) {
+						await sendSkillMessage(
+							content,
+							skillId,
+							options?.commandName ||
+								selectedCommandName ||
+								undefined,
+						);
+					} else {
+						await sendDirectMessage(content, {
+							searchEngine: options?.searchEngine,
+							searchConfigs: options?.searchConfigs,
+						});
+					}
 					break;
+				}
 			}
 		},
 		[
@@ -1258,7 +1547,15 @@ export function useChat() {
 
 	const stopCurrentStream = useCallback(() => {
 		if (currentRequestIdRef.current) {
-			modelService.stopStream(currentRequestIdRef.current);
+			if (isAgentSDKRequestRef.current) {
+				agentSDKClient
+					.interruptQuery(currentRequestIdRef.current)
+					.catch((err) =>
+						console.error("[useChat] interruptQuery failed:", err),
+					);
+			} else {
+				modelService.stopStream(currentRequestIdRef.current);
+			}
 			currentRequestIdRef.current = null;
 		}
 		// Save any accumulated streaming content to the last message
@@ -1270,12 +1567,16 @@ export function useChat() {
 		setSessionStatus("idle");
 		setStreamingContent("");
 		streamContentRef.current = "";
+		isAgentSDKRequestRef.current = false;
 		// Persist messages to disk
 		const { currentConversationId, persistMessages } = useChatStore.getState();
 		if (currentConversationId) {
 			persistMessages();
 		}
 	}, [setSessionStatus, setStreamingContent, updateLastMessage]);
+
+	// Mode is locked once the conversation has any messages
+	const isModeLocked = messages.length > 0;
 
 	return {
 		// State
@@ -1285,6 +1586,7 @@ export function useChat() {
 		isStreaming,
 		streamingContent,
 		chatMode,
+		isModeLocked,
 		selectedAgentId,
 		selectedSkillId,
 		selectedCommandName,

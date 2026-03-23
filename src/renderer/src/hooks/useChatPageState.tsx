@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 import type { SessionSettings } from "../components/chat/ChatSettingsModal";
 import { ProviderIcon } from "../components/models/ProviderIcon";
+import { chatHistoryService } from "../services/chatHistoryService";
 import type { Message } from "../stores/chatStore";
 import { useChatStore } from "../stores/chatStore";
 import { useModelStore } from "../stores/modelStore";
@@ -81,7 +82,7 @@ export function useChatPageState({
   }, []);
 
   // ── Sidebar (inline collapsible) state ──
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<string>("conversations");
 
   // ── View mode (main area: local AI chat vs remote IM) ──
@@ -178,6 +179,7 @@ export function useChatPageState({
   // ── Conversation management ──
   const {
     currentConversationId,
+    conversations,
     loadConversations,
     createConversation,
     switchConversation,
@@ -189,16 +191,9 @@ export function useChatPageState({
     setPendingSkillId,
   } = useChatStore();
 
-  // Load conversations on mount and restore last conversation
+  // Load conversations on mount (don't auto-restore last conversation)
   useEffect(() => {
-    const init = async () => {
-      await loadConversations();
-      const res = await window.electron.chat.getLastConversation();
-      if (res.success && res.data) {
-        switchConversation(res.data);
-      }
-    };
-    init();
+    loadConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -227,23 +222,25 @@ export function useChatPageState({
     if (floatAutoSend && input.trim()) {
       setFloatAutoSend(false);
       const doSend = async () => {
-        await useChatStore
-          .getState()
-          .createConversation(input.trim().slice(0, 50));
+        // Eager create if no conversation exists
+        if (!useChatStore.getState().currentConversationId) {
+          await useChatStore
+            .getState()
+            .createConversation(input.trim().slice(0, 50), "direct");
+        }
         sendMessage({ mode: "direct" });
       };
       doSend();
     }
   }, [floatAutoSend, input, sendMessage]);
 
-  // Consume pendingSkillId from Skills page navigation
+  // Consume pendingSkillId from Skills page navigation (skill is independent of mode)
   useEffect(() => {
     if (pendingSkillId) {
-      setChatMode("skill");
       setSelectedSkillId(pendingSkillId);
       setPendingSkillId(null);
     }
-  }, [pendingSkillId, setChatMode, setSelectedSkillId, setPendingSkillId]);
+  }, [pendingSkillId, setSelectedSkillId, setPendingSkillId]);
 
   // Reset session model override and settings when switching conversations
   useEffect(() => {
@@ -313,17 +310,64 @@ export function useChatPageState({
   }, [providers, getAllEnabledModels]);
 
   // ── Callbacks ──
+  const isCreatingRef = useRef(false);
+
+  /**
+   * Unified new conversation handler.
+   * Reuses the current conversation if it's empty (0 messages, no remote binding);
+   * otherwise creates a new one with the given chatMode.
+   */
+  const handleNewConversation = useCallback(
+    async (mode: ChatMode) => {
+      if (isCreatingRef.current) return;
+      isCreatingRef.current = true;
+      try {
+        const state = useChatStore.getState();
+        const curId = state.currentConversationId;
+        const curConv = curId
+          ? state.conversations.find((c) => c.id === curId)
+          : null;
+        const curMessages = state.messages;
+
+        // Reuse current empty conversation (0 messages, no remote binding)
+        if (curId && curConv && curMessages.length === 0 && !curConv.remote) {
+          // Just update chatMode if different
+          if (curConv.chatMode !== mode) {
+            chatHistoryService
+              .updateConversationMetadata(curId, { chatMode: mode })
+              .catch(() => {});
+            useChatStore.setState((s) => ({
+              conversations: s.conversations.map((c) =>
+                c.id === curId ? { ...c, chatMode: mode } : c,
+              ),
+            }));
+          }
+          setChatMode(mode);
+          return;
+        }
+
+        // Create new conversation
+        await createConversation("New Chat", mode);
+        setChatMode(mode);
+      } finally {
+        isCreatingRef.current = false;
+      }
+    },
+    [createConversation, setChatMode],
+  );
+
   const handleNewChat = useCallback(() => {
-    createConversation();
-  }, [createConversation]);
+    handleNewConversation("direct");
+  }, [handleNewConversation]);
 
-  // Flag: next bind should create a new conversation first
-  const pendingNewRemoteRef = useRef(false);
+  const handleNewAgentChat = useCallback(() => {
+    handleNewConversation("agent");
+  }, [handleNewConversation]);
 
-  const handleNewRemoteChat = useCallback(() => {
-    pendingNewRemoteRef.current = true;
+  const handleNewRemoteChat = useCallback(async () => {
+    await handleNewConversation("direct");
     setRemoteBindModalOpen(true);
-  }, []);
+  }, [handleNewConversation]);
 
   const handleUnbindRemote = useCallback(async () => {
     await unbindRemote();
@@ -369,9 +413,8 @@ export function useChatPageState({
     activeSelection,
     // Callbacks
     handleNewChat,
+    handleNewAgentChat,
     handleNewRemoteChat,
     handleUnbindRemote,
-    // Refs
-    pendingNewRemoteRef,
   };
 }

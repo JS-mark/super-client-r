@@ -5,6 +5,8 @@ import {
 	DeleteOutlined,
 	EditOutlined,
 	MoreOutlined,
+	RobotOutlined,
+	ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Button, Dropdown, Input, theme } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -155,10 +157,20 @@ export function ConversationItem({
 							className="text-sm font-medium truncate flex items-center gap-1"
 							style={{ color: token.colorText }}
 						>
-							{conversation.remote && (
+							{conversation.remote ? (
 								<ApiOutlined
 									className="text-xs shrink-0"
 									style={{ color: token.colorPrimary }}
+								/>
+							) : conversation.chatMode === "agent" ? (
+								<ThunderboltOutlined
+									className="text-xs shrink-0"
+									style={{ color: token.colorPrimary }}
+								/>
+							) : (
+								<RobotOutlined
+									className="text-xs shrink-0"
+									style={{ color: token.colorTextQuaternary }}
 								/>
 							)}
 							{conversation.name}

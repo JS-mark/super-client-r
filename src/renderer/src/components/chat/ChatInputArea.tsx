@@ -1,10 +1,11 @@
 import {
+  CloseOutlined,
   PauseCircleOutlined,
   RobotOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Sender } from "@ant-design/x";
-import { Button, Flex, Tooltip, theme } from "antd";
+import { Button, Flex, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useRef, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,6 +16,7 @@ import {
   useShortcutStore,
 } from "../../stores/shortcutStore";
 import { AttachmentList } from "../attachment";
+import { AgentTeamSelector } from "./AgentTeamSelector";
 import type { ChatModeSelection } from "./ChatModePanel";
 import { ChatModePanel } from "./ChatModePanel";
 import type { ChatMode } from "../../hooks/useChat";
@@ -35,7 +37,10 @@ interface ChatInputAreaProps {
   isStreaming: boolean;
   onStopStream: () => void;
   chatMode: ChatMode;
+  isModeLocked: boolean;
   onModeSelect: (selection: ChatModeSelection) => void;
+  selectedSkillId: string | null;
+  onClearSkill: () => void;
   selectedEngine: string;
   onSelectEngine: (engine: string) => void;
   hasSearchEngines: boolean;
@@ -61,7 +66,10 @@ export function ChatInputArea({
   isStreaming,
   onStopStream,
   chatMode,
+  isModeLocked,
   onModeSelect,
+  selectedSkillId,
+  onClearSkill,
   selectedEngine,
   onSelectEngine,
   hasSearchEngines,
@@ -162,7 +170,6 @@ export function ChatInputArea({
           <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
             <ChatModePanel
               chatMode={chatMode}
-              selectedSkillId={null}
               onSelect={handleModeSelect}
               onClose={() => setModePanelOpen(false)}
             />
@@ -277,21 +284,30 @@ export function ChatInputArea({
                 <Flex align="center" gap={4}>
                   {/* Mode selector */}
                   <Tooltip
-                    title={t("chatMode.switchMode", "切换模式", {
-                      ns: "chat",
-                    })}
+                    title={
+                      isModeLocked
+                        ? t("chatMode.modeLocked", {
+                            ns: "chat",
+                            defaultValue: "Mode locked for this conversation",
+                          })
+                        : t("chatMode.switchMode", "切换模式", {
+                            ns: "chat",
+                          })
+                    }
                   >
                     <Button
                       type="text"
                       size="small"
+                      disabled={isModeLocked}
                       icon={
-                        chatMode === "skill" ? (
+                        chatMode === "agent" ? (
                           <ThunderboltOutlined />
                         ) : (
                           <RobotOutlined />
                         )
                       }
                       onClick={() => {
+                        if (isModeLocked) return;
                         setModePanelOpen(!modePanelOpen);
                         if (searchPopoverOpen) setSearchPopoverOpen(false);
                       }}
@@ -306,6 +322,27 @@ export function ChatInputArea({
                       </span>
                     </Button>
                   </Tooltip>
+
+                  {/* Agent team selector (agent mode only) */}
+                  {chatMode === "agent" && <AgentTeamSelector />}
+
+                  {/* Skill indicator tag */}
+                  {selectedSkillId && (
+                    <Tag
+                      color="green"
+                      className="text-xs flex items-center gap-0.5 m-0"
+                      closeIcon={<CloseOutlined className="text-[10px]" />}
+                      onClose={(e) => {
+                        e.preventDefault();
+                        onClearSkill();
+                      }}
+                    >
+                      <ThunderboltOutlined className="text-[10px]" />
+                      <span className="ml-0.5">
+                        {t("chatMode.skillActive", "Skill", { ns: "chat" })}
+                      </span>
+                    </Tag>
+                  )}
 
                   <div
                     className="w-px h-3 opacity-25"
