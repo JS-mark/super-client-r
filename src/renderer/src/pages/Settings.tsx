@@ -1,5 +1,4 @@
 import {
-  ApiOutlined,
   AppstoreOutlined,
   BellOutlined,
   BugOutlined,
@@ -33,7 +32,6 @@ import { PluginConfigPanel } from "../components/settings/PluginConfigPanel";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
 import { AgentSettings } from "../components/settings/AgentSettings";
-import { NetworkSettings } from "../components/settings/NetworkSettings";
 import { WebhookSettings } from "../components/settings/WebhookSettings";
 import { useTitle } from "../hooks/useTitle";
 import { type AppInfo, appService } from "../services/appService";
@@ -211,12 +209,6 @@ const Settings: React.FC = () => {
             <WebhookSettings />
           </Card>
         ),
-      },
-      {
-        key: "network",
-        icon: <ApiOutlined />,
-        label: t("network.title", "Network", { ns: "settings" }),
-        content: <NetworkSettings />,
       },
       {
         key: "debug",

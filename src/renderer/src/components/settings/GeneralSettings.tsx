@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appService } from "../../services/appService";
 import { FloatWidgetSettings } from "./FloatWidgetSettings";
+import { NetworkSettings } from "./NetworkSettings";
 import { SettingSection } from "./SettingSection";
 import { ThemeSettings } from "./ThemeSettings";
 
@@ -177,6 +178,8 @@ export const GeneralSettings: React.FC = () => {
 				</SettingSection>
 
 				<FloatWidgetSettings />
+
+				<NetworkSettings />
 
 				<SettingSection
 					title={t("updates", "Updates", { ns: "settings" })}
