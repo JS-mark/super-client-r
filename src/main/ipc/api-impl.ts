@@ -34,16 +34,10 @@ import type {
 	WebhookConfig,
 	SearchExecuteRequest,
 	AuthProvider,
-	RenameConversationRequest,
-	SaveMessagesRequest,
-	AppendMessageRequest,
-	UpdateMessageRequest,
 	ConversationSummary,
 	ProxyConfig,
 	ModelProvider,
-	TestConnectionRequest,
-	FetchModelsRequest,
-	UpdateModelConfigRequest,
+	ModelProviderPreset,
 	ActiveModelSelection,
 } from "./types";
 import type { SearchConfig, SearchProviderType } from "../store";
@@ -152,28 +146,23 @@ const apiImpl = {
 			conversationStorage.createConversation(name || "New Chat"),
 		deleteConversation: (id: string) =>
 			conversationStorage.deleteConversation(id),
-		renameConversation: (request: RenameConversationRequest) =>
-			conversationStorage.renameConversation(
-				request.conversationId,
-				request.name,
-			),
+		renameConversation: (conversationId: string, name: string) =>
+			conversationStorage.renameConversation(conversationId, name),
 		getMessages: (conversationId: string) =>
 			conversationStorage.getMessages(conversationId),
-		saveMessages: (request: SaveMessagesRequest) =>
-			conversationStorage.saveMessages(
-				request.conversationId,
-				request.messages,
-			),
-		appendMessage: (request: AppendMessageRequest) =>
-			conversationStorage.appendMessage(
-				request.conversationId,
-				request.message,
-			),
-		updateMessage: (request: UpdateMessageRequest) =>
+		saveMessages: (conversationId: string, messages: unknown[]) =>
+			conversationStorage.saveMessages(conversationId, messages as any),
+		appendMessage: (conversationId: string, message: unknown) =>
+			conversationStorage.appendMessage(conversationId, message as any),
+		updateMessage: (
+			conversationId: string,
+			messageId: string,
+			updates: Record<string, unknown>,
+		) =>
 			conversationStorage.updateChatMessage(
-				request.conversationId,
-				request.messageId,
-				request.updates,
+				conversationId,
+				messageId,
+				updates as any,
 			),
 		clearMessages: (conversationId: string) =>
 			conversationStorage.clearConversationMessages(conversationId),
@@ -185,11 +174,10 @@ const apiImpl = {
 			conversationStorage.getConversationDir(conversationId),
 		getWorkspaceDir: (conversationId: string) =>
 			conversationStorage.getWorkspaceDir(conversationId),
-		updateConversationMetadata: ({
-			id,
-			updates,
-		}: { id: string; updates: Partial<ConversationSummary> }) =>
-			conversationStorage.updateConversationMetadata(id, updates),
+		updateConversationMetadata: (
+			id: string,
+			updates: Partial<ConversationSummary>,
+		) => conversationStorage.updateConversationMetadata(id, updates),
 	},
 
 	// ─── Network ──────────────────────────────
@@ -222,41 +210,40 @@ const apiImpl = {
 		saveProvider: (provider: ModelProvider) =>
 			storeManager.saveModelProvider(provider),
 		deleteProvider: (id: string) => storeManager.deleteModelProvider(id),
-		testConnection: (request: TestConnectionRequest) =>
-			llmService.testConnection(request.baseUrl, request.apiKey),
-		fetchModels: async (request: FetchModelsRequest) => {
-			const models = await llmService.fetchModels(
-				request.baseUrl,
-				request.apiKey,
-				request.preset,
-			);
+		testConnection: (baseUrl: string, apiKey: string) =>
+			llmService.testConnection(baseUrl, apiKey),
+		fetchModels: async (
+			baseUrl: string,
+			apiKey: string,
+			preset?: ModelProviderPreset,
+		) => {
+			const models = await llmService.fetchModels(baseUrl, apiKey, preset);
 			return { models };
 		},
-		updateModelConfig: (request: UpdateModelConfigRequest) =>
-			storeManager.updateModelConfig(
-				request.providerId,
-				request.modelId,
-				request.config,
-			),
+		updateModelConfig: (
+			providerId: string,
+			modelId: string,
+			config: Record<string, unknown>,
+		) => storeManager.updateModelConfig(providerId, modelId, config as any),
 		getActiveModel: () => storeManager.getActiveModelSelection(),
 		setActiveModel: (selection: ActiveModelSelection | null) =>
 			storeManager.setActiveModelSelection(selection),
 	},
 
 	// ─── Skill ────────────────────────────────
-	// channels: skill:list, skill:install, skill:uninstall, skill:get,
-	//           skill:execute, skill:get-system-prompt, skill:get-command-prompt,
-	//           skill:validate-skill, skill:get-all-tools, skill:enable, skill:disable
+	// channels: skill:list-skills, skill:install-skill, skill:uninstall-skill, skill:get-skill,
+	//           skill:execute-skill, skill:get-system-prompt, skill:get-command-prompt,
+	//           skill:validate-skill, skill:get-all-tools, skill:enable-skill, skill:disable-skill
 	skill: {
-		list: () => getSkillService().listSkills(),
-		install: (source: string) => getSkillService().installSkill(source),
-		uninstall: (id: string) => getSkillService().uninstallSkill(id),
-		get: (id: string) => {
+		listSkills: () => getSkillService().listSkills(),
+		installSkill: (source: string) => getSkillService().installSkill(source),
+		uninstallSkill: (id: string) => getSkillService().uninstallSkill(id),
+		getSkill: (id: string) => {
 			const skill = getSkillService().getSkill(id);
 			if (!skill) throw new Error("Skill not found");
 			return skill;
 		},
-		execute: (
+		executeSkill: (
 			skillId: string,
 			toolName: string,
 			input: Record<string, unknown>,
@@ -268,8 +255,8 @@ const apiImpl = {
 		validateSkill: (source: string) =>
 			getSkillService().validateSkill(source),
 		getAllTools: () => getSkillService().getAllAvailableTools(),
-		enable: (id: string) => getSkillService().enableSkill(id),
-		disable: (id: string) => getSkillService().disableSkill(id),
+		enableSkill: (id: string) => getSkillService().enableSkill(id),
+		disableSkill: (id: string) => getSkillService().disableSkill(id),
 	},
 };
 

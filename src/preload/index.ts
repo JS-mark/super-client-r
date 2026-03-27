@@ -4,6 +4,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+import { createBridge } from "./bridge";
 
 // ============ 类型定义 ============
 
@@ -1490,23 +1491,8 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// Skill API
-	skill: {
-		listSkills: () => ipcRenderer.invoke("skill:list"),
-		installSkill: (source) => ipcRenderer.invoke("skill:install", source),
-		uninstallSkill: (id) => ipcRenderer.invoke("skill:uninstall", id),
-		getSkill: (id) => ipcRenderer.invoke("skill:get", id),
-		executeSkill: (skillId, toolName, input) =>
-			ipcRenderer.invoke("skill:execute", skillId, toolName, input),
-		getAllTools: () => ipcRenderer.invoke("skill:get-all-tools"),
-		enableSkill: (id) => ipcRenderer.invoke("skill:enable", id),
-		disableSkill: (id) => ipcRenderer.invoke("skill:disable", id),
-		getSystemPrompt: (id) => ipcRenderer.invoke("skill:get-system-prompt", id),
-		getCommandPrompt: (skillId, commandName) =>
-			ipcRenderer.invoke("skill:get-command-prompt", skillId, commandName),
-		validateSkill: (source) =>
-			ipcRenderer.invoke("skill:validate-skill", source),
-	},
+	// Skill API → auto-bridged
+	skill: createBridge<ElectronAPI["skill"]>("skill"),
 
 	// MCP API
 	mcp: {
@@ -1555,49 +1541,8 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// Chat History API
-	chat: {
-		listConversations: () => ipcRenderer.invoke("chat:list-conversations"),
-		createConversation: (name: string) =>
-			ipcRenderer.invoke("chat:create-conversation", name),
-		deleteConversation: (id: string) =>
-			ipcRenderer.invoke("chat:delete-conversation", id),
-		renameConversation: (conversationId: string, name: string) =>
-			ipcRenderer.invoke("chat:rename-conversation", { conversationId, name }),
-		getMessages: (conversationId: string) =>
-			ipcRenderer.invoke("chat:get-messages", conversationId),
-		saveMessages: (conversationId: string, messages: ChatMessagePersist[]) =>
-			ipcRenderer.invoke("chat:save-messages", { conversationId, messages }),
-		appendMessage: (conversationId: string, message: ChatMessagePersist) =>
-			ipcRenderer.invoke("chat:append-message", { conversationId, message }),
-		updateMessage: (
-			conversationId: string,
-			messageId: string,
-			updates: Partial<ChatMessagePersist>,
-		) =>
-			ipcRenderer.invoke("chat:update-message", {
-				conversationId,
-				messageId,
-				updates,
-			}),
-		clearMessages: (conversationId: string) =>
-			ipcRenderer.invoke("chat:clear-messages", conversationId),
-		getLastConversation: () => ipcRenderer.invoke("chat:get-last-conversation"),
-		setLastConversation: (id: string) =>
-			ipcRenderer.invoke("chat:set-last-conversation", id),
-		getConversationDir: (id: string) =>
-			ipcRenderer.invoke("chat:get-conversation-dir", id),
-		getWorkspaceDir: (id: string) =>
-			ipcRenderer.invoke("chat:get-workspace-dir", id),
-		updateConversationMetadata: (
-			id: string,
-			updates: Partial<ConversationSummary>,
-		) =>
-			ipcRenderer.invoke("chat:update-conversation-metadata", {
-				id,
-				updates,
-			}),
-	},
+	// Chat History API → auto-bridged
+	chat: createBridge<ElectronAPI["chat"]>("chat"),
 
 	// 主题 API
 	theme: {
@@ -1610,21 +1555,8 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// 搜索配置 API
-	search: {
-		getConfigs: () => ipcRenderer.invoke("search:get-configs"),
-		saveConfig: (config: SearchConfig) =>
-			ipcRenderer.invoke("search:save-config", config),
-		deleteConfig: (id: string) =>
-			ipcRenderer.invoke("search:delete-config", id),
-		setDefault: (provider: SearchProviderType | null) =>
-			ipcRenderer.invoke("search:set-default", provider),
-		getDefault: () => ipcRenderer.invoke("search:get-default"),
-		validateConfig: (config: SearchConfig) =>
-			ipcRenderer.invoke("search:validate-config", config),
-		execute: (request: SearchExecuteRequest) =>
-			ipcRenderer.invoke("search:execute", request),
-	},
+	// 搜索配置 API → auto-bridged
+	search: createBridge<ElectronAPI["search"]>("search"),
 
 	// 文件附件 API
 	file: {
@@ -1653,13 +1585,8 @@ const electronAPI: ElectronAPI = {
 		openViewer: () => ipcRenderer.invoke("log:open-viewer"),
 	},
 
-	// Auth API
-	auth: {
-		login: (provider: "google" | "github") =>
-			ipcRenderer.invoke("auth:login", provider),
-		logout: () => ipcRenderer.invoke("auth:logout"),
-		getUser: () => ipcRenderer.invoke("auth:get-user"),
-	},
+	// Auth API → auto-bridged
+	auth: createBridge<ElectronAPI["auth"]>("auth"),
 
 	// Update API
 	update: {
@@ -1713,35 +1640,8 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// Model Provider API
-	model: {
-		listProviders: () => ipcRenderer.invoke("model:list-providers"),
-		getProvider: (id: string) => ipcRenderer.invoke("model:get-provider", id),
-		saveProvider: (provider: ModelProvider) =>
-			ipcRenderer.invoke("model:save-provider", provider),
-		deleteProvider: (id: string) =>
-			ipcRenderer.invoke("model:delete-provider", id),
-		testConnection: (baseUrl: string, apiKey: string) =>
-			ipcRenderer.invoke("model:test-connection", { baseUrl, apiKey }),
-		fetchModels: (
-			baseUrl: string,
-			apiKey: string,
-			preset?: ModelProviderPreset,
-		) => ipcRenderer.invoke("model:fetch-models", { baseUrl, apiKey, preset }),
-		updateModelConfig: (
-			providerId: string,
-			modelId: string,
-			config: Partial<ProviderModel>,
-		) =>
-			ipcRenderer.invoke("model:update-model-config", {
-				providerId,
-				modelId,
-				config,
-			}),
-		getActiveModel: () => ipcRenderer.invoke("model:get-active-model"),
-		setActiveModel: (selection: ActiveModelSelection | null) =>
-			ipcRenderer.invoke("model:set-active-model", selection),
-	},
+	// Model Provider API → auto-bridged
+	model: createBridge<ElectronAPI["model"]>("model"),
 
 	// Agent SDK API
 	agentSDK: {
@@ -2058,51 +1958,14 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// Network API（代理 + 请求日志）
-	network: {
-		getProxyConfig: () =>
-			ipcRenderer.invoke("network:get-proxy-config"),
-		setProxyConfig: (config: ProxyConfig) =>
-			ipcRenderer.invoke("network:set-proxy-config", config),
-		testProxy: (config: ProxyConfig) =>
-			ipcRenderer.invoke("network:test-proxy", config),
-		getLogEnabled: () =>
-			ipcRenderer.invoke("network:get-log-enabled"),
-		setLogEnabled: (enabled: boolean) =>
-			ipcRenderer.invoke("network:set-log-enabled", enabled),
-		getRequestLog: () =>
-			ipcRenderer.invoke("network:get-request-log"),
-		clearRequestLog: () =>
-			ipcRenderer.invoke("network:clear-request-log"),
-		onRequestLogEntry: (callback: (entry: RequestLogEntry) => void) => {
-			const listener = (_event: unknown, entry: RequestLogEntry) =>
-				callback(entry);
-			ipcRenderer.on("network:request-log-entry", listener);
-			return () => ipcRenderer.off("network:request-log-entry", listener);
-		},
-	},
+	// Network API → auto-bridged（含 onRequestLogEntry 事件）
+	network: createBridge<ElectronAPI["network"]>("network"),
 
-	// Webhook API
-	webhook: {
-		getConfigs: () => ipcRenderer.invoke("webhook:get-configs"),
-		saveConfig: (config: WebhookConfig) =>
-			ipcRenderer.invoke("webhook:save-config", config),
-		deleteConfig: (id: string) =>
-			ipcRenderer.invoke("webhook:delete-config", id),
-		test: (configId: string) => ipcRenderer.invoke("webhook:test", configId),
-	},
+	// Webhook API → auto-bridged
+	webhook: createBridge<ElectronAPI["webhook"]>("webhook"),
 
-	// App Config API
-	appConfig: {
-		getConfig: () => ipcRenderer.invoke("app-config:get-config"),
-		refresh: () => ipcRenderer.invoke("app-config:refresh"),
-		onConfigUpdated: (callback) => {
-			const listener = (_event: unknown, config: AppInitConfig) =>
-				callback(config);
-			ipcRenderer.on("app-config:config-updated", listener);
-			return () => ipcRenderer.off("app-config:config-updated", listener);
-		},
-	},
+	// App Config API → auto-bridged（含 onConfigUpdated 事件）
+	appConfig: createBridge<ElectronAPI["appConfig"]>("appConfig"),
 
 	// 系统信息 API
 	system: {
