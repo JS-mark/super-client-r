@@ -306,21 +306,6 @@ export const REMOTE_CHAT_CHANNELS = {
 	IM_MESSAGE: "remote-chat:im-message",
 } as const;
 
-// Network 相关通道（代理 + 请求日志）
-export const NETWORK_CHANNELS = {
-	// 代理配置
-	GET_PROXY_CONFIG: "network:get-proxy-config",
-	SET_PROXY_CONFIG: "network:set-proxy-config",
-	TEST_PROXY: "network:test-proxy",
-	// 请求日志
-	GET_REQUEST_LOG: "network:get-request-log",
-	SET_LOG_ENABLED: "network:set-log-enabled",
-	GET_LOG_ENABLED: "network:get-log-enabled",
-	CLEAR_REQUEST_LOG: "network:clear-request-log",
-	// 实时推送 (main → renderer)
-	REQUEST_LOG_ENTRY: "network:request-log-entry",
-} as const;
-
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_SDK_CHANNELS)[keyof typeof AGENT_SDK_CHANNELS]
@@ -340,5 +325,4 @@ export type IPCChannel =
 	| (typeof IMBOT_CHANNELS)[keyof typeof IMBOT_CHANNELS]
 	| (typeof REMOTE_DEVICE_CHANNELS)[keyof typeof REMOTE_DEVICE_CHANNELS]
 	| (typeof REMOTE_CONTROL_CHANNELS)[keyof typeof REMOTE_CONTROL_CHANNELS]
-	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS]
-	| (typeof NETWORK_CHANNELS)[keyof typeof NETWORK_CHANNELS];
+	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS];

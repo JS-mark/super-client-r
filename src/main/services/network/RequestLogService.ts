@@ -4,9 +4,8 @@
  */
 
 import { EventEmitter } from "events";
-import { BrowserWindow } from "electron";
 import axios from "axios";
-import { NETWORK_CHANNELS } from "../../ipc/channels";
+import { broadcastEvent } from "../../ipc/events";
 import { storeManager } from "../../store/StoreManager";
 import type { RequestLogEntry } from "../../ipc/types";
 import { logger as rootLogger } from "../../utils/logger";
@@ -286,15 +285,7 @@ export class RequestLogService extends EventEmitter {
 		}
 
 		// 广播到所有渲染窗口
-		try {
-			for (const win of BrowserWindow.getAllWindows()) {
-				if (!win.isDestroyed()) {
-					win.webContents.send(NETWORK_CHANNELS.REQUEST_LOG_ENTRY, entry);
-				}
-			}
-		} catch {
-			// 窗口可能已关闭
-		}
+		broadcastEvent("network:request-log-entry", entry);
 
 		this.emit("entry", entry);
 	}

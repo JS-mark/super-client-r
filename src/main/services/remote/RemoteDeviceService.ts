@@ -2,8 +2,7 @@ import { EventEmitter } from "events";
 import WebSocket, { WebSocketServer } from "ws";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
-import { BrowserWindow } from "electron";
-import { REMOTE_DEVICE_CHANNELS } from "../../ipc/channels";
+import { broadcastEvent } from "../../ipc/events";
 import type {
 	RemoteDevice,
 	CommandResult,
@@ -431,13 +430,11 @@ export class RemoteDeviceService extends EventEmitter {
 		// 只转发有效请求的输出
 		if (!this.pendingCommands.has(requestId)) return;
 
-		BrowserWindow.getAllWindows().forEach((win) => {
-			win.webContents.send(REMOTE_DEVICE_CHANNELS.COMMAND_OUTPUT, {
-				requestId,
-				deviceId,
-				stream,
-				data,
-			});
+		broadcastEvent("remote-device:command-output", {
+			requestId,
+			deviceId,
+			stream,
+			data,
 		});
 	}
 

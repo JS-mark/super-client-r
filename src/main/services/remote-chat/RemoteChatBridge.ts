@@ -8,11 +8,10 @@
  * - Persists remote messages per conversation
  */
 
-import { BrowserWindow } from "electron";
 import { EventEmitter } from "events";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { REMOTE_CHAT_CHANNELS } from "../../ipc/channels";
+import { broadcastEvent } from "../../ipc/events";
 import type { RemoteBinding, RemoteIMMessage } from "../../ipc/types";
 import type { RemoteChatMessage } from "../../ipc/types";
 import type { IMBotService } from "../imbot/IMBotService";
@@ -218,9 +217,7 @@ export class RemoteChatBridge extends EventEmitter {
 				};
 
 				// Broadcast to all renderer windows
-				BrowserWindow.getAllWindows().forEach((win) => {
-					win.webContents.send(REMOTE_CHAT_CHANNELS.IM_MESSAGE, imMessage);
-				});
+				broadcastEvent("remote-chat:im-message", imMessage);
 
 				// Persist as incoming message
 				const inMsg: RemoteChatMessage = {

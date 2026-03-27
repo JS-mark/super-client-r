@@ -1,5 +1,5 @@
-import { BrowserWindow } from "electron";
 import os from "os";
+import { broadcastEvent } from "../../ipc/events";
 import { nanoid } from "nanoid";
 import type { RemoteDeviceService } from "./RemoteDeviceService";
 import type { IMBotService } from "../imbot/IMBotService";
@@ -13,8 +13,6 @@ import type {
 	RemoteDevice,
 	CommandResult,
 } from "./types";
-
-const CHANNEL_NEW_EVENT = "remote-control:new-event";
 
 /**
  * 远程控制事件枢纽
@@ -150,11 +148,7 @@ export class RemoteControlEventService {
 		this.storeManager.appendRemoteControlEvent(event);
 
 		// 广播到所有窗口
-		for (const win of BrowserWindow.getAllWindows()) {
-			if (!win.isDestroyed()) {
-				win.webContents.send(CHANNEL_NEW_EVENT, event);
-			}
-		}
+		broadcastEvent("remote-control:new-event", event);
 	}
 
 	/**
