@@ -3,55 +3,49 @@
  * 统一注册所有 IPC 处理器
  */
 
+// ─── 旧架构：手动注册（逐步迁移到 Typed IPC Proxy） ───
 import { registerAgentHandlers } from "./handlers/agentHandlers";
 import { registerAgentSDKHandlers } from "./handlers/agentSDKHandlers";
 import { registerApiHandlers } from "./handlers/apiHandlers";
 import { registerAppHandlers } from "./handlers/appHandlers";
-import { registerAuthHandlers } from "./handlers/authHandlers";
-import { registerChatHandlers } from "./handlers/chatHandlers";
 import { registerFileHandlers } from "./handlers/fileHandlers";
 import { registerLogHandlers } from "./handlers/logHandlers";
 import { registerModelHandlers } from "./handlers/modelHandlers";
 import { registerFloatWidgetHandlers } from "./handlers/floatWidgetHandlers";
 import { registerMcpHandlers } from "./handlers/mcpHandlers";
 import { registerPluginHandlers } from "./handlers/pluginHandlers";
-import { registerSearchHandlers } from "./handlers/searchHandlers";
-import { registerSkillHandlers } from "./handlers/skillHandlers";
-import { registerWebhookHandlers } from "./handlers/webhookHandlers";
 import { registerWindowControlHandlers } from "./handlers/windowHandlers";
 import { registerIMBotHandlers } from "./handlers/imbotHandlers";
 import { registerRemoteDeviceHandlers } from "./handlers/remoteDeviceHandlers";
 import { registerRemoteControlHandlers } from "./handlers/remoteControlHandlers";
 import { registerRemoteChatHandlers } from "./handlers/remoteChatHandlers";
-import { registerNetworkHandlers } from "./handlers/networkHandlers";
-import { registerAppConfigHandlers } from "./handlers/appConfigHandler";
+
+// ─── 新架构：Typed IPC Proxy 自动注册 ───
+import { registerProxyHandlers } from "./api-impl";
 
 /**
  * 注册所有 IPC 处理器
  */
 export function registerIpcHandlers(): void {
+	// 旧架构 handlers（待迁移）
 	registerAgentHandlers();
 	registerAgentSDKHandlers();
-	registerAuthHandlers();
-	registerChatHandlers();
-	registerSkillHandlers();
 	registerMcpHandlers();
 	registerAppHandlers();
 	registerApiHandlers();
 	registerWindowControlHandlers();
 	registerFloatWidgetHandlers();
-	registerSearchHandlers();
 	registerPluginHandlers();
 	registerFileHandlers();
 	registerLogHandlers();
-	registerModelHandlers();
-	registerWebhookHandlers();
+	registerModelHandlers(); // 仅 LLM streaming，Model CRUD 已迁移
 	registerIMBotHandlers();
 	registerRemoteDeviceHandlers();
 	registerRemoteControlHandlers();
 	registerRemoteChatHandlers();
-	registerNetworkHandlers();
-	registerAppConfigHandlers();
+
+	// 新架构：webhook, auth, appConfig, search, skill, chat, network, model(CRUD)
+	registerProxyHandlers();
 }
 
 export * from "./channels";

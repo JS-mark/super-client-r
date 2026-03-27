@@ -4,7 +4,7 @@
  */
 
 import { app } from "electron";
-import { broadcastConfigUpdate } from "../../ipc/handlers/appConfigHandler";
+import { broadcastEvent } from "../../ipc/events";
 import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
 import { authService } from "../auth/AuthService";
@@ -231,7 +231,7 @@ class AppConfigService {
 		}
 
 		// 广播配置更新到所有窗口
-		broadcastConfigUpdate(config);
+		broadcastEvent("app-config:config-updated", config);
 
 		logger.info("[AppConfigService] Config applied successfully");
 	}
