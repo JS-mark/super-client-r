@@ -54,50 +54,6 @@ export const AGENT_CHANNELS = {
 	STREAM_EVENT: "agent:stream-event",
 } as const;
 
-// Skill 相关通道
-export const SKILL_CHANNELS = {
-	// 获取已安装 skills
-	LIST_SKILLS: "skill:list",
-	// 安装 skill
-	INSTALL_SKILL: "skill:install",
-	// 卸载 skill
-	UNINSTALL_SKILL: "skill:uninstall",
-	// 获取 skill 详情
-	GET_SKILL: "skill:get",
-	// 执行 skill
-	EXECUTE_SKILL: "skill:execute",
-	// 获取 skill 系统提示词
-	GET_SYSTEM_PROMPT: "skill:get-system-prompt",
-	// 获取 command 提示词
-	GET_COMMAND_PROMPT: "skill:get-command-prompt",
-	// 校验 skill
-	VALIDATE_SKILL: "skill:validate-skill",
-} as const;
-
-// Chat 相关通道
-export const CHAT_CHANNELS = {
-	// 对话管理
-	LIST_CONVERSATIONS: "chat:list-conversations",
-	CREATE_CONVERSATION: "chat:create-conversation",
-	DELETE_CONVERSATION: "chat:delete-conversation",
-	RENAME_CONVERSATION: "chat:rename-conversation",
-	// 消息管理
-	GET_MESSAGES: "chat:get-messages",
-	SAVE_MESSAGES: "chat:save-messages",
-	APPEND_MESSAGE: "chat:append-message",
-	UPDATE_MESSAGE: "chat:update-message",
-	CLEAR_MESSAGES: "chat:clear-messages",
-	// 上次对话
-	GET_LAST_CONVERSATION: "chat:get-last-conversation",
-	SET_LAST_CONVERSATION: "chat:set-last-conversation",
-	// 对话目录
-	GET_CONVERSATION_DIR: "chat:get-conversation-dir",
-	// 工作目录
-	GET_WORKSPACE_DIR: "chat:get-workspace-dir",
-	// 更新对话元数据
-	UPDATE_METADATA: "chat:update-conversation-metadata",
-} as const;
-
 // MCP 相关通道
 export const MCP_CHANNELS = {
 	// 连接 MCP 服务器
@@ -206,24 +162,6 @@ export const THEME_CHANNELS = {
 	ON_CHANGE: "theme:on-change",
 } as const;
 
-// 搜索相关通道
-export const SEARCH_CHANNELS = {
-	// 获取所有搜索配置
-	GET_CONFIGS: "search:get-configs",
-	// 保存搜索配置
-	SAVE_CONFIG: "search:save-config",
-	// 删除搜索配置
-	DELETE_CONFIG: "search:delete-config",
-	// 设置默认搜索引擎
-	SET_DEFAULT: "search:set-default",
-	// 获取默认搜索引擎
-	GET_DEFAULT: "search:get-default",
-	// 验证搜索配置
-	VALIDATE_CONFIG: "search:validate-config",
-	// 执行搜索
-	EXECUTE: "search:execute",
-} as const;
-
 // 日志系统相关通道
 export const LOG_CHANNELS = {
 	// 查询日志
@@ -240,16 +178,6 @@ export const LOG_CHANNELS = {
 	EXPORT: "log:export",
 	// 打开日志查看器窗口
 	OPEN_VIEWER: "log:open-viewer",
-} as const;
-
-// Auth 相关通道
-export const AUTH_CHANNELS = {
-	// OAuth 登录
-	LOGIN: "auth:login",
-	// 登出
-	LOGOUT: "auth:logout",
-	// 获取当前用户
-	GET_USER: "auth:get-user",
 } as const;
 
 // 更新相关通道
@@ -289,28 +217,6 @@ export const FILE_CHANNELS = {
 	COPY_FILE: "file:copy-file",
 } as const;
 
-// Model Provider 相关通道
-export const MODEL_CHANNELS = {
-	// 获取所有 providers
-	LIST_PROVIDERS: "model:list-providers",
-	// 获取单个 provider
-	GET_PROVIDER: "model:get-provider",
-	// 保存 provider (新建或更新)
-	SAVE_PROVIDER: "model:save-provider",
-	// 删除 provider
-	DELETE_PROVIDER: "model:delete-provider",
-	// 测试连接
-	TEST_CONNECTION: "model:test-connection",
-	// 获取可用模型列表
-	FETCH_MODELS: "model:fetch-models",
-	// 更新单个模型配置
-	UPDATE_MODEL_CONFIG: "model:update-model-config",
-	// 获取当前活跃模型
-	GET_ACTIVE_MODEL: "model:get-active-model",
-	// 设置活跃模型
-	SET_ACTIVE_MODEL: "model:set-active-model",
-} as const;
-
 // LLM 调用相关通道
 export const LLM_CHANNELS = {
 	// 发起聊天补全请求
@@ -342,14 +248,6 @@ export const PLUGIN_CHANNELS = {
 	// 更新
 	CHECK_UPDATES: "plugin:checkUpdates",
 	UPDATE_PLUGIN: "plugin:updatePlugin",
-} as const;
-
-// Webhook 通知相关通道
-export const WEBHOOK_CHANNELS = {
-	GET_CONFIGS: "webhook:get-configs",
-	SAVE_CONFIG: "webhook:save-config",
-	DELETE_CONFIG: "webhook:delete-config",
-	TEST_WEBHOOK: "webhook:test",
 } as const;
 
 // IM Bot 相关通道
@@ -423,41 +321,24 @@ export const NETWORK_CHANNELS = {
 	REQUEST_LOG_ENTRY: "network:request-log-entry",
 } as const;
 
-// App Config 相关通道
-export const APP_CONFIG_CHANNELS = {
-	// 获取当前配置
-	GET_CONFIG: "app-config:get-config",
-	// 刷新配置
-	REFRESH: "app-config:refresh",
-	// 配置更新事件 (main → renderer)
-	CONFIG_UPDATED: "app-config:config-updated",
-} as const;
-
 // 所有通道的联合类型
 export type IPCChannel =
 	| (typeof AGENT_SDK_CHANNELS)[keyof typeof AGENT_SDK_CHANNELS]
 	| (typeof AGENT_CHANNELS)[keyof typeof AGENT_CHANNELS]
-	| (typeof SKILL_CHANNELS)[keyof typeof SKILL_CHANNELS]
-	| (typeof CHAT_CHANNELS)[keyof typeof CHAT_CHANNELS]
 	| (typeof MCP_CHANNELS)[keyof typeof MCP_CHANNELS]
 	| (typeof APP_CHANNELS)[keyof typeof APP_CHANNELS]
 	| (typeof API_CHANNELS)[keyof typeof API_CHANNELS]
 	| (typeof WINDOW_CHANNELS)[keyof typeof WINDOW_CHANNELS]
 	| (typeof FLOAT_WIDGET_CHANNELS)[keyof typeof FLOAT_WIDGET_CHANNELS]
 	| (typeof THEME_CHANNELS)[keyof typeof THEME_CHANNELS]
-	| (typeof SEARCH_CHANNELS)[keyof typeof SEARCH_CHANNELS]
 	| (typeof LOG_CHANNELS)[keyof typeof LOG_CHANNELS]
 	| (typeof FILE_CHANNELS)[keyof typeof FILE_CHANNELS]
-	| (typeof AUTH_CHANNELS)[keyof typeof AUTH_CHANNELS]
 	| (typeof UPDATE_CHANNELS)[keyof typeof UPDATE_CHANNELS]
-	| (typeof MODEL_CHANNELS)[keyof typeof MODEL_CHANNELS]
 	| (typeof LLM_CHANNELS)[keyof typeof LLM_CHANNELS]
 	| (typeof SYSTEM_CHANNELS)[keyof typeof SYSTEM_CHANNELS]
 	| (typeof PLUGIN_CHANNELS)[keyof typeof PLUGIN_CHANNELS]
-	| (typeof WEBHOOK_CHANNELS)[keyof typeof WEBHOOK_CHANNELS]
 	| (typeof IMBOT_CHANNELS)[keyof typeof IMBOT_CHANNELS]
 	| (typeof REMOTE_DEVICE_CHANNELS)[keyof typeof REMOTE_DEVICE_CHANNELS]
 	| (typeof REMOTE_CONTROL_CHANNELS)[keyof typeof REMOTE_CONTROL_CHANNELS]
 	| (typeof REMOTE_CHAT_CHANNELS)[keyof typeof REMOTE_CHAT_CHANNELS]
-	| (typeof NETWORK_CHANNELS)[keyof typeof NETWORK_CHANNELS]
-	| (typeof APP_CONFIG_CHANNELS)[keyof typeof APP_CONFIG_CHANNELS];
+	| (typeof NETWORK_CHANNELS)[keyof typeof NETWORK_CHANNELS];

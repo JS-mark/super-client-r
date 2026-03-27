@@ -79,10 +79,6 @@ export type {
 	SendRemoteMessageRequest,
 	ConversationSummary,
 	ConversationData,
-	AppendMessageRequest,
-	UpdateMessageRequest,
-	SaveMessagesRequest,
-	RenameConversationRequest,
 	IMPlatform,
 } from "@super-client/shared-types/chat";
 
@@ -301,31 +297,14 @@ export interface ActiveModelSelection {
 	modelId: string;
 }
 
-export interface TestConnectionRequest {
-	baseUrl: string;
-	apiKey: string;
-}
-
 export interface TestConnectionResponse {
 	success: boolean;
 	latencyMs: number;
 	error?: string;
 }
 
-export interface FetchModelsRequest {
-	baseUrl: string;
-	apiKey: string;
-	preset?: ModelProviderPreset;
-}
-
 export interface FetchModelsResponse {
 	models: ProviderModel[];
-}
-
-export interface UpdateModelConfigRequest {
-	providerId: string;
-	modelId: string;
-	config: Partial<Omit<ProviderModel, "id">>;
 }
 
 export interface ChatCompletionRequest {

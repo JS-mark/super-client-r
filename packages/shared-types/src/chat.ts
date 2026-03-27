@@ -109,30 +109,5 @@ export interface ConversationData extends ConversationSummary {
 	messages: ChatMessagePersist[];
 }
 
-/** 追加消息请求 */
-export interface AppendMessageRequest {
-	conversationId: string;
-	message: ChatMessagePersist;
-}
-
-/** 更新消息请求 */
-export interface UpdateMessageRequest {
-	conversationId: string;
-	messageId: string;
-	updates: Partial<ChatMessagePersist>;
-}
-
-/** 保存消息请求 */
-export interface SaveMessagesRequest {
-	conversationId: string;
-	messages: ChatMessagePersist[];
-}
-
-/** 重命名对话请求 */
-export interface RenameConversationRequest {
-	conversationId: string;
-	name: string;
-}
-
 /** IM 平台 */
 export type IMPlatform = "dingtalk" | "lark" | "telegram";
