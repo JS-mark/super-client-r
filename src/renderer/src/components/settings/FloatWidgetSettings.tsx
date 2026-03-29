@@ -38,9 +38,9 @@ export const FloatWidgetSettings: React.FC = () => {
 			checked,
 		);
 		if (checked) {
-			window.electron.ipc.send("float-widget:show");
+			window.electron.ipc.invoke("float-widget:show");
 		} else {
-			window.electron.ipc.send("float-widget:hide");
+			window.electron.ipc.invoke("float-widget:hide");
 		}
 	};
 

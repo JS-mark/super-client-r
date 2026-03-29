@@ -1,24 +1,27 @@
 import type { PluginInfo, PluginCommand, MarketPlugin } from "../types/plugin";
-// IPC 通道定义（与主进程保持一致）
+
+/**
+ * IPC 通道定义（kebab-case，与 api-impl registerAPI 自动生成的 channel 对齐）
+ */
 const PLUGIN_CHANNELS = {
-	GET_ALL_PLUGINS: "plugin:getAll",
-	GET_PLUGIN: "plugin:get",
-	INSTALL_PLUGIN: "plugin:install",
-	UNINSTALL_PLUGIN: "plugin:uninstall",
-	ENABLE_PLUGIN: "plugin:enable",
-	DISABLE_PLUGIN: "plugin:disable",
-	ACTIVATE_PLUGIN: "plugin:activate",
-	DEACTIVATE_PLUGIN: "plugin:deactivate",
-	SEARCH_MARKET: "plugin:searchMarket",
-	GET_MARKET_PLUGIN: "plugin:getMarketPlugin",
-	DOWNLOAD_PLUGIN: "plugin:download",
-	GET_COMMANDS: "plugin:getCommands",
-	EXECUTE_COMMAND: "plugin:executeCommand",
-	GET_STORAGE: "plugin:getStorage",
-	SET_STORAGE: "plugin:setStorage",
-	DELETE_STORAGE: "plugin:deleteStorage",
-	GET_KEYBINDINGS: "plugin:getKeybindings",
-	SET_KEYBINDINGS: "plugin:setKeybindings",
+	GET_ALL_PLUGINS: "plugin:get-all-plugins",
+	GET_PLUGIN: "plugin:get-plugin",
+	INSTALL_PLUGIN: "plugin:install-plugin",
+	UNINSTALL_PLUGIN: "plugin:uninstall-plugin",
+	ENABLE_PLUGIN: "plugin:enable-plugin",
+	DISABLE_PLUGIN: "plugin:disable-plugin",
+	ACTIVATE_PLUGIN: "plugin:activate-plugin",
+	DEACTIVATE_PLUGIN: "plugin:deactivate-plugin",
+	SEARCH_MARKET: "plugin:search-market",
+	GET_MARKET_PLUGIN: "plugin:get-market-plugin",
+	DOWNLOAD_PLUGIN: "plugin:download-plugin",
+	GET_COMMANDS: "plugin:get-commands",
+	EXECUTE_COMMAND: "plugin:execute-command",
+	GET_STORAGE: "plugin:get-storage",
+	SET_STORAGE: "plugin:set-storage",
+	DELETE_STORAGE: "plugin:delete-storage",
+	GET_KEYBINDINGS: "plugin:get-keybindings",
+	SET_KEYBINDINGS: "plugin:set-keybindings",
 } as const;
 
 interface IPCResult<T = unknown> {
@@ -40,7 +43,6 @@ export const pluginService = {
 	async getAllPlugins(): Promise<PluginInfo[]> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_ALL_PLUGINS,
-			{},
 		)) as IPCResult<PluginInfo[]>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -54,7 +56,7 @@ export const pluginService = {
 	async getPlugin(pluginId: string): Promise<PluginInfo> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult<PluginInfo>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -69,7 +71,7 @@ export const pluginService = {
 	async installPlugin(sourcePath?: string): Promise<PluginInfo> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.INSTALL_PLUGIN,
-			{ sourcePath },
+			sourcePath,
 		)) as IPCResult<PluginInfo>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -83,7 +85,7 @@ export const pluginService = {
 	async uninstallPlugin(pluginId: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.UNINSTALL_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -96,7 +98,7 @@ export const pluginService = {
 	async enablePlugin(pluginId: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.ENABLE_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -109,7 +111,7 @@ export const pluginService = {
 	async disablePlugin(pluginId: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.DISABLE_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -122,7 +124,7 @@ export const pluginService = {
 	async activatePlugin(pluginId: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.ACTIVATE_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -135,7 +137,7 @@ export const pluginService = {
 	async deactivatePlugin(pluginId: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.DEACTIVATE_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -153,7 +155,8 @@ export const pluginService = {
 	): Promise<MarketPlugin[]> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.SEARCH_MARKET,
-			{ query, category },
+			query,
+			category,
 		)) as IPCResult<MarketPlugin[]>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -167,7 +170,7 @@ export const pluginService = {
 	async getMarketPlugin(pluginId: string): Promise<MarketPlugin> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_MARKET_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult<MarketPlugin>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -181,7 +184,7 @@ export const pluginService = {
 	async downloadPlugin(pluginId: string): Promise<PluginInfo> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.DOWNLOAD_PLUGIN,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult<PluginInfo>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -197,7 +200,7 @@ export const pluginService = {
 	async getCommands(pluginId?: string): Promise<PluginCommand[]> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_COMMANDS,
-			{ pluginId },
+			pluginId,
 		)) as IPCResult<PluginCommand[]>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -214,7 +217,8 @@ export const pluginService = {
 	): Promise<T> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.EXECUTE_COMMAND,
-			{ command, args },
+			command,
+			args,
 		)) as IPCResult<T>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -230,7 +234,8 @@ export const pluginService = {
 	async getStorage<T>(pluginId: string, key: string): Promise<T | undefined> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_STORAGE,
-			{ pluginId, key },
+			pluginId,
+			key,
 		)) as IPCResult<T>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -244,7 +249,9 @@ export const pluginService = {
 	async setStorage<T>(pluginId: string, key: string, value: T): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.SET_STORAGE,
-			{ pluginId, key, value },
+			pluginId,
+			key,
+			value,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -257,7 +264,8 @@ export const pluginService = {
 	async deleteStorage(pluginId: string, key: string): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.DELETE_STORAGE,
-			{ pluginId, key },
+			pluginId,
+			key,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -272,7 +280,6 @@ export const pluginService = {
 	async getKeybindings(): Promise<Record<string, string>> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.GET_KEYBINDINGS,
-			{},
 		)) as IPCResult<Record<string, string>>;
 		if (!result.success) {
 			throw new Error(result.error);
@@ -286,7 +293,7 @@ export const pluginService = {
 	async setKeybindings(keybindings: Record<string, string>): Promise<void> {
 		const result = (await window.electron.ipc.invoke(
 			PLUGIN_CHANNELS.SET_KEYBINDINGS,
-			{ keybindings },
+			keybindings,
 		)) as IPCResult;
 		if (!result.success) {
 			throw new Error(result.error);

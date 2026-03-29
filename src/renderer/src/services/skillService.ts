@@ -11,7 +11,7 @@ const getProxyUrl = async (path: string) => {
 	if (!serverPort) {
 		try {
 			serverPort = (await window.electron.ipc.invoke(
-				"get-server-port",
+				"api:get-server-port",
 			)) as number;
 		} catch (e) {
 			console.error("Failed to get server port", e);

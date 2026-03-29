@@ -465,31 +465,6 @@ import type { IMBotConfig, BotStatus } from "../services/imbot/types";
 
 export type { IMBotConfig, BotStatus };
 
-export interface StartBotRequest {
-	config: IMBotConfig;
-}
-
-export interface SendMessageRequest {
-	botId: string;
-	chatId: string;
-	content: string;
-}
-
-// ============ Remote Device 相关类型 ============
-
-export interface RegisterDeviceRequest {
-	name: string;
-	platform: "linux" | "windows" | "macos";
-	tags?: string[];
-	description?: string;
-}
-
-export interface ExecuteCommandRequest {
-	deviceId: string;
-	command: string;
-	timeout?: number;
-}
-
 // ============ Network 相关类型（代理 + 请求日志）============
 
 export interface ProxyConfig {

@@ -1454,49 +1454,95 @@ export interface AppInitConfig {
 // ============ 实现 ============
 
 const electronAPI: ElectronAPI = {
-	// Window API
-	window: {
-		minimize: () => ipcRenderer.invoke("window:minimize"),
-		maximize: () => ipcRenderer.invoke("window:maximize"),
-		close: () => ipcRenderer.invoke("window:close"),
-		isMaximized: () => ipcRenderer.invoke("window:is-maximized"),
-		onMaximizeChange: (callback) => {
-			const listener = (_event: unknown, isMaximized: boolean) =>
-				callback(isMaximized);
-			ipcRenderer.on("window:on-maximize-change", listener);
-			return () => ipcRenderer.off("window:on-maximize-change", listener);
-		},
-	},
+	// ─── Auto-bridged namespaces ─────────────────
+	// createBridge 根据方法名列表生成普通对象（contextBridge 不支持 Proxy）
+	window: createBridge<ElectronAPI["window"]>("window", [
+		"minimize", "maximize", "close", "isMaximized", "onMaximizeChange",
+	]),
+	agent: createBridge<ElectronAPI["agent"]>("agent", [
+		"createSession", "sendMessage", "getStatus", "stopAgent",
+		"listAgents", "getMessages", "clearMessages", "deleteSession",
+		"onStreamEvent",
+	]),
+	skill: createBridge<ElectronAPI["skill"]>("skill", [
+		"listSkills", "installSkill", "uninstallSkill", "getSkill",
+		"executeSkill", "getAllTools", "enableSkill", "disableSkill",
+		"getSystemPrompt", "getCommandPrompt", "validateSkill",
+	]),
+	chat: createBridge<ElectronAPI["chat"]>("chat", [
+		"listConversations", "createConversation", "deleteConversation",
+		"renameConversation", "getMessages", "saveMessages", "appendMessage",
+		"updateMessage", "clearMessages", "getLastConversation",
+		"setLastConversation", "getConversationDir", "getWorkspaceDir",
+		"updateConversationMetadata",
+	]),
+	theme: createBridge<ElectronAPI["theme"]>("theme", [
+		"get", "set", "onChange",
+	]),
+	search: createBridge<ElectronAPI["search"]>("search", [
+		"getConfigs", "saveConfig", "deleteConfig", "setDefault",
+		"getDefault", "validateConfig", "execute",
+	]),
+	file: createBridge<ElectronAPI["file"]>("file", [
+		"selectFiles", "readFile", "saveAttachment", "deleteAttachment",
+		"listAttachments", "openAttachment", "getAttachmentPath", "copyFile",
+	]),
+	log: createBridge<ElectronAPI["log"]>("log", [
+		"query", "getStats", "getModules", "rendererLog",
+		"clearDb", "exportLogs", "openViewer",
+	]),
+	auth: createBridge<ElectronAPI["auth"]>("auth", [
+		"login", "logout", "getUser",
+	]),
+	update: createBridge<ElectronAPI["update"]>("update", [
+		"check", "download", "install",
+		"onChecking", "onAvailable", "onNotAvailable",
+		"onProgress", "onDownloaded", "onError",
+	]),
+	model: createBridge<ElectronAPI["model"]>("model", [
+		"listProviders", "getProvider", "saveProvider", "deleteProvider",
+		"testConnection", "fetchModels", "updateModelConfig",
+		"getActiveModel", "setActiveModel",
+	]),
+	agentSDK: createBridge<ElectronAPI["agentSDK"]>("agentSDK", [
+		"createQuery", "interrupt", "close", "listSessions",
+		"getSessionInfo", "setModel", "resolvePermission", "onStreamEvent",
+		"forkSession", "renameSession", "tagSession", "getSessionMessages",
+		"getConfig", "setConfig", "getProfiles", "setProfiles",
+		"getTeams", "setTeams",
+	]),
+	imbot: createBridge<ElectronAPI["imbot"]>("imbot", [
+		"listBots", "startBot", "stopBot", "getBotStatus", "sendMessage",
+	]),
+	remoteChat: createBridge<ElectronAPI["remoteChat"]>("remoteChat", [
+		"bind", "unbind", "getBinding", "checkBotOnline",
+		"sendMessage", "getRemoteMessages", "onIMMessage",
+	]),
+	remoteDevice: createBridge<ElectronAPI["remoteDevice"]>("remoteDevice", [
+		"listDevices", "registerDevice", "removeDevice", "getDevice",
+		"executeCommand", "onCommandOutput", "killCommand",
+		"tabComplete", "getCwd", "getRelayConfig", "setRelayConfig",
+	]),
+	remoteControl: createBridge<ElectronAPI["remoteControl"]>("remoteControl", [
+		"getEvents", "clearEvents", "getConnectionInfo", "onNewEvent",
+	]),
+	network: createBridge<ElectronAPI["network"]>("network", [
+		"getProxyConfig", "setProxyConfig", "testProxy",
+		"getLogEnabled", "setLogEnabled", "getRequestLog",
+		"clearRequestLog", "onRequestLogEntry",
+	]),
+	webhook: createBridge<ElectronAPI["webhook"]>("webhook", [
+		"getConfigs", "saveConfig", "deleteConfig", "test",
+	]),
+	appConfig: createBridge<ElectronAPI["appConfig"]>("appConfig", [
+		"getConfig", "refresh", "onConfigUpdated",
+	]),
+	system: createBridge<ElectronAPI["system"]>("system", [
+		"getHomedir", "getEnvInfo", "getProcessMetrics",
+	]),
 
-	// Agent API
-	agent: {
-		createSession: (config) =>
-			ipcRenderer.invoke("agent:create-session", config),
-		sendMessage: (sessionId, content) =>
-			ipcRenderer.invoke("agent:send-message", sessionId, content),
-		getStatus: (sessionId) => ipcRenderer.invoke("agent:get-status", sessionId),
-		stopAgent: (sessionId) => ipcRenderer.invoke("agent:stop-agent", sessionId),
-		listAgents: () => ipcRenderer.invoke("agent:list-agents"),
-		getMessages: (sessionId) =>
-			ipcRenderer.invoke("agent:get-messages", sessionId),
-		clearMessages: (sessionId) =>
-			ipcRenderer.invoke("agent:clear-messages", sessionId),
-		deleteSession: (sessionId) =>
-			ipcRenderer.invoke("agent:delete-session", sessionId),
-		onStreamEvent: (callback) => {
-			const listener = (_event: unknown, data: AgentStreamEvent) =>
-				callback(data);
-			ipcRenderer.on("agent:stream-event", listener);
-			return () => ipcRenderer.off("agent:stream-event", listener);
-		},
-	},
-
-	// Skill API → auto-bridged
-	skill: createBridge<ElectronAPI["skill"]>("skill"),
-
-	// MCP API
+	// ─── MCP（嵌套结构，需手动映射到不同 namespace）─────
 	mcp: {
-		// 基础管理
 		connect: (id) => ipcRenderer.invoke("mcp:connect", id),
 		disconnect: (id) => ipcRenderer.invoke("mcp:disconnect", id),
 		listServers: () => ipcRenderer.invoke("mcp:list-servers"),
@@ -1504,212 +1550,69 @@ const electronAPI: ElectronAPI = {
 		addServer: (config) => ipcRenderer.invoke("mcp:add-server", config),
 		removeServer: (id) => ipcRenderer.invoke("mcp:remove-server", id),
 		updateServer: (id, config) =>
-			ipcRenderer.invoke("mcp:update-server", { id, config }),
+			ipcRenderer.invoke("mcp:update-server", id, config),
 		getAllStatus: () => ipcRenderer.invoke("mcp:get-all-status"),
 		callTool: (serverId, toolName, args) =>
 			ipcRenderer.invoke("mcp:call-tool", serverId, toolName, args),
 		getAllTools: () => ipcRenderer.invoke("mcp:get-all-tools"),
-		// 内置 MCP
 		builtin: {
-			getDefinitions: () => ipcRenderer.invoke("mcp:builtin:get-definitions"),
+			getDefinitions: () =>
+				ipcRenderer.invoke("mcp-builtin:get-definitions"),
 			createConfig: (definitionId, config) =>
-				ipcRenderer.invoke("mcp:builtin:create-config", {
+				ipcRenderer.invoke(
+					"mcp-builtin:create-config",
 					definitionId,
 					config,
-				}),
-			search: (params) => ipcRenderer.invoke("mcp:builtin:search", params),
+				),
+			search: (params) =>
+				ipcRenderer.invoke("mcp-builtin:search", params),
 		},
-		// 第三方 MCP
 		thirdParty: {
-			add: (config) => ipcRenderer.invoke("mcp:thirdparty:add", config),
+			add: (config) => ipcRenderer.invoke("mcp-thirdparty:add", config),
 			proxy: (serverId, request) =>
-				ipcRenderer.invoke("mcp:thirdparty:proxy", { serverId, request }),
+				ipcRenderer.invoke(
+					"mcp-thirdparty:proxy",
+					serverId,
+					request,
+				),
 		},
-		// MCP 市场
 		market: {
-			search: (params) => ipcRenderer.invoke("mcp:market:search", params),
-			getPopular: (limit) => ipcRenderer.invoke("mcp:market:popular", limit),
-			getTopRated: (limit) => ipcRenderer.invoke("mcp:market:top-rated", limit),
-			getNewest: (limit) => ipcRenderer.invoke("mcp:market:newest", limit),
-			getDetail: (id) => ipcRenderer.invoke("mcp:market:get-detail", id),
-			getTags: () => ipcRenderer.invoke("mcp:market:get-tags"),
+			search: (params) =>
+				ipcRenderer.invoke("mcp-market:search", params),
+			getPopular: (limit) =>
+				ipcRenderer.invoke("mcp-market:popular", limit),
+			getTopRated: (limit) =>
+				ipcRenderer.invoke("mcp-market:top-rated", limit),
+			getNewest: (limit) =>
+				ipcRenderer.invoke("mcp-market:newest", limit),
+			getDetail: (id) =>
+				ipcRenderer.invoke("mcp-market:get-detail", id),
+			getTags: () => ipcRenderer.invoke("mcp-market:get-tags"),
 			install: (marketItem, customConfig) =>
-				ipcRenderer.invoke("mcp:market:install", { marketItem, customConfig }),
+				ipcRenderer.invoke(
+					"mcp-market:install",
+					marketItem,
+					customConfig,
+				),
 			getReadme: (marketItem) =>
-				ipcRenderer.invoke("mcp:market:get-readme", marketItem),
-			setApiUrl: (url) => ipcRenderer.invoke("mcp:market:set-api-url", url),
+				ipcRenderer.invoke("mcp-market:get-readme", marketItem),
+			setApiUrl: (url) =>
+				ipcRenderer.invoke("mcp-market:set-api-url", url),
 		},
 	},
 
-	// Chat History API → auto-bridged
-	chat: createBridge<ElectronAPI["chat"]>("chat"),
-
-	// 主题 API
-	theme: {
-		get: () => ipcRenderer.invoke("theme:get"),
-		set: (mode: string) => ipcRenderer.invoke("theme:set", mode),
-		onChange: (callback: (mode: string) => void) => {
-			const listener = (_event: unknown, mode: string) => callback(mode);
-			ipcRenderer.on("theme:on-change", listener);
-			return () => ipcRenderer.off("theme:on-change", listener);
-		},
-	},
-
-	// 搜索配置 API → auto-bridged
-	search: createBridge<ElectronAPI["search"]>("search"),
-
-	// 文件附件 API
-	file: {
-		selectFiles: (options) => ipcRenderer.invoke("file:select-files", options),
-		readFile: (filePath, options) =>
-			ipcRenderer.invoke("file:read-file", filePath, options),
-		saveAttachment: (data) => ipcRenderer.invoke("file:save-attachment", data),
-		deleteAttachment: (attachmentPath) =>
-			ipcRenderer.invoke("file:delete-attachment", attachmentPath),
-		listAttachments: (filter) =>
-			ipcRenderer.invoke("file:list-attachments", filter),
-		openAttachment: (attachmentPath) =>
-			ipcRenderer.invoke("file:open-attachment", attachmentPath),
-		getAttachmentPath: () => ipcRenderer.invoke("file:get-attachment-path"),
-		copyFile: (filePath) => ipcRenderer.invoke("file:copy-file", filePath),
-	},
-
-	// 日志系统 API
-	log: {
-		query: (params) => ipcRenderer.invoke("log:query", params),
-		getStats: () => ipcRenderer.invoke("log:get-stats"),
-		getModules: () => ipcRenderer.invoke("log:get-modules"),
-		rendererLog: (entry) => ipcRenderer.invoke("log:renderer-log", entry),
-		clearDb: () => ipcRenderer.invoke("log:clear-db"),
-		exportLogs: (params) => ipcRenderer.invoke("log:export", params),
-		openViewer: () => ipcRenderer.invoke("log:open-viewer"),
-	},
-
-	// Auth API → auto-bridged
-	auth: createBridge<ElectronAPI["auth"]>("auth"),
-
-	// Update API
-	update: {
-		check: () => ipcRenderer.invoke("app:check-update"),
-		download: () => ipcRenderer.invoke("update:download"),
-		install: () => ipcRenderer.invoke("update:install"),
-		onChecking: (callback: () => void) => {
-			const listener = () => callback();
-			ipcRenderer.on("update:checking", listener);
-			return () => ipcRenderer.off("update:checking", listener);
-		},
-		onAvailable: (callback: (info: unknown) => void) => {
-			const listener = (_event: unknown, info: unknown) => callback(info);
-			ipcRenderer.on("update:available", listener);
-			return () => ipcRenderer.off("update:available", listener);
-		},
-		onNotAvailable: (callback: (info: unknown) => void) => {
-			const listener = (_event: unknown, info: unknown) => callback(info);
-			ipcRenderer.on("update:not-available", listener);
-			return () => ipcRenderer.off("update:not-available", listener);
-		},
-		onProgress: (
-			callback: (progress: {
-				percent: number;
-				bytesPerSecond: number;
-				transferred: number;
-				total: number;
-			}) => void,
-		) => {
-			const listener = (
-				_event: unknown,
-				progress: {
-					percent: number;
-					bytesPerSecond: number;
-					transferred: number;
-					total: number;
-				},
-			) => callback(progress);
-			ipcRenderer.on("update:progress", listener);
-			return () => ipcRenderer.off("update:progress", listener);
-		},
-		onDownloaded: (callback: (info: unknown) => void) => {
-			const listener = (_event: unknown, info: unknown) => callback(info);
-			ipcRenderer.on("update:downloaded", listener);
-			return () => ipcRenderer.off("update:downloaded", listener);
-		},
-		onError: (callback: (error: string) => void) => {
-			const listener = (_event: unknown, error: string) => callback(error);
-			ipcRenderer.on("update:error", listener);
-			return () => ipcRenderer.off("update:error", listener);
-		},
-	},
-
-	// Model Provider API → auto-bridged
-	model: createBridge<ElectronAPI["model"]>("model"),
-
-	// Agent SDK API
-	agentSDK: {
-		createQuery: (requestId: string, request: AgentSDKQueryRequest) =>
-			ipcRenderer.invoke("agent-sdk:create-query", { requestId, request }),
-		interrupt: (requestId: string) =>
-			ipcRenderer.invoke("agent-sdk:interrupt", { requestId }),
-		close: (requestId: string) =>
-			ipcRenderer.invoke("agent-sdk:close", { requestId }),
-		listSessions: (dir?: string) =>
-			ipcRenderer.invoke("agent-sdk:list-sessions", { dir }),
-		getSessionInfo: (sessionId: string) =>
-			ipcRenderer.invoke("agent-sdk:get-session-info", { sessionId }),
-		setModel: (requestId: string, model: string) =>
-			ipcRenderer.invoke("agent-sdk:set-model", { requestId, model }),
-		resolvePermission: (toolUseId: string, allowed: boolean, updatedInput?: Record<string, unknown>) =>
-			ipcRenderer.invoke("agent-sdk:permission-response", {
-				toolUseId,
-				allowed,
-				updatedInput,
-			}),
-		onStreamEvent: (callback: (event: AgentSDKStreamEvent) => void) => {
-			const listener = (_event: unknown, data: AgentSDKStreamEvent) =>
-				callback(data);
-			ipcRenderer.on("agent-sdk:stream-event", listener);
-			return () => ipcRenderer.off("agent-sdk:stream-event", listener);
-		},
-		// Session 操作
-		forkSession: (sessionId: string, dir?: string) =>
-			ipcRenderer.invoke("agent-sdk:fork-session", { sessionId, dir }),
-		renameSession: (sessionId: string, title: string, dir?: string) =>
-			ipcRenderer.invoke("agent-sdk:rename-session", {
-				sessionId,
-				title,
-				dir,
-			}),
-		tagSession: (sessionId: string, tag: string, dir?: string) =>
-			ipcRenderer.invoke("agent-sdk:tag-session", {
-				sessionId,
-				tag,
-				dir,
-			}),
-		getSessionMessages: (sessionId: string, dir?: string) =>
-			ipcRenderer.invoke("agent-sdk:get-session-messages", {
-				sessionId,
-				dir,
-			}),
-		// 配置
-		getConfig: () => ipcRenderer.invoke("agent-sdk:get-config"),
-		setConfig: (config: AgentSDKConfig) =>
-			ipcRenderer.invoke("agent-sdk:set-config", { config }),
-		// Multi-Agent 角色和团队
-		getProfiles: () => ipcRenderer.invoke("agent-sdk:get-profiles"),
-		setProfiles: (profiles: AgentProfile[]) =>
-			ipcRenderer.invoke("agent-sdk:set-profiles", { profiles }),
-		getTeams: () => ipcRenderer.invoke("agent-sdk:get-teams"),
-		setTeams: (teams: AgentTeam[]) =>
-			ipcRenderer.invoke("agent-sdk:set-teams", { teams }),
-	},
-
-	// LLM API
+	// ─── LLM（streaming，保留手动注册）────────────
 	llm: {
 		chatCompletion: (request) =>
 			ipcRenderer.invoke("llm:chat-completion", request),
-		stopStream: (requestId: string) =>
+		stopStream: (requestId) =>
 			ipcRenderer.invoke("llm:stop-stream", requestId),
-		toolApprovalResponse: (toolCallId: string, approved: boolean) =>
-			ipcRenderer.invoke("llm:tool-approval-response", toolCallId, approved),
+		toolApprovalResponse: (toolCallId, approved) =>
+			ipcRenderer.invoke(
+				"llm:tool-approval-response",
+				toolCallId,
+				approved,
+			),
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => {
 			const listener = (_event: unknown, data: ChatStreamEvent) =>
 				callback(data);
@@ -1718,11 +1621,12 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// 皮肤 API
+	// ─── Skin（跨 namespace 映射到 plugin:* channels）──
 	skin: {
-		getActiveSkin: () => ipcRenderer.invoke("plugin:getActiveSkin"),
-		setActiveSkin: (pluginId: string | null, themeId?: string) =>
-			ipcRenderer.invoke("plugin:setActiveSkin", { pluginId, themeId }),
+		getActiveSkin: () =>
+			ipcRenderer.invoke("plugin:get-active-skin"),
+		setActiveSkin: (pluginId, themeId) =>
+			ipcRenderer.invoke("plugin:set-active-skin", pluginId, themeId),
 		onTokensChanged: (
 			callback: (tokens: Record<string, unknown> | null) => void,
 		) => {
@@ -1735,249 +1639,87 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
-	// Markdown 主题 API
+	// ─── Markdown Theme（跨 namespace 映射到 plugin:* channels）──
 	markdownTheme: {
-		getActive: () => ipcRenderer.invoke("plugin:getActiveMarkdownTheme"),
-		setActive: (pluginId: string | null, themeId?: string) =>
-			ipcRenderer.invoke("plugin:setActiveMarkdownTheme", {
+		getActive: () =>
+			ipcRenderer.invoke("plugin:get-active-markdown-theme"),
+		setActive: (pluginId, themeId) =>
+			ipcRenderer.invoke(
+				"plugin:set-active-markdown-theme",
 				pluginId,
 				themeId,
-			}),
-		getCSS: () => ipcRenderer.invoke("plugin:getMarkdownThemeCSS"),
+			),
+		getCSS: () =>
+			ipcRenderer.invoke("plugin:get-markdown-theme-css"),
 		onCSSChanged: (callback: (css: string | null) => void) => {
-			const listener = (_event: unknown, css: string | null) => callback(css);
+			const listener = (_event: unknown, css: string | null) =>
+				callback(css);
 			ipcRenderer.on("markdown-theme:css-changed", listener);
-			return () => ipcRenderer.off("markdown-theme:css-changed", listener);
+			return () =>
+				ipcRenderer.off("markdown-theme:css-changed", listener);
 		},
 	},
 
-	// 插件扩展 API
+	// ─── Plugin（事件 channel 使用 camelCase，需手动映射）──
 	plugin: {
-		grantPermissions: (pluginId: string, permissions: string[]) =>
-			ipcRenderer.invoke("plugin:grantPermissions", {
+		grantPermissions: (pluginId, permissions) =>
+			ipcRenderer.invoke(
+				"plugin:grant-permissions",
 				pluginId,
 				permissions,
-			}),
-		getPermissions: (pluginId: string) =>
-			ipcRenderer.invoke("plugin:getPermissions", { pluginId }),
-		getUIContributions: () => ipcRenderer.invoke("plugin:getUIContributions"),
-		getPluginPageHTML: (pluginId: string, pagePath: string) =>
-			ipcRenderer.invoke("plugin:getPluginPageHTML", {
+			),
+		getPermissions: (pluginId) =>
+			ipcRenderer.invoke("plugin:get-permissions", pluginId),
+		getUIContributions: () =>
+			ipcRenderer.invoke("plugin:get-ui-contributions"),
+		getPluginPageHTML: (pluginId, pagePath) =>
+			ipcRenderer.invoke(
+				"plugin:get-plugin-page-html",
 				pluginId,
 				pagePath,
-			}),
-		installDev: (sourcePath: string) =>
-			ipcRenderer.invoke("plugin:installDev", { sourcePath }),
-		reloadDev: (pluginId: string) =>
-			ipcRenderer.invoke("plugin:reloadDev", { pluginId }),
-		checkUpdates: () => ipcRenderer.invoke("plugin:checkUpdates"),
-		updatePlugin: (pluginId: string) =>
-			ipcRenderer.invoke("plugin:updatePlugin", { pluginId }),
-		onUIContributionsChanged: (callback: (contributions: unknown) => void) => {
+			),
+		installDev: (sourcePath) =>
+			ipcRenderer.invoke("plugin:install-dev", sourcePath),
+		reloadDev: (pluginId) =>
+			ipcRenderer.invoke("plugin:reload-dev", pluginId),
+		checkUpdates: () => ipcRenderer.invoke("plugin:check-updates"),
+		updatePlugin: (pluginId) =>
+			ipcRenderer.invoke("plugin:update-plugin", pluginId),
+		onUIContributionsChanged: (
+			callback: (contributions: unknown) => void,
+		) => {
 			const listener = (_event: unknown, contributions: unknown) =>
 				callback(contributions);
 			ipcRenderer.on("plugin:ui-contributions-changed", listener);
-			return () => ipcRenderer.off("plugin:ui-contributions-changed", listener);
+			return () =>
+				ipcRenderer.off("plugin:ui-contributions-changed", listener);
 		},
-		onShowMessage: (
-			callback: (data: {
-				type: string;
-				message: string;
-				items: string[];
-				pluginId: string;
-				responseChannel: string;
-			}) => void,
-		) => {
-			const listener = (
-				_event: unknown,
-				data: {
-					type: string;
-					message: string;
-					items: string[];
-					pluginId: string;
-					responseChannel: string;
-				},
-			) => callback(data);
+		onShowMessage: (callback) => {
+			const listener = (_event: unknown, data: unknown) =>
+				callback(data as any);
 			ipcRenderer.on("plugin:showMessage", listener);
 			return () => ipcRenderer.off("plugin:showMessage", listener);
 		},
-		onShowInputBox: (
-			callback: (data: {
-				options: unknown;
-				pluginId: string;
-				responseChannel: string;
-			}) => void,
-		) => {
-			const listener = (
-				_event: unknown,
-				data: {
-					options: unknown;
-					pluginId: string;
-					responseChannel: string;
-				},
-			) => callback(data);
+		onShowInputBox: (callback) => {
+			const listener = (_event: unknown, data: unknown) =>
+				callback(data as any);
 			ipcRenderer.on("plugin:showInputBox", listener);
 			return () => ipcRenderer.off("plugin:showInputBox", listener);
 		},
-		onShowQuickPick: (
-			callback: (data: {
-				items: unknown[];
-				options: unknown;
-				pluginId: string;
-				responseChannel: string;
-			}) => void,
-		) => {
-			const listener = (
-				_event: unknown,
-				data: {
-					items: unknown[];
-					options: unknown;
-					pluginId: string;
-					responseChannel: string;
-				},
-			) => callback(data);
+		onShowQuickPick: (callback) => {
+			const listener = (_event: unknown, data: unknown) =>
+				callback(data as any);
 			ipcRenderer.on("plugin:showQuickPick", listener);
 			return () => ipcRenderer.off("plugin:showQuickPick", listener);
 		},
 	},
 
-	// IM Bot API
-	imbot: {
-		listBots: () => ipcRenderer.invoke("imbot:list"),
-		startBot: (config) =>
-			ipcRenderer.invoke("imbot:start", { payload: { config } }),
-		stopBot: (botId) =>
-			ipcRenderer.invoke("imbot:stop", { payload: { botId } }),
-		getBotStatus: (botId) =>
-			ipcRenderer.invoke("imbot:get-status", { payload: { botId } }),
-		sendMessage: (botId, chatId, content) =>
-			ipcRenderer.invoke("imbot:send-message", {
-				payload: { botId, chatId, content },
-			}),
-	},
-
-	// Remote Device API
-	remoteDevice: {
-		listDevices: () => ipcRenderer.invoke("remote-device:list"),
-		registerDevice: (req) =>
-			ipcRenderer.invoke("remote-device:register", { payload: req }),
-		removeDevice: (deviceId) =>
-			ipcRenderer.invoke("remote-device:remove", { payload: { deviceId } }),
-		getDevice: (deviceId) =>
-			ipcRenderer.invoke("remote-device:get", { payload: { deviceId } }),
-		executeCommand: (deviceId, command, timeout) =>
-			ipcRenderer.invoke("remote-device:execute-command", {
-				payload: { deviceId, command, timeout },
-			}),
-		onCommandOutput: (
-			callback: (data: {
-				requestId: string;
-				deviceId: string;
-				stream: "stdout" | "stderr";
-				data: string;
-			}) => void,
-		) => {
-			const listener = (
-				_event: unknown,
-				data: {
-					requestId: string;
-					deviceId: string;
-					stream: "stdout" | "stderr";
-					data: string;
-				},
-			) => callback(data);
-			ipcRenderer.on("remote-device:command-output", listener);
-			return () =>
-				ipcRenderer.off("remote-device:command-output", listener);
-		},
-		killCommand: (deviceId: string, requestId: string) =>
-			ipcRenderer.invoke("remote-device:kill-command", {
-				payload: { deviceId, requestId },
-			}),
-		tabComplete: (deviceId: string, line: string, cursorPos: number) =>
-			ipcRenderer.invoke("remote-device:tab-complete", {
-				payload: { deviceId, line, cursorPos },
-			}),
-		getCwd: (deviceId: string) =>
-			ipcRenderer.invoke("remote-device:get-cwd", {
-				payload: { deviceId },
-			}),
-		getRelayConfig: () =>
-			ipcRenderer.invoke("remote-device:get-relay-config"),
-		setRelayConfig: (config: RelayConfig) =>
-			ipcRenderer.invoke("remote-device:set-relay-config", {
-				payload: config,
-			}),
-	},
-
-	// Remote Control Events API
-	remoteControl: {
-		getEvents: () => ipcRenderer.invoke("remote-control:get-events"),
-		clearEvents: () => ipcRenderer.invoke("remote-control:clear-events"),
-		getConnectionInfo: () =>
-			ipcRenderer.invoke("remote-control:get-connection-info"),
-		onNewEvent: (callback: (event: RemoteControlEvent) => void) => {
-			const listener = (_event: unknown, data: RemoteControlEvent) =>
-				callback(data);
-			ipcRenderer.on("remote-control:new-event", listener);
-			return () => ipcRenderer.off("remote-control:new-event", listener);
-		},
-	},
-
-	// Remote Chat Bridge API
-	remoteChat: {
-		bind: (conversationId: string, botId: string, chatId: string) =>
-			ipcRenderer.invoke("remote-chat:bind", {
-				payload: { conversationId, botId, chatId },
-			}),
-		unbind: (conversationId: string) =>
-			ipcRenderer.invoke("remote-chat:unbind", {
-				payload: { conversationId },
-			}),
-		getBinding: (conversationId: string) =>
-			ipcRenderer.invoke("remote-chat:get-binding", {
-				payload: { conversationId },
-			}),
-		checkBotOnline: (botId: string) =>
-			ipcRenderer.invoke("remote-chat:check-bot-online", {
-				payload: { botId },
-			}),
-		sendMessage: (conversationId: string, content: string) =>
-			ipcRenderer.invoke("remote-chat:send-message", {
-				payload: { conversationId, content },
-			}),
-		getRemoteMessages: (conversationId: string) =>
-			ipcRenderer.invoke("remote-chat:get-remote-messages", {
-				payload: { conversationId },
-			}),
-		onIMMessage: (callback: (message: RemoteIMMessage) => void) => {
-			const listener = (_event: unknown, data: RemoteIMMessage) =>
-				callback(data);
-			ipcRenderer.on("remote-chat:im-message", listener);
-			return () => ipcRenderer.off("remote-chat:im-message", listener);
-		},
-	},
-
-	// Network API → auto-bridged（含 onRequestLogEntry 事件）
-	network: createBridge<ElectronAPI["network"]>("network"),
-
-	// Webhook API → auto-bridged
-	webhook: createBridge<ElectronAPI["webhook"]>("webhook"),
-
-	// App Config API → auto-bridged（含 onConfigUpdated 事件）
-	appConfig: createBridge<ElectronAPI["appConfig"]>("appConfig"),
-
-	// 系统信息 API
-	system: {
-		getHomedir: () => ipcRenderer.invoke("system:get-homedir"),
-		getEnvInfo: () => ipcRenderer.invoke("system:get-env-info"),
-		getProcessMetrics: () => ipcRenderer.invoke("system:get-process-metrics"),
-	},
-
-	// 通用 IPC
+	// ─── 通用 IPC ──────────────────────────────
 	ipc: {
 		on: (channel, listener) =>
-			ipcRenderer.on(channel, (event, ...args) => listener(event, ...args)),
+			ipcRenderer.on(channel, (event, ...args) =>
+				listener(event, ...args),
+			),
 		off: (channel, listener) => ipcRenderer.off(channel, listener),
 		send: (channel, ...args) => ipcRenderer.send(channel, ...args),
 		invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),

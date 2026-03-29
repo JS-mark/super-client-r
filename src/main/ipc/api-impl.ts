@@ -19,7 +19,24 @@
  *   - channel "skill:get-system-prompt" → method 应为 `getSystemPrompt`
  */
 
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import {
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	statSync,
+} from "fs";
+import { promises as fsPromises } from "fs";
+import os from "os";
+import { basename, extname, join } from "path";
+import * as path from "path";
+
 import { registerAPI } from "./register";
+import { broadcastEvent } from "./events";
+
+// ─── Services ──────────────────────────────
 import { storeManager } from "../store/StoreManager";
 import { webhookService } from "../services/market/WebhookService";
 import { authService } from "../services/auth/AuthService";
@@ -30,6 +47,44 @@ import { getSkillService } from "../services/skill/SkillService";
 import { proxyService } from "../services/network/ProxyService";
 import { requestLogService } from "../services/network/RequestLogService";
 import { llmService } from "../services/llm";
+import { localServer } from "../server";
+import { getOrCreateApiKey } from "../server/config";
+import { logDatabaseService } from "../services/log";
+import { updateService } from "../services/updateService";
+import { agentService } from "../services/agent/AgentService";
+import type { AgentConfig } from "../services/agent/AgentService";
+import { agentSDKService } from "../services/agent/AgentSDKService";
+import {
+	BUILTIN_PROFILES,
+	BUILTIN_TEAMS,
+	BUILTIN_VERSION,
+} from "../services/agent/builtinTeams";
+import { mcpService } from "../services/mcp/McpService";
+import { builtinMcpService } from "../services/mcp/BuiltinMcpService";
+import { thirdPartyMcpService } from "../services/mcp/ThirdPartyMcpService";
+import { mcpMarketService } from "../services/mcp/McpMarketService";
+import {
+	getPluginManager,
+	resetPluginManager,
+} from "../services/plugin/PluginManager";
+import {
+	BUILTIN_MARKET_PLUGINS,
+	BUILTIN_PLUGIN_SOURCES,
+} from "../services/plugin/builtin";
+
+// ─── Service Holders ───────────────────────
+import {
+	getIMBotService,
+	getRemoteDeviceService,
+	getRemoteControlEventService,
+	getRemoteChatBridge,
+	getFloatingWindow,
+	getFloatWidgetVisible,
+	setFloatWidgetVisible,
+	getLogViewerOpener,
+} from "./service-holders";
+
+// ─── Types ─────────────────────────────────
 import type {
 	WebhookConfig,
 	SearchExecuteRequest,
@@ -39,12 +94,188 @@ import type {
 	ModelProvider,
 	ModelProviderPreset,
 	ActiveModelSelection,
+	LogQueryParams,
+	RendererLogEntry,
+	McpServerConfig,
+	McpMarketSearchParams,
+	McpMarketItem,
+	IMBotConfig,
+	BotStatus,
+	RelayConfig,
+	AgentSDKConfig,
+	AgentProfile,
+	AgentTeam,
 } from "./types";
 import type { SearchConfig, SearchProviderType } from "../store";
 
+// ─── Helper Functions ──────────────────────
+
+const PORT_MIN = 1024;
+const PORT_MAX = 65535;
+
+function validatePort(port: number): void {
+	if (isNaN(port)) throw new Error("Port must be a number");
+	if (!Number.isInteger(port)) throw new Error("Port must be an integer");
+	if (port < PORT_MIN || port > PORT_MAX) {
+		throw new Error(`Port must be between ${PORT_MIN} and ${PORT_MAX}`);
+	}
+}
+
+/**
+ * 从文件末尾高效读取最后 N 行
+ */
+async function readLastLines(
+	filePath: string,
+	lineCount: number,
+): Promise<string> {
+	const fs = await import("fs");
+	const CHUNK_SIZE = 16384;
+
+	return new Promise((resolve, reject) => {
+		try {
+			const fd = fs.openSync(filePath, "r");
+			const stats = fs.fstatSync(fd);
+			const fileSize = stats.size;
+
+			if (fileSize === 0) {
+				fs.closeSync(fd);
+				resolve("");
+				return;
+			}
+
+			if (fileSize <= CHUNK_SIZE) {
+				const buffer = Buffer.alloc(fileSize);
+				fs.readSync(fd, buffer, 0, fileSize, 0);
+				fs.closeSync(fd);
+				const lines = buffer.toString("utf-8").split("\n");
+				resolve(lines.slice(-lineCount).join("\n"));
+				return;
+			}
+
+			let position = fileSize;
+			const chunks: Buffer[] = [];
+			let totalBytes = 0;
+			let foundLines = 0;
+
+			while (position > 0 && foundLines <= lineCount) {
+				const chunkSize = Math.min(CHUNK_SIZE, position);
+				position -= chunkSize;
+				const chunkBuffer = Buffer.alloc(chunkSize);
+				fs.readSync(fd, chunkBuffer, 0, chunkSize, position);
+				chunks.unshift(chunkBuffer);
+				totalBytes += chunkSize;
+				const currentContent = Buffer.concat(chunks).toString("utf-8");
+				foundLines = currentContent.split("\n").length - 1;
+				if (totalBytes >= 262144) break;
+			}
+
+			fs.closeSync(fd);
+			const content = Buffer.concat(chunks).toString("utf-8");
+			const lines = content.split("\n");
+			const startIndex = position > 0 ? 1 : 0;
+			resolve(lines.slice(startIndex).slice(-lineCount).join("\n"));
+		} catch (err) {
+			reject(err);
+		}
+	});
+}
+
+// ─── File attachment helpers ───────────────
+
+function getAttachmentsDir(conversationId?: string): string {
+	if (conversationId) {
+		return conversationStorage.getAttachmentsDir(conversationId);
+	}
+	const dir = join(app.getPath("userData"), "attachments");
+	if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+	return dir;
+}
+
+function generateUniqueFileName(originalName: string): string {
+	const ext = extname(originalName);
+	const base = basename(originalName, ext);
+	const timestamp = Date.now();
+	const random = Math.random().toString(36).substring(2, 8);
+	return `${base}_${timestamp}_${random}${ext}`;
+}
+
+const IMAGE_EXTENSIONS = [
+	".jpg",
+	".jpeg",
+	".png",
+	".gif",
+	".webp",
+	".bmp",
+	".svg",
+];
+
+function getFileType(
+	mimeType: string,
+): "image" | "document" | "code" | "audio" | "video" | "archive" | "other" {
+	if (mimeType.startsWith("image/")) return "image";
+	if (mimeType.startsWith("audio/")) return "audio";
+	if (mimeType.startsWith("video/")) return "video";
+	if (
+		mimeType.includes("pdf") ||
+		mimeType.includes("word") ||
+		mimeType.includes("excel") ||
+		mimeType.includes("text")
+	)
+		return "document";
+	if (
+		mimeType.includes("zip") ||
+		mimeType.includes("rar") ||
+		mimeType.includes("7z")
+	)
+		return "archive";
+	if (
+		mimeType.includes("javascript") ||
+		mimeType.includes("typescript") ||
+		mimeType.includes("json") ||
+		mimeType.includes("html")
+	)
+		return "code";
+	return "other";
+}
+
+function inferMimeType(ext: string): string {
+	if (IMAGE_EXTENSIONS.includes(ext))
+		return `image/${ext.replace(".", "").replace("jpg", "jpeg")}`;
+	if (ext === ".pdf") return "application/pdf";
+	if (ext === ".txt") return "text/plain";
+	if (ext === ".md") return "text/markdown";
+	if (ext === ".json") return "application/json";
+	if (ext === ".js") return "application/javascript";
+	if (ext === ".html") return "text/html";
+	if (ext === ".css") return "text/css";
+	return "application/octet-stream";
+}
+
+// ─── Plugin builtin presets merge ──────────
+
+function mergeBuiltinPresets(): void {
+	const storedVersion = storeManager.getBuiltinAgentVersion();
+	if (storedVersion >= BUILTIN_VERSION) return;
+
+	const existingProfiles = storeManager.getAgentProfiles();
+	const builtinIds = new Set(BUILTIN_PROFILES.map((p) => p.id));
+	const userProfiles = existingProfiles.filter((p) => !builtinIds.has(p.id));
+	storeManager.setAgentProfiles([...BUILTIN_PROFILES, ...userProfiles]);
+
+	const existingTeams = storeManager.getAgentTeams();
+	const builtinTeamIds = new Set(BUILTIN_TEAMS.map((t) => t.id));
+	const userTeams = existingTeams.filter((t) => !builtinTeamIds.has(t.id));
+	storeManager.setAgentTeams([...BUILTIN_TEAMS, ...userTeams]);
+
+	storeManager.setBuiltinAgentVersion(BUILTIN_VERSION);
+}
+
+// ════════════════════════════════════════════
+// API Implementation
+// ════════════════════════════════════════════
+
 const apiImpl = {
 	// ─── Webhook ──────────────────────────────
-	// channels: webhook:get-configs, webhook:save-config, webhook:delete-config, webhook:test
 	webhook: {
 		getConfigs: () => storeManager.getWebhookConfigs(),
 		saveConfig: (config: WebhookConfig) =>
@@ -54,34 +285,26 @@ const apiImpl = {
 	},
 
 	// ─── Auth ─────────────────────────────────
-	// channels: auth:login, auth:logout, auth:get-user
 	auth: {
 		login: async (provider: AuthProvider) => {
 			const user = await authService.login(provider);
-			// 切换对话存储到用户目录
 			conversationStorage.setCurrentUser(user.id);
 			return user;
 		},
 		logout: async () => {
 			await authService.logout();
-			// 切换回匿名目录
 			conversationStorage.setCurrentUser(null);
 		},
 		getUser: () => authService.getUser(),
 	},
 
 	// ─── App Config ───────────────────────────
-	// channels: app-config:get-config, app-config:refresh
-	// broadcast 由 AppConfigService 直接调用 broadcastEvent()
 	appConfig: {
 		getConfig: () => appConfigService.getConfig(),
 		refresh: () => appConfigService.refresh(),
 	},
 
 	// ─── Search ───────────────────────────────
-	// channels: search:execute, search:get-configs, search:save-config,
-	//           search:delete-config, search:set-default, search:get-default,
-	//           search:validate-config
 	search: {
 		execute: (request: SearchExecuteRequest) =>
 			searchService.execute(request),
@@ -96,7 +319,6 @@ const apiImpl = {
 			storeManager.setDefaultSearchProvider(provider),
 		getDefault: () => storeManager.getDefaultSearchProvider(),
 		validateConfig: async (config: SearchConfig) => {
-			// SearXNG 不一定需要 apiKey
 			if (
 				(!config.apiKey || config.apiKey.trim() === "") &&
 				config.provider !== "searxng"
@@ -135,11 +357,6 @@ const apiImpl = {
 	},
 
 	// ─── Chat ─────────────────────────────────
-	// channels: chat:list-conversations, chat:create-conversation, chat:delete-conversation,
-	//           chat:rename-conversation, chat:get-messages, chat:save-messages,
-	//           chat:append-message, chat:update-message, chat:clear-messages,
-	//           chat:get-last-conversation, chat:set-last-conversation,
-	//           chat:get-conversation-dir, chat:get-workspace-dir, chat:update-conversation-metadata
 	chat: {
 		listConversations: () => conversationStorage.getConversationList(),
 		createConversation: (name: string) =>
@@ -181,25 +398,20 @@ const apiImpl = {
 	},
 
 	// ─── Network ──────────────────────────────
-	// channels: network:get-proxy-config, network:set-proxy-config, network:test-proxy,
-	//           network:get-log-enabled, network:set-log-enabled, network:get-request-log,
-	//           network:clear-request-log
 	network: {
 		getProxyConfig: () => proxyService.getConfig() ?? null,
-		setProxyConfig: (config: ProxyConfig) => proxyService.updateConfig(config),
-		testProxy: (config: ProxyConfig) => proxyService.testConnection(config),
+		setProxyConfig: (config: ProxyConfig) =>
+			proxyService.updateConfig(config),
+		testProxy: (config: ProxyConfig) =>
+			proxyService.testConnection(config),
 		getLogEnabled: () => requestLogService.getEnabled(),
-		setLogEnabled: (enabled: boolean) => requestLogService.setEnabled(enabled),
+		setLogEnabled: (enabled: boolean) =>
+			requestLogService.setEnabled(enabled),
 		getRequestLog: () => requestLogService.getEntries(),
 		clearRequestLog: () => requestLogService.clearEntries(),
 	},
 
-	// ─── Model ────────────────────────────────
-	// channels: model:list-providers, model:get-provider, model:save-provider,
-	//           model:delete-provider, model:test-connection, model:fetch-models,
-	//           model:update-model-config, model:get-active-model, model:set-active-model
-	// ⚠️ LLM streaming channels (llm:chat-completion, llm:stop-stream, llm:tool-approval-response)
-	//    仍在 modelHandlers.ts 手动注册
+	// ─── Model (CRUD only, streaming in modelHandlers) ─
 	model: {
 		listProviders: () => storeManager.getModelProviders(),
 		getProvider: (id: string) => {
@@ -217,26 +429,33 @@ const apiImpl = {
 			apiKey: string,
 			preset?: ModelProviderPreset,
 		) => {
-			const models = await llmService.fetchModels(baseUrl, apiKey, preset);
+			const models = await llmService.fetchModels(
+				baseUrl,
+				apiKey,
+				preset,
+			);
 			return { models };
 		},
 		updateModelConfig: (
 			providerId: string,
 			modelId: string,
 			config: Record<string, unknown>,
-		) => storeManager.updateModelConfig(providerId, modelId, config as any),
+		) =>
+			storeManager.updateModelConfig(
+				providerId,
+				modelId,
+				config as any,
+			),
 		getActiveModel: () => storeManager.getActiveModelSelection(),
 		setActiveModel: (selection: ActiveModelSelection | null) =>
 			storeManager.setActiveModelSelection(selection),
 	},
 
 	// ─── Skill ────────────────────────────────
-	// channels: skill:list-skills, skill:install-skill, skill:uninstall-skill, skill:get-skill,
-	//           skill:execute-skill, skill:get-system-prompt, skill:get-command-prompt,
-	//           skill:validate-skill, skill:get-all-tools, skill:enable-skill, skill:disable-skill
 	skill: {
 		listSkills: () => getSkillService().listSkills(),
-		installSkill: (source: string) => getSkillService().installSkill(source),
+		installSkill: (source: string) =>
+			getSkillService().installSkill(source),
 		uninstallSkill: (id: string) => getSkillService().uninstallSkill(id),
 		getSkill: (id: string) => {
 			const skill = getSkillService().getSkill(id);
@@ -258,11 +477,967 @@ const apiImpl = {
 		enableSkill: (id: string) => getSkillService().enableSkill(id),
 		disableSkill: (id: string) => getSkillService().disableSkill(id),
 	},
+
+	// ─── API Server ───────────────────────────
+	api: {
+		getStatus: () => localServer.getStatus(),
+		start: async () => {
+			const status = localServer.getStatus();
+			if (status.status === "running")
+				throw new Error("Server is already running");
+			await localServer.start();
+			return localServer.getStatus();
+		},
+		stop: async () => {
+			const status = localServer.getStatus();
+			if (status.status === "stopped")
+				throw new Error("Server is already stopped");
+			await localServer.stop();
+			return localServer.getStatus();
+		},
+		restart: async (port?: number) => {
+			if (port !== undefined) {
+				validatePort(port);
+				storeManager.setConfig("apiPort", port);
+			}
+			await localServer.restart(port);
+			return localServer.getStatus();
+		},
+		setPort: (port: number) => {
+			validatePort(port);
+			storeManager.setConfig("apiPort", port);
+			return true;
+		},
+		getServerPort: () => localServer.getPort(),
+		getApiKey: () => getOrCreateApiKey(),
+	},
+
+	// ─── Remote Control ───────────────────────
+	remoteControl: {
+		getEvents: () => getRemoteControlEventService().getEvents(),
+		clearEvents: () => getRemoteControlEventService().clearEvents(),
+		getConnectionInfo: () =>
+			getRemoteControlEventService().getConnectionInfo(),
+	},
+
+	// ─── IM Bot ───────────────────────────────
+	imbot: {
+		listBots: () => getIMBotService().getBotStatuses(),
+		startBot: (config: IMBotConfig) => getIMBotService().startBot(config),
+		stopBot: (botId: string) => getIMBotService().stopBot(botId),
+		getBotStatus: (botId: string) => {
+			const statuses = getIMBotService().getBotStatuses();
+			return (
+				statuses.find((s: BotStatus) => s.id === botId) || null
+			);
+		},
+		sendMessage: async (
+			botId: string,
+			chatId: string,
+			content: string,
+		) => {
+			const bot = getIMBotService()["bots"].get(botId);
+			if (!bot) throw new Error("Bot not found or not running");
+			await bot.sendMessage(chatId, content);
+		},
+	},
+
+	// ─── Remote Chat ──────────────────────────
+	remoteChat: {
+		bind: (conversationId: string, botId: string, chatId: string) =>
+			getRemoteChatBridge().bind(conversationId, botId, chatId),
+		unbind: (conversationId: string) =>
+			getRemoteChatBridge().unbind(conversationId),
+		getBinding: (conversationId: string) =>
+			getRemoteChatBridge().getBinding(conversationId) || null,
+		checkBotOnline: (botId: string) =>
+			getRemoteChatBridge().checkBotOnline(botId),
+		sendMessage: (conversationId: string, content: string) =>
+			getRemoteChatBridge().sendMessage(conversationId, content),
+		getRemoteMessages: (conversationId: string) =>
+			getRemoteChatBridge().getRemoteMessages(conversationId),
+	},
+
+	// ─── Remote Device ────────────────────────
+	remoteDevice: {
+		listDevices: () => getRemoteDeviceService().listDevices(),
+		registerDevice: async (req: {
+			name: string;
+			platform: "linux" | "windows" | "macos";
+			tags?: string[];
+			description?: string;
+		}) => {
+			const { nanoid } = await import("nanoid");
+			const device = getRemoteDeviceService().registerDevice({
+				id: nanoid(),
+				name: req.name,
+				platform: req.platform,
+				tags: req.tags,
+				description: req.description,
+			});
+			storeManager.saveRemoteDevice(device);
+			return device;
+		},
+		removeDevice: (deviceId: string) => {
+			const success = getRemoteDeviceService().removeDevice(deviceId);
+			if (success) storeManager.deleteRemoteDevice(deviceId);
+			return success;
+		},
+		getDevice: (deviceId: string) =>
+			getRemoteDeviceService().getDevice(deviceId) || null,
+		executeCommand: (
+			deviceId: string,
+			command: string,
+			timeout?: number,
+		) =>
+			getRemoteDeviceService().executeCommand(
+				deviceId,
+				command,
+				timeout,
+			),
+		killCommand: (deviceId: string, requestId: string) =>
+			getRemoteDeviceService().killCommand(deviceId, requestId),
+		tabComplete: (deviceId: string, line: string, cursorPos: number) =>
+			getRemoteDeviceService().tabComplete(deviceId, line, cursorPos),
+		getCwd: (deviceId: string) =>
+			getRemoteDeviceService().getCwd(deviceId),
+		getRelayConfig: () => storeManager.getRelayConfig() || null,
+		setRelayConfig: async (config: RelayConfig) => {
+			storeManager.setRelayConfig(config);
+			await getRemoteDeviceService().switchMode(config);
+		},
+	},
+
+	// ─── Window Control ───────────────────────
+	window: {
+		minimize: () => {
+			BrowserWindow.getFocusedWindow()?.minimize();
+		},
+		maximize: () => {
+			const win = BrowserWindow.getFocusedWindow();
+			if (win) {
+				if (win.isMaximized()) win.unmaximize();
+				else win.maximize();
+			}
+		},
+		close: () => {
+			BrowserWindow.getFocusedWindow()?.close();
+		},
+		isMaximized: () =>
+			BrowserWindow.getFocusedWindow()?.isMaximized() ?? false,
+	},
+
+	// ─── Float Widget ─────────────────────────
+	floatWidget: {
+		show: () => {
+			setFloatWidgetVisible(true);
+			storeManager.setConfig("floatWidgetEnabled", true);
+			getFloatingWindow()?.show();
+		},
+		hide: () => {
+			setFloatWidgetVisible(false);
+			storeManager.setConfig("floatWidgetEnabled", false);
+			getFloatingWindow()?.hide();
+		},
+		getStatus: () => ({ visible: getFloatWidgetVisible() }),
+	},
+
+	// ─── Log ──────────────────────────────────
+	log: {
+		query: (params: LogQueryParams) => logDatabaseService.query(params),
+		getStats: () => logDatabaseService.getStats(),
+		getModules: () => logDatabaseService.getModules(),
+		rendererLog: (entry: RendererLogEntry) => {
+			logDatabaseService.insert({
+				timestamp: new Date().toISOString(),
+				level: entry.level,
+				module: entry.module || "Renderer",
+				process: "renderer",
+				message: entry.message,
+				meta: entry.meta,
+				error_message: entry.error_message,
+				error_stack: entry.error_stack,
+			});
+		},
+		clearDb: () => logDatabaseService.clear(),
+		exportLogs: async (params: LogQueryParams) => {
+			const result = await dialog.showSaveDialog({
+				title: "导出日志",
+				defaultPath: `logs-export-${new Date().toISOString().slice(0, 10)}.json`,
+				filters: [{ name: "JSON", extensions: ["json"] }],
+			});
+			if (result.canceled || !result.filePath) return null;
+			const exportResult = logDatabaseService.exportToFile(
+				params,
+				result.filePath,
+			);
+			return { count: exportResult.count, filePath: result.filePath };
+		},
+		openViewer: () => {
+			getLogViewerOpener()?.();
+		},
+	},
+
+	// ─── App ──────────────────────────────────
+	app: {
+		getInfo: () => ({
+			name: app.getName(),
+			version: app.getVersion(),
+			electron: process.versions.electron,
+			node: process.versions.node,
+			v8: process.versions.v8,
+			platform: process.platform,
+			arch: process.arch,
+		}),
+		getUserDataPath: () => app.getPath("userData"),
+		openPath: async (p: string) => {
+			if (!p) throw new Error("Path is required");
+			const error = await shell.openPath(p);
+			if (error) throw new Error(error);
+			return true;
+		},
+		checkUpdate: () => updateService.checkForUpdates(),
+		quit: () => app.quit(),
+		relaunch: () => {
+			app.relaunch();
+			app.exit(0);
+		},
+		getLogsPath: () => join(app.getPath("userData"), "logs"),
+		listLogFiles: async () => {
+			const logsDir = join(app.getPath("userData"), "logs");
+			if (!existsSync(logsDir)) return [];
+			try {
+				const entries = await fsPromises.readdir(logsDir, {
+					withFileTypes: true,
+				});
+				const files = await Promise.all(
+					entries
+						.filter(
+							(entry) =>
+								entry.isFile() && entry.name.endsWith(".log"),
+						)
+						.map(async (entry) => {
+							const filePath = join(logsDir, entry.name);
+							const stats = await fsPromises.stat(filePath);
+							return {
+								name: entry.name,
+								path: filePath,
+								size: stats.size,
+								createdAt: stats.birthtime.toISOString(),
+								modifiedAt: stats.mtime.toISOString(),
+							};
+						}),
+				);
+				return files.sort((a, b) =>
+					b.modifiedAt.localeCompare(a.modifiedAt),
+				);
+			} catch {
+				return [];
+			}
+		},
+		getLogs: async (filePath?: string, tail?: number) => {
+			const logsDir = join(app.getPath("userData"), "logs");
+			let targetFile = filePath;
+			if (!targetFile) {
+				if (!existsSync(logsDir)) return "";
+				const files = readdirSync(logsDir)
+					.filter((f) => f.endsWith(".log"))
+					.sort()
+					.reverse();
+				if (files.length === 0) return "";
+				targetFile = join(logsDir, files[0]);
+			}
+			if (!existsSync(targetFile)) return "";
+			const lineCount = tail && tail > 0 ? tail : 500;
+			return readLastLines(targetFile, lineCount);
+		},
+		clearLogs: async () => {
+			const logsDir = join(app.getPath("userData"), "logs");
+			if (!existsSync(logsDir)) return true;
+			try {
+				const entries = await fsPromises.readdir(logsDir, {
+					withFileTypes: true,
+				});
+				const files = entries
+					.filter(
+						(entry) =>
+							entry.isFile() && entry.name.endsWith(".log"),
+					)
+					.map((entry) => join(logsDir, entry.name));
+				await Promise.all(
+					files.map((fp) =>
+						fsPromises.unlink(fp).catch(() => {}),
+					),
+				);
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		openExternal: async (url: string) => {
+			if (!url) throw new Error("URL is required");
+			await shell.openExternal(url);
+			return true;
+		},
+		getConfig: (key: string) => storeManager.getConfig(key as any),
+		setConfig: (key: string, value: unknown) => {
+			storeManager.setConfig(key as any, value);
+			return true;
+		},
+	},
+
+	// ─── Theme ────────────────────────────────
+	theme: {
+		get: () => storeManager.getConfig("theme") || "auto",
+		set: (themeMode: string) => {
+			storeManager.setConfig(
+				"theme",
+				themeMode as "light" | "dark" | "auto",
+			);
+			broadcastEvent("theme:change", themeMode);
+			return true;
+		},
+	},
+
+	// ─── System ───────────────────────────────
+	system: {
+		getHomedir: () => os.homedir(),
+		getEnvInfo: () => ({
+			os: `${os.type()} ${os.release()}`,
+			platform: process.platform,
+			arch: process.arch,
+			nodeVersion: process.versions.node,
+			electronVersion: process.versions.electron,
+			v8Version: process.versions.v8,
+			homedir: os.homedir(),
+			cwd: os.homedir(),
+			appVersion: app.getVersion(),
+			locale: app.getLocale(),
+		}),
+		getProcessMetrics: () => {
+			const mem = process.memoryUsage();
+			const cpuUsage = process.cpuUsage();
+			return {
+				heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+				heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+				rss: Math.round(mem.rss / 1024 / 1024),
+				systemTotal: Math.round(os.totalmem() / 1024 / 1024),
+				systemFree: Math.round(os.freemem() / 1024 / 1024),
+				cpuCores: os.cpus().length,
+				cpuModel: os.cpus()[0]?.model || "N/A",
+				cpuUser: cpuUsage.user,
+				cpuSystem: cpuUsage.system,
+				uptime: Math.round(process.uptime()),
+				pid: process.pid,
+			};
+		},
+	},
+
+	// ─── Update ───────────────────────────────
+	update: {
+		check: () => updateService.checkForUpdates(),
+		download: () => updateService.downloadUpdate(),
+		install: () => updateService.quitAndInstall(),
+	},
+
+	// ─── File ─────────────────────────────────
+	file: {
+		selectFiles: async (options?: {
+			multiple?: boolean;
+			filters?: { name: string; extensions: string[] }[];
+		}) => {
+			const result = await dialog.showOpenDialog({
+				properties: options?.multiple
+					? ["openFile", "multiSelections"]
+					: ["openFile"],
+				filters: options?.filters || [
+					{ name: "所有文件", extensions: ["*"] },
+					{
+						name: "图片",
+						extensions: ["jpg", "jpeg", "png", "gif", "webp"],
+					},
+					{
+						name: "文档",
+						extensions: ["pdf", "doc", "docx", "txt", "md"],
+					},
+					{
+						name: "代码",
+						extensions: ["js", "ts", "json", "html", "css", "py"],
+					},
+				],
+			});
+			if (result.canceled || !result.filePaths.length) return [];
+			return result.filePaths.map((fp) => {
+				const stats = statSync(fp);
+				const ext = extname(fp).toLowerCase();
+				return {
+					path: fp,
+					name: basename(fp),
+					size: stats.size,
+					mimeType: inferMimeType(ext),
+				};
+			});
+		},
+		readFile: (
+			filePath: string,
+			options?: { encoding?: BufferEncoding; maxSize?: number },
+		) => {
+			if (!existsSync(filePath))
+				throw new Error("文件不存在");
+			const stats = statSync(filePath);
+			const maxSize = options?.maxSize || 10 * 1024 * 1024;
+			if (stats.size > maxSize) throw new Error("文件过大");
+			const encoding = options?.encoding || "utf-8";
+			const content = readFileSync(filePath, { encoding });
+			return { content, size: stats.size };
+		},
+		saveAttachment: (data: {
+			sourcePath: string;
+			conversationId?: string;
+			messageId?: string;
+			customName?: string;
+		}) => {
+			const { sourcePath, conversationId, messageId, customName } = data;
+			if (!existsSync(sourcePath))
+				throw new Error("源文件不存在");
+			const attachmentsDir = getAttachmentsDir(conversationId);
+			const originalName = customName || basename(sourcePath);
+			const uniqueName = generateUniqueFileName(originalName);
+			const targetPath = join(attachmentsDir, uniqueName);
+			copyFileSync(sourcePath, targetPath);
+			const stats = statSync(targetPath);
+			const ext = extname(originalName).toLowerCase();
+			const mimeType = inferMimeType(ext);
+			return {
+				id: uniqueName.replace(extname(uniqueName), ""),
+				name: uniqueName,
+				originalName,
+				path: targetPath,
+				size: stats.size,
+				mimeType,
+				type: getFileType(mimeType),
+				createdAt: new Date().toISOString(),
+				conversationId,
+				messageId,
+			};
+		},
+		deleteAttachment: async (attachmentPath: string) => {
+			if (existsSync(attachmentPath)) {
+				await fsPromises.unlink(attachmentPath);
+			}
+		},
+		listAttachments: (filter?: { conversationId?: string }) => {
+			const attachmentsDir = getAttachmentsDir(filter?.conversationId);
+			if (!existsSync(attachmentsDir)) return [];
+			const files = readdirSync(attachmentsDir);
+			const attachments = files
+				.map((file) => {
+					const filePath = join(attachmentsDir, file);
+					const stats = statSync(filePath);
+					if (!stats.isFile()) return null;
+					const ext = extname(file).toLowerCase();
+					const mimeType = inferMimeType(ext);
+					return {
+						id: file.replace(ext, ""),
+						name: file,
+						originalName: file,
+						path: filePath,
+						size: stats.size,
+						mimeType,
+						type: getFileType(mimeType),
+						createdAt: stats.birthtime.toISOString(),
+					};
+				})
+				.filter(Boolean);
+			attachments.sort(
+				(a: any, b: any) =>
+					new Date(b.createdAt).getTime() -
+					new Date(a.createdAt).getTime(),
+			);
+			return attachments;
+		},
+		openAttachment: async (attachmentPath: string) => {
+			if (!existsSync(attachmentPath))
+				throw new Error("文件不存在");
+			const error = await shell.openPath(attachmentPath);
+			if (error) throw new Error(error);
+		},
+		getAttachmentPath: () => getAttachmentsDir(),
+		copyFile: (filePath: string) => {
+			if (!existsSync(filePath))
+				throw new Error("文件不存在");
+			return true;
+		},
+	},
+
+	// ─── Agent (RPC only, streaming in streamingHandlers) ─
+	agent: {
+		createSession: (config: AgentConfig) =>
+			agentService.createSession(config),
+		getStatus: (sessionId: string) => {
+			const session = agentService.getSession(sessionId);
+			if (!session) throw new Error("Session not found");
+			return session;
+		},
+		stopAgent: (sessionId: string) => agentService.stopAgent(sessionId),
+		listAgents: () => agentService.listSessions(),
+		getMessages: (sessionId: string) =>
+			agentService.getMessages(sessionId),
+		clearMessages: (sessionId: string) =>
+			agentService.clearMessages(sessionId),
+		deleteSession: (sessionId: string) =>
+			agentService.deleteSession(sessionId),
+	},
+
+	// ─── Agent SDK (RPC only, streaming in streamingHandlers) ─
+	agentSDK: {
+		interrupt: (requestId: string) =>
+			agentSDKService.interruptQuery(requestId),
+		close: (requestId: string) => agentSDKService.closeQuery(requestId),
+		listSessions: (dir?: string) =>
+			agentSDKService.listSDKSessions(dir),
+		getSessionInfo: (sessionId: string) =>
+			agentSDKService.getSDKSessionInfo(sessionId),
+		setModel: (requestId: string, model: string) =>
+			agentSDKService.setModel(requestId, model),
+		resolvePermission: (
+			toolUseId: string,
+			allowed: boolean,
+			updatedInput?: Record<string, unknown>,
+		) => agentSDKService.resolvePermission(toolUseId, allowed, updatedInput),
+		forkSession: (sessionId: string, dir?: string) =>
+			agentSDKService.forkSDKSession(
+				sessionId,
+				dir ? { dir } : undefined,
+			),
+		renameSession: (sessionId: string, title: string, dir?: string) =>
+			agentSDKService.renameSDKSession(
+				sessionId,
+				title,
+				dir ? { dir } : undefined,
+			),
+		tagSession: (sessionId: string, tag: string, dir?: string) =>
+			agentSDKService.tagSDKSession(
+				sessionId,
+				tag,
+				dir ? { dir } : undefined,
+			),
+		getSessionMessages: (sessionId: string, dir?: string) =>
+			agentSDKService.getSDKSessionMessages(
+				sessionId,
+				dir ? { dir } : undefined,
+			),
+		getConfig: () => storeManager.getAgentSDKConfig(),
+		setConfig: (config: AgentSDKConfig) =>
+			storeManager.setAgentSDKConfig(config),
+		getProfiles: () => storeManager.getAgentProfiles(),
+		setProfiles: (profiles: AgentProfile[]) =>
+			storeManager.setAgentProfiles(profiles),
+		getTeams: () => storeManager.getAgentTeams(),
+		setTeams: (teams: AgentTeam[]) => storeManager.setAgentTeams(teams),
+	},
+
+	// ─── MCP ──────────────────────────────────
+	mcp: {
+		connect: (id: string) => mcpService.connect(id),
+		disconnect: (id: string) => mcpService.disconnect(id),
+		listServers: () => mcpService.listServers(),
+		getTools: (id: string) => mcpService.getServerTools(id),
+		addServer: (config: McpServerConfig) => mcpService.addServer(config),
+		removeServer: (id: string) => mcpService.removeServer(id),
+		getAllStatus: () => mcpService.getAllServerStatus(),
+		updateServer: (id: string, config: Partial<McpServerConfig>) =>
+			mcpService.updateServer(id, config),
+		callTool: (
+			serverId: string,
+			toolName: string,
+			args: Record<string, unknown>,
+		) => mcpService.callTool(serverId, toolName, args),
+		getAllTools: () => mcpService.getAllAvailableTools(),
+	},
+
+	// ─── MCP Builtin ─────────────────────────
+	mcpBuiltin: {
+		getDefinitions: () => builtinMcpService.getAllDefinitions(),
+		createConfig: (
+			definitionId: string,
+			config?: Record<string, unknown>,
+		) => {
+			const serverConfig = builtinMcpService.createServerConfig(
+				definitionId,
+				config,
+			);
+			if (!serverConfig) throw new Error("Definition not found");
+			return serverConfig;
+		},
+		search: (params: { keyword?: string; tags?: string[] }) => {
+			if (params.keyword)
+				return builtinMcpService.searchByKeyword(params.keyword);
+			if (params.tags)
+				return builtinMcpService.searchByTags(params.tags);
+			return builtinMcpService.getAllDefinitions();
+		},
+	},
+
+	// ─── MCP Third Party ─────────────────────
+	mcpThirdparty: {
+		add: (config: McpServerConfig) => {
+			mcpService.addServer({ ...config, type: "third-party" as const });
+		},
+		proxy: (
+			serverId: string,
+			request: {
+				endpoint: string;
+				method: "GET" | "POST" | "PUT" | "DELETE";
+				body?: unknown;
+				headers?: Record<string, string>;
+			},
+		) => thirdPartyMcpService.proxyRequest(serverId, request),
+	},
+
+	// ─── MCP Market ──────────────────────────
+	mcpMarket: {
+		search: (params: McpMarketSearchParams) =>
+			mcpMarketService.search(params),
+		popular: (limit?: number) => mcpMarketService.getPopular(limit),
+		topRated: (limit?: number) => mcpMarketService.getTopRated(limit),
+		newest: (limit?: number) => mcpMarketService.getNewest(limit),
+		getDetail: (id: string) => mcpMarketService.getDetail(id),
+		getTags: () => mcpMarketService.getTags(),
+		install: async (
+			marketItem: McpMarketItem,
+			customConfig?: {
+				name?: string;
+				env?: Record<string, string>;
+				url?: string;
+			},
+		) => {
+			const config = await mcpMarketService.install(
+				marketItem,
+				customConfig,
+			);
+			mcpService.addServer(config);
+			return config;
+		},
+		getReadme: (marketItem: McpMarketItem) =>
+			mcpMarketService.getReadme(marketItem),
+		setApiUrl: (_url: string) => {
+			/* reserved for compatibility */
+		},
+	},
+
+	// ─── Plugin ───────────────────────────────
+	plugin: {
+		getAllPlugins: () => getPluginManager().getAllPlugins(),
+		getPlugin: (pluginId: string) => {
+			const plugin = getPluginManager().getPlugin(pluginId);
+			if (!plugin) throw new Error(`Plugin ${pluginId} not found`);
+			return plugin;
+		},
+		installPlugin: async (sourcePath?: string) => {
+			let targetPath = sourcePath;
+			if (!targetPath) {
+				const result = await dialog.showOpenDialog({
+					properties: ["openDirectory"],
+					title: "选择插件目录",
+					buttonLabel: "安装插件",
+				});
+				if (result.canceled || result.filePaths.length === 0)
+					throw new Error("Installation cancelled");
+				targetPath = result.filePaths[0];
+			}
+			return getPluginManager().installPlugin(targetPath);
+		},
+		uninstallPlugin: (pluginId: string) =>
+			getPluginManager().uninstallPlugin(pluginId),
+		enablePlugin: (pluginId: string) =>
+			getPluginManager().enablePlugin(pluginId),
+		disablePlugin: (pluginId: string) =>
+			getPluginManager().disablePlugin(pluginId),
+		activatePlugin: (pluginId: string) =>
+			getPluginManager().activatePlugin(pluginId),
+		deactivatePlugin: (pluginId: string) =>
+			getPluginManager().deactivatePlugin(pluginId),
+		searchMarket: (query?: string, category?: string) => {
+			const pm = getPluginManager();
+			let results = [...BUILTIN_MARKET_PLUGINS];
+			const installedPlugins = pm.getAllPlugins();
+			const installedIds = new Set(installedPlugins.map((p) => p.id));
+			results = results.map((p) => ({
+				...p,
+				installed: installedIds.has(p.id),
+			}));
+			if (query) {
+				const lq = query.toLowerCase();
+				results = results.filter(
+					(p) =>
+						p.name.toLowerCase().includes(lq) ||
+						p.displayName.toLowerCase().includes(lq) ||
+						p.description.toLowerCase().includes(lq),
+				);
+			}
+			if (category) {
+				results = results.filter((p) =>
+					p.categories.includes(category),
+				);
+			}
+			return results;
+		},
+		getMarketPlugin: (pluginId: string) => {
+			const plugin = BUILTIN_MARKET_PLUGINS.find(
+				(p) => p.id === pluginId,
+			);
+			if (!plugin) throw new Error("Plugin not found in market");
+			const installed = getPluginManager()
+				.getAllPlugins()
+				.some((p) => p.id === pluginId);
+			return { ...plugin, installed };
+		},
+		downloadPlugin: async (pluginId: string) => {
+			const pluginData = BUILTIN_MARKET_PLUGINS.find(
+				(p) => p.id === pluginId,
+			);
+			if (!pluginData) throw new Error("Plugin not found in market");
+			const existing = getPluginManager().getPlugin(pluginId);
+			if (existing) throw new Error("Plugin is already installed");
+
+			const tmpDir = path.join(
+				app.getPath("temp"),
+				`plugin-install-${pluginId}-${Date.now()}`,
+			);
+			await fsPromises.mkdir(tmpDir, { recursive: true });
+
+			const builtinSource =
+				BUILTIN_PLUGIN_SOURCES[
+					pluginId as keyof typeof BUILTIN_PLUGIN_SOURCES
+				];
+			if (builtinSource) {
+				await fsPromises.writeFile(
+					path.join(tmpDir, "package.json"),
+					JSON.stringify(builtinSource.manifest, null, 2),
+					"utf-8",
+				);
+				await fsPromises.writeFile(
+					path.join(tmpDir, "index.js"),
+					builtinSource.source,
+					"utf-8",
+				);
+				if (builtinSource.extraFiles) {
+					for (const [fileName, content] of Object.entries(
+						builtinSource.extraFiles,
+					)) {
+						await fsPromises.writeFile(
+							path.join(tmpDir, fileName),
+							content,
+							"utf-8",
+						);
+					}
+				}
+			} else {
+				const manifest = {
+					name: pluginData.id,
+					displayName: pluginData.displayName,
+					version: pluginData.version,
+					description: pluginData.description,
+					author: pluginData.author,
+					main: "index.js",
+					categories: pluginData.categories,
+					engines: { "super-client-r": "^1.0.0" },
+				};
+				await fsPromises.writeFile(
+					path.join(tmpDir, "package.json"),
+					JSON.stringify(manifest, null, 2),
+					"utf-8",
+				);
+				const entryCode = `"use strict";
+module.exports = {
+  activate(context) {
+    console.log("[${pluginData.displayName}] Plugin activated");
+  },
+  deactivate() {
+    console.log("[${pluginData.displayName}] Plugin deactivated");
+  }
 };
+`;
+				await fsPromises.writeFile(
+					path.join(tmpDir, "index.js"),
+					entryCode,
+					"utf-8",
+				);
+			}
+
+			const plugin = await getPluginManager().installPlugin(tmpDir);
+			await fsPromises
+				.rm(tmpDir, { recursive: true, force: true })
+				.catch(() => {});
+			return plugin;
+		},
+		getCommands: (pluginId?: string) =>
+			getPluginManager().getRegisteredCommands(pluginId),
+		executeCommand: (command: string, args?: unknown[]) =>
+			getPluginManager().executeCommand(command, ...(args || [])),
+		getStorage: (pluginId: string, key: string) => {
+			const pluginsData = storeManager.getConfig("pluginsData") || {};
+			return (pluginsData as Record<string, unknown>)[
+				`${pluginId}.${key}`
+			];
+		},
+		setStorage: (pluginId: string, key: string, value: unknown) => {
+			const pluginsData =
+				(storeManager.getConfig("pluginsData") as Record<
+					string,
+					unknown
+				>) || {};
+			pluginsData[`${pluginId}.${key}`] = value;
+			storeManager.setConfig("pluginsData", pluginsData);
+		},
+		deleteStorage: (pluginId: string, key: string) => {
+			const pluginsData =
+				(storeManager.getConfig("pluginsData") as Record<
+					string,
+					unknown
+				>) || {};
+			delete pluginsData[`${pluginId}.${key}`];
+			storeManager.setConfig("pluginsData", pluginsData);
+		},
+		getKeybindings: () => storeManager.getConfig("keybindings") || {},
+		setKeybindings: (keybindings: Record<string, string>) =>
+			storeManager.setConfig("keybindings", keybindings),
+		getActiveSkin: () => getPluginManager().getActiveSkinId(),
+		setActiveSkin: async (
+			pluginId: string | null,
+			themeId?: string,
+		) => {
+			const pm = getPluginManager();
+			if (pluginId === null) {
+				await pm.removeSkinCSS();
+				return;
+			}
+			if (!themeId) throw new Error("themeId is required");
+			const pluginInfo = pm.getPlugin(pluginId);
+			if (!pluginInfo) throw new Error(`Plugin ${pluginId} not found`);
+			if (!pm.isSkinPlugin(pluginInfo))
+				throw new Error(`Plugin ${pluginId} is not a skin plugin`);
+			if (!pm.isPluginActive(pluginId)) await pm.enablePlugin(pluginId);
+			await pm.applySkinCSS(pluginInfo, themeId);
+		},
+		getActiveMarkdownTheme: () =>
+			getPluginManager().getActiveMarkdownThemeId(),
+		setActiveMarkdownTheme: async (
+			pluginId: string | null,
+			themeId?: string,
+		) => {
+			const pm = getPluginManager();
+			if (pluginId === null) {
+				await pm.removeMarkdownCSS();
+				return;
+			}
+			if (!themeId) throw new Error("themeId is required");
+			const pluginInfo = pm.getPlugin(pluginId);
+			if (!pluginInfo) throw new Error(`Plugin ${pluginId} not found`);
+			if (!pm.isMarkdownThemePlugin(pluginInfo))
+				throw new Error(
+					`Plugin ${pluginId} is not a markdown theme plugin`,
+				);
+			if (!pm.isPluginActive(pluginId)) await pm.enablePlugin(pluginId);
+			await pm.applyMarkdownCSS(pluginInfo, themeId);
+		},
+		getMarkdownThemeCSS: () =>
+			getPluginManager().getActiveMarkdownThemeCSS(),
+		grantPermissions: (pluginId: string, permissions: string[]) =>
+			getPluginManager().grantPermissions(pluginId, permissions as any),
+		getPermissions: (pluginId: string) =>
+			getPluginManager().getPermissions(pluginId),
+		getUIContributions: () =>
+			getPluginManager().uiContributionRegistry.getAllContributions(),
+		getPluginPageHTML: async (pluginId: string, pagePath: string) => {
+			const pm = getPluginManager();
+			const pages = pm.uiContributionRegistry.getAllPages();
+			const page = pages.find(
+				(p) =>
+					p.pluginId === pluginId &&
+					(p.path === pagePath || p.id === pagePath),
+			);
+			if (!page) throw new Error("Page not found");
+			const pluginInfo = pm.getPlugin(pluginId);
+			if (!pluginInfo) throw new Error("Plugin not found");
+			const htmlPath = path.join(pluginInfo.path, page.htmlFile);
+			const content = await fsPromises.readFile(htmlPath, "utf-8");
+			return { html: content, title: page.title };
+		},
+		installDev: (sourcePath: string) =>
+			getPluginManager().installDev(sourcePath),
+		reloadDev: (pluginId: string) =>
+			getPluginManager().reloadDev(pluginId),
+		checkUpdates: () => getPluginManager().checkForUpdates(),
+		updatePlugin: (pluginId: string) =>
+			getPluginManager().updatePlugin(pluginId),
+	},
+};
+
+// ════════════════════════════════════════════
+// Registration
+// ════════════════════════════════════════════
 
 /**
  * 注册所有通过 Typed IPC Proxy 管理的 handlers
  */
 export function registerProxyHandlers(): void {
+	// 合并内置 Agent 预设
+	mergeBuiltinPresets();
+
+	// 注册所有 RPC handlers
 	registerAPI(apiImpl);
+
+	// 加载已持久化的 MCP 服务器
+	mcpService.loadPersistedServers();
+
+	// 手动注册：openDevTools 需要 event.sender
+	ipcMain.handle("app:open-dev-tools", (event) => {
+		BrowserWindow.fromWebContents(event.sender)?.webContents.openDevTools({
+			mode: "detach",
+		});
+	});
+}
+
+// ════════════════════════════════════════════
+// Plugin lifecycle (used by main.ts)
+// ════════════════════════════════════════════
+
+/**
+ * 初始化插件管理器
+ */
+export async function initializePluginManager(): Promise<void> {
+	const pluginManager = getPluginManager();
+	await pluginManager.initialize();
+
+	// Wire up chat hook registry to LLM service
+	try {
+		const { llmService: llm } = await import("../services/llm");
+		llm.setChatHookRegistry(pluginManager.chatHookRegistry);
+	} catch (error) {
+		console.warn(
+			"[PluginHandlers] Failed to wire chat hooks to LLM service:",
+			error,
+		);
+	}
+
+	// Register reload listeners on all existing windows so CSS re-injects on HMR/reload
+	for (const win of BrowserWindow.getAllWindows()) {
+		pluginManager.setupWindowReloadListener(win);
+	}
+
+	// Also register on any future windows
+	app.on("browser-window-created", (_event, win) => {
+		pluginManager.setupWindowReloadListener(win);
+	});
+}
+
+/**
+ * 清理插件处理器
+ */
+export function disposePluginHandlers(): void {
+	const pluginManager = getPluginManager();
+	pluginManager.dispose();
+	resetPluginManager();
 }

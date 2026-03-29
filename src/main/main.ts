@@ -16,10 +16,16 @@ import {
 import { homedir } from "os";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
-import { setFloatingWindow } from "./ipc/handlers/floatWidgetHandlers";
-import { setLogViewerOpener } from "./ipc/handlers/logHandlers";
-import { initializePluginManager } from "./ipc/handlers/pluginHandlers";
-import { setupWindowEventListeners } from "./ipc/handlers/windowHandlers";
+import {
+	setFloatingWindow,
+	setLogViewerOpener,
+	setIMBotService,
+	setRemoteDeviceService,
+	setRemoteControlEventService,
+	setRemoteChatBridge,
+} from "./ipc/service-holders";
+import { initializePluginManager } from "./ipc/api-impl";
+import { setupWindowEventListeners } from "./ipc/window-events";
 import { localServer } from "./server";
 import { logDatabaseService } from "./services/log";
 import { pathService } from "./services/pathService";
@@ -500,13 +506,7 @@ app.whenReady().then(async () => {
 		const { RemoteControlEventService } = await import(
 			"./services/remote/RemoteControlEventService"
 		);
-		const { setIMBotService } = await import("./ipc/handlers/imbotHandlers");
-		const { setRemoteDeviceService } = await import(
-			"./ipc/handlers/remoteDeviceHandlers"
-		);
-		const { setRemoteControlEventService } = await import(
-			"./ipc/handlers/remoteControlHandlers"
-		);
+		// Service setters are now imported from service-holders at the top
 
 		// 根据 relay 配置决定启动模式
 		const relayConfig = storeManager.getRelayConfig();
@@ -543,9 +543,7 @@ app.whenReady().then(async () => {
 		const { RemoteChatBridge } = await import(
 			"./services/remote-chat/RemoteChatBridge"
 		);
-		const { setRemoteChatBridge } = await import(
-			"./ipc/handlers/remoteChatHandlers"
-		);
+		// setRemoteChatBridge is now imported from service-holders at the top
 		const remoteChatBridge = new RemoteChatBridge(imbotService);
 		setRemoteChatBridge(remoteChatBridge);
 		logger.info("Remote Chat Bridge initialized");
