@@ -648,7 +648,7 @@ function MarketTab({
 				) : marketItems.length === 0 ? (
 					<Empty description={t("noData", { ns: "mcp" })} className="py-20" />
 				) : (
-					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 						{marketItems.map((item) => (
 							<McpMarketCard
 								key={item.id}
@@ -713,7 +713,7 @@ function ThirdPartyTab({
 					</Button>
 				</Empty>
 			) : (
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
 					{servers.map((server) => (
 						<ThirdPartyMcpCard
 							key={server.id}
@@ -763,7 +763,7 @@ function BuiltinInternalTab({
 					className="py-20"
 				/>
 			) : (
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
 					{servers.map((server) => (
 						<InstalledMcpCard
 							key={server.id}
@@ -809,7 +809,7 @@ function InstalledTab({
 					className="py-20"
 				/>
 			) : (
-				<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-4">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
 					{servers.map((server) => (
 						<InstalledMcpCard
 							key={server.id}

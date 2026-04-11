@@ -59,7 +59,7 @@ export const McpMarketCard: React.FC<{
 	return (
 		<div
 			onClick={onClick}
-			className="group relative flex flex-col rounded-xl border cursor-pointer transition-all duration-200"
+			className="group relative flex flex-col rounded-xl border cursor-pointer transition-all duration-200 overflow-hidden"
 			style={{
 				borderColor: token.colorBorderSecondary,
 				backgroundColor: token.colorBgContainer,
@@ -120,7 +120,7 @@ export const McpMarketCard: React.FC<{
 
 			{/* Footer */}
 			<div className="px-4 py-3 flex items-center justify-between">
-				<div className="flex items-center gap-3">
+				<div className="flex items-center gap-3 min-w-0 overflow-hidden">
 					<span
 						className="text-xs truncate max-w-[80px]"
 						style={{ color: token.colorTextTertiary }}
@@ -148,7 +148,7 @@ export const McpMarketCard: React.FC<{
 
 				{/* Action buttons */}
 				<div
-					className="flex items-center gap-1"
+					className="flex items-center gap-1 shrink-0"
 					onClick={(e) => e.stopPropagation()}
 				>
 					{isInstalled ? (
