@@ -18,6 +18,7 @@ The original plan was directionally correct, but several points needed tightenin
 | Interaction profile could become cosmetic only. | Claude Code / Codex mode would not meaningfully change behavior. | Define concrete layout, density, approval, timeline, command, and inspector differences per profile. |
 | The plan still leaned too much toward UI aggregation. | The app could look like Claude Code / Codex while still running on old, inconsistent model, permission, attachment, and extension paths. | Move kernel work earlier: persistence, runtime policy, approval adapter, attachment resolver, and extension descriptors must land before final UI polish. |
 | Migration was too broad. | A large rewrite would destabilize existing chat, MCP, skill, and plugin flows. | Use phased migration: stabilize the runtime contract first, then expose it through UI, then migrate backing services gradually. |
+| Plan review found parallel implementations and missing wiring. | Types such as `WorkspaceConfig`, `ModelSelection`, approval grants, and runtime policy could exist without being authoritative. | Add explicit source-of-truth, API contract, resolver, dependency, rollback, and adapter boundaries before continuing feature work. |
 
 ## 2. Product Model
 
@@ -66,6 +67,13 @@ Implementation note from Phase 0 audit:
 - Add `workspaceId` and session metadata to existing conversation metadata before introducing any separate session persistence layer.
 - The current per-conversation `workspace/` directory is an execution directory, not the same thing as the user-facing `Workspace` entity.
 
+Implementation note from plan review:
+
+- Two workspace stores currently coexist: renderer `useWorkspaceStore` and main-process `WorkspaceConfig` in `StoreManager`.
+- Main-process `WorkspaceConfig` must become the source of truth for runtime configuration.
+- Renderer workspace state should become a read-through UI cache and local interaction state, not an independent runtime store.
+- Existing persisted renderer workspaces must be backfilled into main-process `WorkspaceConfig` before settings UI is treated as authoritative.
+
 ## 3. Main Navigation
 
 Reduce first-level navigation to:
@@ -78,7 +86,71 @@ Reduce first-level navigation to:
 
 The existing `MCP Market`, `Skills`, and `Plugins` pages should no longer appear as first-level navigation items after Phase 1. Keep the old routes temporarily for compatibility and redirects.
 
-## 4. Interaction Profiles
+## 4. Pre-Phase 1 Corrections
+
+The plan review identifies three blockers that must be resolved before Phase 1 is considered complete.
+
+### Workspace Source of Truth
+
+Main-process `WorkspaceConfig` is the source of truth for:
+
+- workspace identity
+- default model
+- interaction profile
+- runtime policy
+- context policy
+- enabled capabilities
+- current/default workspace IDs
+
+Renderer `useWorkspaceStore` may continue temporarily, but only as:
+
+- UI cache for workspace lists
+- optimistic interaction state
+- compatibility layer for existing components
+
+Required migration:
+
+1. Read existing renderer persisted workspaces.
+2. Convert them into main-process `WorkspaceConfig`.
+3. Preserve renderer fields that do not yet exist in `WorkspaceConfig` as UI-only metadata.
+4. Sync current/default workspace IDs from main process to renderer on startup.
+5. Derive `sessionIds` and `activeSessionId` from conversation metadata instead of manually maintaining them as independent truth.
+
+### Electron API Contract
+
+The typed IPC proxy must have a single contract source.
+
+Required direction:
+
+- Add `packages/shared-types/src/electron-api.ts`.
+- Move the actual `ElectronAPI` namespace shape out of `src/preload/index.ts`.
+- Make preload bridge keys and main `apiImpl` conform to the shared interface.
+- All new namespaces, including workspace runtime, approval runtime, file artifact actions, and extension descriptors, must extend this shared contract.
+
+### Effective Runtime Resolver
+
+`EffectiveSessionRuntime` must be implemented before UI surfaces depend on workspace/session state.
+
+Resolver inputs:
+
+- global app defaults
+- main-process `WorkspaceConfig`
+- conversation-backed `SessionMetadata`
+- per-message overrides
+- current model provider state
+- enabled extension descriptors
+
+Resolver consumers:
+
+- direct/skill chat request construction
+- Agent SDK query setup, initially with limited model support
+- approval adapter
+- runtime policy service
+- attachment context resolver
+- chat renderer profile selection
+- composer/status chips
+
+## 5. Interaction Profiles
 
 Interaction profile is a workspace setting with optional session override.
 
@@ -115,7 +187,7 @@ Default profile.
 - Task timeline and inspector are available when a session enters plan or agent mode.
 - Approval UI favors inline blocks for simple actions and inspector queue for multi-step work.
 
-## 5. Chat Page Layout
+## 6. Chat Page Layout
 
 Target layout:
 
@@ -144,7 +216,7 @@ Model · Plan mode · Approval mode · Sandbox · Active capabilities · Context
 
 The status bar should be compact, persistent, and clickable where useful. For example, clicking the model chip opens the model switcher.
 
-## 6. Composer Design
+## 7. Composer Design
 
 The chat composer must support these controls:
 
@@ -173,7 +245,7 @@ Composer rules:
 - If streaming is active, disable model switching and capability changes until stopped.
 - If the selected model cannot support the current attachments or tools, show an inline compatibility warning before send.
 
-## 7. Model Switcher
+## 8. Model Switcher
 
 Chat must include a session-level model switching modal, not just a dropdown.
 
@@ -229,7 +301,20 @@ Rules:
 - If the selected provider is not configured, show setup action instead of selection.
 - First implementation scope: model switching applies to direct and skill chat paths. Agent SDK mode currently has a separate model configuration chain and should be wired in a later phase.
 
-## 8. Attachments
+Model resolution order:
+
+```text
+global active model -> workspace default model -> session model override -> per-message override
+```
+
+Runtime wiring:
+
+- Direct/skill chat must accept resolved `ModelSelection` from `EffectiveSessionRuntime` before calling `modelService.chatCompletion()`.
+- The global `activeModelSelection` remains the fallback only, not the effective model once workspace/session values exist.
+- Agent SDK sessions must have an explicit milestone for reading compatible fields from `EffectiveSessionRuntime`; until then the UI must label Agent SDK model switching as limited.
+- The model switcher must write to session metadata for session overrides and to main-process `WorkspaceConfig` for workspace defaults.
+
+## 9. Attachments
 
 Supported attachment sources:
 
@@ -267,8 +352,16 @@ Rules:
 - URLs follow network policy before fetch.
 - MCP resources follow MCP server permission and workspace runtime policy.
 - Current composer attachment upload is renderer-only and does not feed file content into model requests. Implement persistent attachment storage and request-time resolution before treating attachment chips as model context.
+- Attachment context resolver must define model input mapping before implementation:
+  - text/code/markdown can become text blocks with source headers and token budget accounting
+  - images can become vision blocks only when the selected model supports vision
+  - binary/archive/audio/video default to reference-only until a parser/transcriber exists
+  - folders default to manifest/reference mode before indexing
+- `reference-only` must include token budgeting and summarized file metadata.
+- `ask-before-read` must create an approval prompt at send time before file content is read.
+- Resolved attachment references must be saved with the message so later replay/debugging can explain what was actually sent.
 
-## 9. Chat File Results and Operations
+## 10. Chat File Results and Operations
 
 Conversation file display and file operations should follow the Codex-style interaction shown in the reference screenshot:
 
@@ -370,7 +463,7 @@ Initial implementation should cover:
 3. support safe `Open`, `Reveal`, and `Copy path`
 4. defer per-app opening until the external app policy adapter exists
 
-## 10. Plan Modes
+## 11. Plan Modes
 
 Plan mode is selected per session and visible in the composer.
 
@@ -400,7 +493,7 @@ Rules:
 - `auto-execute-safe` still respects sandbox policy.
 - `full-agent` does not bypass sandbox policy.
 
-## 11. Permissions and Approval
+## 12. Permissions and Approval
 
 Approval mode:
 
@@ -434,7 +527,17 @@ Approval display must include:
 
 Prefer inline approval blocks or inspector queue over blocking modals. Use modals only for high-risk actions or when no inspector is visible.
 
-## 12. Sandbox Policy
+Approval grants:
+
+- Approval grants are stored on conversation-backed `SessionMetadata.approvalGrants`.
+- Direct/skill tool approval must consult grants before asking the user.
+- Agent SDK permission requests must route through the same grant lookup before resolving `canUseTool`.
+- `Allow once` creates a non-persistent grant for the current operation.
+- `Allow for session` persists a session-scoped grant to conversation metadata.
+- Workspace/global grants require a separate settings surface and explicit user confirmation.
+- Denials should be auditable but should not create broad persistent state unless the user chooses a persistent deny action.
+
+## 13. Sandbox Policy
 
 Approval policy and sandbox policy are separate.
 
@@ -457,8 +560,12 @@ Rules:
 - Sessions require explicit approval to become less restrictive than workspace policy.
 - MCP, skills, hooks, app plugins, search, file access, commands, and external app access must route through the same runtime policy.
 - Current code has partial boundaries, not a central sandbox policy. Implement runtime policy as an adapter/guard layer over existing LLM tool execution, Agent SDK permission requests, MCP calls, and plugin APIs.
+- Internal app storage writes under Electron `userData` are app-internal state and must be classified separately from user workspace file writes.
+- Per-conversation execution directory is always a writable root for that conversation unless session policy is stricter.
+- Workspace path and user-configured writable roots define user-file write boundaries.
+- File, shell, network, external app, MCP, and plugin operations must call the same operation classifier before execution.
 
-## 13. Extensions
+## 14. Extensions
 
 Use one `Extensions` page and one normalized descriptor model.
 
@@ -479,8 +586,11 @@ Rules:
 - Agent-facing capabilities should not be presented as generic app plugins.
 - Every extension item must show type, scope, source, enabled state, permissions, health, and contribution points.
 - Scope must be explicit: `global`, `workspace`, or `session`.
+- `ExtensionDescriptor` is a read-only projection for UI, search, health, and policy.
+- Write/admin operations stay on service-specific APIs: MCP connection management, Skill install/validation, App Plugin install/reload/permissions.
+- Descriptor adapters must not hide lifecycle differences between MCP, Skill, and App Plugin.
 
-## 14. Workspace Settings
+## 15. Workspace Settings
 
 Workspace settings should be organized as:
 
@@ -495,7 +605,7 @@ Workspace settings should be organized as:
 
 Global settings should remain separate and only manage app-wide preferences.
 
-## 15. Data Model Direction
+## 16. Data Model Direction
 
 Introduce these durable concepts gradually.
 
@@ -552,7 +662,7 @@ Initial persistence strategy:
 - Derive or synchronize workspace `sessionIds` from conversation metadata.
 - Keep the current conversation directory layout stable during early phases.
 
-## 16. Core Runtime Requirements
+## 17. Core Runtime Requirements
 
 These requirements decide whether the work is actually complete. UI is only valid when it is backed by these behaviors.
 
@@ -588,6 +698,22 @@ The resolver should apply:
 global defaults -> workspace config -> session metadata -> per-message overrides
 ```
 
+The first resolver API should be small and explicit:
+
+```ts
+interface ResolveSessionRuntimeInput {
+  workspaceId?: string;
+  sessionId: string;
+  messageOverride?: Partial<SessionMessageOverride>;
+}
+
+interface SessionRuntimeResolver {
+  resolve(input: ResolveSessionRuntimeInput): Promise<EffectiveSessionRuntime>;
+}
+```
+
+Do not let renderer components manually merge global, workspace, and session state. Renderer reads the resolved snapshot for display and sends explicit mutations through typed IPC.
+
 ### Approval and Sandbox Enforcement
 
 - Direct/skill tool approval and Agent SDK permission requests must map to one normalized approval request type.
@@ -595,6 +721,8 @@ global defaults -> workspace config -> session metadata -> per-message overrides
 - Approval grants must be scoped: once, session, workspace, or global.
 - Sandbox checks must run even when approval mode is `full-access`.
 - Runtime decisions must be written to an audit log that can be surfaced in the inspector.
+- Grant lookup must happen before prompting, and grant writes must happen only after an explicit `Allow once` or `Allow for session` user action.
+- Internal app storage writes, conversation execution directory writes, workspace file writes, and workspace-external writes must be separate operation classes.
 
 ### Attachment Context Pipeline
 
@@ -635,7 +763,18 @@ Required behavior:
 - App Plugin remains the term for app UI and app feature extensions.
 - Agent-facing capabilities must be separately visible and permissioned even if they are delivered by an App Plugin.
 
-## 17. Visual Direction
+### Agent SDK Runtime Milestone
+
+Agent SDK integration should not be assumed complete just because the direct/skill chat path uses the new runtime.
+
+Required staged behavior:
+
+1. Phase 1: Agent sessions receive `workspaceId`, `sessionId`, and a readonly `EffectiveSessionRuntime` snapshot for display and audit.
+2. Phase 2: Agent SDK permission requests map into the normalized approval model and grant lookup.
+3. Phase 6: Agent SDK model switching remains labelled as limited until the provider/model chain can consume `ModelSelection`.
+4. Final milestone: Agent SDK query setup reads compatible runtime fields for model, sandbox, enabled capabilities, and approval policy.
+
+## 18. Visual Direction
 
 The app should feel like an engineering workbench, not a marketplace dashboard.
 
@@ -652,7 +791,7 @@ Guidelines:
 - Model, permissions, sandbox, and plan mode should render as chips/status controls.
 - Approval UI should be inline or in inspector queue by default.
 
-## 18. Migration Phases
+## 19. Migration Phases
 
 ### Phase 0 - Implementation Audit and Session Metadata
 
@@ -678,11 +817,15 @@ Goal: make `Workspace -> Session` real in data and execution before relying on U
 Tasks:
 
 - Define main-process-compatible `WorkspaceConfig`, `SessionMetadata`, `ModelSelection`, `WorkspaceRuntimePolicy`, and `EnabledCapability` types.
+- Move the typed Electron API shape into `packages/shared-types/src/electron-api.ts` and make preload/main implementations conform to it.
+- Make main-process `WorkspaceConfig` the source of truth for runtime configuration.
 - Persist workspace config in a place readable by the main process.
+- Backfill renderer-persisted `useWorkspaceStore` workspaces into main-process `WorkspaceConfig`.
 - Add a runtime resolver that returns `EffectiveSessionRuntime`.
 - Route conversation creation and conversation switching through workspace/session binding.
 - Backfill existing conversations into the default workspace.
 - Keep renderer workspace store as a UI cache until main-process state sync is complete.
+- Define the model resolution adapter and apply it to direct/skill chat before `modelService.chatCompletion()`.
 
 Validation:
 
@@ -690,6 +833,8 @@ Validation:
 - Every new conversation has a workspace ID.
 - Direct/skill chat can receive an effective runtime snapshot.
 - Renderer state can be rebuilt from persisted workspace/conversation metadata.
+- New IPC namespaces are represented in the shared Electron API contract.
+- Global active model is only a fallback once workspace/session model state exists.
 
 ### Phase 2 - Runtime Policy and Approval Kernel
 
@@ -698,9 +843,11 @@ Goal: enforce permissions and sandbox behavior below the UI.
 Tasks:
 
 - Define normalized approval request, approval grant, operation classification, and audit event models.
+- Add approval grant read/write helpers on conversation-backed session metadata.
 - Map existing direct/skill tool approval into the normalized approval model.
 - Map Agent SDK permission requests into the normalized approval model.
 - Add runtime policy checks for file, command, network, MCP, external app, and plugin actions.
+- Classify internal app storage, conversation execution directory, workspace path, configured writable roots, and workspace-external paths separately.
 - Enforce workspace-write by default.
 - Add explicit approval path for less restrictive session overrides.
 - Persist approval and sandbox decisions to audit logs.
@@ -711,6 +858,7 @@ Validation:
 - `full-access` approval mode does not bypass sandbox policy.
 - Workspace-external writes are blocked or require approval according to policy.
 - Approval grants are scoped to the current session unless explicitly promoted.
+- `Allow for session` immediately changes later approval decisions in the same session.
 
 ### Phase 3 - Attachment, File Artifact, and Context Kernel
 
@@ -721,6 +869,9 @@ Tasks:
 - Replace renderer-only composer file handling with main-process persisted attachments.
 - Add attachment metadata, content mode, trust state, and message references.
 - Add attachment context resolver.
+- Implement attachment-to-message-block mapping for text/code/markdown, image, binary, folder, URL, and MCP resource inputs.
+- Add token budgeting and summarized metadata for `reference-only` attachments.
+- Add send-time `ask-before-read` approval for workspace-external or sensitive attachment reads.
 - Add chat file artifact and change-set models.
 - Capture file artifacts from file-system, patch/write, and agent/tool result paths.
 - Add safe open/reveal/copy action metadata for file artifacts.
@@ -735,6 +886,7 @@ Validation:
 - File write/edit results produce file cards and changed-file summaries in the assistant turn.
 - Unsupported model/content combinations show warnings and do not silently inject data.
 - Existing attachment management remains usable.
+- Message history records which attachment references and content blocks were actually sent.
 
 ### Phase 4 - Extension Descriptor and Capability Kernel
 
@@ -765,16 +917,29 @@ Tasks:
 - Add `Extensions` page as the unified entry.
 - Move MCP, skills, and app plugins into tabs/sections under `Extensions`.
 - Hide old `MCP`, `Skills`, and `Plugins` first-level sidebar items.
-- Keep existing routes for compatibility.
+- Keep existing routes for compatibility, but redirect or render the matching `Extensions` tab.
 - Add a menu migration for users with persisted menu config.
+- Migrate navigation shortcuts that point to old extension routes.
 - Add workspace settings pages: overview, interaction, models, runtime, capabilities, context, automation, advanced.
 - Render settings from persisted/effective runtime state rather than independent UI-only state.
+
+Legacy route strategy:
+
+| Existing route/action | New target | Notes |
+| --- | --- | --- |
+| `/mcp` | `/extensions?tab=mcp` | Keep route shell during migration so deep links do not break. |
+| `/skills` | `/extensions?tab=skills` | Preserve skill detail/use-in-chat flows. |
+| `/plugins` | `/extensions?tab=app-plugins` | User-facing copy becomes `App Plugin`. |
+| persisted menu id `mcp` | menu id `extensions`, tab `mcp` | Migrate only first-level nav state, not MCP service state. |
+| persisted menu id `skills` | menu id `extensions`, tab `skills` | Shortcut labels should change to Extensions/Skills tab. |
+| persisted menu id `plugins` | menu id `extensions`, tab `app-plugins` | Preserve plugin page routes under `/plugin/:pluginId/*`. |
 
 Validation:
 
 - Existing MCP, skill, and plugin flows still work.
 - Changing workspace settings updates effective runtime.
 - Legacy navigation entries do not remain as first-level items after migration.
+- Old shortcuts and deep links land on the correct `Extensions` tab.
 
 ### Phase 6 - Composer, Model Switcher, and Plan Mode
 
@@ -790,6 +955,7 @@ Tasks:
 - Add capability selector entry.
 - Add status bar for model, plan mode, approval, sandbox, capabilities, and context.
 - First model switcher version targets direct/skill chat; Agent SDK model switching requires provider-chain support before it is shown as fully supported.
+- Model switcher writes through typed IPC to session metadata or main-process `WorkspaceConfig`; it must not mutate renderer-only model state as the effective source.
 
 Validation:
 
@@ -797,6 +963,7 @@ Validation:
 - Session model override affects only future responses.
 - Reset to workspace model works.
 - Plan mode changes are persisted on session metadata.
+- Model compatibility warnings reflect the resolved runtime model and current attachments/capabilities.
 
 ### Phase 7 - Approval UI and Runtime Inspector
 
@@ -847,48 +1014,96 @@ Validation:
 - Switching interaction profile changes layout and workflow surfaces.
 - Session override can temporarily switch profile.
 
-## 19. Development Task Breakdown
+## 20. Phase Dependencies and Rollback
+
+Development must respect this dependency graph:
+
+```text
+Phase 0 audit
+  -> Phase 1 workspace source of truth + Electron API contract + EffectiveSessionRuntime
+    -> Phase 2 approval grants + runtime policy classifier
+      -> Phase 3 attachment/file artifact context kernel
+      -> Phase 4 extension descriptors
+        -> Phase 5 IA/settings migration
+          -> Phase 6 composer/model/plan UI
+          -> Phase 7 approval UI/inspector
+            -> Phase 8 app plugin naming
+              -> Phase 9 profile-specific layouts
+```
+
+Phase 6 UI must not ship as final behavior before Phase 1 and Phase 2 are working, because model, plan, approval, sandbox, and attachment controls would otherwise be cosmetic.
+
+Feature flags:
+
+- `workspaceRuntime.enabled`: use main-process `WorkspaceConfig` and conversation-backed session metadata.
+- `effectiveRuntimeResolver.enabled`: route chat execution through `EffectiveSessionRuntime`.
+- `runtimePolicy.enforce`: enforce operation classifier decisions instead of logging only.
+- `extensionsUnified.enabled`: show unified `Extensions` route and migrated navigation.
+- `chatFileArtifacts.enabled`: render file cards and changed-file summaries.
+- `profileLayouts.enabled`: enable Claude Code / Codex profile-specific layout changes.
+
+Rollback strategy:
+
+- Keep existing conversation storage and per-conversation workspace directories stable through Phase 3.
+- Keep old MCP, Skill, and Plugin backing services active while descriptor adapters are introduced.
+- Allow disabling unified `Extensions` navigation while old routes still render their existing pages.
+- Allow runtime policy to run in audit-only mode before enforcement is enabled.
+- Allow `EffectiveSessionRuntime` to fall back to global model/provider state only when workspace/session model state is absent.
+- Store migrations must be additive and idempotent; do not delete renderer workspace or legacy menu data until a later cleanup phase.
+
+## 21. Development Task Breakdown
 
 Suggested initial task order:
 
 1. `implementation-audit`: land Phase 0 audit notes.
-2. `session-metadata-types`: define session metadata on top of conversation metadata.
-3. `workspace-conversation-binding`: assign conversations to workspace IDs and backfill defaults.
-4. `workspace-config-main-readable`: persist workspace config in a main-process-readable form.
-5. `effective-runtime-resolver`: resolve global/workspace/session/message settings into one runtime snapshot.
-6. `runtime-policy-service-skeleton`: add operation classification and audit logs before hard enforcement expands.
-7. `approval-adapter`: normalize LLM tool approval and Agent SDK permission requests.
-8. `runtime-policy-enforcement-file-command`: enforce file/command policy on the highest-risk local operations first.
-9. `attachment-persistence-for-composer`: replace renderer-only chat upload with main-process persisted attachments.
-10. `attachment-context-resolver`: add attachment context mode and request-time resolution.
-11. `chat-file-artifact-model`: define file artifact and change-set types tied to messages/tool calls.
-12. `file-operation-action-adapter`: expose safe open, reveal, copy path, and later app-open actions through policy-aware IPC.
-13. `chat-file-artifact-capture`: capture file artifacts from file-system/write/patch/tool result paths.
-14. `chat-file-card`: render Codex-style file cards inside assistant turns.
-15. `changed-files-summary`: render collapsible changed-files summary with additions/deletions and file rows.
-16. `extension-descriptor-adapter`: normalize MCP/Skill/App Plugin for runtime and unified UI.
-17. `workspace-capability-state`: connect enabled extension descriptors to workspace/session runtime.
-18. `extensions-shell`: create unified Extensions page shell and route.
-19. `menu-migration-extensions`: add Extensions nav item and demote legacy MCP/Skills/Plugins entries.
-20. `workspace-settings-shell`: add workspace settings pages wired to real config/effective runtime.
-21. `model-switcher-direct-skill`: implement model switcher modal using existing model store for direct/skill chat.
-22. `composer-status-bar`: add model, plan mode, approval, sandbox, and context status chips.
-23. `plan-mode-state`: add session-level plan mode state and send-time propagation.
-24. `approval-ui`: replace modal-first approval with inline/inspector-capable UI.
-25. `app-plugin-copy`: rename user-facing plugin terminology.
-26. `profile-layouts`: implement Claude Code / Codex / Hybrid layout differences.
+2. `workspace-source-of-truth-migration`: make main-process `WorkspaceConfig` authoritative and backfill renderer-persisted workspaces.
+3. `electron-api-contract`: add shared `ElectronAPI` contract and make preload/main implementations conform.
+4. `session-metadata-types`: define session metadata on top of conversation metadata.
+5. `workspace-conversation-binding`: assign conversations to workspace IDs and backfill defaults.
+6. `workspace-config-main-readable`: persist workspace config in a main-process-readable form.
+7. `effective-runtime-resolver`: resolve global/workspace/session/message settings into one runtime snapshot.
+8. `model-resolution-adapter`: apply resolved model selection to direct/skill chat and define Agent SDK limitation state.
+9. `runtime-policy-service-skeleton`: add operation classification and audit logs before hard enforcement expands.
+10. `approval-grants-store`: add session-scoped grant lookup/write helpers and auditable deny records.
+11. `approval-adapter`: normalize LLM tool approval and Agent SDK permission requests.
+12. `runtime-policy-enforcement-file-command`: enforce file/command policy on the highest-risk local operations first.
+13. `attachment-persistence-for-composer`: replace renderer-only chat upload with main-process persisted attachments.
+14. `attachment-context-resolver`: add attachment context mode, model input mapping, token budget, and request-time resolution.
+15. `chat-file-artifact-model`: define file artifact and change-set types tied to messages/tool calls.
+16. `file-operation-action-adapter`: expose safe open, reveal, copy path, and later app-open actions through policy-aware IPC.
+17. `chat-file-artifact-capture`: capture file artifacts from file-system/write/patch/tool result paths.
+18. `chat-file-card`: render Codex-style file cards inside assistant turns.
+19. `changed-files-summary`: render collapsible changed-files summary with additions/deletions and file rows.
+20. `extension-descriptor-adapter`: normalize MCP/Skill/App Plugin for runtime and unified UI without replacing service-specific admin APIs.
+21. `workspace-capability-state`: connect enabled extension descriptors to workspace/session runtime.
+22. `extensions-shell`: create unified Extensions page shell and route.
+23. `legacy-extension-route-redirects`: redirect `/mcp`, `/skills`, and `/plugins` to the correct Extensions tab.
+24. `menu-migration-extensions`: add Extensions nav item and demote legacy MCP/Skills/Plugins entries.
+25. `workspace-settings-shell`: add workspace settings pages wired to real config/effective runtime.
+26. `model-switcher-direct-skill`: implement model switcher modal using effective runtime for direct/skill chat.
+27. `composer-status-bar`: add model, plan mode, approval, sandbox, and context status chips.
+28. `plan-mode-state`: add session-level plan mode state and send-time propagation.
+29. `agent-sdk-runtime-alignment`: route Agent SDK approval first, then model/capability fields when provider-chain support exists.
+30. `approval-ui`: replace modal-first approval with inline/inspector-capable UI.
+31. `app-plugin-copy`: rename user-facing plugin terminology.
+32. `profile-layouts`: implement Claude Code / Codex / Hybrid layout differences.
 
 Each task should be independently buildable and testable.
 
-## 20. Acceptance Criteria
+## 22. Acceptance Criteria
 
 The redesign is complete when:
 
 - Every session belongs to a workspace.
+- Main-process `WorkspaceConfig` is the authoritative workspace runtime source; renderer workspace state is cache/UI state only.
+- New IPC namespaces conform to the shared `ElectronAPI` contract.
 - Sessions inherit workspace model, permission, sandbox, interaction, and capability config.
+- Every execution path can receive or derive an `EffectiveSessionRuntime` snapshot.
 - Chat supports fast session-level model switching.
 - The model switcher can save either session override or workspace default.
+- Model resolution follows global fallback, workspace default, session override, then per-message override.
 - Chat supports attachments with explicit context mode.
+- Attachments are resolved into actual model input or reference metadata according to context mode, token budget, model capability, and approval policy.
 - Assistant turns render generated/modified files as Codex-style file cards.
 - File cards support open, reveal, copy path, and later open-with-app actions through runtime policy.
 - File write/edit turns render changed-files summaries with additions/deletions and expandable detail.
@@ -896,6 +1111,10 @@ The redesign is complete when:
 - MCP, skills, hooks, app plugins, and themes appear under one Extensions area.
 - Existing app plugins are presented as `App Plugins`.
 - Approval mode has three options: request approval, auto approve safe, full access.
+- `Allow once` and `Allow for session` are backed by real grant lookup/write behavior.
 - Sandbox policy remains a hard boundary even in full access mode.
+- Operation classification distinguishes internal app writes, conversation execution writes, workspace writes, external writes, commands, network, MCP, plugin, and external app actions.
 - Claude Code and Codex interaction profiles materially change workflow, not only colors.
 - Existing MCP, skill, plugin, model, and chat flows continue to work during migration.
+- Legacy `/mcp`, `/skills`, and `/plugins` navigation remains compatible while first-level navigation moves to `Extensions`.
+- Rollback flags can disable unified navigation, runtime enforcement, file artifacts, and profile layouts without corrupting stored conversations.
