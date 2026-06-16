@@ -13,6 +13,17 @@ const APP_CHANNELS = {
 	CLEAR_LOGS: "app:clear-logs",
 };
 
+interface IPCResult<T = unknown> {
+	success: boolean;
+	data?: T;
+	error?: string;
+}
+
+function unwrap<T>(result: IPCResult<T>): T {
+	if (!result.success) throw new Error(result.error || "IPC call failed");
+	return result.data as T;
+}
+
 export interface AppInfo {
 	name: string;
 	version: string;
@@ -37,44 +48,33 @@ export interface LogFileInfo {
 	modifiedAt: string;
 }
 
+const api = window.electron.ipc;
+
 export const appService = {
-	getInfo: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.GET_INFO) as Promise<AppInfo>,
-	getUserDataPath: () =>
-		window.electron.ipc.invoke(
-			APP_CHANNELS.GET_USER_DATA_PATH,
-		) as Promise<string>,
-	openPath: (path: string) =>
-		window.electron.ipc.invoke(
-			APP_CHANNELS.OPEN_PATH,
-			path,
-		) as Promise<boolean>,
+	getInfo: async () =>
+		unwrap<AppInfo>(await api.invoke(APP_CHANNELS.GET_INFO) as IPCResult<AppInfo>),
+	getUserDataPath: async () =>
+		unwrap<string>(await api.invoke(APP_CHANNELS.GET_USER_DATA_PATH) as IPCResult<string>),
+	openPath: async (path: string) =>
+		unwrap<boolean>(await api.invoke(APP_CHANNELS.OPEN_PATH, path) as IPCResult<boolean>),
 	checkUpdate: () =>
 		window.electron.update.check() as Promise<UpdateCheckResult>,
-	quit: () => window.electron.ipc.invoke(APP_CHANNELS.QUIT) as Promise<void>,
-	relaunch: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.RELAUNCH) as Promise<void>,
-	openDevTools: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.OPEN_DEV_TOOLS) as Promise<void>,
-	getLogs: (filePath?: string, tail?: number) =>
-		window.electron.ipc.invoke(
-			APP_CHANNELS.GET_LOGS,
-			filePath,
-			tail,
-		) as Promise<string>,
-	getLogsPath: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.GET_LOGS_PATH) as Promise<string>,
-	listLogFiles: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.LIST_LOG_FILES) as Promise<
-			LogFileInfo[]
-		>,
-	clearLogs: () =>
-		window.electron.ipc.invoke(APP_CHANNELS.CLEAR_LOGS) as Promise<boolean>,
-	openExternal: (url: string) =>
-		window.electron.ipc.invoke(
-			APP_CHANNELS.OPEN_EXTERNAL,
-			url,
-		) as Promise<boolean>,
+	quit: async () =>
+		unwrap<void>(await api.invoke(APP_CHANNELS.QUIT) as IPCResult<void>),
+	relaunch: async () =>
+		unwrap<void>(await api.invoke(APP_CHANNELS.RELAUNCH) as IPCResult<void>),
+	openDevTools: async () =>
+		unwrap<void>(await api.invoke(APP_CHANNELS.OPEN_DEV_TOOLS) as IPCResult<void>),
+	getLogs: async (filePath?: string, tail?: number) =>
+		unwrap<string>(await api.invoke(APP_CHANNELS.GET_LOGS, filePath, tail) as IPCResult<string>),
+	getLogsPath: async () =>
+		unwrap<string>(await api.invoke(APP_CHANNELS.GET_LOGS_PATH) as IPCResult<string>),
+	listLogFiles: async () =>
+		unwrap<LogFileInfo[]>(await api.invoke(APP_CHANNELS.LIST_LOG_FILES) as IPCResult<LogFileInfo[]>),
+	clearLogs: async () =>
+		unwrap<boolean>(await api.invoke(APP_CHANNELS.CLEAR_LOGS) as IPCResult<boolean>),
+	openExternal: async (url: string) =>
+		unwrap<boolean>(await api.invoke(APP_CHANNELS.OPEN_EXTERNAL, url) as IPCResult<boolean>),
 	// Update methods using typed preload API
 	downloadUpdate: () => window.electron.update.download(),
 	installUpdate: () => window.electron.update.install(),

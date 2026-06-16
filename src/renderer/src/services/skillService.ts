@@ -4,15 +4,23 @@ import type { Skill } from "../types/skills";
 // 在实际生产环境中，这里应该调用 https://skillsmp.com/api/v1/skills/search 或读取 GitHub 仓库的 marketplace.json
 const MOCK_MARKET_SKILLS: Skill[] = [];
 
+interface IPCResult<T = unknown> {
+	success: boolean;
+	data?: T;
+	error?: string;
+}
+
 let serverPort: number | null = null;
 let apiKey: string | null = null;
 
 const getProxyUrl = async (path: string) => {
 	if (!serverPort) {
 		try {
-			serverPort = (await window.electron.ipc.invoke(
+			const result = (await window.electron.ipc.invoke(
 				"api:get-server-port",
-			)) as number;
+			)) as IPCResult<number>;
+			if (!result.success) throw new Error(result.error);
+			serverPort = result.data!;
 		} catch (e) {
 			console.error("Failed to get server port", e);
 			return null;
@@ -24,7 +32,11 @@ const getProxyUrl = async (path: string) => {
 const getApiKey = async (): Promise<string | null> => {
 	if (apiKey) return apiKey;
 	try {
-		apiKey = (await window.electron.ipc.invoke("api:get-api-key")) as string;
+		const result = (await window.electron.ipc.invoke(
+			"api:get-api-key",
+		)) as IPCResult<string>;
+		if (!result.success) throw new Error(result.error);
+		apiKey = result.data!;
 		return apiKey;
 	} catch (e) {
 		console.error("Failed to get API key", e);
