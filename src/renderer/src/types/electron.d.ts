@@ -79,6 +79,8 @@ export type {
 	SandboxMode,
 	ModelSelection,
 	WorkspaceRuntimePolicy,
+	WorkspaceContextPolicy,
+	WorkspaceConfig,
 	EnabledCapability,
 	SessionApprovalGrant,
 	SessionMetadata,
@@ -630,6 +632,20 @@ export interface ElectronAPI {
 			id: string,
 			updates: Partial<ConversationSummary>,
 		) => Promise<IPCResponse>;
+	};
+
+	// Workspace Runtime API
+	workspaceRuntime: {
+		listConfigs: () => Promise<IPCResponse<WorkspaceConfig[]>>;
+		getConfig: (id: string) => Promise<IPCResponse<WorkspaceConfig | null>>;
+		saveConfig: (
+			config: WorkspaceConfig,
+		) => Promise<IPCResponse<WorkspaceConfig>>;
+		deleteConfig: (id: string) => Promise<IPCResponse<boolean>>;
+		getCurrentId: () => Promise<IPCResponse<string>>;
+		setCurrentId: (id: string) => Promise<IPCResponse<string>>;
+		getDefaultId: () => Promise<IPCResponse<string>>;
+		setDefaultId: (id: string) => Promise<IPCResponse<string>>;
 	};
 
 	// 主题 API

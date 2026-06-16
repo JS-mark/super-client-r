@@ -176,6 +176,20 @@ export interface ElectronAPI {
 		) => Promise<IPCResponse>;
 	};
 
+	// Workspace Runtime API
+	workspaceRuntime: {
+		listConfigs: () => Promise<IPCResponse<WorkspaceConfig[]>>;
+		getConfig: (id: string) => Promise<IPCResponse<WorkspaceConfig | null>>;
+		saveConfig: (
+			config: WorkspaceConfig,
+		) => Promise<IPCResponse<WorkspaceConfig>>;
+		deleteConfig: (id: string) => Promise<IPCResponse<boolean>>;
+		getCurrentId: () => Promise<IPCResponse<string>>;
+		setCurrentId: (id: string) => Promise<IPCResponse<string>>;
+		getDefaultId: () => Promise<IPCResponse<string>>;
+		setDefaultId: (id: string) => Promise<IPCResponse<string>>;
+	};
+
 	// 主题 API
 	theme: {
 		get: () => Promise<IPCResponse<string>>;
@@ -1272,6 +1286,17 @@ export interface WorkspaceRuntimePolicy {
 	externalAppAccess: "blocked" | "approval-required" | "allowed";
 }
 
+export interface WorkspaceContextPolicy {
+	defaultAttachmentMode:
+		| "include-content"
+		| "reference-only"
+		| "ask-before-read"
+		| "ignore";
+	includeWorkspaceKnowledge: boolean;
+	maxAttachmentBytes?: number;
+	ignoreRules?: string[];
+}
+
 export interface EnabledCapability {
 	id: string;
 	type: "mcp" | "skill" | "hook" | "app-plugin" | "theme" | "capability-package";
@@ -1300,6 +1325,19 @@ export interface SessionMetadata {
 	enabledCapabilityOverrides?: EnabledCapability[];
 	attachmentIds: string[];
 	approvalGrants: SessionApprovalGrant[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface WorkspaceConfig {
+	id: string;
+	name: string;
+	path?: string;
+	interactionProfile: InteractionProfile;
+	defaultModel?: ModelSelection;
+	runtimePolicy: WorkspaceRuntimePolicy;
+	enabledCapabilities: EnabledCapability[];
+	contextPolicy: WorkspaceContextPolicy;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -1544,6 +1582,13 @@ const electronAPI: ElectronAPI = {
 		"setLastConversation", "getConversationDir", "getWorkspaceDir",
 		"updateConversationMetadata",
 	]),
+	workspaceRuntime: createBridge<ElectronAPI["workspaceRuntime"]>(
+		"workspaceRuntime",
+		[
+			"listConfigs", "getConfig", "saveConfig", "deleteConfig",
+			"getCurrentId", "setCurrentId", "getDefaultId", "setDefaultId",
+		],
+	),
 	theme: createBridge<ElectronAPI["theme"]>("theme", [
 		"get", "set", "onChange",
 	]),

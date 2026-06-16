@@ -87,6 +87,8 @@ export type {
 	SandboxMode,
 	ModelSelection,
 	WorkspaceRuntimePolicy,
+	WorkspaceContextPolicy,
+	WorkspaceConfig,
 	EnabledCapability,
 	SessionApprovalGrant,
 	SessionMetadata,

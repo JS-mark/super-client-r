@@ -17,6 +17,7 @@ import type {
 	IMBotConfig,
 	RemoteDevice,
 	RelayConfig,
+	WorkspaceConfig,
 } from "../ipc/types";
 import type { RemoteControlEvent } from "../services/remote/types";
 import { ensureModelDefaults } from "../services/llm/modelNormalizer";
@@ -32,6 +33,31 @@ export type SearchProviderType =
 	| "google"
 	| "bing"
 	| "baidu";
+
+const DEFAULT_WORKSPACE_ID = "default";
+
+function createDefaultWorkspaceConfig(): WorkspaceConfig {
+	const now = Date.now();
+	return {
+		id: DEFAULT_WORKSPACE_ID,
+		name: "默认工作区",
+		interactionProfile: "hybrid",
+		runtimePolicy: {
+			approvalMode: "request",
+			sandboxMode: "workspace-write",
+			writableRoots: [],
+			networkAccess: "approval-required",
+			externalAppAccess: "approval-required",
+		},
+		enabledCapabilities: [],
+		contextPolicy: {
+			defaultAttachmentMode: "ask-before-read",
+			includeWorkspaceKnowledge: false,
+		},
+		createdAt: now,
+		updatedAt: now,
+	};
+}
 
 export interface SearchConfig {
 	id: string;
@@ -105,6 +131,10 @@ export interface AppConfig {
 	// Network proxy
 	proxyConfig?: ProxyConfig;
 	requestLogEnabled?: boolean;
+	// Workspace runtime configs
+	workspaceConfigs?: WorkspaceConfig[];
+	currentWorkspaceId?: string;
+	defaultWorkspaceId?: string;
 	// App Config 缓存
 	appInitConfigCache?: {
 		config: any;
@@ -167,6 +197,108 @@ export class StoreManager {
 
 	getAllConfig(): AppConfig {
 		return this.configStore.store;
+	}
+
+	private ensureWorkspaceConfigs(): WorkspaceConfig[] {
+		const configs = this.configStore.get("workspaceConfigs") || [];
+		if (configs.length > 0) {
+			return configs;
+		}
+
+		const defaultConfig = createDefaultWorkspaceConfig();
+		this.configStore.set("workspaceConfigs", [defaultConfig]);
+		this.configStore.set("defaultWorkspaceId", defaultConfig.id);
+		this.configStore.set("currentWorkspaceId", defaultConfig.id);
+		return [defaultConfig];
+	}
+
+	getWorkspaceConfigs(): WorkspaceConfig[] {
+		return this.ensureWorkspaceConfigs();
+	}
+
+	getWorkspaceConfig(id: string): WorkspaceConfig | undefined {
+		return this.ensureWorkspaceConfigs().find((config) => config.id === id);
+	}
+
+	saveWorkspaceConfig(config: WorkspaceConfig): WorkspaceConfig {
+		const now = Date.now();
+		const configs = this.ensureWorkspaceConfigs();
+		const existingIndex = configs.findIndex((item) => item.id === config.id);
+		const existing = existingIndex >= 0 ? configs[existingIndex] : undefined;
+		const nextConfig: WorkspaceConfig = {
+			...config,
+			createdAt: existing?.createdAt || config.createdAt || now,
+			updatedAt: now,
+		};
+		const nextConfigs =
+			existingIndex >= 0
+				? configs.map((item) =>
+						item.id === nextConfig.id ? nextConfig : item,
+					)
+				: [...configs, nextConfig];
+
+		this.configStore.set("workspaceConfigs", nextConfigs);
+		if (!this.configStore.get("defaultWorkspaceId")) {
+			this.configStore.set("defaultWorkspaceId", nextConfig.id);
+		}
+		if (!this.configStore.get("currentWorkspaceId")) {
+			this.configStore.set("currentWorkspaceId", nextConfig.id);
+		}
+		return nextConfig;
+	}
+
+	deleteWorkspaceConfig(id: string): boolean {
+		if (id === this.getDefaultWorkspaceId()) {
+			return false;
+		}
+
+		const configs = this.ensureWorkspaceConfigs();
+		const nextConfigs = configs.filter((config) => config.id !== id);
+		if (nextConfigs.length === configs.length) {
+			return false;
+		}
+
+		this.configStore.set("workspaceConfigs", nextConfigs);
+		if (this.getCurrentWorkspaceId() === id) {
+			this.configStore.set("currentWorkspaceId", this.getDefaultWorkspaceId());
+		}
+		return true;
+	}
+
+	getCurrentWorkspaceId(): string {
+		const currentId = this.configStore.get("currentWorkspaceId");
+		if (currentId && this.getWorkspaceConfig(currentId)) {
+			return currentId;
+		}
+		const defaultId = this.getDefaultWorkspaceId();
+		this.configStore.set("currentWorkspaceId", defaultId);
+		return defaultId;
+	}
+
+	setCurrentWorkspaceId(id: string): string {
+		if (!this.getWorkspaceConfig(id)) {
+			throw new Error(`Workspace config not found: ${id}`);
+		}
+		this.configStore.set("currentWorkspaceId", id);
+		return id;
+	}
+
+	getDefaultWorkspaceId(): string {
+		const defaultId = this.configStore.get("defaultWorkspaceId");
+		if (defaultId && this.getWorkspaceConfig(defaultId)) {
+			return defaultId;
+		}
+		const fallback = this.ensureWorkspaceConfigs()[0]?.id || DEFAULT_WORKSPACE_ID;
+		this.configStore.set("defaultWorkspaceId", fallback);
+		return fallback;
+	}
+
+	setDefaultWorkspaceId(id: string): string {
+		if (!this.getWorkspaceConfig(id)) {
+			throw new Error(`Workspace config not found: ${id}`);
+		}
+		this.configStore.set("defaultWorkspaceId", id);
+		return id;
 	}
 
 	// ============ 数据相关 ============

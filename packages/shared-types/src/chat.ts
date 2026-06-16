@@ -127,6 +127,18 @@ export interface WorkspaceRuntimePolicy {
 	externalAppAccess: "blocked" | "approval-required" | "allowed";
 }
 
+/** 工作区上下文策略 */
+export interface WorkspaceContextPolicy {
+	defaultAttachmentMode:
+		| "include-content"
+		| "reference-only"
+		| "ask-before-read"
+		| "ignore";
+	includeWorkspaceKnowledge: boolean;
+	maxAttachmentBytes?: number;
+	ignoreRules?: string[];
+}
+
 /** 启用的能力 */
 export interface EnabledCapability {
 	id: string;
@@ -158,6 +170,20 @@ export interface SessionMetadata {
 	enabledCapabilityOverrides?: EnabledCapability[];
 	attachmentIds: string[];
 	approvalGrants: SessionApprovalGrant[];
+	createdAt: number;
+	updatedAt: number;
+}
+
+/** 主进程可读的工作区配置 */
+export interface WorkspaceConfig {
+	id: string;
+	name: string;
+	path?: string;
+	interactionProfile: InteractionProfile;
+	defaultModel?: ModelSelection;
+	runtimePolicy: WorkspaceRuntimePolicy;
+	enabledCapabilities: EnabledCapability[];
+	contextPolicy: WorkspaceContextPolicy;
 	createdAt: number;
 	updatedAt: number;
 }

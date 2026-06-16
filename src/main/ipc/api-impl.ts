@@ -105,6 +105,7 @@ import type {
 	AgentSDKConfig,
 	AgentProfile,
 	AgentTeam,
+	WorkspaceConfig,
 } from "./types";
 import type { SearchConfig, SearchProviderType } from "../store";
 
@@ -395,6 +396,20 @@ const apiImpl = {
 			id: string,
 			updates: Partial<ConversationSummary>,
 		) => conversationStorage.updateConversationMetadata(id, updates),
+	},
+
+	workspaceRuntime: {
+		listConfigs: () => storeManager.getWorkspaceConfigs(),
+		getConfig: (id: string) =>
+			storeManager.getWorkspaceConfig(id) || null,
+		saveConfig: (config: WorkspaceConfig) =>
+			storeManager.saveWorkspaceConfig(config),
+		deleteConfig: (id: string) =>
+			storeManager.deleteWorkspaceConfig(id),
+		getCurrentId: () => storeManager.getCurrentWorkspaceId(),
+		setCurrentId: (id: string) => storeManager.setCurrentWorkspaceId(id),
+		getDefaultId: () => storeManager.getDefaultWorkspaceId(),
+		setDefaultId: (id: string) => storeManager.setDefaultWorkspaceId(id),
 	},
 
 	// ─── Network ──────────────────────────────
