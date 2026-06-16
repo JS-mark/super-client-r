@@ -268,7 +268,109 @@ Rules:
 - MCP resources follow MCP server permission and workspace runtime policy.
 - Current composer attachment upload is renderer-only and does not feed file content into model requests. Implement persistent attachment storage and request-time resolution before treating attachment chips as model context.
 
-## 9. Plan Modes
+## 9. Chat File Results and Operations
+
+Conversation file display and file operations should follow the Codex-style interaction shown in the reference screenshot:
+
+- file paths in assistant text render as inline path chips, not plain text only
+- generated or modified files render as full-width file result cards inside the assistant turn
+- file cards expose a primary `Open` action and an app picker menu
+- the app picker should support configured external targets such as VS Code, Trae, Sublime Text, Terminal, iTerm, Warp, and Finder where available
+- file write/edit results render a compact changed-files summary with added/deleted line counts
+- changed-file summaries are collapsible and can expand to a file list and diff preview
+- destructive or external actions still route through runtime policy and approval
+
+Target assistant turn structure:
+
+```text
+Assistant text
+Inline path chips
+File result card(s)
+Changed files summary: N files changed +added -deleted
+Expandable diff / file list
+Follow-up actions
+```
+
+File result card content:
+
+```text
+icon · filename
+kind · extension · optional relative path
+primary action: Open
+secondary menu: open with app, reveal in Finder, copy path, attach/reference, view diff
+```
+
+Changed-file summary content:
+
+```text
+N files changed · +added · -deleted
+file path · status · +added · -deleted
+expandable hunks or diff preview
+```
+
+Runtime model:
+
+```ts
+interface ChatFileArtifact {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  path: string;
+  relativePath?: string;
+  name: string;
+  extension?: string;
+  mimeType?: string;
+  kind: "created" | "modified" | "read" | "referenced" | "attached";
+  source: "tool" | "agent" | "attachment" | "user" | "plugin";
+  openTargets: FileOpenTarget[];
+  policy: {
+    canOpen: boolean;
+    canReveal: boolean;
+    canDiff: boolean;
+    requiresApproval?: boolean;
+  };
+}
+
+interface ChatFileChangeSet {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  files: Array<{
+    path: string;
+    status: "added" | "modified" | "deleted" | "renamed";
+    additions: number;
+    deletions: number;
+    diffPreview?: string;
+  }>;
+  additions: number;
+  deletions: number;
+}
+
+interface FileOpenTarget {
+  id: string;
+  label: string;
+  kind: "editor" | "terminal" | "finder" | "custom";
+  available: boolean;
+}
+```
+
+Rules:
+
+- File cards are output artifacts, not composer attachments. They may later be attached back into context, but they must be tracked separately.
+- File cards must use workspace-relative paths where possible and preserve absolute paths only for actions.
+- Opening an external app is an external-app operation and must respect `WorkspaceRuntimePolicy.externalAppAccess`.
+- Revealing or opening files outside the workspace requires approval unless the session policy explicitly allows it.
+- Diff previews should be generated from recorded change data when available; avoid re-reading arbitrary paths just to render UI.
+- If a file operation came from a tool call, the file card should be linked to that tool/audit event.
+
+Initial implementation should cover:
+
+1. render file artifacts in assistant turns
+2. render changed-files summary and expandable list
+3. support safe `Open`, `Reveal`, and `Copy path`
+4. defer per-app opening until the external app policy adapter exists
+
+## 10. Plan Modes
 
 Plan mode is selected per session and visible in the composer.
 
@@ -298,7 +400,7 @@ Rules:
 - `auto-execute-safe` still respects sandbox policy.
 - `full-agent` does not bypass sandbox policy.
 
-## 10. Permissions and Approval
+## 11. Permissions and Approval
 
 Approval mode:
 
@@ -332,7 +434,7 @@ Approval display must include:
 
 Prefer inline approval blocks or inspector queue over blocking modals. Use modals only for high-risk actions or when no inspector is visible.
 
-## 11. Sandbox Policy
+## 12. Sandbox Policy
 
 Approval policy and sandbox policy are separate.
 
@@ -356,7 +458,7 @@ Rules:
 - MCP, skills, hooks, app plugins, search, file access, commands, and external app access must route through the same runtime policy.
 - Current code has partial boundaries, not a central sandbox policy. Implement runtime policy as an adapter/guard layer over existing LLM tool execution, Agent SDK permission requests, MCP calls, and plugin APIs.
 
-## 12. Extensions
+## 13. Extensions
 
 Use one `Extensions` page and one normalized descriptor model.
 
@@ -378,7 +480,7 @@ Rules:
 - Every extension item must show type, scope, source, enabled state, permissions, health, and contribution points.
 - Scope must be explicit: `global`, `workspace`, or `session`.
 
-## 13. Workspace Settings
+## 14. Workspace Settings
 
 Workspace settings should be organized as:
 
@@ -393,7 +495,7 @@ Workspace settings should be organized as:
 
 Global settings should remain separate and only manage app-wide preferences.
 
-## 14. Data Model Direction
+## 15. Data Model Direction
 
 Introduce these durable concepts gradually.
 
@@ -450,7 +552,7 @@ Initial persistence strategy:
 - Derive or synchronize workspace `sessionIds` from conversation metadata.
 - Keep the current conversation directory layout stable during early phases.
 
-## 15. Core Runtime Requirements
+## 16. Core Runtime Requirements
 
 These requirements decide whether the work is actually complete. UI is only valid when it is backed by these behaviors.
 
@@ -507,6 +609,20 @@ Required behavior:
 - Apply runtime policy before reading files, URLs, external app data, or plugin-provided resources.
 - Store the resolved attachment references with the message for replay/debugging.
 
+### Chat File Artifact Pipeline
+
+Tool and agent file operations must produce structured artifacts that the chat UI can render.
+
+Required behavior:
+
+- Capture files created, modified, read, referenced, or attached by tool/agent/plugin operations.
+- Persist file artifacts with `conversationId`, `messageId`, workspace-relative path, absolute action path, operation source, and policy state.
+- Capture changed-file summaries with additions/deletions and per-file status when write/edit tools mutate files.
+- Link file artifacts and change sets back to the originating tool call or audit event.
+- Expose safe actions: open, reveal, copy path, view diff, attach/reference.
+- Route open/reveal/external-app actions through runtime policy before execution.
+- Render file artifacts inline in the assistant turn, not only in a separate attachments manager.
+
 ### Extension Runtime Contract
 
 The unified `Extensions` area must be backed by descriptors, not only tabs.
@@ -519,7 +635,7 @@ Required behavior:
 - App Plugin remains the term for app UI and app feature extensions.
 - Agent-facing capabilities must be separately visible and permissioned even if they are delivered by an App Plugin.
 
-## 16. Visual Direction
+## 17. Visual Direction
 
 The app should feel like an engineering workbench, not a marketplace dashboard.
 
@@ -536,7 +652,7 @@ Guidelines:
 - Model, permissions, sandbox, and plan mode should render as chips/status controls.
 - Approval UI should be inline or in inspector queue by default.
 
-## 17. Migration Phases
+## 18. Migration Phases
 
 ### Phase 0 - Implementation Audit and Session Metadata
 
@@ -596,22 +712,27 @@ Validation:
 - Workspace-external writes are blocked or require approval according to policy.
 - Approval grants are scoped to the current session unless explicitly promoted.
 
-### Phase 3 - Attachment and Context Kernel
+### Phase 3 - Attachment, File Artifact, and Context Kernel
 
-Goal: make attachments and context selection affect actual model input safely.
+Goal: make attachments, generated files, changed-file summaries, and context selection affect actual runtime behavior safely.
 
 Tasks:
 
 - Replace renderer-only composer file handling with main-process persisted attachments.
 - Add attachment metadata, content mode, trust state, and message references.
 - Add attachment context resolver.
+- Add chat file artifact and change-set models.
+- Capture file artifacts from file-system, patch/write, and agent/tool result paths.
+- Add safe open/reveal/copy action metadata for file artifacts.
 - Add model capability checks for images, files, long context, and tool-required context.
 - Apply runtime policy before reading attachment content or external resources.
+- Apply runtime policy before opening files in external apps or revealing them in Finder.
 - Preserve resolved context references for replay/debugging.
 
 Validation:
 
 - Sending a message with an attachment passes the expected context to the runtime.
+- File write/edit results produce file cards and changed-file summaries in the assistant turn.
 - Unsupported model/content combinations show warnings and do not silently inject data.
 - Existing attachment management remains usable.
 
@@ -726,7 +847,7 @@ Validation:
 - Switching interaction profile changes layout and workflow surfaces.
 - Session override can temporarily switch profile.
 
-## 18. Development Task Breakdown
+## 19. Development Task Breakdown
 
 Suggested initial task order:
 
@@ -740,21 +861,26 @@ Suggested initial task order:
 8. `runtime-policy-enforcement-file-command`: enforce file/command policy on the highest-risk local operations first.
 9. `attachment-persistence-for-composer`: replace renderer-only chat upload with main-process persisted attachments.
 10. `attachment-context-resolver`: add attachment context mode and request-time resolution.
-11. `extension-descriptor-adapter`: normalize MCP/Skill/App Plugin for runtime and unified UI.
-12. `workspace-capability-state`: connect enabled extension descriptors to workspace/session runtime.
-13. `extensions-shell`: create unified Extensions page shell and route.
-14. `menu-migration-extensions`: add Extensions nav item and demote legacy MCP/Skills/Plugins entries.
-15. `workspace-settings-shell`: add workspace settings pages wired to real config/effective runtime.
-16. `model-switcher-direct-skill`: implement model switcher modal using existing model store for direct/skill chat.
-17. `composer-status-bar`: add model, plan mode, approval, sandbox, and context status chips.
-18. `plan-mode-state`: add session-level plan mode state and send-time propagation.
-19. `approval-ui`: replace modal-first approval with inline/inspector-capable UI.
-20. `app-plugin-copy`: rename user-facing plugin terminology.
-21. `profile-layouts`: implement Claude Code / Codex / Hybrid layout differences.
+11. `chat-file-artifact-model`: define file artifact and change-set types tied to messages/tool calls.
+12. `file-operation-action-adapter`: expose safe open, reveal, copy path, and later app-open actions through policy-aware IPC.
+13. `chat-file-artifact-capture`: capture file artifacts from file-system/write/patch/tool result paths.
+14. `chat-file-card`: render Codex-style file cards inside assistant turns.
+15. `changed-files-summary`: render collapsible changed-files summary with additions/deletions and file rows.
+16. `extension-descriptor-adapter`: normalize MCP/Skill/App Plugin for runtime and unified UI.
+17. `workspace-capability-state`: connect enabled extension descriptors to workspace/session runtime.
+18. `extensions-shell`: create unified Extensions page shell and route.
+19. `menu-migration-extensions`: add Extensions nav item and demote legacy MCP/Skills/Plugins entries.
+20. `workspace-settings-shell`: add workspace settings pages wired to real config/effective runtime.
+21. `model-switcher-direct-skill`: implement model switcher modal using existing model store for direct/skill chat.
+22. `composer-status-bar`: add model, plan mode, approval, sandbox, and context status chips.
+23. `plan-mode-state`: add session-level plan mode state and send-time propagation.
+24. `approval-ui`: replace modal-first approval with inline/inspector-capable UI.
+25. `app-plugin-copy`: rename user-facing plugin terminology.
+26. `profile-layouts`: implement Claude Code / Codex / Hybrid layout differences.
 
 Each task should be independently buildable and testable.
 
-## 19. Acceptance Criteria
+## 20. Acceptance Criteria
 
 The redesign is complete when:
 
@@ -763,6 +889,9 @@ The redesign is complete when:
 - Chat supports fast session-level model switching.
 - The model switcher can save either session override or workspace default.
 - Chat supports attachments with explicit context mode.
+- Assistant turns render generated/modified files as Codex-style file cards.
+- File cards support open, reveal, copy path, and later open-with-app actions through runtime policy.
+- File write/edit turns render changed-files summaries with additions/deletions and expandable detail.
 - Chat supports plan mode selection before sending.
 - MCP, skills, hooks, app plugins, and themes appear under one Extensions area.
 - Existing app plugins are presented as `App Plugins`.
