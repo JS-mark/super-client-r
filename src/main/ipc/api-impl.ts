@@ -1394,9 +1394,16 @@ export function registerProxyHandlers(): void {
 
 	// 手动注册：openDevTools 需要 event.sender
 	ipcMain.handle("app:open-dev-tools", (event) => {
-		BrowserWindow.fromWebContents(event.sender)?.webContents.openDevTools({
-			mode: "detach",
-		});
+		try {
+			BrowserWindow.fromWebContents(event.sender)?.webContents.openDevTools({
+				mode: "detach",
+			});
+			return { success: true, data: undefined };
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : String(error);
+			return { success: false, error: message };
+		}
 	});
 }
 
