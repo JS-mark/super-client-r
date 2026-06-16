@@ -80,6 +80,7 @@ export type {
 	ConversationSummary,
 	ConversationData,
 	IMPlatform,
+	CreateConversationOptions,
 	SessionKind,
 	InteractionProfile,
 	PlanMode,

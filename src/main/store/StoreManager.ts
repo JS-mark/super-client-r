@@ -59,6 +59,111 @@ function createDefaultWorkspaceConfig(): WorkspaceConfig {
 	};
 }
 
+function requireWorkspaceConfig(config: WorkspaceConfig): void {
+	if (!config || typeof config !== "object") {
+		throw new Error("Workspace config must be an object");
+	}
+	if (!config.id || typeof config.id !== "string") {
+		throw new Error("Workspace config id is required");
+	}
+	if (!config.name || typeof config.name !== "string") {
+		throw new Error("Workspace config name is required");
+	}
+}
+
+function isOneOf<T extends string>(
+	value: unknown,
+	values: readonly T[],
+): value is T {
+	return typeof value === "string" && values.includes(value as T);
+}
+
+function normalizeWorkspaceConfig(config: WorkspaceConfig): WorkspaceConfig {
+	requireWorkspaceConfig(config);
+
+	if (config.runtimePolicy?.sandboxMode === "system-access") {
+		throw new Error("System access requires an explicit approval flow");
+	}
+	if (config.runtimePolicy?.networkAccess === "allowed") {
+		throw new Error(
+			"Always-allowed network access requires an explicit approval flow",
+		);
+	}
+	if (config.runtimePolicy?.externalAppAccess === "allowed") {
+		throw new Error(
+			"Always-allowed external app access requires an explicit approval flow",
+		);
+	}
+
+	const defaults = createDefaultWorkspaceConfig();
+	return {
+		...config,
+		interactionProfile: isOneOf(
+			config.interactionProfile,
+			["claude-code", "codex", "hybrid"],
+		)
+			? config.interactionProfile
+			: defaults.interactionProfile,
+		runtimePolicy: {
+			approvalMode: isOneOf(
+				config.runtimePolicy?.approvalMode,
+				["request", "auto-safe", "full-access"],
+			)
+				? config.runtimePolicy.approvalMode
+				: defaults.runtimePolicy.approvalMode,
+			sandboxMode:
+				config.runtimePolicy?.sandboxMode === "read-only" ||
+				config.runtimePolicy?.sandboxMode === "workspace-write"
+					? config.runtimePolicy.sandboxMode
+					: defaults.runtimePolicy.sandboxMode,
+			writableRoots: Array.isArray(config.runtimePolicy?.writableRoots)
+				? config.runtimePolicy.writableRoots.filter(
+						(root) => typeof root === "string",
+					)
+				: defaults.runtimePolicy.writableRoots,
+			networkAccess:
+				config.runtimePolicy?.networkAccess === "blocked" ||
+				config.runtimePolicy?.networkAccess === "approval-required"
+					? config.runtimePolicy.networkAccess
+					: defaults.runtimePolicy.networkAccess,
+			externalAppAccess:
+				config.runtimePolicy?.externalAppAccess === "blocked" ||
+				config.runtimePolicy?.externalAppAccess === "approval-required"
+					? config.runtimePolicy.externalAppAccess
+					: defaults.runtimePolicy.externalAppAccess,
+		},
+		enabledCapabilities: Array.isArray(config.enabledCapabilities)
+			? config.enabledCapabilities
+			: [],
+		contextPolicy: {
+			defaultAttachmentMode: isOneOf(
+				config.contextPolicy?.defaultAttachmentMode,
+				[
+					"include-content",
+					"reference-only",
+					"ask-before-read",
+					"ignore",
+				],
+			)
+				? config.contextPolicy.defaultAttachmentMode
+				: defaults.contextPolicy.defaultAttachmentMode,
+			includeWorkspaceKnowledge:
+				typeof config.contextPolicy?.includeWorkspaceKnowledge === "boolean"
+					? config.contextPolicy.includeWorkspaceKnowledge
+					: defaults.contextPolicy.includeWorkspaceKnowledge,
+			maxAttachmentBytes:
+				typeof config.contextPolicy?.maxAttachmentBytes === "number"
+					? config.contextPolicy.maxAttachmentBytes
+					: undefined,
+			ignoreRules: Array.isArray(config.contextPolicy?.ignoreRules)
+				? config.contextPolicy.ignoreRules.filter(
+						(rule) => typeof rule === "string",
+					)
+				: undefined,
+		},
+	};
+}
+
 export interface SearchConfig {
 	id: string;
 	provider: SearchProviderType;
@@ -222,12 +327,15 @@ export class StoreManager {
 
 	saveWorkspaceConfig(config: WorkspaceConfig): WorkspaceConfig {
 		const now = Date.now();
+		const normalizedConfig = normalizeWorkspaceConfig(config);
 		const configs = this.ensureWorkspaceConfigs();
-		const existingIndex = configs.findIndex((item) => item.id === config.id);
+		const existingIndex = configs.findIndex(
+			(item) => item.id === normalizedConfig.id,
+		);
 		const existing = existingIndex >= 0 ? configs[existingIndex] : undefined;
 		const nextConfig: WorkspaceConfig = {
-			...config,
-			createdAt: existing?.createdAt || config.createdAt || now,
+			...normalizedConfig,
+			createdAt: existing?.createdAt || normalizedConfig.createdAt || now,
 			updatedAt: now,
 		};
 		const nextConfigs =

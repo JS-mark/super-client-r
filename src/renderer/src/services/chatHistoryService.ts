@@ -1,6 +1,7 @@
 import type {
 	ChatMessagePersist,
 	ConversationSummary,
+	CreateConversationOptions,
 	IPCResponse,
 } from "../types/electron";
 
@@ -12,8 +13,9 @@ export const chatHistoryService = {
 
 	createConversation: (
 		name: string,
+		options?: CreateConversationOptions,
 	): Promise<IPCResponse<ConversationSummary>> =>
-		window.electron.chat.createConversation(name),
+		window.electron.chat.createConversation(name, options),
 
 	deleteConversation: (id: string): Promise<IPCResponse> =>
 		window.electron.chat.deleteConversation(id),

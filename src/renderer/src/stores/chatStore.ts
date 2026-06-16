@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { chatHistoryService } from "../services/chatHistoryService";
 import type { ConversationSummary } from "../types/electron";
+import { useWorkspaceStore } from "./workspaceStore";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageType = "text" | "tool_use" | "tool_result" | "error";
@@ -262,8 +263,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
 	createConversation: async (name, chatMode) => {
 		try {
+			const workspaceState = useWorkspaceStore.getState();
+			const workspaceId =
+				workspaceState.currentWorkspaceId ||
+				workspaceState.defaultWorkspaceId ||
+				"default";
 			const res = await chatHistoryService.createConversation(
 				name || "New Chat",
+				{
+					workspaceId,
+					kind: chatMode === "agent" ? "agent" : "chat",
+					chatMode,
+				},
 			);
 			if (res.success && res.data) {
 				const conv = chatMode
@@ -275,6 +286,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 					messages: [],
 				}));
 				chatHistoryService.setLastConversation(conv.id).catch(() => {});
+				workspaceState.addSessionToWorkspace(workspaceId, conv.id);
+				workspaceState.setActiveSession(workspaceId, conv.id);
 				// Persist chatMode to metadata immediately so it survives restart
 				if (chatMode) {
 					chatHistoryService

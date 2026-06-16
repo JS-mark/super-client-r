@@ -143,6 +143,7 @@ export interface ElectronAPI {
 		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
 		createConversation: (
 			name: string,
+			options?: CreateConversationOptions,
 		) => Promise<IPCResponse<ConversationSummary>>;
 		deleteConversation: (id: string) => Promise<IPCResponse>;
 		renameConversation: (
@@ -1256,6 +1257,12 @@ export interface ConversationSummary {
 }
 
 export type SessionKind = "chat" | "agent" | "plan" | "remote" | "automation";
+
+export interface CreateConversationOptions {
+	workspaceId?: string;
+	kind?: SessionKind;
+	chatMode?: "direct" | "agent";
+}
 
 export type InteractionProfile = "claude-code" | "codex" | "hybrid";
 

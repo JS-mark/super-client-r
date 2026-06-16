@@ -30,6 +30,7 @@ import type {
 	ChatMessagePersist,
 	ConversationData,
 	ConversationSummary,
+	CreateConversationOptions,
 	SessionKind,
 	SessionMetadata,
 } from "../../ipc/types";
@@ -180,6 +181,28 @@ export class ConversationStorageService {
 		return normalized;
 	}
 
+	private mergeSessionMetadata(
+		metadata: ConversationSummary,
+		updates: Partial<SessionMetadata>,
+	): SessionMetadata {
+		const base = this.normalizeSessionMetadata(metadata);
+		const now = Date.now();
+		const workspaceId =
+			updates.workspaceId ||
+			metadata.workspaceId ||
+			base.workspaceId ||
+			DEFAULT_WORKSPACE_ID;
+
+		return {
+			...base,
+			...updates,
+			workspaceId,
+			attachmentIds: updates.attachmentIds || base.attachmentIds,
+			approvalGrants: updates.approvalGrants || base.approvalGrants,
+			updatedAt: now,
+		};
+	}
+
 	// ============ Migration ============
 
 	private migrateFromLegacy(): void {
@@ -326,9 +349,13 @@ export class ConversationStorageService {
 		return list;
 	}
 
-	createConversation(name: string): ConversationSummary {
+	createConversation(
+		name: string,
+		options: CreateConversationOptions = {},
+	): ConversationSummary {
 		const id = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 		const now = Date.now();
+		const workspaceId = options.workspaceId || DEFAULT_WORKSPACE_ID;
 
 		const convDir = join(this.chatsDir, id);
 		mkdirSync(convDir, { recursive: true });
@@ -342,6 +369,20 @@ export class ConversationStorageService {
 			updatedAt: now,
 			messageCount: 0,
 			preview: "",
+			chatMode: options.chatMode,
+			workspaceId,
+			session: {
+				id,
+				workspaceId,
+				kind:
+					options.kind ||
+					(options.chatMode === "agent" ? "agent" : "chat"),
+				planMode: "off",
+				attachmentIds: [],
+				approvalGrants: [],
+				createdAt: now,
+				updatedAt: now,
+			},
 		});
 
 		writeFileSync(
@@ -403,10 +444,25 @@ export class ConversationStorageService {
 		const raw = readFileSync(metadataPath, "utf-8");
 		const metadata: ConversationSummary = JSON.parse(raw);
 
-		// Merge updates, allowing undefined values to delete keys
+		// Merge updates, allowing undefined values to delete keys.
+		// Session metadata is deep-merged so partial session updates do not
+		// accidentally drop model overrides, attachment state, or approval grants.
 		for (const [key, value] of Object.entries(updates)) {
 			if (value === undefined) {
 				delete (metadata as any)[key];
+			} else if (key === "session") {
+				if (value && typeof value === "object") {
+					metadata.session = this.mergeSessionMetadata(
+						metadata,
+						value as Partial<SessionMetadata>,
+					);
+					metadata.workspaceId = metadata.session.workspaceId;
+				}
+			} else if (key === "workspaceId") {
+				metadata.workspaceId = String(value);
+				metadata.session = this.mergeSessionMetadata(metadata, {
+					workspaceId: metadata.workspaceId,
+				});
 			} else {
 				(metadata as any)[key] = value;
 			}

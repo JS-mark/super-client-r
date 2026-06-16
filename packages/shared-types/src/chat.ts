@@ -92,6 +92,13 @@ export interface SendRemoteMessageRequest {
 /** Session 类型 */
 export type SessionKind = "chat" | "agent" | "plan" | "remote" | "automation";
 
+/** 创建对话选项 */
+export interface CreateConversationOptions {
+	workspaceId?: string;
+	kind?: SessionKind;
+	chatMode?: "direct" | "agent";
+}
+
 /** 交互模式 */
 export type InteractionProfile = "claude-code" | "codex" | "hybrid";
 

@@ -90,6 +90,7 @@ import type {
 	SearchExecuteRequest,
 	AuthProvider,
 	ConversationSummary,
+	CreateConversationOptions,
 	ProxyConfig,
 	ModelProvider,
 	ModelProviderPreset,
@@ -360,8 +361,15 @@ const apiImpl = {
 	// ─── Chat ─────────────────────────────────
 	chat: {
 		listConversations: () => conversationStorage.getConversationList(),
-		createConversation: (name: string) =>
-			conversationStorage.createConversation(name || "New Chat"),
+		createConversation: (
+			name: string,
+			options: CreateConversationOptions = {},
+		) =>
+			conversationStorage.createConversation(name || "New Chat", {
+				...options,
+				workspaceId:
+					options.workspaceId || storeManager.getCurrentWorkspaceId(),
+			}),
 		deleteConversation: (id: string) =>
 			conversationStorage.deleteConversation(id),
 		renameConversation: (conversationId: string, name: string) =>

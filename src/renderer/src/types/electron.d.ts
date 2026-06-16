@@ -72,6 +72,7 @@ export type {
 	RemoteChatMessage,
 	ConversationSummary,
 	IMPlatform,
+	CreateConversationOptions,
 	SessionKind,
 	InteractionProfile,
 	PlanMode,
@@ -601,6 +602,7 @@ export interface ElectronAPI {
 		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
 		createConversation: (
 			name: string,
+			options?: CreateConversationOptions,
 		) => Promise<IPCResponse<ConversationSummary>>;
 		deleteConversation: (id: string) => Promise<IPCResponse>;
 		renameConversation: (
