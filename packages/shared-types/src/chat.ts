@@ -89,6 +89,79 @@ export interface SendRemoteMessageRequest {
 	content: string;
 }
 
+/** Session 类型 */
+export type SessionKind = "chat" | "agent" | "plan" | "remote" | "automation";
+
+/** 交互模式 */
+export type InteractionProfile = "claude-code" | "codex" | "hybrid";
+
+/** 计划模式 */
+export type PlanMode = "off" | "auto" | "plan";
+
+/** 审批模式 */
+export type ApprovalMode = "request" | "auto-safe" | "full-access";
+
+/** 沙箱模式 */
+export type SandboxMode = "read-only" | "workspace-write" | "system-access";
+
+/** 模型选择 */
+export interface ModelSelection {
+	providerId: string;
+	modelId: string;
+	reasoningEffort?: "low" | "medium" | "high";
+	temperature?: number;
+	maxOutputTokens?: number;
+	contextMode?: "auto" | "compact" | "full";
+	fallbackModel?: {
+		providerId: string;
+		modelId: string;
+	};
+}
+
+/** 工作区运行策略 */
+export interface WorkspaceRuntimePolicy {
+	approvalMode: ApprovalMode;
+	sandboxMode: SandboxMode;
+	writableRoots: string[];
+	networkAccess: "blocked" | "approval-required" | "allowed";
+	externalAppAccess: "blocked" | "approval-required" | "allowed";
+}
+
+/** 启用的能力 */
+export interface EnabledCapability {
+	id: string;
+	type: "mcp" | "skill" | "hook" | "app-plugin" | "theme" | "capability-package";
+	scope: "global" | "workspace" | "session";
+	enabled: boolean;
+}
+
+/** Session 审批授权 */
+export interface SessionApprovalGrant {
+	id: string;
+	operationType: string;
+	scope: "once" | "session" | "workspace" | "global";
+	target?: string;
+	riskLevel?: "low" | "medium" | "high";
+	grantedAt: number;
+	expiresAt?: number;
+}
+
+/** Conversation 迁移期承载的 Session 元数据 */
+export interface SessionMetadata {
+	id: string;
+	workspaceId: string;
+	kind: SessionKind;
+	planMode: PlanMode;
+	modelOverride?: ModelSelection;
+	interactionProfileOverride?: InteractionProfile;
+	runtimePolicyOverride?: Partial<WorkspaceRuntimePolicy>;
+	enabledCapabilityOverrides?: EnabledCapability[];
+	attachmentIds: string[];
+	approvalGrants: SessionApprovalGrant[];
+	createdAt: number;
+	updatedAt: number;
+}
+
 /** 对话摘要 */
 export interface ConversationSummary {
 	id: string;
@@ -102,6 +175,10 @@ export interface ConversationSummary {
 	agentSDKSessionId?: string;
 	/** 会话绑定的聊天模式，首次发送后锁定 */
 	chatMode?: "direct" | "agent";
+	/** 关联的产品工作区 ID；不同于 per-conversation execution workspace directory */
+	workspaceId?: string;
+	/** 迁移期 Session 元数据，长期会演进为正式 Session 存储 */
+	session?: SessionMetadata;
 }
 
 /** 对话数据 */

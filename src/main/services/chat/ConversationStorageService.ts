@@ -30,6 +30,8 @@ import type {
 	ChatMessagePersist,
 	ConversationData,
 	ConversationSummary,
+	SessionKind,
+	SessionMetadata,
 } from "../../ipc/types";
 import { logger } from "../../utils/logger";
 
@@ -41,6 +43,7 @@ interface LegacyChatStoreData {
 
 const MAX_MESSAGES_PER_CONVERSATION = 500;
 const DEFAULT_USER_DIR = "default";
+const DEFAULT_WORKSPACE_ID = "default";
 
 export class ConversationStorageService {
 	private chatsBaseDir = "";
@@ -111,6 +114,72 @@ export class ConversationStorageService {
 		return this.currentUserDir;
 	}
 
+	private deriveSessionKind(metadata: ConversationSummary): SessionKind {
+		if (
+			metadata.session?.kind === "plan" ||
+			metadata.session?.kind === "automation"
+		) {
+			return metadata.session.kind;
+		}
+		if (metadata.remote) {
+			return "remote";
+		}
+		if (metadata.chatMode === "agent" || metadata.agentSDKSessionId) {
+			return "agent";
+		}
+		if (metadata.session?.kind) {
+			return metadata.session.kind;
+		}
+		return "chat";
+	}
+
+	private normalizeSessionMetadata(
+		metadata: ConversationSummary,
+	): SessionMetadata {
+		const workspaceId =
+			metadata.workspaceId ||
+			metadata.session?.workspaceId ||
+			DEFAULT_WORKSPACE_ID;
+		const now = Date.now();
+
+		return {
+			id: metadata.session?.id || metadata.id,
+			workspaceId,
+			kind: this.deriveSessionKind(metadata),
+			planMode: metadata.session?.planMode || "off",
+			modelOverride: metadata.session?.modelOverride,
+			interactionProfileOverride:
+				metadata.session?.interactionProfileOverride,
+			runtimePolicyOverride: metadata.session?.runtimePolicyOverride,
+			enabledCapabilityOverrides:
+				metadata.session?.enabledCapabilityOverrides,
+			attachmentIds: metadata.session?.attachmentIds || [],
+			approvalGrants: metadata.session?.approvalGrants || [],
+			createdAt: metadata.session?.createdAt || metadata.createdAt || now,
+			updatedAt: metadata.updatedAt || metadata.session?.updatedAt || now,
+		};
+	}
+
+	private normalizeConversationMetadata(
+		metadata: ConversationSummary,
+	): ConversationSummary {
+		const session = this.normalizeSessionMetadata(metadata);
+		return {
+			...metadata,
+			workspaceId: session.workspaceId,
+			session,
+		};
+	}
+
+	private writeMetadata(
+		metadataPath: string,
+		metadata: ConversationSummary,
+	): ConversationSummary {
+		const normalized = this.normalizeConversationMetadata(metadata);
+		writeFileSync(metadataPath, JSON.stringify(normalized, null, 2), "utf-8");
+		return normalized;
+	}
+
 	// ============ Migration ============
 
 	private migrateFromLegacy(): void {
@@ -165,14 +234,14 @@ export class ConversationStorageService {
 				mkdirSync(join(convDir, "attachments"), { recursive: true });
 				mkdirSync(join(convDir, "tool-outputs"), { recursive: true });
 
-				const metadata: ConversationSummary = {
+				const metadata: ConversationSummary = this.normalizeConversationMetadata({
 					id: conv.id,
 					name: conv.name,
 					createdAt: conv.createdAt,
 					updatedAt: conv.updatedAt,
 					messageCount: conv.messageCount,
 					preview: conv.preview || "",
-				};
+				});
 
 				writeFileSync(
 					join(convDir, "metadata.json"),
@@ -242,7 +311,11 @@ export class ConversationStorageService {
 			try {
 				const raw = readFileSync(metadataPath, "utf-8");
 				const metadata: ConversationSummary = JSON.parse(raw);
-				list.push(metadata);
+				const normalized = this.normalizeConversationMetadata(metadata);
+				list.push(normalized);
+				if (JSON.stringify(metadata) !== JSON.stringify(normalized)) {
+					this.writeMetadata(metadataPath, normalized);
+				}
 			} catch {
 				// Skip corrupted entries
 			}
@@ -262,14 +335,14 @@ export class ConversationStorageService {
 		mkdirSync(join(convDir, "attachments"), { recursive: true });
 		mkdirSync(join(convDir, "tool-outputs"), { recursive: true });
 
-		const metadata: ConversationSummary = {
+		const metadata: ConversationSummary = this.normalizeConversationMetadata({
 			id,
 			name,
 			createdAt: now,
 			updatedAt: now,
 			messageCount: 0,
 			preview: "",
-		};
+		});
 
 		writeFileSync(
 			join(convDir, "metadata.json"),
@@ -310,7 +383,7 @@ export class ConversationStorageService {
 		metadata.name = name;
 		metadata.updatedAt = Date.now();
 
-		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		this.writeMetadata(metadataPath, metadata);
 		this.cachedList = null;
 	}
 
@@ -340,7 +413,7 @@ export class ConversationStorageService {
 		}
 
 		metadata.updatedAt = Date.now();
-		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		this.writeMetadata(metadataPath, metadata);
 		this.cachedList = null;
 	}
 
@@ -380,7 +453,7 @@ export class ConversationStorageService {
 		const firstUser = trimmed.find((m) => m.role === "user");
 		metadata.preview = firstUser ? firstUser.content.slice(0, 100) : "";
 
-		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		this.writeMetadata(metadataPath, metadata);
 		this.cachedList = null;
 	}
 
@@ -416,7 +489,7 @@ export class ConversationStorageService {
 			metadata.preview = message.content.slice(0, 100);
 		}
 
-		writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+		this.writeMetadata(metadataPath, metadata);
 		this.cachedList = null;
 	}
 
@@ -447,7 +520,7 @@ export class ConversationStorageService {
 			const raw = readFileSync(metadataPath, "utf-8");
 			const metadata: ConversationSummary = JSON.parse(raw);
 			metadata.updatedAt = Date.now();
-			writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+			this.writeMetadata(metadataPath, metadata);
 			this.cachedList = null;
 		}
 	}
@@ -465,7 +538,7 @@ export class ConversationStorageService {
 			metadata.messageCount = 0;
 			metadata.preview = "";
 			metadata.updatedAt = Date.now();
-			writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), "utf-8");
+			this.writeMetadata(metadataPath, metadata);
 			this.cachedList = null;
 		}
 	}

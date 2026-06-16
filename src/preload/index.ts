@@ -1234,6 +1234,74 @@ export interface ConversationSummary {
 	updatedAt: number;
 	messageCount: number;
 	preview: string;
+	remote?: RemoteBinding;
+	agentSDKSessionId?: string;
+	chatMode?: "direct" | "agent";
+	workspaceId?: string;
+	session?: SessionMetadata;
+}
+
+export type SessionKind = "chat" | "agent" | "plan" | "remote" | "automation";
+
+export type InteractionProfile = "claude-code" | "codex" | "hybrid";
+
+export type PlanMode = "off" | "auto" | "plan";
+
+export type ApprovalMode = "request" | "auto-safe" | "full-access";
+
+export type SandboxMode = "read-only" | "workspace-write" | "system-access";
+
+export interface ModelSelection {
+	providerId: string;
+	modelId: string;
+	reasoningEffort?: "low" | "medium" | "high";
+	temperature?: number;
+	maxOutputTokens?: number;
+	contextMode?: "auto" | "compact" | "full";
+	fallbackModel?: {
+		providerId: string;
+		modelId: string;
+	};
+}
+
+export interface WorkspaceRuntimePolicy {
+	approvalMode: ApprovalMode;
+	sandboxMode: SandboxMode;
+	writableRoots: string[];
+	networkAccess: "blocked" | "approval-required" | "allowed";
+	externalAppAccess: "blocked" | "approval-required" | "allowed";
+}
+
+export interface EnabledCapability {
+	id: string;
+	type: "mcp" | "skill" | "hook" | "app-plugin" | "theme" | "capability-package";
+	scope: "global" | "workspace" | "session";
+	enabled: boolean;
+}
+
+export interface SessionApprovalGrant {
+	id: string;
+	operationType: string;
+	scope: "once" | "session" | "workspace" | "global";
+	target?: string;
+	riskLevel?: "low" | "medium" | "high";
+	grantedAt: number;
+	expiresAt?: number;
+}
+
+export interface SessionMetadata {
+	id: string;
+	workspaceId: string;
+	kind: SessionKind;
+	planMode: PlanMode;
+	modelOverride?: ModelSelection;
+	interactionProfileOverride?: InteractionProfile;
+	runtimePolicyOverride?: Partial<WorkspaceRuntimePolicy>;
+	enabledCapabilityOverrides?: EnabledCapability[];
+	attachmentIds: string[];
+	approvalGrants: SessionApprovalGrant[];
+	createdAt: number;
+	updatedAt: number;
 }
 
 export interface AttachmentInfo {

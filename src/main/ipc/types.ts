@@ -80,6 +80,16 @@ export type {
 	ConversationSummary,
 	ConversationData,
 	IMPlatform,
+	SessionKind,
+	InteractionProfile,
+	PlanMode,
+	ApprovalMode,
+	SandboxMode,
+	ModelSelection,
+	WorkspaceRuntimePolicy,
+	EnabledCapability,
+	SessionApprovalGrant,
+	SessionMetadata,
 } from "@super-client/shared-types/chat";
 
 export type {
@@ -524,4 +534,3 @@ export interface AppInitConfig {
 		endpoints: Record<string, string>;
 	};
 }
-

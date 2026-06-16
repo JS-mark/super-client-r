@@ -72,6 +72,16 @@ export type {
 	RemoteChatMessage,
 	ConversationSummary,
 	IMPlatform,
+	SessionKind,
+	InteractionProfile,
+	PlanMode,
+	ApprovalMode,
+	SandboxMode,
+	ModelSelection,
+	WorkspaceRuntimePolicy,
+	EnabledCapability,
+	SessionApprovalGrant,
+	SessionMetadata,
 } from "@super-client/shared-types/chat";
 
 export type {
