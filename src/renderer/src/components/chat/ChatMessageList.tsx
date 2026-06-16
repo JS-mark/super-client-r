@@ -17,10 +17,10 @@ import { App, Avatar, Button, Dropdown, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import type { ChatSessionStatus, Message } from "../../stores/chatStore";
+import { type Message, useChatStore } from "../../stores/chatStore";
 import { useMessageStore } from "../../stores/messageStore";
 import type { ModelProviderPreset } from "../../types/models";
-import { Markdown } from "../Markdown";
+import { Markdown, StreamingMarkdown } from "../Markdown";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
@@ -29,11 +29,26 @@ import { ToolCallCard } from "./ToolCallCard";
 
 const { useToken } = theme;
 
+/** Reads sessionStatus from the store so the parent doesn't need it as a dep. */
+function StreamingStatusIndicator() {
+  const { t } = useTranslation();
+  const { token } = useToken();
+  const sessionStatus = useChatStore((s) => s.sessionStatus);
+  if (sessionStatus === "idle") return null;
+  return (
+    <div
+      className="flex items-center gap-1.5 mt-2"
+      style={{ color: token.colorTextTertiary, fontSize: 12 }}
+    >
+      <LoadingOutlined spin style={{ fontSize: 12 }} />
+      <span>{t(`sessionStatus.${sessionStatus}`, { ns: "chat" })}</span>
+    </div>
+  );
+}
+
 interface ChatMessageListProps {
   messages: Message[];
   isStreaming: boolean;
-  streamingContent: string;
-  sessionStatus: ChatSessionStatus;
   conversationId: string;
   bubbleListRef: React.RefObject<BubbleListRef | null>;
   retryMessage: (messageId: string) => void;
@@ -45,8 +60,6 @@ interface ChatMessageListProps {
 export function ChatMessageList({
   messages,
   isStreaming,
-  streamingContent,
-  sessionStatus,
   conversationId,
   bubbleListRef,
   retryMessage,
@@ -124,6 +137,18 @@ export function ChatMessageList({
       messageApi,
       t,
     ],
+  );
+
+  // ── Stable styles for Bubble.List (avoids inline object triggering re-renders) ──
+  const bubbleListStyles = useMemo(
+    () => ({
+      content: {
+        maxWidth: "56rem",
+        margin: "0 auto",
+        padding: "2rem 1.5rem",
+      },
+    }),
+    [],
   );
 
   // ── Roles config ──
@@ -247,7 +272,7 @@ export function ChatMessageList({
 
         // Token info
         const tokenText =
-          meta?.inputTokens != null ? `↑${meta.inputTokens}` : "";
+          meta?.inputTokens != null ? `↑${meta.inputTokens.toLocaleString()}` : "";
         const tokenInfo = (
           <div className="flex items-center gap-1.5">
             {isBookmarked(msg.id) && (
@@ -265,7 +290,7 @@ export function ChatMessageList({
         );
         const tokenInfoEl =
           meta?.inputTokens != null ? (
-            <Tooltip title={`Tokens: ↑${meta.inputTokens}`}>
+            <Tooltip title={`Tokens: ↑${meta.inputTokens.toLocaleString()}`}>
               {tokenInfo}
             </Tooltip>
           ) : (
@@ -360,9 +385,11 @@ export function ChatMessageList({
         const m = aiMessages[i];
         if (m.role === "assistant") {
           const isLastInTurn = i === aiMessages.length - 1;
-          const content =
-            isStreamingTurn && isLastInTurn ? streamingContent : m.content;
-          if (content?.trim()) {
+          // During streaming, the last assistant message content comes from the store
+          // via StreamingMarkdown (not from props), so check m.content for non-streaming
+          // and always include the last message in a streaming turn
+          const hasContent = (isStreamingTurn && isLastInTurn) || m.content?.trim();
+          if (hasContent) {
             precomputedParts.push({ msg: m, idx: i });
           }
         } else if (m.role === "tool" && m.toolCall) {
@@ -455,15 +482,18 @@ export function ChatMessageList({
           const m = aiMessages[i];
           if (m.role === "assistant") {
             const isLastInTurn = i === aiMessages.length - 1;
-            const content =
-              isStreamingTurn && isLastInTurn ? streamingContent : m.content;
-            if (content?.trim()) {
+            if (isStreamingTurn && isLastInTurn) {
+              // StreamingMarkdown reads streamingContent from Zustand store directly,
+              // so this component re-renders in isolation without rebuilding all bubbleItems.
               parts.push(
-                <Markdown
+                <StreamingMarkdown
                   key={m.id}
-                  content={content}
-                  streaming={isStreamingTurn && isLastInTurn}
+                  fallbackContent={m.content || ""}
                 />,
+              );
+            } else if (m.content?.trim()) {
+              parts.push(
+                <Markdown key={m.id} content={m.content} />,
               );
             }
           } else if (m.role === "tool" && m.toolCall) {
@@ -509,17 +539,7 @@ export function ChatMessageList({
           >
             <div id={`msg-${firstAssistant?.id || aiMessages[0].id}`}>
               {parts}
-              {isStreamingTurn && sessionStatus !== "idle" && (
-                <div
-                  className="flex items-center gap-1.5 mt-2"
-                  style={{ color: token.colorTextTertiary, fontSize: 12 }}
-                >
-                  <LoadingOutlined spin style={{ fontSize: 12 }} />
-                  <span>
-                    {t(`sessionStatus.${sessionStatus}`, { ns: "chat" })}
-                  </span>
-                </div>
-              )}
+              {isStreamingTurn && <StreamingStatusIndicator />}
             </div>
           </MessageContextMenu>
         );
@@ -559,11 +579,11 @@ export function ChatMessageList({
           );
         }
         if (footerMeta?.tokens != null) {
-          const parts = [`Tokens: ${footerMeta.tokens}`];
+          const parts = [`Tokens: ${footerMeta.tokens.toLocaleString()}`];
           if (footerMeta.inputTokens != null)
-            parts.push(`↑${footerMeta.inputTokens}`);
+            parts.push(`↑${footerMeta.inputTokens.toLocaleString()}`);
           if (footerMeta.outputTokens != null)
-            parts.push(`↓${footerMeta.outputTokens}`);
+            parts.push(`↓${footerMeta.outputTokens.toLocaleString()}`);
           tooltipLines.push(parts.join(" "));
         }
 
@@ -572,9 +592,9 @@ export function ChatMessageList({
           footerMeta?.inputTokens != null &&
           footerMeta?.outputTokens != null
         ) {
-          tokenText = `↑${footerMeta.inputTokens} ↓${footerMeta.outputTokens}`;
+          tokenText = `↑${footerMeta.inputTokens.toLocaleString()} ↓${footerMeta.outputTokens.toLocaleString()}`;
         } else if (footerMeta?.tokens != null) {
-          tokenText = `${footerMeta.tokens} tokens`;
+          tokenText = `${footerMeta.tokens.toLocaleString()} tokens`;
         }
 
         const tokenInfo = (
@@ -638,7 +658,9 @@ export function ChatMessageList({
                 style={actionBtnStyle}
                 onClick={() =>
                   handleCopyMessage(
-                    isStreamingTurn ? streamingContent : combinedContent,
+                    isStreamingTurn
+                      ? useChatStore.getState().streamingContent
+                      : combinedContent,
                   )
                 }
               />
@@ -690,7 +712,6 @@ export function ChatMessageList({
         content: "",
         loading:
           isStreamingTurn &&
-          !streamingContent?.trim() &&
           !aiMessages.some(
             (m) =>
               m.role === "tool" ||
@@ -708,8 +729,6 @@ export function ChatMessageList({
   }, [
     messages,
     isStreaming,
-    streamingContent,
-    sessionStatus,
     conversationId,
     isBookmarked,
     messageApi,
@@ -734,13 +753,7 @@ export function ChatMessageList({
       role={roles}
       autoScroll
       className="h-full"
-      styles={{
-        content: {
-          maxWidth: "56rem",
-          margin: "0 auto",
-          padding: "2rem 1.5rem",
-        },
-      }}
+      styles={bubbleListStyles}
     />
   );
 }

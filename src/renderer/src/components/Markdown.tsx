@@ -1,8 +1,9 @@
 import type { ComponentProps } from "@ant-design/x-markdown";
 import { XMarkdown } from "@ant-design/x-markdown";
-import { type FC, useCallback, useMemo, useRef } from "react";
+import { type FC, memo, useCallback, useRef } from "react";
 import "@ant-design/x-markdown/es/XMarkdown/index.css";
 import { cn } from "../lib/utils";
+import { useChatStore } from "../stores/chatStore";
 import { EChartsBlock } from "./EChartsBlock";
 import { MermaidChart } from "./MermaidChart";
 import { CopyButton } from "./markdown/CopyButton";
@@ -114,34 +115,59 @@ const markdownComponents: Record<string, FC<ComponentProps>> = {
 	table: TableBlock,
 };
 
-export const Markdown: FC<MarkdownProps> = ({
-	content,
-	className,
-	streaming = false,
-}) => {
-	const streamingConfig = useMemo(
-		() =>
-			streaming
-				? {
-						hasNextChunk: true,
-						enableAnimation: true,
-						animationConfig: {
-							fadeDuration: 150,
-							easing: "ease-out",
-						},
-					}
-				: undefined,
-		[streaming],
-	);
-
-	return (
-		<div className={cn("markdown-content", className)}>
-			<XMarkdown
-				content={content}
-				openLinksInNewTab
-				components={markdownComponents}
-				streaming={streamingConfig}
-			/>
-		</div>
-	);
+const streamingOn = {
+	hasNextChunk: true,
+	enableAnimation: true,
+	animationConfig: {
+		fadeDuration: 150,
+		easing: "ease-out" as const,
+	},
 };
+
+export const Markdown: FC<MarkdownProps> = memo(
+	({ content, className, streaming = false }) => {
+		return (
+			<div className={cn("markdown-content", className)}>
+				<XMarkdown
+					content={content}
+					openLinksInNewTab
+					components={markdownComponents}
+					streaming={streaming ? streamingOn : undefined}
+				/>
+			</div>
+		);
+	},
+);
+
+/**
+ * A self-contained streaming Markdown component that reads
+ * `streamingContent` directly from the Zustand store.
+ *
+ * Using this instead of `<Markdown content={streamingContent} streaming />`
+ * prevents the parent from needing `streamingContent` as a dependency,
+ * which would otherwise force ALL sibling bubbles to re-render on every chunk.
+ */
+interface StreamingMarkdownProps {
+	/** Fallback content used when not actively streaming (e.g. final message text) */
+	fallbackContent: string;
+	className?: string;
+}
+
+export const StreamingMarkdown: FC<StreamingMarkdownProps> = memo(
+	({ fallbackContent, className }) => {
+		const streamingContent = useChatStore((s) => s.streamingContent);
+		const isStreaming = useChatStore((s) => s.isStreaming);
+		const content = isStreaming ? (streamingContent || fallbackContent) : fallbackContent;
+
+		return (
+			<div className={cn("markdown-content", className)}>
+				<XMarkdown
+					content={content}
+					openLinksInNewTab
+					components={markdownComponents}
+					streaming={isStreaming ? streamingOn : undefined}
+				/>
+			</div>
+		);
+	},
+);

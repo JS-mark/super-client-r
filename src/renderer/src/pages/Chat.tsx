@@ -19,7 +19,7 @@ import { useChatPageState } from "../hooks/useChatPageState";
 import { useRemoteChat } from "../hooks/useRemoteChat";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useTitle } from "../hooks/useTitle";
-import { useChatStore } from "../stores/chatStore";
+
 import { useModelStore } from "../stores/modelStore";
 
 const { useToken } = theme;
@@ -34,9 +34,7 @@ const Chat: React.FC = () => {
     input,
     setInput,
     sendMessage,
-    sessionStatus,
     isStreaming,
-    streamingContent,
     clearMessages,
     stopCurrentStream,
     retryMessage,
@@ -330,8 +328,6 @@ const Chat: React.FC = () => {
                     <ChatMessageList
                       messages={messages}
                       isStreaming={isStreaming}
-                      streamingContent={streamingContent}
-                      sessionStatus={sessionStatus}
                       conversationId={pageState.conversationId}
                       bubbleListRef={pageState.bubbleListRef}
                       retryMessage={retryMessage}
