@@ -9,7 +9,7 @@ const ErrorPage: React.FC = () => {
 	const error: any = useRouteError();
 
 	return (
-		<div className="flex h-full w-full items-center justify-center">
+		<div className="flex h-full w-full items-center justify-center bg-[var(--ant-color-bg-base)]">
 			<Result
 				status="500"
 				title={t("title", "Something went wrong", { ns: "error" })}

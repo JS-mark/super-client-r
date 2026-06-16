@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
 			// Default error UI
 			return (
-				<div className="flex items-center justify-center min-h-screen p-4">
+				<div className="flex items-center justify-center min-h-screen p-4 bg-[var(--ant-color-bg-base)]">
 					<Result
 						status="error"
 						title={t("somethingWentWrong", { ns: "error" })}

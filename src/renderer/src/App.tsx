@@ -52,6 +52,16 @@ function App() {
 		initSystemThemeDetection();
 	}, []);
 
+	// 同步 body 背景色到当前主题（确保 Error 等全屏页面背景正确）
+	useEffect(() => {
+		document.body.style.backgroundColor =
+			actualTheme === "dark" ? "#141414" : "#ffffff";
+		document.body.style.color =
+			actualTheme === "dark"
+				? "rgba(255, 255, 255, 0.88)"
+				: "rgba(0, 0, 0, 0.88)";
+	}, [actualTheme]);
+
 	// 初始化皮肤
 	useEffect(() => {
 		initSkin();
