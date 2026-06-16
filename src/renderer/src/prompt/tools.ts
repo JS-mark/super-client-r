@@ -34,6 +34,18 @@ For managing independent work items:
 - \`list_tasks\`: Filter by status, priority, or tag to see relevant tasks
 - \`delete_task\`: Remove a task by ID
 
+## Batch File Operations
+When the user asks to move, copy, rename, or delete **multiple files**, prefer a single shell command over calling file tools (move_file, copy_file, etc.) one-by-one:
+- Move multiple files: \`mv /source/*.md /target/\`
+- Copy by pattern: \`cp /source/*.{html,css} /target/\`
+- Batch rename: \`for f in /dir/*.txt; do mv "$f" "\${f%.txt}.md"; done\`
+- Find + act: \`find /source -name "*.log" -exec mv {} /target/ \\;\`
+
+Only fall back to individual file tool calls when:
+- The shell tool is unavailable
+- A single file needs to be moved/copied (no batch benefit)
+- The operation requires per-file error handling the user explicitly requested
+
 ## Shell Commands: execute_command / execute_script
 - **Delete safety**: Commands containing delete operations (rm, rmdir, unlink, shred, truncate, find -delete, git clean -f) require explicit confirmation. When you receive a warning about a delete operation, ask the user for confirmation first, then re-call with \`confirmed: true\`.
 - **Catastrophic commands are always blocked**: rm -rf /, mkfs, dd to raw devices, fork bombs, etc. cannot be executed even with confirmation.
