@@ -294,10 +294,20 @@ export class LLMService {
 		const controller = new AbortController();
 		this.activeStreams.set(request.requestId, controller);
 
-		const client = new OpenAI({
+		const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
 			baseURL: request.baseUrl,
 			apiKey: request.apiKey || "sk-placeholder",
-		});
+		};
+
+		// OpenRouter requires additional headers for identification
+		if (request.providerPreset === "openrouter") {
+			clientOptions.defaultHeaders = {
+				"HTTP-Referer": "https://superclient.app",
+				"X-Title": "Super Client",
+			};
+		}
+
+		const client = new OpenAI(clientOptions);
 
 		const isPromptMode = request.toolCallMode === "prompt";
 		const hasTools = request.tools && request.tools.length > 0 && toolExecutor;
