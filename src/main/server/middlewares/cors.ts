@@ -1,7 +1,7 @@
-import type { Context, Next } from "koa";
+import type Koa from "koa";
 
 // CORS 配置中间件
-export const corsMiddleware = async (ctx: Context, next: Next) => {
+export const corsMiddleware = async (ctx: Koa.Context, next: Koa.Next) => {
 	// 允许的开发环境 origin
 	const allowedOrigins = [
 		"http://localhost:5173", // Vite 默认 dev server

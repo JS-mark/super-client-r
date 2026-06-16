@@ -12,7 +12,7 @@ import {
 	summary,
 	tags,
 } from "koa-swagger-decorator";
-import { Context } from "koa";
+import Koa from "koa";
 import { mcpService } from "../../services/mcp/McpService";
 import { thirdPartyMcpService } from "../../services/mcp/ThirdPartyMcpService";
 import { mcpMarketService } from "../../services/mcp/McpMarketService";
@@ -33,7 +33,7 @@ interface ApiResponse<T = unknown> {
 }
 
 function createResponse<T>(
-	ctx: Context,
+	ctx: Koa.Context,
 	code: number,
 	message: string,
 	data?: T,
@@ -53,7 +53,7 @@ export class McpController {
 	@request("get", "/api/mcp/servers")
 	@summary("获取所有 MCP 服务器")
 	@tag
-	async listServers(ctx: Context) {
+	async listServers(ctx: Koa.Context) {
 		try {
 			const servers = mcpService.listServers();
 			ctx.body = createResponse(ctx, 200, "Success", servers);
@@ -72,7 +72,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "服务器 ID" },
 	})
-	async getServer(ctx: Context) {
+	async getServer(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			const server = mcpService.getServer(id);
@@ -137,7 +137,7 @@ export class McpController {
 			description: "请求头（sse/http 类型需要）",
 		},
 	})
-	async addServer(ctx: Context) {
+	async addServer(ctx: Koa.Context) {
 		try {
 			const config = ctx.request.body as McpServerConfig;
 
@@ -163,7 +163,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "服务器 ID" },
 	})
-	async removeServer(ctx: Context) {
+	async removeServer(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			await mcpService.removeServer(id);
@@ -183,7 +183,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "服务器 ID" },
 	})
-	async connectServer(ctx: Context) {
+	async connectServer(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			const status = await mcpService.connect(id);
@@ -203,7 +203,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "服务器 ID" },
 	})
-	async disconnectServer(ctx: Context) {
+	async disconnectServer(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			await mcpService.disconnect(id);
@@ -225,7 +225,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "服务器 ID" },
 	})
-	async getServerTools(ctx: Context) {
+	async getServerTools(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			const tools = mcpService.getServerTools(id);
@@ -242,7 +242,7 @@ export class McpController {
 	@request("get", "/api/mcp/tools")
 	@summary("获取所有可用工具")
 	@tag
-	async getAllTools(ctx: Context) {
+	async getAllTools(ctx: Koa.Context) {
 		try {
 			const tools = mcpService.getAllAvailableTools();
 			ctx.body = createResponse(ctx, 200, "Success", tools);
@@ -263,7 +263,7 @@ export class McpController {
 		toolName: { type: "string", required: true, description: "工具名称" },
 		args: { type: "object", required: true, description: "工具参数" },
 	})
-	async callTool(ctx: Context) {
+	async callTool(ctx: Koa.Context) {
 		try {
 			const { serverId, toolName, args } = ctx.request
 				.body as McpToolCallRequest;
@@ -306,7 +306,7 @@ export class McpController {
 			},
 		},
 	})
-	async callToolsBatch(ctx: Context) {
+	async callToolsBatch(ctx: Koa.Context) {
 		try {
 			const { requests } = ctx.request.body as {
 				requests: Array<{
@@ -339,7 +339,7 @@ export class McpController {
 		},
 		path: { type: "string", required: true, description: "目标路径" },
 	})
-	async proxyRequest(ctx: Context) {
+	async proxyRequest(ctx: Koa.Context) {
 		try {
 			const { serverId, path } = ctx.params;
 			const method = ctx.method as "GET" | "POST" | "PUT" | "DELETE";
@@ -395,7 +395,7 @@ export class McpController {
 		page: { type: "number", required: false, description: "页码" },
 		limit: { type: "number", required: false, description: "每页数量" },
 	})
-	async searchMarket(ctx: Context) {
+	async searchMarket(ctx: Koa.Context) {
 		try {
 			const { q, tags, sortBy, page, limit } = ctx.query;
 
@@ -424,7 +424,7 @@ export class McpController {
 	@query({
 		limit: { type: "number", required: false, description: "数量限制" },
 	})
-	async getPopular(ctx: Context) {
+	async getPopular(ctx: Koa.Context) {
 		try {
 			const limit = ctx.query.limit
 				? parseInt(ctx.query.limit as string, 10)
@@ -446,7 +446,7 @@ export class McpController {
 	@query({
 		limit: { type: "number", required: false, description: "数量限制" },
 	})
-	async getTopRated(ctx: Context) {
+	async getTopRated(ctx: Koa.Context) {
 		try {
 			const limit = ctx.query.limit
 				? parseInt(ctx.query.limit as string, 10)
@@ -470,7 +470,7 @@ export class McpController {
 	@query({
 		limit: { type: "number", required: false, description: "数量限制" },
 	})
-	async getNewest(ctx: Context) {
+	async getNewest(ctx: Koa.Context) {
 		try {
 			const limit = ctx.query.limit
 				? parseInt(ctx.query.limit as string, 10)
@@ -492,7 +492,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "MCP ID" },
 	})
-	async getMarketItem(ctx: Context) {
+	async getMarketItem(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			const item = await mcpMarketService.getDetail(id);
@@ -515,7 +515,7 @@ export class McpController {
 	@request("get", "/api/mcp/market/tags")
 	@summary("获取所有标签")
 	@tag
-	async getTags(ctx: Context) {
+	async getTags(ctx: Koa.Context) {
 		try {
 			const tags = await mcpMarketService.getTags();
 			ctx.body = createResponse(ctx, 200, "Success", tags);
@@ -539,7 +539,7 @@ export class McpController {
 			description: "自定义配置",
 		},
 	})
-	async installMcp(ctx: Context) {
+	async installMcp(ctx: Koa.Context) {
 		try {
 			const { marketItem, customConfig } = ctx.request.body as {
 				marketItem: Parameters<typeof mcpMarketService.install>[0];
@@ -565,7 +565,7 @@ export class McpController {
 	@path({
 		id: { type: "string", required: true, description: "MCP ID" },
 	})
-	async getReadme(ctx: Context) {
+	async getReadme(ctx: Koa.Context) {
 		try {
 			const { id } = ctx.params;
 			const item = await mcpMarketService.getDetail(id);
@@ -591,7 +591,7 @@ export class McpController {
 	@request("get", "/api/mcp/status")
 	@summary("获取 MCP 服务状态")
 	@tag
-	async getStatus(ctx: Context) {
+	async getStatus(ctx: Koa.Context) {
 		try {
 			const servers = mcpService.listServers();
 			const statuses = mcpService.getAllServerStatus();

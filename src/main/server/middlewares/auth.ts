@@ -1,7 +1,7 @@
-import type { Context, Next } from "koa";
+import type Koa from "koa";
 import { SERVER_CONFIG, getOrCreateApiKey } from "../config";
 
-export const authMiddleware = async (ctx: Context, next: Next) => {
+export const authMiddleware = async (ctx: Koa.Context, next: Koa.Next) => {
 	// 公开路径跳过认证
 	if (SERVER_CONFIG.PUBLIC_PATHS.some((p) => ctx.path.startsWith(p))) {
 		return next();

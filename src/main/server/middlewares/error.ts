@@ -1,9 +1,9 @@
-import type { Context, Next } from "koa";
+import type Koa from "koa";
 import { logger } from "../../utils/logger";
 
 const log = logger.withContext("ApiServer");
 
-export const errorHandler = async (ctx: Context, next: Next) => {
+export const errorHandler = async (ctx: Koa.Context, next: Koa.Next) => {
 	try {
 		await next();
 	} catch (err: any) {

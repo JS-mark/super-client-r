@@ -1,9 +1,9 @@
-import type { Context, Next } from "koa";
+import type Koa from "koa";
 import { logger } from "../../utils/logger";
 
 const log = logger.withContext("ApiServer");
 
-export const requestLogger = async (ctx: Context, next: Next) => {
+export const requestLogger = async (ctx: Koa.Context, next: Koa.Next) => {
 	const start = Date.now();
 
 	const reqMeta: Record<string, unknown> = { ip: ctx.ip };

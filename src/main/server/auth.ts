@@ -4,7 +4,7 @@
  */
 
 import crypto from "crypto";
-import type { Context, Next } from "koa";
+import type Koa from "koa";
 
 // JWT 配置
 const JWT_CONFIG = {
@@ -269,7 +269,7 @@ export function verifyToken(token: string): JwtPayload | null {
 /**
  * JWT Middleware for Koa
  */
-export async function jwtMiddleware(ctx: Context, next: Next) {
+export async function jwtMiddleware(ctx: Koa.Context, next: Koa.Next) {
 	// Get token from Authorization header
 	const authHeader = ctx.headers.authorization;
 	let token: string | undefined;
@@ -337,7 +337,7 @@ export async function jwtMiddleware(ctx: Context, next: Next) {
  * Permission Check Middleware
  */
 export function requirePermission(...permissions: string[]) {
-	return async (ctx: Context, next: Next) => {
+	return async (ctx: Koa.Context, next: Koa.Next) => {
 		const user = ctx.state.user as JwtPayload | undefined;
 
 		if (!user) {
@@ -363,7 +363,7 @@ export function requirePermission(...permissions: string[]) {
 /**
  * Optional Auth Middleware (allows both authenticated and anonymous)
  */
-export async function optionalAuthMiddleware(ctx: Context, next: Next) {
+export async function optionalAuthMiddleware(ctx: Koa.Context, next: Koa.Next) {
 	const authHeader = ctx.headers.authorization;
 
 	if (authHeader) {
