@@ -252,6 +252,13 @@
       "bun",
       "msw",
       "protobufjs"
-    ]
+    ],
+    "packageExtensions": {
+      "langium": {
+        "dependencies": {
+          "@chevrotain/regexp-to-ast": "*"
+        }
+      }
+    }
   }
 }

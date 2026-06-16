@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: sha256-Mf4EvA/+CvVPGrhNgFDcj12+qVCUcmQEKydO1fpUwyk=
+
 importers:
 
   .:
@@ -13666,6 +13668,7 @@ snapshots:
 
   langium@4.2.1:
     dependencies:
+      '@chevrotain/regexp-to-ast': 11.1.2
       chevrotain: 11.1.2
       chevrotain-allstar: 0.3.1(chevrotain@11.1.2)
       vscode-languageserver: 9.0.1
