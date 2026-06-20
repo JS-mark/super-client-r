@@ -1,13 +1,17 @@
 import {
   CloseOutlined,
   PauseCircleOutlined,
+  SearchOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Button, Flex, Tag, Tooltip, theme } from "antd";
+import { App, Button, Flex, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Attachment } from "../../stores/attachmentStore";
+import {
+  type Attachment,
+  useAttachmentStore,
+} from "../../stores/attachmentStore";
 import {
   getShortcutFromEvent,
   normalizeShortcut,
@@ -20,6 +24,7 @@ import { ApprovalModePill } from "./composer/ApprovalModePill";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
 import { ChatModePill } from "./composer/ChatModePill";
+import { ChatToolsMenu } from "./composer/ChatToolsMenu";
 import { ComposerStatusBar } from "./ComposerStatusBar";
 import { useChatStore } from "../../stores/chatStore";
 import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
@@ -28,8 +33,10 @@ import type { ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
 import type { SlashItem } from "./SlashCommandPanel";
 import { SlashCommandPanel } from "./SlashCommandPanel";
-import { ChatToolbar } from "./toolbar/ChatToolbar";
+import { PromptTemplatePanel } from "./toolbar/PromptTemplatePanel";
 import type { PromptTemplate } from "./toolbar/PromptTemplatePanel";
+import { QuotePanel } from "./toolbar/QuotePanel";
+import { ToolsPanel } from "./toolbar/ToolsPanel";
 import type { ToolItem } from "./toolbar/ToolsPanel";
 import type { Message } from "../../stores/chatStore";
 
@@ -93,17 +100,91 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const { t } = useTranslation();
   const { token } = useToken();
+  const { message } = App.useApp();
   const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
   const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
-  const [modePanelOpen, setModePanelOpen] = useState(false);
+  const [promptPanelOpen, setPromptPanelOpen] = useState(false);
+  const [quotePanelOpen, setQuotePanelOpen] = useState(false);
+  const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleModeSelect = useCallback(
-    (selection: ChatModeSelection) => {
-      onModeSelect(selection);
-      setModePanelOpen(false);
+  const closeAllToolPanels = useCallback(() => {
+    setPromptPanelOpen(false);
+    setQuotePanelOpen(false);
+    setToolsPanelOpen(false);
+  }, []);
+
+  const handleAttachmentFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const completed: Attachment[] = [];
+      for (const file of Array.from(files)) {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const bytes = new Uint8Array(arrayBuffer);
+          const result = await window.electron.file.saveAttachmentBytes({
+            bytes,
+            fileName: file.name,
+            mimeType: file.type || undefined,
+            conversationId,
+          });
+          if (!result.success || !result.data) {
+            throw new Error(result.error || "saveAttachmentBytes failed");
+          }
+          const info = result.data;
+          const ext = (file.name.split(".").pop() || "").toLowerCase();
+          const mime = info.mimeType ?? file.type ?? "application/octet-stream";
+          const type: Attachment["type"] = mime.startsWith("image/")
+            ? "image"
+            : mime.startsWith("video/")
+              ? "video"
+              : mime.startsWith("audio/")
+                ? "audio"
+                : mime.includes("pdf") ||
+                    mime.includes("word") ||
+                    mime.includes("excel")
+                  ? "document"
+                  : mime.includes("zip") ||
+                      mime.includes("rar") ||
+                      mime.includes("7z")
+                    ? "archive"
+                    : ["js", "ts", "jsx", "tsx", "json"].includes(ext)
+                      ? "code"
+                      : "other";
+          const attachment: Attachment = {
+            id: info.id,
+            name: info.name ?? file.name,
+            originalName: info.originalName ?? file.name,
+            path: info.path,
+            size: info.size ?? file.size,
+            mimeType: mime,
+            type,
+            createdAt: info.createdAt ?? new Date().toISOString(),
+            conversationId: info.conversationId ?? conversationId,
+            messageId: info.messageId,
+          };
+          useAttachmentStore.getState().addAttachment(attachment);
+          completed.push(attachment);
+        } catch (error) {
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
+          message.error(
+            t("attachment.upload.error", "上传失败：{{error}}", {
+              error: errorMsg,
+            }),
+          );
+        }
+      }
+      if (completed.length > 0) {
+        setAttachedFiles((prev) => [...prev, ...completed]);
+      }
     },
-    [onModeSelect],
+    [conversationId, message, t],
   );
+
+  const handleAttachmentClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const handleSenderChange = useCallback(
     (val: string) => {
@@ -176,6 +257,39 @@ export function ChatInputArea({
             selectedEngine={selectedEngine}
             onSelectEngine={onSelectEngine}
             onClose={() => setSearchPopoverOpen(false)}
+          />
+        </div>
+      )}
+      {!hideToolbar && promptPanelOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <PromptTemplatePanel
+            onSelect={(tpl) => {
+              handlePromptSelect(tpl);
+              closeAllToolPanels();
+            }}
+            onClose={closeAllToolPanels}
+          />
+        </div>
+      )}
+      {!hideToolbar && quotePanelOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <QuotePanel
+            onSelect={(msg) => {
+              handleQuoteSelect(msg);
+              closeAllToolPanels();
+            }}
+            onClose={closeAllToolPanels}
+          />
+        </div>
+      )}
+      {!hideToolbar && toolsPanelOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <ToolsPanel
+            onSelect={(tool) => {
+              handleToolSelect(tool);
+              closeAllToolPanels();
+            }}
+            onClose={closeAllToolPanels}
           />
         </div>
       )}
@@ -269,24 +383,43 @@ export function ChatInputArea({
                 </span>
               </Tag>
             )}
-            {/* 过渡期保留 ChatToolbar 在右侧 — 批次 C (T9) 替换为 ChatToolsMenu */}
-            <ChatToolbar
-              conversationId={conversationId}
-              selectedEngine={selectedEngine}
-              onSelectEngine={onSelectEngine}
-              hasSearchEngines={hasSearchEngines}
-              currentEngine={currentEngine}
-              searchPopoverOpen={searchPopoverOpen}
-              onSearchPopoverToggle={() =>
-                setSearchPopoverOpen(!searchPopoverOpen)
-              }
-              onUploadComplete={(attachments) => {
-                setAttachedFiles((prev) => [...prev, ...attachments]);
+            <ChatToolsMenu
+              onAttachment={handleAttachmentClick}
+              onPromptTemplate={() => {
+                closeAllToolPanels();
+                setPromptPanelOpen(true);
               }}
-              onPromptSelect={handlePromptSelect}
-              onQuoteSelect={handleQuoteSelect}
-              onToolSelect={handleToolSelect}
+              onQuote={() => {
+                closeAllToolPanels();
+                setQuotePanelOpen(true);
+              }}
+              onTools={() => {
+                closeAllToolPanels();
+                setToolsPanelOpen(true);
+              }}
             />
+            {hasSearchEngines && (
+              <Tooltip
+                title={
+                  currentEngine?.name ??
+                  t("chat.toolbar.search", "搜索", { ns: "chat" })
+                }
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  icon={currentEngine?.icon ?? <SearchOutlined />}
+                  onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
+                  style={
+                    searchPopoverOpen
+                      ? { backgroundColor: token.colorBgTextHover }
+                      : selectedEngine
+                        ? { color: token.colorPrimary }
+                        : undefined
+                  }
+                />
+              </Tooltip>
+            )}
           </Flex>
 
           {/* Send or Stop button */}
@@ -315,6 +448,7 @@ export function ChatInputArea({
     },
     [
       t,
+      token,
       hideToolbar,
       isStreaming,
       onStopStream,
@@ -326,19 +460,26 @@ export function ChatInputArea({
       searchPopoverOpen,
       selectedSkillId,
       onClearSkill,
-      conversationId,
       selectedEngine,
-      onSelectEngine,
       hasSearchEngines,
       currentEngine,
-      handlePromptSelect,
-      handleQuoteSelect,
-      handleToolSelect,
+      handleAttachmentClick,
+      closeAllToolPanels,
     ],
   );
 
   return (
     <div className="chat-input-shell px-6 py-4">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleAttachmentFiles(e.target.files);
+          if (e.target) e.target.value = "";
+        }}
+      />
       <ChatComposer
         value={input}
         onChange={handleSenderChange}
