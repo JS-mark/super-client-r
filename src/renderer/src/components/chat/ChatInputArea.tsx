@@ -1,7 +1,6 @@
 import {
   CloseOutlined,
   PauseCircleOutlined,
-  RobotOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { Button, Flex, Tag, Tooltip, theme } from "antd";
@@ -17,11 +16,12 @@ import {
 import { AttachmentList } from "../attachment";
 import { AgentTeamSelector } from "./AgentTeamSelector";
 import type { ChatModeSelection } from "./ChatModePanel";
-import { ChatModePanel } from "./ChatModePanel";
+import { ApprovalModePill } from "./composer/ApprovalModePill";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
+import { ChatModePill } from "./composer/ChatModePill";
 import { useChatStore } from "../../stores/chatStore";
-import { useProjectStore } from "../../stores/projectStore";
+import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
 import type { ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
@@ -158,15 +158,6 @@ export function ChatInputArea({
 
   const topOverlay = (
     <>
-      {!hideToolbar && modePanelOpen && (
-        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-          <ChatModePanel
-            chatMode={chatMode}
-            onSelect={handleModeSelect}
-            onClose={() => setModePanelOpen(false)}
-          />
-        </div>
-      )}
       {!hideToolbar && slashPanelOpen && (
         <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
           <SlashCommandPanel
@@ -213,6 +204,8 @@ export function ChatInputArea({
   );
   const workspaceName = project?.name ?? "未指定工作区";
   const remoteBinding = currentConversation?.remote;
+  const projectSettings = useProjectSettings(projectId);
+  const approvalMode = projectSettings?.runtimePolicy?.approvalMode;
 
   const existingFooterFn = useCallback(
     (
@@ -246,52 +239,19 @@ export function ChatInputArea({
       }
       return (
         <Flex justify="space-between" align="center">
-          <Flex align="center" gap={4}>
-            {/* Mode selector */}
-            <Tooltip
-              title={
-                isModeLocked
-                  ? t("chatMode.modeLocked", {
-                      ns: "chat",
-                      defaultValue: "Mode locked for this conversation",
-                    })
-                  : t("chatMode.switchMode", "切换模式", {
-                      ns: "chat",
-                    })
-              }
-            >
-              <Button
-                type="text"
-                size="small"
-                disabled={isModeLocked}
-                icon={
-                  chatMode === "agent" ? (
-                    <ThunderboltOutlined />
-                  ) : (
-                    <RobotOutlined />
-                  )
-                }
-                onClick={() => {
-                  if (isModeLocked) return;
-                  setModePanelOpen(!modePanelOpen);
-                  if (searchPopoverOpen) setSearchPopoverOpen(false);
-                }}
-                style={
-                  modePanelOpen
-                    ? { backgroundColor: token.colorBgTextHover }
-                    : undefined
-                }
-              >
-                <span className="text-xs">
-                  {t(`chatMode.${chatMode}`, { ns: "chat" })}
-                </span>
-              </Button>
-            </Tooltip>
-
-            {/* Agent team selector (agent mode only) */}
+          <Flex align="center" gap={8}>
+            <ChatModePill
+              chatMode={chatMode}
+              isModeLocked={isModeLocked}
+              onSelect={onModeSelect}
+            />
+            {chatMode === "agent" && (
+              <ApprovalModePill
+                projectId={projectId}
+                approvalMode={approvalMode}
+              />
+            )}
             {chatMode === "agent" && <AgentTeamSelector />}
-
-            {/* Skill indicator tag */}
             {selectedSkillId && (
               <Tag
                 color="green"
@@ -308,15 +268,7 @@ export function ChatInputArea({
                 </span>
               </Tag>
             )}
-
-            <div
-              className="w-px h-3 opacity-25"
-              style={{
-                backgroundColor: token.colorBorder,
-              }}
-            />
-
-            {/* Toolbar (file upload, prompt, quote, doc, tools, search, etc.) */}
+            {/* 过渡期保留 ChatToolbar 在右侧 — 批次 C (T9) 替换为 ChatToolsMenu */}
             <ChatToolbar
               conversationId={conversationId}
               selectedEngine={selectedEngine}
@@ -367,9 +319,10 @@ export function ChatInputArea({
       onStopStream,
       chatMode,
       isModeLocked,
-      modePanelOpen,
+      onModeSelect,
+      projectId,
+      approvalMode,
       searchPopoverOpen,
-      token,
       selectedSkillId,
       onClearSkill,
       conversationId,
