@@ -1,4 +1,5 @@
 import {
+	AppstoreAddOutlined,
 	ClusterOutlined,
 	DownOutlined,
 	FolderAddOutlined,
@@ -352,6 +353,10 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		navigate("/imbot");
 	}, [navigate]);
 
+	const handleExtensions = useCallback(() => {
+		navigate("/extensions");
+	}, [navigate]);
+
 	const handleConversationClick = useCallback(
 		async (conversationId: string) => {
 			try {
@@ -486,6 +491,15 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					icon={<ClusterOutlined />}
 					label="IM 机器人"
 					onClick={handleImBot}
+					hoverBg={hoverBg}
+					textColor={textColor}
+					mutedColor={mutedColor}
+					chipBg={chipBg}
+				/>
+				<QuickActionRow
+					icon={<AppstoreAddOutlined />}
+					label="扩展"
+					onClick={handleExtensions}
 					hoverBg={hoverBg}
 					textColor={textColor}
 					mutedColor={mutedColor}
