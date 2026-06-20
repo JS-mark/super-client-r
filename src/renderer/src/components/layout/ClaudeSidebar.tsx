@@ -1,4 +1,5 @@
 import {
+	ClusterOutlined,
 	DownOutlined,
 	FolderAddOutlined,
 	FolderOutlined,
@@ -347,6 +348,10 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		navigate("/bookmarks");
 	}, [navigate]);
 
+	const handleImBot = useCallback(() => {
+		navigate("/imbot");
+	}, [navigate]);
+
 	const handleConversationClick = useCallback(
 		async (conversationId: string) => {
 			try {
@@ -472,6 +477,15 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					icon={<ReadOutlined />}
 					label="库"
 					onClick={handleLibrary}
+					hoverBg={hoverBg}
+					textColor={textColor}
+					mutedColor={mutedColor}
+					chipBg={chipBg}
+				/>
+				<QuickActionRow
+					icon={<ClusterOutlined />}
+					label="IM 机器人"
+					onClick={handleImBot}
 					hoverBg={hoverBg}
 					textColor={textColor}
 					mutedColor={mutedColor}
