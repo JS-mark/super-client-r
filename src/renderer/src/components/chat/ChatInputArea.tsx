@@ -19,6 +19,9 @@ import { AgentTeamSelector } from "./AgentTeamSelector";
 import type { ChatModeSelection } from "./ChatModePanel";
 import { ChatModePanel } from "./ChatModePanel";
 import { ChatComposer } from "./composer/ChatComposer";
+import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
+import { useChatStore } from "../../stores/chatStore";
+import { useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
 import type { ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
@@ -196,6 +199,20 @@ export function ChatInputArea({
       )}
     </>
   );
+
+  const currentConversation = useChatStore((s) =>
+    s.conversations.find((c) => c.id === conversationId),
+  );
+  const projectId =
+    currentConversation?.workspaceId &&
+    currentConversation.workspaceId !== "default"
+      ? currentConversation.workspaceId
+      : null;
+  const project = useProjectStore((s) =>
+    projectId ? s.projects.find((p) => p.id === projectId) : null,
+  );
+  const workspaceName = project?.name ?? "未指定工作区";
+  const remoteBinding = currentConversation?.remote;
 
   const existingFooterFn = useCallback(
     (
@@ -379,6 +396,14 @@ export function ChatInputArea({
           t("chat.placeholder", "在这里输入消息，按 Enter 发送")
         }
         hideToolbar={hideToolbar}
+        infoBar={
+          hideToolbar ? null : (
+            <ChatComposerInfoBar
+              workspaceName={workspaceName}
+              remoteBinding={remoteBinding}
+            />
+          )
+        }
         topOverlay={topOverlay}
         registerKeydownHandler={registerKeydownHandler}
         onKeyDown={(e) => {
