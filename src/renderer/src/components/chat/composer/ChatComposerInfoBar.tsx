@@ -1,5 +1,9 @@
-import { DesktopOutlined, FolderOutlined } from "@ant-design/icons";
-import { theme } from "antd";
+import {
+  DesktopOutlined,
+  FolderOutlined,
+  MoreOutlined,
+} from "@ant-design/icons";
+import { Popover, theme } from "antd";
 import type * as React from "react";
 
 const { useToken } = theme;
@@ -70,7 +74,27 @@ export function ChatComposerInfoBar({
           <span>{localRemoteLabel}</span>
         </button>
       </div>
-      {trailing && <div>{trailing}</div>}
+      {trailing && (
+        <Popover
+          content={<div className="max-w-[420px]">{trailing}</div>}
+          trigger="click"
+          placement="topRight"
+        >
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-5 h-5 rounded"
+            style={{
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              color: "inherit",
+            }}
+            aria-label="更多状态"
+          >
+            <MoreOutlined style={{ fontSize: 14 }} />
+          </button>
+        </Popover>
+      )}
     </div>
   );
 }

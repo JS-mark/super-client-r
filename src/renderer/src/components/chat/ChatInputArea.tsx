@@ -20,6 +20,7 @@ import { ApprovalModePill } from "./composer/ApprovalModePill";
 import { ChatComposer } from "./composer/ChatComposer";
 import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
 import { ChatModePill } from "./composer/ChatModePill";
+import { ComposerStatusBar } from "./ComposerStatusBar";
 import { useChatStore } from "../../stores/chatStore";
 import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
@@ -354,6 +355,7 @@ export function ChatInputArea({
             <ChatComposerInfoBar
               workspaceName={workspaceName}
               remoteBinding={remoteBinding}
+              trailing={<ComposerStatusBar />}
             />
           )
         }

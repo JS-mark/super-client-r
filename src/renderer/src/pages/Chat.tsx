@@ -1,26 +1,31 @@
 import { FolderOpenOutlined } from "@ant-design/icons";
 import { Alert, App, Button, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ChatModeSelection } from "../components/chat/ChatModePanel";
-import { ChatSidebar } from "../components/chat/ChatInlineSidebar";
 import { ChatInputArea } from "../components/chat/ChatInputArea";
 import { ChatMessageList } from "../components/chat/ChatMessageList";
 import { ChatModals } from "../components/chat/ChatModals";
-import { ChatPageTitle } from "../components/chat/ChatPageTitle";
+import { CodexEnvironmentInspector } from "../components/chat/CodexEnvironmentInspector";
+import { ModelSwitcherModal } from "../components/chat/ModelSwitcherModal";
 import { ChatNewSession } from "../components/chat/ChatNewSession";
 import { ChatWelcomeScreen } from "../components/chat/ChatWelcomeScreen";
+import { ClaudeEmptyChatHome } from "../components/chat/ClaudeEmptyChatHome";
 import { RemoteChatPane } from "../components/chat/RemoteChatPane";
 import { useSearchEngine } from "../components/chat/SearchEnginePanel";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useChat } from "../hooks/useChat";
 import { useChatPageState } from "../hooks/useChatPageState";
+import { useEffectiveInteractionProfile } from "../hooks/useEffectiveInteractionProfile";
 import { useRemoteChat } from "../hooks/useRemoteChat";
 import { useSlashCommands } from "../hooks/useSlashCommands";
-import { useTitle } from "../hooks/useTitle";
 
 import { useModelStore } from "../stores/modelStore";
+import { useChatStore } from "../stores/chatStore";
+import { useFeatureFlagsStore } from "../stores/featureFlagsStore";
+import { useFileArtifactStore } from "../stores/fileArtifactStore";
+import { useUserStore } from "../stores/userStore";
 
 const { useToken } = theme;
 
@@ -35,7 +40,6 @@ const Chat: React.FC = () => {
     setInput,
     sendMessage,
     isStreaming,
-    clearMessages,
     stopCurrentStream,
     retryMessage,
     editMessage,
@@ -53,6 +57,7 @@ const Chat: React.FC = () => {
     setSessionSettings,
     respondToApproval,
     availableTools,
+    getEffectiveModel,
   } = useChat();
 
   // Search engine state
@@ -83,9 +88,7 @@ const Chat: React.FC = () => {
     messages,
     sendMessage,
     setInput,
-    setChatMode,
     setSelectedSkillId,
-    setSessionModelOverride,
     setSessionSettings,
     remoteBinding,
     remoteMessages,
@@ -93,6 +96,62 @@ const Chat: React.FC = () => {
     unbindRemote,
     input,
   });
+
+  // Effective interactionProfile for the current conversation.
+  // Drives the data-interaction-profile attribute on the page wrapper so
+  // CSS in `styles/interaction-profile.css` can differentiate density.
+  const currentConversation = useChatStore((s) =>
+    s.conversations.find((c) => c.id === s.currentConversationId),
+  );
+  const interactionProfile = useEffectiveInteractionProfile();
+
+  // Codex Environment Inspector visibility:
+  //   - codex profile: always show.
+  //   - hybrid profile: show when there is "content to inspect"
+  //     (artifacts present OR a tool is running OR planMode != "chat").
+  //   - claude-code: never show.
+  // Read the raw map via selector (stable ref) and derive the per-conversation
+  // list with useMemo. Selector must NOT build a new array each render — that
+  // breaks zustand's strict-equal short-circuit and infinite-loops.
+  const artifactsMap = useFileArtifactStore((s) => s.artifacts);
+  const inspectorArtifacts = useMemo(() => {
+    const cid = pageState.currentConversationId;
+    return cid ? (artifactsMap[cid] ?? []) : [];
+  }, [artifactsMap, pageState.currentConversationId]);
+  const sessionPlanMode = currentConversation?.session?.planMode;
+  // §22 rollback flags: fileArtifacts=false 时强制隐藏 inspector；
+  // profileLayouts=false 时把 hybrid/claude 一并视为 codex（永远显示）。
+  const fileArtifactsEnabled = useFeatureFlagsStore((s) => s.fileArtifacts);
+  const profileLayoutsEnabled = useFeatureFlagsStore((s) => s.profileLayouts);
+  const showInspector = useMemo(() => {
+    if (!fileArtifactsEnabled) return false;
+    if (!profileLayoutsEnabled) return true;
+    if (interactionProfile === "claude-code") return false;
+    if (interactionProfile === "codex") return true;
+    // hybrid
+    if (inspectorArtifacts.length > 0) return true;
+    if (isStreaming) return true;
+    if (sessionPlanMode && sessionPlanMode !== "chat") return true;
+    return false;
+  }, [
+    fileArtifactsEnabled,
+    profileLayoutsEnabled,
+    interactionProfile,
+    inspectorArtifacts.length,
+    isStreaming,
+    sessionPlanMode,
+  ]);
+
+  // Claude empty home: derive user name and effective model label.
+  const claudeHomeUserName = useUserStore((s) => s.user?.name) ?? "你";
+  const claudeHomeModelLabel = useMemo(() => {
+    if (messages.length !== 0) return undefined;
+    if (interactionProfile === "codex") return undefined;
+    const eff = getEffectiveModel();
+    if (!eff) return undefined;
+    const label = `${eff.provider.name} · ${eff.model.name}`;
+    return label.length > 20 ? `${label.slice(0, 20)}…` : label;
+  }, [messages.length, interactionProfile, getEffectiveModel]);
 
   // Slash commands
   const slash = useSlashCommands({
@@ -155,62 +214,11 @@ const Chat: React.FC = () => {
     setSelectedCommandName(null);
   }, [setSelectedSkillId, setSelectedCommandName]);
 
-  // ── Switch to remote conversation ──
-  const handleSwitchToRemote = useCallback(
-    (_id: string) => {
-      pageState.setViewMode("remote");
-    },
-    [pageState.setViewMode],
-  );
-
-  // ── Page title ──
-  const pageTitle = useMemo(
-    () => (
-      <ChatPageTitle
-        hasMessages={messages.length > 0}
-        isStreaming={isStreaming}
-        conversationId={pageState.currentConversationId}
-        remoteBinding={remoteBinding}
-        unreadRemoteCount={pageState.unreadRemoteCount}
-        viewMode={pageState.viewMode}
-        sidebarVisible={pageState.sidebarVisible}
-        onViewModeChange={pageState.setViewMode}
-        onSearch={() => pageState.setIsSearchOpen(true)}
-        onExport={() => pageState.setIsExportOpen(true)}
-        onClear={clearMessages}
-        onNewChat={pageState.handleNewChat}
-        onNewAgentChat={pageState.handleNewAgentChat}
-        onNewRemoteChat={pageState.handleNewRemoteChat}
-        onToggleSidebar={() => pageState.setSidebarVisible((v) => !v)}
-        onOpenSettings={() => pageState.setSettingsOpen(true)}
-        onUnbindRemote={unbindRemote}
-      />
-    ),
-    [
-      messages.length,
-      isStreaming,
-      pageState.currentConversationId,
-      remoteBinding,
-      pageState.unreadRemoteCount,
-      pageState.viewMode,
-      pageState.sidebarVisible,
-      pageState.setViewMode,
-      clearMessages,
-      pageState.handleNewChat,
-      pageState.handleNewAgentChat,
-      pageState.handleNewRemoteChat,
-      unbindRemote,
-      pageState.setIsSearchOpen,
-      pageState.setIsExportOpen,
-      pageState.setSidebarVisible,
-      pageState.setSettingsOpen,
-      pageState.setRemoteBindModalOpen,
-    ],
-  );
-  useTitle(pageTitle);
-
   // ── Remote bind handler ──
-  // Conversation is already created by handleNewRemoteChat before modal opens.
+  // R-7 / §25.3: remote conversations are now created via NewConversationModal
+  // (TitleBar 新建对话…) which calls chatStore.createConversationAdvanced and
+  // binds the remote in one step. The local-then-bind flow this comment used to
+  // describe is no longer reachable from any live UI surface.
   const handleRemoteBind = useCallback(
     async (botId: string, chatId: string) => {
       try {
@@ -257,28 +265,45 @@ const Chat: React.FC = () => {
     [setSessionModelOverride],
   );
 
+  // ── Model switcher (Cmd/Ctrl+M, or chip click via window event) ──
+  const [modelSwitcherOpen, setModelSwitcherOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && (e.key === "m" || e.key === "M") && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setModelSwitcherOpen((prev) => !prev);
+      }
+    };
+    const onOpen = () => setModelSwitcherOpen(true);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("chat:open-model-switcher", onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("chat:open-model-switcher", onOpen);
+    };
+  }, []);
+
+  // ── Session settings opener (triggered from TitleBar more menu) ──
+  useEffect(() => {
+    const onOpenSessionSettings = () => pageState.setSettingsOpen(true);
+    window.addEventListener("chat:open-session-settings", onOpenSessionSettings);
+    return () => {
+      window.removeEventListener(
+        "chat:open-session-settings",
+        onOpenSessionSettings,
+      );
+    };
+  }, [pageState.setSettingsOpen]);
+
   return (
     <MainLayout>
-      <div className="flex h-full">
-        {/* Drawer Sidebar (right) */}
-        <ChatSidebar
-          visible={pageState.sidebarVisible}
-          onClose={() => pageState.setSidebarVisible(false)}
-          onNewChat={pageState.handleNewChat}
-          onNewAgentChat={pageState.handleNewAgentChat}
-          onNewRemoteChat={pageState.handleNewRemoteChat}
-          newChatDisabled={isStreaming}
-          activeTab={pageState.sidebarTab}
-          onTabChange={pageState.setSidebarTab}
-          unreadRemoteCount={pageState.unreadRemoteCount}
-          onSwitchToRemote={handleSwitchToRemote}
-        />
-
+      <div className="flex h-full" data-interaction-profile={interactionProfile}>
         {/* Main Chat Area */}
         <div className="flex flex-col flex-1 h-full min-w-0">
           <div
             className="flex flex-col h-full min-w-0"
-            style={{ backgroundColor: token.colorBgLayout }}
+            style={{ backgroundColor: token.colorBgContainer }}
           >
             {pageState.viewMode === "local" ? (
               <>
@@ -314,16 +339,35 @@ const Chat: React.FC = () => {
                 )}
 
                 {/* Chat Area */}
-                <div className="flex-1 overflow-hidden w-full px-4 sm:px-6">
+                <div className="chat-message-area flex-1 overflow-hidden w-full px-4 sm:px-6">
                   {!pageState.currentConversationId ? (
                     <ChatNewSession chatMode={chatMode} />
                   ) : messages.length === 0 ? (
-                    <ChatWelcomeScreen
-                      hasActiveModel={hasActiveModel}
-                      isModelLoading={isModelLoading}
-                      onInputChange={setInput}
-                      messageApi={message}
-                    />
+                    profileLayoutsEnabled &&
+                    (interactionProfile === "claude-code" ||
+                      interactionProfile === "hybrid") ? (
+                      <ClaudeEmptyChatHome
+                        userName={claudeHomeUserName}
+                        modelLabel={claudeHomeModelLabel}
+                        onSend={(text) => {
+                          setInput(text);
+                          handleSend(text);
+                        }}
+                        isStreaming={isStreaming}
+                        onOpenModelSwitcher={() =>
+                          window.dispatchEvent(
+                            new Event("chat:open-model-switcher"),
+                          )
+                        }
+                      />
+                    ) : (
+                      <ChatWelcomeScreen
+                        hasActiveModel={hasActiveModel}
+                        isModelLoading={isModelLoading}
+                        onInputChange={setInput}
+                        messageApi={message}
+                      />
+                    )
                   ) : (
                     <ChatMessageList
                       messages={messages}
@@ -338,8 +382,14 @@ const Chat: React.FC = () => {
                   )}
                 </div>
 
-                {/* Input Area — hidden when no conversation (app-level empty state) */}
-                {pageState.currentConversationId && (
+                {/* Input Area — hidden when no conversation (app-level empty state)
+                    or when Claude empty home owns the centered composer. */}
+                {pageState.currentConversationId &&
+                  !(
+                    messages.length === 0 &&
+                    (interactionProfile === "claude-code" ||
+                      interactionProfile === "hybrid")
+                  ) && (
                 <ChatInputArea
                   input={input}
                   onInputChange={setInput}
@@ -420,6 +470,9 @@ const Chat: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Codex Environment Inspector — rightmost column for codex/hybrid */}
+        {showInspector && <CodexEnvironmentInspector />}
       </div>
 
       {/* Modals */}
@@ -445,6 +498,14 @@ const Chat: React.FC = () => {
         }}
         onBind={handleRemoteBind}
         checkBotOnline={checkBotOnline}
+      />
+
+      <ModelSwitcherModal
+        open={modelSwitcherOpen}
+        onClose={() => setModelSwitcherOpen(false)}
+        currentSelection={sessionModelOverride}
+        onSelect={(sel) => setSessionModelOverride(sel)}
+        onClear={() => setSessionModelOverride(null)}
       />
     </MainLayout>
   );
