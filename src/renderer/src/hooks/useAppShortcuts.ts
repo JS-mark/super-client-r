@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useChatStore } from "../stores/chatStore";
+import { useChatMessageStore } from "../stores/chatMessageStore";
 import type { ShortcutScope } from "../stores/shortcutStore";
 import { useGlobalShortcuts } from "./useShortcuts";
 
@@ -14,7 +14,7 @@ import { useGlobalShortcuts } from "./useShortcuts";
 export function useAppShortcuts() {
 	const navigate = useNavigate();
 	const location = useLocation();
-	const clearMessages = useChatStore((s) => s.clearMessages);
+	const clearMessages = useChatMessageStore((s) => s.clearMessages);
 
 	// Determine active scope from current pathname
 	const activeScope: ShortcutScope = useMemo(() => {
@@ -37,6 +37,9 @@ export function useAppShortcuts() {
 			},
 			"quick-search": () => {
 				window.dispatchEvent(new Event("chat:toggle-search"));
+			},
+			"global-search": () => {
+				window.dispatchEvent(new Event("chat:open-global-search"));
 			},
 			"toggle-sidebar": () => {
 				window.dispatchEvent(new Event("chat:toggle-sidebar"));
