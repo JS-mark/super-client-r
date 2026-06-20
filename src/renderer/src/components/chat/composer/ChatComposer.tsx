@@ -9,7 +9,7 @@ export interface ChatComposerProps {
   isStreaming: boolean;
   onStopStream?: () => void;
   placeholder?: string;
-  /** IM remote 模式：仅 textarea + send，不渲染底部 footer 行 */
+  /** IM remote 模式 flag。ChatComposer 自身不消费此值，由调用方在 renderFooter 内分支处理 */
   hideToolbar?: boolean;
   /** Composer 下方信息行（容器外渲染） */
   infoBar?: React.ReactNode;
@@ -26,7 +26,7 @@ export interface ChatComposerProps {
  * 共用 composer：包装 @ant-design/x 的 Sender，统一视觉与行为。
  *
  * - onSubmit 由调用方负责语义；ChatComposer 不做"创建会话 + 发送"的复合逻辑。
- * - hideToolbar=true 时仅渲染 textarea + 发送按钮（IM remote 流程）。
+ * - hideToolbar 仅作为 prop 透传给调用方决策；renderFooter 函数负责按 hideToolbar 渲染对应内容。
  * - infoBar 在容器外渲染（Sender 卡片下方）。
  */
 export function ChatComposer({
@@ -63,7 +63,7 @@ export function ChatComposer({
         autoSize={{ minRows: 2, maxRows: 6 }}
         onKeyDown={onKeyDown}
         suffix={() => null}
-        footer={hideToolbar ? undefined : renderFooter}
+        footer={renderFooter}
         styles={{ input: { fontSize: 14 } }}
       />
       {infoBar && <div className="mt-2">{infoBar}</div>}
