@@ -81,6 +81,16 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 		enabled: true,
 	},
 	{
+		id: "global-search",
+		name: "全局会话搜索",
+		nameKey: "globalSearch",
+		description: "跨所有会话按 title 和 preview 搜索",
+		descriptionKey: "globalSearchDesc",
+		scope: "global",
+		defaultKey: "mod+p",
+		enabled: true,
+	},
+	{
 		id: "toggle-sidebar",
 		name: "切换侧边栏",
 		nameKey: "toggleSidebar",

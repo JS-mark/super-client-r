@@ -43,6 +43,8 @@
 	"newChatDesc": "创建一个新的对话",
 	"quickSearch": "快速搜索",
 	"quickSearchDesc": "打开快速搜索面板",
+	"globalSearch": "全局会话搜索",
+	"globalSearchDesc": "跨所有会话按 title 和 preview 搜索",
 	"toggleSidebar": "切换侧边栏",
 	"toggleSidebarDesc": "显示/隐藏侧边栏",
 	"openSettings": "打开设置",
@@ -63,8 +65,8 @@
 	"goToModelsDesc": "导航到模型页面",
 	"goToSkills": "前往技能",
 	"goToSkillsDesc": "导航到技能页面",
-	"goToPlugins": "前往插件",
-	"goToPluginsDesc": "导航到插件页面",
+	"goToPlugins": "前往应用插件",
+	"goToPluginsDesc": "导航到应用插件页面",
 	"goToBookmarks": "前往收藏",
 	"goToBookmarksDesc": "导航到收藏页面"
 }

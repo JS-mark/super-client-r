@@ -43,6 +43,8 @@
 	"newChatDesc": "Create a new chat",
 	"quickSearch": "Quick Search",
 	"quickSearchDesc": "Open quick search panel",
+	"globalSearch": "Global Session Search",
+	"globalSearchDesc": "Search all conversations by title and preview",
 	"toggleSidebar": "Toggle Sidebar",
 	"toggleSidebarDesc": "Show/hide sidebar",
 	"openSettings": "Open Settings",
@@ -63,8 +65,8 @@
 	"goToModelsDesc": "Navigate to models page",
 	"goToSkills": "Go to Skills",
 	"goToSkillsDesc": "Navigate to skills page",
-	"goToPlugins": "Go to Plugins",
-	"goToPluginsDesc": "Navigate to plugins page",
+	"goToPlugins": "Go to App Plugins",
+	"goToPluginsDesc": "Navigate to app plugins page",
 	"goToBookmarks": "Go to Bookmarks",
 	"goToBookmarksDesc": "Navigate to bookmarks page"
 }
