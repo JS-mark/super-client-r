@@ -4,10 +4,9 @@ import {
   RobotOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
-import { Sender } from "@ant-design/x";
 import { Button, Flex, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useRef, useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Attachment } from "../../stores/attachmentStore";
 import {
@@ -19,6 +18,8 @@ import { AttachmentList } from "../attachment";
 import { AgentTeamSelector } from "./AgentTeamSelector";
 import type { ChatModeSelection } from "./ChatModePanel";
 import { ChatModePanel } from "./ChatModePanel";
+import { ChatComposer } from "./composer/ChatComposer";
+import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
 import type { ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
 import type { SlashItem } from "./SlashCommandPanel";
@@ -88,16 +89,9 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const { t } = useTranslation();
   const { token } = useToken();
-  const senderWrapperRef = useRef<HTMLDivElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
   const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
   const [modePanelOpen, setModePanelOpen] = useState(false);
-
-  // Register capture-phase keydown handler for slash commands
-  useEffect(() => {
-    const cleanup = registerKeydownHandler(senderWrapperRef.current);
-    return cleanup;
-  }, [registerKeydownHandler]);
 
   const handleModeSelect = useCallback(
     (selection: ChatModeSelection) => {
@@ -159,249 +153,258 @@ export function ChatInputArea({
     [onInputChange, input],
   );
 
-  return (
-    <div className="px-6 py-4">
-      <div
-        ref={senderWrapperRef}
-        className="relative w-full mx-auto max-w-4xl"
-      >
-        {/* Chat Mode Panel */}
-        {!hideToolbar && modePanelOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-            <ChatModePanel
-              chatMode={chatMode}
-              onSelect={handleModeSelect}
-              onClose={() => setModePanelOpen(false)}
-            />
-          </div>
-        )}
+  const topOverlay = (
+    <>
+      {!hideToolbar && modePanelOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <ChatModePanel
+            chatMode={chatMode}
+            onSelect={handleModeSelect}
+            onClose={() => setModePanelOpen(false)}
+          />
+        </div>
+      )}
+      {!hideToolbar && slashPanelOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <SlashCommandPanel
+            items={slashFilteredItems}
+            highlightIndex={slashHighlight}
+            onSelect={onSlashSelect}
+            onHighlightChange={onSlashHighlightChange}
+            onClose={onSlashPanelClose}
+          />
+        </div>
+      )}
+      {!hideToolbar && searchPopoverOpen && (
+        <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+          <SearchEnginePanel
+            selectedEngine={selectedEngine}
+            onSelectEngine={onSelectEngine}
+            onClose={() => setSearchPopoverOpen(false)}
+          />
+        </div>
+      )}
+      {attachedFiles.length > 0 && (
+        <div className="mb-2">
+          <AttachmentList
+            attachments={attachedFiles}
+            onRemove={(id) =>
+              setAttachedFiles((prev) => prev.filter((f) => f.id !== id))
+            }
+          />
+        </div>
+      )}
+    </>
+  );
 
-        {/* Slash Command Panel */}
-        {!hideToolbar && slashPanelOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-            <SlashCommandPanel
-              items={slashFilteredItems}
-              highlightIndex={slashHighlight}
-              onSelect={onSlashSelect}
-              onHighlightChange={onSlashHighlightChange}
-              onClose={onSlashPanelClose}
-            />
-          </div>
-        )}
+  const existingFooterFn = useCallback(
+    (
+      _footerNode: React.ReactNode,
+      opts: { components: ActionsComponents },
+    ) => {
+      const { SendButton } = opts.components;
+      if (hideToolbar) {
+        return (
+          <Flex justify="end" align="center">
+            {isStreaming ? (
+              <Tooltip title={t("actions.stop", "Stop", { ns: "chat" })}>
+                <Button
+                  className="chat-stop-btn"
+                  type="primary"
+                  danger
+                  shape="circle"
+                  icon={<PauseCircleOutlined />}
+                  onClick={onStopStream}
+                />
+              </Tooltip>
+            ) : (
+              <SendButton
+                className="chat-send-btn"
+                type="primary"
+                shape="circle"
+              />
+            )}
+          </Flex>
+        );
+      }
+      return (
+        <Flex justify="space-between" align="center">
+          <Flex align="center" gap={4}>
+            {/* Mode selector */}
+            <Tooltip
+              title={
+                isModeLocked
+                  ? t("chatMode.modeLocked", {
+                      ns: "chat",
+                      defaultValue: "Mode locked for this conversation",
+                    })
+                  : t("chatMode.switchMode", "切换模式", {
+                      ns: "chat",
+                    })
+              }
+            >
+              <Button
+                type="text"
+                size="small"
+                disabled={isModeLocked}
+                icon={
+                  chatMode === "agent" ? (
+                    <ThunderboltOutlined />
+                  ) : (
+                    <RobotOutlined />
+                  )
+                }
+                onClick={() => {
+                  if (isModeLocked) return;
+                  setModePanelOpen(!modePanelOpen);
+                  if (searchPopoverOpen) setSearchPopoverOpen(false);
+                }}
+                style={
+                  modePanelOpen
+                    ? { backgroundColor: token.colorBgTextHover }
+                    : undefined
+                }
+              >
+                <span className="text-xs">
+                  {t(`chatMode.${chatMode}`, { ns: "chat" })}
+                </span>
+              </Button>
+            </Tooltip>
 
-        {/* Search Engine Panel */}
-        {!hideToolbar && searchPopoverOpen && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-            <SearchEnginePanel
+            {/* Agent team selector (agent mode only) */}
+            {chatMode === "agent" && <AgentTeamSelector />}
+
+            {/* Skill indicator tag */}
+            {selectedSkillId && (
+              <Tag
+                color="green"
+                className="text-xs flex items-center gap-0.5 m-0"
+                closeIcon={<CloseOutlined className="text-[10px]" />}
+                onClose={(e) => {
+                  e.preventDefault();
+                  onClearSkill();
+                }}
+              >
+                <ThunderboltOutlined className="text-[10px]" />
+                <span className="ml-0.5">
+                  {t("chatMode.skillActive", "Skill", { ns: "chat" })}
+                </span>
+              </Tag>
+            )}
+
+            <div
+              className="w-px h-3 opacity-25"
+              style={{
+                backgroundColor: token.colorBorder,
+              }}
+            />
+
+            {/* Toolbar (file upload, prompt, quote, doc, tools, search, etc.) */}
+            <ChatToolbar
+              conversationId={conversationId}
               selectedEngine={selectedEngine}
               onSelectEngine={onSelectEngine}
-              onClose={() => setSearchPopoverOpen(false)}
-            />
-          </div>
-        )}
-
-        {/* Attached files preview */}
-        {attachedFiles.length > 0 && (
-          <div className="mb-2">
-            <AttachmentList
-              attachments={attachedFiles}
-              onRemove={(id) =>
-                setAttachedFiles((prev) => prev.filter((f) => f.id !== id))
+              hasSearchEngines={hasSearchEngines}
+              currentEngine={currentEngine}
+              searchPopoverOpen={searchPopoverOpen}
+              onSearchPopoverToggle={() =>
+                setSearchPopoverOpen(!searchPopoverOpen)
               }
+              onUploadComplete={(attachments) => {
+                setAttachedFiles((prev) => [...prev, ...attachments]);
+              }}
+              onPromptSelect={handlePromptSelect}
+              onQuoteSelect={handleQuoteSelect}
+              onToolSelect={handleToolSelect}
             />
-          </div>
-        )}
+          </Flex>
 
-        {/* Sender component */}
-        <Sender
-          value={input}
-          onChange={handleSenderChange}
-          onSubmit={handleSend}
-          onCancel={isStreaming ? onStopStream : undefined}
-          loading={isStreaming}
-          placeholder={placeholderProp ?? t(
-            "chat.placeholder",
-            "在这里输入消息，按 Enter 发送",
-          )}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) return;
+          {/* Send or Stop button */}
+          <Flex align="center" gap={8}>
+            {isStreaming ? (
+              <Tooltip title={t("actions.stop", "终止", { ns: "chat" })}>
+                <Button
+                  className="chat-stop-btn"
+                  type="primary"
+                  danger
+                  shape="circle"
+                  icon={<PauseCircleOutlined />}
+                  onClick={onStopStream}
+                />
+              </Tooltip>
+            ) : (
+              <SendButton
+                className="chat-send-btn"
+                type="primary"
+                shape="circle"
+              />
+            )}
+          </Flex>
+        </Flex>
+      );
+    },
+    [
+      t,
+      hideToolbar,
+      isStreaming,
+      onStopStream,
+      chatMode,
+      isModeLocked,
+      modePanelOpen,
+      searchPopoverOpen,
+      token,
+      selectedSkillId,
+      onClearSkill,
+      conversationId,
+      selectedEngine,
+      onSelectEngine,
+      hasSearchEngines,
+      currentEngine,
+      handlePromptSelect,
+      handleQuoteSelect,
+      handleToolSelect,
+    ],
+  );
 
-            const { getShortcut } = useShortcutStore.getState();
-            const sendShortcut = getShortcut("send-message");
-            const newLineShortcut = getShortcut("new-line");
-            const pressed = normalizeShortcut(
-              getShortcutFromEvent(e.nativeEvent),
-            );
-
-            if (
-              newLineShortcut?.enabled &&
-              normalizeShortcut(newLineShortcut.currentKey) === pressed
-            ) {
-              return;
-            }
-
-            if (
-              sendShortcut?.enabled &&
-              normalizeShortcut(sendShortcut.currentKey) === pressed
-            ) {
-              e.preventDefault();
-              handleSend(input);
-              return false;
-            }
-          }}
-          autoSize={{ minRows: 2, maxRows: 6 }}
-          suffix={() => null}
-          footer={(_footerNode, { components }) => {
-            const { SendButton } = components;
-            if (hideToolbar) {
-              return (
-                <Flex justify="end" align="center">
-                  {isStreaming ? (
-                    <Tooltip
-                      title={t("actions.stop", "Stop", { ns: "chat" })}
-                    >
-                      <Button
-                        className="chat-stop-btn"
-                        type="primary"
-                        danger
-                        shape="circle"
-                        icon={<PauseCircleOutlined />}
-                        onClick={onStopStream}
-                      />
-                    </Tooltip>
-                  ) : (
-                    <SendButton
-                      className="chat-send-btn"
-                      type="primary"
-                      shape="circle"
-                    />
-                  )}
-                </Flex>
-              );
-            }
-            return (
-              <Flex justify="space-between" align="center">
-                <Flex align="center" gap={4}>
-                  {/* Mode selector */}
-                  <Tooltip
-                    title={
-                      isModeLocked
-                        ? t("chatMode.modeLocked", {
-                            ns: "chat",
-                            defaultValue: "Mode locked for this conversation",
-                          })
-                        : t("chatMode.switchMode", "切换模式", {
-                            ns: "chat",
-                          })
-                    }
-                  >
-                    <Button
-                      type="text"
-                      size="small"
-                      disabled={isModeLocked}
-                      icon={
-                        chatMode === "agent" ? (
-                          <ThunderboltOutlined />
-                        ) : (
-                          <RobotOutlined />
-                        )
-                      }
-                      onClick={() => {
-                        if (isModeLocked) return;
-                        setModePanelOpen(!modePanelOpen);
-                        if (searchPopoverOpen) setSearchPopoverOpen(false);
-                      }}
-                      style={
-                        modePanelOpen
-                          ? { backgroundColor: token.colorBgTextHover }
-                          : undefined
-                      }
-                    >
-                      <span className="text-xs">
-                        {t(`chatMode.${chatMode}`, { ns: "chat" })}
-                      </span>
-                    </Button>
-                  </Tooltip>
-
-                  {/* Agent team selector (agent mode only) */}
-                  {chatMode === "agent" && <AgentTeamSelector />}
-
-                  {/* Skill indicator tag */}
-                  {selectedSkillId && (
-                    <Tag
-                      color="green"
-                      className="text-xs flex items-center gap-0.5 m-0"
-                      closeIcon={<CloseOutlined className="text-[10px]" />}
-                      onClose={(e) => {
-                        e.preventDefault();
-                        onClearSkill();
-                      }}
-                    >
-                      <ThunderboltOutlined className="text-[10px]" />
-                      <span className="ml-0.5">
-                        {t("chatMode.skillActive", "Skill", { ns: "chat" })}
-                      </span>
-                    </Tag>
-                  )}
-
-                  <div
-                    className="w-px h-3 opacity-25"
-                    style={{
-                      backgroundColor: token.colorBorder,
-                    }}
-                  />
-
-                  {/* Toolbar (file upload, prompt, quote, doc, tools, search, etc.) */}
-                  <ChatToolbar
-                    conversationId={conversationId}
-                    selectedEngine={selectedEngine}
-                    onSelectEngine={onSelectEngine}
-                    hasSearchEngines={hasSearchEngines}
-                    currentEngine={currentEngine}
-                    searchPopoverOpen={searchPopoverOpen}
-                    onSearchPopoverToggle={() =>
-                      setSearchPopoverOpen(!searchPopoverOpen)
-                    }
-                    onUploadComplete={(attachments) => {
-                      setAttachedFiles((prev) => [...prev, ...attachments]);
-                    }}
-                    onPromptSelect={handlePromptSelect}
-                    onQuoteSelect={handleQuoteSelect}
-                    onToolSelect={handleToolSelect}
-                  />
-                </Flex>
-
-                {/* Send or Stop button */}
-                <Flex align="center" gap={8}>
-                  {isStreaming ? (
-                    <Tooltip
-                      title={t("actions.stop", "终止", { ns: "chat" })}
-                    >
-                      <Button
-                        className="chat-stop-btn"
-                        type="primary"
-                        danger
-                        shape="circle"
-                        icon={<PauseCircleOutlined />}
-                        onClick={onStopStream}
-                      />
-                    </Tooltip>
-                  ) : (
-                    <SendButton
-                      className="chat-send-btn"
-                      type="primary"
-                      shape="circle"
-                    />
-                  )}
-                </Flex>
-              </Flex>
-            );
-          }}
-          styles={{
-            input: { fontSize: 14 },
-          }}
-        />
-      </div>
+  return (
+    <div className="chat-input-shell px-6 py-4">
+      <ChatComposer
+        value={input}
+        onChange={handleSenderChange}
+        onSubmit={handleSend}
+        isStreaming={isStreaming}
+        onStopStream={onStopStream}
+        placeholder={
+          placeholderProp ??
+          t("chat.placeholder", "在这里输入消息，按 Enter 发送")
+        }
+        hideToolbar={hideToolbar}
+        topOverlay={topOverlay}
+        registerKeydownHandler={registerKeydownHandler}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing) return;
+          const { getShortcut } = useShortcutStore.getState();
+          const sendShortcut = getShortcut("send-message");
+          const newLineShortcut = getShortcut("new-line");
+          const pressed = normalizeShortcut(
+            getShortcutFromEvent(e.nativeEvent),
+          );
+          if (
+            newLineShortcut?.enabled &&
+            normalizeShortcut(newLineShortcut.currentKey) === pressed
+          ) {
+            return;
+          }
+          if (
+            sendShortcut?.enabled &&
+            normalizeShortcut(sendShortcut.currentKey) === pressed
+          ) {
+            e.preventDefault();
+            handleSend(input);
+          }
+        }}
+        renderFooter={existingFooterFn}
+      />
     </div>
   );
 }
