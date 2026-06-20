@@ -6,18 +6,20 @@ import {
 	FolderOutlined,
 	PlusOutlined,
 	ReadOutlined,
+	SearchOutlined,
 	SettingOutlined,
 	UpOutlined,
 } from "@ant-design/icons";
 import { Input, type InputRef, Tooltip, message, theme } from "antd";
 import type React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 import { useChatStore } from "../../stores/chatStore";
 import { useNewConversation } from "../../hooks/useNewConversation";
 import type { ConversationSummary } from "../../types/electron";
 import { SessionContextMenu } from "./SessionContextMenu";
+import { GlobalSessionSearchModal } from "../chat/GlobalSessionSearchModal";
 import { useSidebarLayoutStore } from "../../stores/sidebarLayoutStore";
 import {
 	getAvatarColor,
@@ -214,6 +216,15 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const [mode, setMode] = useState<ChatMode>("chat");
 	const [recentsOpen, setRecentsOpen] = useState(true);
 	const [projectsOpen, setProjectsOpen] = useState(true);
+	const [searchModalOpen, setSearchModalOpen] = useState(false);
+
+	useEffect(() => {
+		const handler = () => setSearchModalOpen(true);
+		window.addEventListener("chat:open-global-search", handler);
+		return () => {
+			window.removeEventListener("chat:open-global-search", handler);
+		};
+	}, []);
 
 	// plan §23.4 — Recents = casual sessions only (projectId === null →
 	// workspaceId === "default" 经 metaToConversation 适配). 项目对话归属在
@@ -357,6 +368,10 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		navigate("/extensions");
 	}, [navigate]);
 
+	const handleSessionSearch = useCallback(() => {
+		setSearchModalOpen(true);
+	}, []);
+
 	const handleConversationClick = useCallback(
 		async (conversationId: string) => {
 			try {
@@ -402,6 +417,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 
 	// 折叠模式已移除（仅保留侧边拖拽）。
 	return (
+		<>
 		<aside
 			className="h-full flex-none flex flex-col"
 			style={{
@@ -482,6 +498,16 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					icon={<ReadOutlined />}
 					label="库"
 					onClick={handleLibrary}
+					hoverBg={hoverBg}
+					textColor={textColor}
+					mutedColor={mutedColor}
+					chipBg={chipBg}
+				/>
+				<QuickActionRow
+					icon={<SearchOutlined />}
+					label="会话搜索"
+					shortcut={`${modKey()}P`}
+					onClick={handleSessionSearch}
 					hoverBg={hoverBg}
 					textColor={textColor}
 					mutedColor={mutedColor}
@@ -702,6 +728,11 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 				onClose={() => setSettingsProjectId(null)}
 			/>
 		</aside>
+		<GlobalSessionSearchModal
+			open={searchModalOpen}
+			onClose={() => setSearchModalOpen(false)}
+		/>
+		</>
 	);
 }
 
