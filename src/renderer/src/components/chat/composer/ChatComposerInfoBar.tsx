@@ -3,10 +3,8 @@ import {
   FolderOutlined,
   MoreOutlined,
 } from "@ant-design/icons";
-import { Popover, theme } from "antd";
+import { Popover } from "antd";
 import type * as React from "react";
-
-const { useToken } = theme;
 
 export function deriveLocalRemoteLabel(
   remote: unknown | null | undefined,
@@ -19,7 +17,7 @@ export interface ChatComposerInfoBarProps {
   remoteBinding: unknown | null | undefined;
   onClickWorkspace?: () => void;
   onClickLocalRemote?: () => void;
-  /** Trailing slot — 用于挂 ⋯ popup（批次 B 后接入） */
+  /** Trailing slot — 用于挂 ⋯ popup */
   trailing?: React.ReactNode;
 }
 
@@ -30,66 +28,41 @@ export function ChatComposerInfoBar({
   onClickLocalRemote,
   trailing,
 }: ChatComposerInfoBarProps) {
-  const { token } = useToken();
   const localRemoteLabel = deriveLocalRemoteLabel(remoteBinding);
 
   return (
-    <div
-      className="w-full mx-auto max-w-4xl flex items-center justify-between"
-      style={{
-        fontSize: 12,
-        color: token.colorTextTertiary,
-        lineHeight: "24px",
-      }}
-    >
-      <div className="flex items-center gap-4">
+    <div className="w-full mx-auto max-w-4xl flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onClickWorkspace}
           disabled={!onClickWorkspace}
-          className="flex items-center gap-1"
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "inherit",
-            cursor: onClickWorkspace ? "pointer" : "default",
-          }}
+          className={`composer-info-item${onClickWorkspace ? " is-clickable" : ""}`}
         >
-          <FolderOutlined style={{ fontSize: 12 }} />
+          <FolderOutlined />
           <span>{workspaceName}</span>
         </button>
         <button
           type="button"
           onClick={onClickLocalRemote}
           disabled={!onClickLocalRemote}
-          className="flex items-center gap-1"
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "inherit",
-            cursor: onClickLocalRemote ? "pointer" : "default",
-          }}
+          className={`composer-info-item${onClickLocalRemote ? " is-clickable" : ""}`}
         >
-          <DesktopOutlined style={{ fontSize: 12 }} />
+          <DesktopOutlined />
           <span>{localRemoteLabel}</span>
         </button>
       </div>
       {trailing && (
         <Popover
-          content={<div className="max-w-[420px]">{trailing}</div>}
+          content={<div style={{ maxWidth: 420, padding: "4px 0" }}>{trailing}</div>}
           trigger="click"
           placement="topRight"
         >
           <button
             type="button"
-            className="inline-flex items-center justify-center w-5 h-5 rounded"
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: "inherit",
-            }}
+            className="composer-info-item is-clickable"
             aria-label="更多状态"
+            style={{ padding: "2px 4px" }}
           >
             <MoreOutlined style={{ fontSize: 14 }} />
           </button>

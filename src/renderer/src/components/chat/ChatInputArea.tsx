@@ -416,19 +416,20 @@ export function ChatInputArea({
                   t("chat.toolbar.search", "搜索", { ns: "chat" })
                 }
               >
-                <Button
-                  type="text"
-                  size="small"
-                  icon={currentEngine?.icon ?? <SearchOutlined />}
+                <button
+                  type="button"
                   onClick={() => setSearchPopoverOpen(!searchPopoverOpen)}
-                  style={
+                  className={`composer-pill is-icon${
                     searchPopoverOpen
-                      ? { backgroundColor: token.colorBgTextHover }
+                      ? " is-active"
                       : selectedEngine
-                        ? { color: token.colorPrimary }
-                        : undefined
-                  }
-                />
+                        ? " is-accent-blue"
+                        : ""
+                  }`}
+                  aria-label={t("chat.toolbar.search", "搜索", { ns: "chat" })}
+                >
+                  {currentEngine?.icon ?? <SearchOutlined />}
+                </button>
               </Tooltip>
             )}
           </Flex>

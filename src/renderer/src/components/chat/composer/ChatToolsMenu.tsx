@@ -64,11 +64,10 @@ export function ChatToolsMenu({
     <Popover open={open} onOpenChange={setOpen} content={content} trigger="click" placement="topLeft">
       <button
         type="button"
-        className="inline-flex items-center justify-center w-7 h-7 rounded transition-colors"
-        style={{ background: open ? "rgba(0,0,0,0.06)" : "transparent", border: "none", cursor: "pointer", color: "inherit" }}
+        className={`composer-pill is-icon${open ? " is-active" : ""}`}
         aria-label="工具"
       >
-        <PlusOutlined style={{ fontSize: 14 }} />
+        <PlusOutlined />
       </button>
     </Popover>
   );

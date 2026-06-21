@@ -24,6 +24,14 @@ export function ChatModePill({ chatMode, isModeLocked, onSelect }: ChatModePillP
     setOpen(false);
   };
 
+  const tooltipTitle = isModeLocked
+    ? t("chatMode.modeLocked", { ns: "chat", defaultValue: "Mode locked" })
+    : t("chatMode.switchMode", "切换模式", { ns: "chat" });
+
+  const classes = ["composer-pill"];
+  if (open) classes.push("is-active");
+  if (isModeLocked) classes.push("is-disabled");
+
   return (
     <div className="relative inline-flex">
       {open && (
@@ -35,29 +43,19 @@ export function ChatModePill({ chatMode, isModeLocked, onSelect }: ChatModePillP
           />
         </div>
       )}
-      <Tooltip
-        title={
-          isModeLocked
-            ? t("chatMode.modeLocked", { ns: "chat", defaultValue: "Mode locked" })
-            : t("chatMode.switchMode", "切换模式", { ns: "chat" })
-        }
-      >
-        <button
-          type="button"
-          disabled={isModeLocked}
-          onClick={() => !isModeLocked && setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-          style={{
-            background: open ? "rgba(0,0,0,0.06)" : "transparent",
-            border: "none",
-            cursor: isModeLocked ? "not-allowed" : "pointer",
-            opacity: isModeLocked ? 0.6 : 1,
-          }}
-        >
-          {isAgent ? <ThunderboltOutlined style={{ fontSize: 12 }} /> : <RobotOutlined style={{ fontSize: 12 }} />}
-          <span>{label}</span>
-          {!isModeLocked && <DownOutlined style={{ fontSize: 10, opacity: 0.7 }} />}
-        </button>
+      <Tooltip title={tooltipTitle}>
+        <span className="inline-flex">
+          <button
+            type="button"
+            disabled={isModeLocked}
+            onClick={() => !isModeLocked && setOpen((v) => !v)}
+            className={classes.join(" ")}
+          >
+            {isAgent ? <ThunderboltOutlined /> : <RobotOutlined />}
+            <span>{label}</span>
+            {!isModeLocked && <DownOutlined className="composer-pill-caret" />}
+          </button>
+        </span>
       </Tooltip>
     </div>
   );

@@ -861,6 +861,194 @@ body {
 }
 
 /* ==========================================
+   Composer Pills & Card
+   ========================================== */
+
+/* Card container — wraps Sender to give it a soft, premium look */
+.chat-composer-card .ant-x-sender {
+	border-radius: 18px !important;
+	border: 1px solid var(--color-border-secondary);
+	background: var(--color-bg-container);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+	transition:
+		border-color 200ms ease,
+		box-shadow 200ms ease;
+}
+
+.chat-composer-card .ant-x-sender:hover {
+	border-color: var(--color-border);
+}
+
+.chat-composer-card .ant-x-sender:focus-within {
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.12);
+}
+
+.dark .chat-composer-card .ant-x-sender {
+	background: rgba(255, 255, 255, 0.02);
+	border-color: rgba(255, 255, 255, 0.08);
+	box-shadow: none;
+}
+
+.dark .chat-composer-card .ant-x-sender:hover {
+	border-color: rgba(255, 255, 255, 0.16);
+}
+
+.dark .chat-composer-card .ant-x-sender:focus-within {
+	border-color: rgba(24, 144, 255, 0.55);
+	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.16);
+}
+
+/* Pill — shared button class for ChatModePill / ApprovalModePill / ModelPill / ChatToolsMenu / search engine icon */
+.composer-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 26px;
+	padding: 0 10px;
+	border-radius: 999px;
+	border: none;
+	background: transparent;
+	color: var(--color-text-secondary);
+	font-size: 12.5px;
+	line-height: 1;
+	cursor: pointer;
+	transition:
+		background 150ms ease,
+		color 150ms ease,
+		opacity 150ms ease;
+	white-space: nowrap;
+	max-width: 240px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.composer-pill > .anticon {
+	font-size: 12px;
+	flex-shrink: 0;
+}
+
+.composer-pill > .composer-pill-caret {
+	font-size: 9px;
+	opacity: 0.55;
+	transition: transform 150ms ease;
+}
+
+.composer-pill:hover:not(:disabled):not(.is-disabled) {
+	background: rgba(0, 0, 0, 0.05);
+	color: var(--color-text-primary);
+}
+
+.composer-pill.is-active {
+	background: rgba(24, 144, 255, 0.1);
+	color: var(--color-primary);
+}
+
+.composer-pill.is-active > .composer-pill-caret {
+	transform: rotate(180deg);
+}
+
+.composer-pill:disabled,
+.composer-pill.is-disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+/* Variant: icon-only (square-ish, e.g. + button, search engine icon) */
+.composer-pill.is-icon {
+	width: 28px;
+	padding: 0;
+	justify-content: center;
+}
+
+/* Variant: accent (e.g. agent approval mode auto-safe = blue) */
+.composer-pill.is-accent-blue {
+	background: rgba(24, 144, 255, 0.12);
+	color: var(--color-primary);
+}
+
+.composer-pill.is-accent-blue:hover:not(:disabled) {
+	background: rgba(24, 144, 255, 0.18);
+}
+
+.composer-pill.is-accent-orange {
+	background: rgba(250, 140, 22, 0.14);
+	color: #fa8c16;
+}
+
+.composer-pill.is-accent-orange:hover:not(:disabled) {
+	background: rgba(250, 140, 22, 0.22);
+}
+
+/* Dark theme overrides */
+.dark .composer-pill {
+	color: rgba(255, 255, 255, 0.65);
+}
+
+.dark .composer-pill:hover:not(:disabled):not(.is-disabled) {
+	background: rgba(255, 255, 255, 0.08);
+	color: rgba(255, 255, 255, 0.92);
+}
+
+.dark .composer-pill.is-active {
+	background: rgba(64, 169, 255, 0.18);
+	color: #69b1ff;
+}
+
+.dark .composer-pill.is-accent-blue {
+	background: rgba(64, 169, 255, 0.15);
+	color: #69b1ff;
+}
+
+.dark .composer-pill.is-accent-blue:hover:not(:disabled) {
+	background: rgba(64, 169, 255, 0.25);
+}
+
+.dark .composer-pill.is-accent-orange {
+	background: rgba(255, 169, 64, 0.18);
+	color: #ffa940;
+}
+
+.dark .composer-pill.is-accent-orange:hover:not(:disabled) {
+	background: rgba(255, 169, 64, 0.28);
+}
+
+/* InfoBar item — text + icon, subtle hover only when clickable */
+.composer-info-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 6px;
+	border-radius: 4px;
+	border: none;
+	background: transparent;
+	color: var(--color-text-tertiary);
+	font-size: 12px;
+	line-height: 1.6;
+	transition: background 150ms ease, color 150ms ease;
+	cursor: default;
+}
+
+.composer-info-item.is-clickable {
+	cursor: pointer;
+}
+
+.composer-info-item.is-clickable:hover {
+	background: rgba(0, 0, 0, 0.04);
+	color: var(--color-text-secondary);
+}
+
+.dark .composer-info-item.is-clickable:hover {
+	background: rgba(255, 255, 255, 0.06);
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.composer-info-item > .anticon {
+	font-size: 11px;
+	opacity: 0.7;
+}
+
+/* ==========================================
    Thinking Cat — Animated Loading Indicator
    ========================================== */
 

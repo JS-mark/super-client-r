@@ -69,41 +69,30 @@ export function ApprovalModePill({ projectId, approvalMode }: ApprovalModePillPr
   );
 
   const color = approvalModeColor(approvalMode);
+  const accentClass =
+    color === "blue"
+      ? " is-accent-blue"
+      : color === "orange"
+        ? " is-accent-orange"
+        : "";
+  const className =
+    "composer-pill" + accentClass + (open ? " is-active" : "");
 
   return (
-    <Tooltip title="工作区级权限策略，影响该工作区所有会话">
-      <Popover
-        open={open}
-        onOpenChange={setOpen}
-        trigger="click"
-        content={popoverContent}
-        placement="top"
-      >
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-          style={{
-            background:
-              color === "blue"
-                ? "rgba(22,119,255,0.12)"
-                : color === "orange"
-                  ? "rgba(250,140,22,0.14)"
-                  : "rgba(0,0,0,0.06)",
-            color:
-              color === "blue"
-                ? "#1677ff"
-                : color === "orange"
-                  ? "#fa8c16"
-                  : "inherit",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
-          <SafetyOutlined style={{ fontSize: 12 }} />
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      content={popoverContent}
+      placement="top"
+    >
+      <Tooltip title={open ? undefined : "工作区级权限策略，影响该工作区所有会话"}>
+        <button type="button" className={className}>
+          <SafetyOutlined />
           <span>{approvalModeLabel(approvalMode)}</span>
-          <DownOutlined style={{ fontSize: 10, opacity: 0.7 }} />
+          <DownOutlined className="composer-pill-caret" />
         </button>
-      </Popover>
-    </Tooltip>
+      </Tooltip>
+    </Popover>
   );
 }

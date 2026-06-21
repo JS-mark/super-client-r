@@ -1,6 +1,5 @@
 import { DownOutlined } from "@ant-design/icons";
 import { Tooltip } from "antd";
-import { useState } from "react";
 
 export interface ModelPillProps {
   /** Display label, typically `${provider.name} · ${model.name}` 或 `model.name`。 */
@@ -23,30 +22,17 @@ export function ModelPill({
   maxLength = 28,
   tooltip,
 }: ModelPillProps) {
-  const [hover, setHover] = useState(false);
-
-  const display = !label ? "选择模型" : label.length > maxLength ? `${label.slice(0, maxLength)}…` : label;
+  const display = !label
+    ? "选择模型"
+    : label.length > maxLength
+      ? `${label.slice(0, maxLength)}…`
+      : label;
 
   return (
     <Tooltip title={tooltip ?? label ?? "选择模型"}>
-      <button
-        type="button"
-        onClick={onClick}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-        style={{
-          background: hover ? "rgba(0,0,0,0.06)" : "transparent",
-          border: "none",
-          cursor: "pointer",
-          maxWidth: 240,
-          overflow: "hidden",
-          whiteSpace: "nowrap",
-          color: "inherit",
-        }}
-      >
+      <button type="button" onClick={onClick} className="composer-pill">
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{display}</span>
-        <DownOutlined style={{ fontSize: 10, opacity: 0.7 }} />
+        <DownOutlined className="composer-pill-caret" />
       </button>
     </Tooltip>
   );

@@ -51,7 +51,7 @@ export function ChatComposer({
   }, [registerKeydownHandler]);
 
   return (
-    <div ref={wrapperRef} className="chat-composer relative w-full mx-auto max-w-4xl">
+    <div ref={wrapperRef} className="chat-composer chat-composer-card relative w-full mx-auto max-w-4xl">
       {topOverlay}
       <Sender
         value={value}
