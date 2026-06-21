@@ -223,21 +223,23 @@ export function ClaudeEmptyChatHome({
       }}
     >
       <h1
-        className="m-0"
+        className="m-0 px-6"
         style={{
-          fontWeight: 400,
-          fontSize: 30,
+          fontWeight: 500,
+          fontSize: 32,
           letterSpacing: "-0.01em",
           color: token.colorTextHeading,
-          opacity: 0.88,
-          marginBottom: 44,
+          opacity: 0.92,
+          marginBottom: 56,
           textAlign: "center",
+          maxWidth: 760,
+          lineHeight: 1.3,
         }}
       >
         {titleText}
       </h1>
 
-      <div className="mx-auto w-full" style={{ maxWidth: 680 }}>
+      <div className="mx-auto w-full px-6" style={{ maxWidth: 760 }}>
         <ChatComposer
           value={text}
           onChange={setText}

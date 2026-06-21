@@ -864,9 +864,11 @@ body {
    Composer Pills & Card
    ========================================== */
 
-/* Card container — wraps Sender to give it a soft, premium look */
-.chat-composer-card .ant-x-sender {
-	border-radius: 18px !important;
+/* Card container — wraps Sender to give it a soft, premium look.
+   Sender 的内部容器在 ChatComposer 中通过 styles.container 设为透明，
+   所以视觉边框 / 背景 / 圆角都由 .chat-composer-card 自己提供。 */
+.chat-composer-card {
+	border-radius: 18px;
 	border: 1px solid var(--color-border-secondary);
 	background: var(--color-bg-container);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -875,26 +877,26 @@ body {
 		box-shadow 200ms ease;
 }
 
-.chat-composer-card .ant-x-sender:hover {
+.chat-composer-card:hover {
 	border-color: var(--color-border);
 }
 
-.chat-composer-card .ant-x-sender:focus-within {
+.chat-composer-card:focus-within {
 	border-color: var(--color-primary);
 	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.12);
 }
 
-.dark .chat-composer-card .ant-x-sender {
+.dark .chat-composer-card {
 	background: rgba(255, 255, 255, 0.02);
 	border-color: rgba(255, 255, 255, 0.08);
 	box-shadow: none;
 }
 
-.dark .chat-composer-card .ant-x-sender:hover {
+.dark .chat-composer-card:hover {
 	border-color: rgba(255, 255, 255, 0.16);
 }
 
-.dark .chat-composer-card .ant-x-sender:focus-within {
+.dark .chat-composer-card:focus-within {
 	border-color: rgba(24, 144, 255, 0.55);
 	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.16);
 }

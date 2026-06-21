@@ -51,7 +51,7 @@ export function ChatComposer({
   }, [registerKeydownHandler]);
 
   return (
-    <div ref={wrapperRef} className="chat-composer chat-composer-card relative w-full mx-auto max-w-4xl">
+    <div ref={wrapperRef} className="chat-composer relative w-full mx-auto max-w-4xl">
       {topOverlay}
       <Sender
         value={value}
@@ -64,9 +64,10 @@ export function ChatComposer({
         onKeyDown={onKeyDown}
         suffix={() => null}
         footer={renderFooter}
+        rootClassName="chat-composer-card"
         styles={{ input: { fontSize: 14 } }}
       />
-      {infoBar && <div className="mt-2">{infoBar}</div>}
+      {infoBar && <div className="mt-3">{infoBar}</div>}
     </div>
   );
 }
