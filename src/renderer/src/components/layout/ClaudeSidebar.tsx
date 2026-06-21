@@ -8,14 +8,13 @@ import {
 	ReadOutlined,
 	SearchOutlined,
 	SettingOutlined,
-	UpOutlined,
 } from "@ant-design/icons";
 import { Input, type InputRef, Tooltip, message, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import { useChatStore } from "../../stores/chatStore";
+import { getProjectIdFromConversation, useChatStore } from "../../stores/chatStore";
 import { useNewConversation } from "../../hooks/useNewConversation";
 import type { ConversationSummary } from "../../types/electron";
 import { SessionContextMenu } from "./SessionContextMenu";
@@ -27,6 +26,7 @@ import {
 	useUserStore,
 } from "../../stores/userStore";
 import { useProjectStore, useSortedProjects } from "../../stores/projectStore";
+import { ProjectContextMenu } from "../project/ProjectContextMenu";
 import { ProjectSettingsModal } from "../project/ProjectSettingsModal";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
 
@@ -112,7 +112,7 @@ const QuickActionRow: React.FC<QuickActionRowProps> = ({
 	<button
 		type="button"
 		onClick={onClick}
-		className="w-full h-9 px-3 flex items-center gap-3 rounded-md transition-colors text-sm"
+		className="group w-full h-8 px-2 flex items-center gap-2.5 rounded-md transition-all duration-150 text-[13px]"
 		style={{ color: textColor }}
 		onMouseEnter={(e) => {
 			e.currentTarget.style.background = hoverBg;
@@ -121,11 +121,16 @@ const QuickActionRow: React.FC<QuickActionRowProps> = ({
 			e.currentTarget.style.background = "transparent";
 		}}
 	>
-		<span className="w-4 flex items-center justify-center">{icon}</span>
+		<span
+			className="w-4 flex items-center justify-center text-[14px] transition-colors"
+			style={{ color: mutedColor }}
+		>
+			{icon}
+		</span>
 		<span className="flex-1 text-left truncate">{label}</span>
 		{shortcut && (
 			<span
-				className="text-[11px] font-mono px-1.5 py-0.5 rounded"
+				className="text-[10.5px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
 				style={{ color: mutedColor, background: chipBg }}
 			>
 				{shortcut}
@@ -153,7 +158,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
 	action,
 }) => (
 	<div
-		className="w-full h-7 px-3 flex items-center justify-between rounded-md transition-colors group"
+		className="w-full h-7 px-2 flex items-center justify-between rounded-md transition-all duration-150 group cursor-pointer"
 		style={{ color: mutedColor }}
 		onMouseEnter={(e) => {
 			e.currentTarget.style.background = hoverBg;
@@ -161,17 +166,14 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
 		onMouseLeave={(e) => {
 			e.currentTarget.style.background = "transparent";
 		}}
+		onClick={onToggle}
 	>
-		<button
-			type="button"
-			onClick={onToggle}
-			className="flex-1 h-full flex items-center text-left"
-			style={{ background: "transparent", color: "inherit" }}
+		<span
+			className="flex-1 text-[12px] font-medium select-none"
+			style={{ letterSpacing: "0.02em" }}
 		>
-			<span className="text-[13px] tracking-wide font-medium">
-				{title}
-			</span>
-		</button>
+			{title}
+		</span>
 		<div className="flex items-center gap-1">
 			{action && (
 				<button
@@ -181,17 +183,20 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
 						action.onClick();
 					}}
 					title={action.tooltip}
-					className="opacity-0 group-hover:opacity-100 w-4 h-4 flex items-center justify-center rounded transition-opacity"
+					className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded transition-all hover:bg-black/5"
 					style={{ color: "inherit" }}
 				>
 					{action.icon}
 				</button>
 			)}
-			{expanded ? (
-				<UpOutlined className="text-[10px]" />
-			) : (
-				<DownOutlined className="text-[10px]" />
-			)}
+			<span
+				className="w-5 h-5 flex items-center justify-center transition-transform duration-200"
+				style={{
+					transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+				}}
+			>
+				<DownOutlined className="text-[9px] opacity-60" />
+			</span>
 		</div>
 	</div>
 );
@@ -226,15 +231,14 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		};
 	}, []);
 
-	// plan §23.4 — Recents = casual sessions only (projectId === null →
-	// workspaceId === "default" 经 metaToConversation 适配). 项目对话归属在
-	// PROJECTS 区，不进 Recents，避免一条会话出现两次。
+	// plan §23.4 — Recents = casual sessions only（projectId === null）。
+	// 项目对话归属在 PROJECTS 区，不进 Recents，避免同一会话出现两次。
 	const recentConversations = useMemo(() => {
 		return [...conversations]
 			.filter(
 				(c) =>
 					!c.session?.flags?.archived &&
-					(!c.workspaceId || c.workspaceId === "default"),
+					getProjectIdFromConversation(c) === null,
 			)
 			.sort((a, b) => {
 				const ap = a.session?.flags?.pinned ? 1 : 0;
@@ -250,10 +254,11 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		const map = new Map<string, ConversationSummary[]>();
 		for (const c of conversations) {
 			if (c.session?.flags?.archived) continue;
-			if (!c.workspaceId || c.workspaceId === "default") continue;
-			const list = map.get(c.workspaceId) ?? [];
+			const projectId = getProjectIdFromConversation(c);
+			if (!projectId) continue;
+			const list = map.get(projectId) ?? [];
 			list.push(c);
-			map.set(c.workspaceId, list);
+			map.set(projectId, list);
 		}
 		for (const [k, list] of map) {
 			map.set(
@@ -379,11 +384,9 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 				const conv = useChatStore
 					.getState()
 					.conversations.find((c) => c.id === conversationId);
-				const projectId =
-					conv?.workspaceId && conv.workspaceId !== "default"
-						? conv.workspaceId
-						: null;
-				useProjectStore.getState().setCurrent(projectId);
+				useProjectStore
+					.getState()
+					.setCurrent(getProjectIdFromConversation(conv));
 				await useChatStore.getState().switchConversation(conversationId);
 			} catch (err) {
 				console.error("Failed to switch conversation:", err);
@@ -404,9 +407,9 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const mutedColor = token.colorTextSecondary;
 	const hoverBg = token.colorFillTertiary;
 	const chipBg = token.colorFillQuaternary;
-	// Session 选中态：使用次级填充（柔和、不抢眼），文字保持正常色 + 轻微加粗。
-	// 项目 active 用左侧主色竖条，不与之冲突。
-	const activeBg = token.colorFillSecondary;
+	// Session 选中态：用更柔和的 fill tertiary（比 secondary 轻一档）+ 左侧主色竖条 +
+	// 轻微加粗。比单纯整段灰底更精致。
+	const activeBg = token.colorFillTertiary;
 	const activeText = token.colorText;
 	const primaryBg = token.colorPrimary;
 
@@ -431,17 +434,17 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 			<TrafficLightSpacer mac={mac} />
 
 			{/* Brand row — collapse button removed; 通过侧边拖拽手柄调整宽度 */}
-			<div className="h-10 px-3 flex items-center flex-none">
-				<div className="flex items-center gap-2 min-w-0">
+			<div className="h-12 px-3 flex items-center flex-none">
+				<div className="flex items-center gap-2.5 min-w-0">
 					<div
-						className="w-6 h-6 rounded-md flex items-center justify-center text-white text-[11px] font-bold flex-none"
+						className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[13px] font-semibold flex-none shadow-sm"
 						style={{ background: primaryBg }}
 					>
 						C
 					</div>
 					<span
-						className="text-sm font-semibold truncate"
-						style={{ color: textColor }}
+						className="text-[15px] font-semibold truncate"
+						style={{ color: textColor, letterSpacing: "-0.01em" }}
 					>
 						Claude
 					</span>
@@ -449,9 +452,9 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 			</div>
 
 			{/* Mode tabs */}
-			<div className="px-3 pt-1 pb-2 flex-none">
+			<div className="px-3 pt-0 pb-3 flex-none">
 				<div
-					className="flex items-center gap-1 p-0.5 rounded-lg"
+					className="flex items-center p-[3px] rounded-lg"
 					style={{ background: chipBg }}
 					data-testid="mode-tabs"
 				>
@@ -462,12 +465,12 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 								key={m}
 								type="button"
 								onClick={() => setMode(m)}
-								className="flex-1 h-7 rounded-md text-xs font-medium transition-colors"
+								className="flex-1 h-7 rounded-[6px] text-[12.5px] font-medium transition-all duration-200"
 								style={{
 									background: active ? token.colorBgContainer : "transparent",
 									color: active ? primaryBg : mutedColor,
 									boxShadow: active
-										? `0 1px 2px ${token.colorBorderSecondary}`
+										? `0 1px 3px rgba(0, 0, 0, 0.08)`
 										: "none",
 								}}
 								data-testid={`mode-tab-${m}`}
@@ -533,13 +536,23 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 				/>
 			</div>
 
+			{/* Subtle divider between quick actions and sections */}
+			<div
+				className="mx-3 my-1 flex-none"
+				style={{
+					height: 1,
+					background: token.colorBorderSecondary,
+					opacity: 0.5,
+				}}
+			/>
+
 			{/* Scrollable section list */}
 			<div
-				className="flex-1 overflow-y-auto px-2 pb-2"
+				className="flex-1 overflow-y-auto px-2 pb-2 pt-2"
 				data-testid="sidebar-sections"
 			>
 				{/* Recents */}
-				<div className="mt-2">
+				<div>
 					<SectionHeader
 						title="最近对话"
 						expanded={recentsOpen}
@@ -581,7 +594,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 				</div>
 
 				{/* Projects */}
-				<div className="mt-3">
+				<div className="mt-4">
 					<SectionHeader
 						title="项目"
 						expanded={projectsOpen}
@@ -620,19 +633,24 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 										conversationsByProject.get(ws.id) ?? [];
 									return (
 										<div key={ws.id} className="flex flex-col">
-											<ProjectRow
-												name={ws.name}
-												active={active}
-												expanded={expanded}
-												count={projectConvs.length}
-												textColor={textColor}
-												mutedColor={mutedColor}
-												hoverBg={hoverBg}
-												primaryBg={primaryBg}
-												onClick={() => toggleProjectExpand(ws.id)}
-												onAdd={() => handleNewConversationInProject(ws.id)}
-												onSettings={() => setSettingsProjectId(ws.id)}
-											/>
+											<ProjectContextMenu
+												project={ws}
+												onRename={(p) => setSettingsProjectId(p.id)}
+											>
+												<ProjectRow
+													name={ws.name}
+													active={active}
+													expanded={expanded}
+													count={projectConvs.length}
+													textColor={textColor}
+													mutedColor={mutedColor}
+													hoverBg={hoverBg}
+													primaryBg={primaryBg}
+													onClick={() => toggleProjectExpand(ws.id)}
+													onAdd={() => handleNewConversationInProject(ws.id)}
+													onSettings={() => setSettingsProjectId(ws.id)}
+												/>
+											</ProjectContextMenu>
 											{expanded && (
 												<div className="ml-5 mt-px mb-1 flex flex-col">
 													{projectConvs.length === 0 ? (
@@ -682,20 +700,21 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 
 			{/* Bottom user/settings */}
 			<div
-				className="h-12 px-3 flex items-center justify-between flex-none"
+				className="h-14 px-3 flex items-center justify-between flex-none"
+				style={{ borderTop: `1px solid ${token.colorBorderSecondary}` }}
 				data-testid="sidebar-user-row"
 			>
-				<div className="flex items-center gap-2 min-w-0">
+				<div className="flex items-center gap-2.5 min-w-0">
 					<div
 						className={cn(
-							"w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-none",
+							"w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-semibold flex-none shadow-sm",
 							avatarColor,
 						)}
 					>
 						{initials}
 					</div>
 					<span
-						className="text-sm truncate"
+						className="text-[13px] font-medium truncate"
 						style={{ color: textColor }}
 					>
 						{user?.name || "访客"}
@@ -705,7 +724,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					<button
 						type="button"
 						onClick={handleSettings}
-						className="w-7 h-7 flex items-center justify-center rounded-md transition-colors"
+						className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
 						style={{ color: mutedColor }}
 						data-testid="sidebar-settings"
 						onMouseEnter={(e) => {
@@ -715,7 +734,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 							e.currentTarget.style.background = "transparent";
 						}}
 					>
-						<SettingOutlined />
+						<SettingOutlined className="text-[15px]" />
 					</button>
 				</Tooltip>
 			</div>
@@ -772,11 +791,11 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 	const [hovered, setHovered] = useState(false);
 	return (
 		<div
-			className="group relative w-full h-8 pl-3 pr-3 flex items-center gap-2 rounded-md text-sm transition-colors cursor-pointer"
+			className="group relative w-full h-8 pl-3 pr-3 flex items-center gap-2 rounded-md text-[13px] transition-colors cursor-pointer"
 			style={{
 				background: "transparent",
 				color: textColor,
-				fontWeight: active ? 600 : 400,
+				fontWeight: active ? 500 : 400,
 			}}
 			onClick={onClick}
 			onMouseEnter={(e) => {
@@ -790,8 +809,8 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 		>
 			{active && (
 				<span
-					className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r"
-					style={{ background: primaryBg }}
+					className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r"
+					style={{ background: primaryBg, opacity: 0.7 }}
 				/>
 			)}
 			<span
@@ -804,7 +823,8 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 				<DownOutlined className="text-[9px]" />
 			</span>
 			<FolderOutlined
-				style={{ color: active ? primaryBg : mutedColor }}
+				className="text-[13px]"
+				style={{ color: mutedColor }}
 			/>
 			<span className="flex-1 text-left truncate">{name}</span>
 			{hovered ? (
@@ -925,7 +945,7 @@ const RecentConversationRow: React.FC<RecentConversationRowProps> = ({
 			<button
 				type="button"
 				onClick={onClick}
-				className="w-full h-8 px-3 flex items-center gap-2 rounded-md text-sm transition-colors"
+				className="relative w-full h-8 pl-3 pr-2 flex items-center gap-2 rounded-md text-[13px] transition-all duration-150"
 				style={{
 					background: active ? activeBg : "transparent",
 					color: active ? activeText : textColor,
@@ -938,6 +958,13 @@ const RecentConversationRow: React.FC<RecentConversationRowProps> = ({
 					if (!active) e.currentTarget.style.background = "transparent";
 				}}
 			>
+				{active && (
+					<span
+						aria-hidden
+						className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r"
+						style={{ background: primaryBg }}
+					/>
+				)}
 				{pinned && (
 					<span
 						aria-label="pinned"
@@ -958,7 +985,7 @@ const RecentConversationRow: React.FC<RecentConversationRowProps> = ({
 					/>
 				)}
 				<span
-					className="text-[11px] flex-none"
+					className="text-[10.5px] flex-none opacity-70"
 					style={{ color: mutedColor }}
 				>
 					{formatRelativeTime(conv.updatedAt)}
