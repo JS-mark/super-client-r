@@ -1,8 +1,15 @@
-import { theme } from "antd";
-import { useState } from "react";
+import { Flex, theme } from "antd";
+import { useCallback, useState } from "react";
+import { useChat } from "../../hooks/useChat";
 import { useChatStore } from "../../stores/chatStore";
-import { useProjectStore } from "../../stores/projectStore";
+import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
+import type { ChatModeSelection } from "./ChatModePanel";
+import { ApprovalModePill } from "./composer/ApprovalModePill";
 import { ChatComposer } from "./composer/ChatComposer";
+import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
+import { ChatModePill } from "./composer/ChatModePill";
+import { ModelPill } from "./composer/ModelPill";
+import { ComposerStatusBar } from "./ComposerStatusBar";
 
 const { useToken } = theme;
 
@@ -20,6 +27,15 @@ export interface ClaudeEmptyChatHomeProps {
  * prominent composer card. Mounted in `Chat.tsx` for the
  * `claude-code` / `hybrid` interaction profiles when the
  * conversation has zero messages.
+ *
+ * Footer 与 ChatInputArea 视觉对齐（简化版）：
+ *   左：ChatModePill + (agent) ApprovalModePill
+ *   右：ModelPill + Send
+ * InfoBar：workspace + 本地远程 + ⋯ popup（含 ComposerStatusBar）。
+ *
+ * 取舍：欢迎页未引入 ChatToolsMenu / 搜索引擎 / Skill tag —— 它们依赖
+ * conversation 范围内的状态（attachedFiles / searchEngine 等），首条消息
+ * 发出后会切到 ChatInputArea，那里有完整工具集。
  */
 export function ClaudeEmptyChatHome({
   onSend,
@@ -43,6 +59,30 @@ export function ClaudeEmptyChatHome({
   const titleText = project
     ? `我们应该在 ${project.name} 中构建什么?`
     : "今天想做什么?";
+
+  // Composer footer 派生数据
+  const { chatMode, isModeLocked, setChatMode, getEffectiveModel } = useChat();
+  const projectSettings = useProjectSettings(projectId);
+  const approvalMode = projectSettings?.runtimePolicy?.approvalMode;
+
+  const remoteBinding = conversation?.remote;
+  const workspaceName = project?.name ?? "未指定工作区";
+
+  const effective = getEffectiveModel();
+  const modelLabel = effective
+    ? `${effective.provider.name} · ${effective.model.name || effective.model.id}`
+    : null;
+
+  const handleOpenModelSwitcher = useCallback(() => {
+    window.dispatchEvent(new Event("chat:open-model-switcher"));
+  }, []);
+
+  const handleModeSelect = useCallback(
+    (selection: ChatModeSelection) => {
+      setChatMode(selection.mode);
+    },
+    [setChatMode],
+  );
 
   return (
     <div
@@ -80,13 +120,38 @@ export function ClaudeEmptyChatHome({
           }}
           isStreaming={isStreaming}
           placeholder="想做什么？"
+          infoBar={
+            <ChatComposerInfoBar
+              workspaceName={workspaceName}
+              remoteBinding={remoteBinding}
+              trailing={<ComposerStatusBar />}
+            />
+          }
           renderFooter={(_footerNode, opts) => {
             const { SendButton } = opts.components;
             return (
-              <div className="flex items-center justify-between">
-                <div />
-                <SendButton type="primary" shape="circle" />
-              </div>
+              <Flex justify="space-between" align="center">
+                <Flex align="center" gap={8}>
+                  <ChatModePill
+                    chatMode={chatMode}
+                    isModeLocked={isModeLocked}
+                    onSelect={handleModeSelect}
+                  />
+                  {chatMode === "agent" && (
+                    <ApprovalModePill
+                      projectId={projectId}
+                      approvalMode={approvalMode}
+                    />
+                  )}
+                </Flex>
+                <Flex align="center" gap={8}>
+                  <ModelPill
+                    label={modelLabel}
+                    onClick={handleOpenModelSwitcher}
+                  />
+                  <SendButton type="primary" shape="circle" />
+                </Flex>
+              </Flex>
             );
           }}
         />
