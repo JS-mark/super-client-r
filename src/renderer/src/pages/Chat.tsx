@@ -25,7 +25,6 @@ import { useModelStore } from "../stores/modelStore";
 import { useChatStore } from "../stores/chatStore";
 import { useFeatureFlagsStore } from "../stores/featureFlagsStore";
 import { useFileArtifactStore } from "../stores/fileArtifactStore";
-import { useUserStore } from "../stores/userStore";
 
 const { useToken } = theme;
 
@@ -57,7 +56,6 @@ const Chat: React.FC = () => {
     setSessionSettings,
     respondToApproval,
     availableTools,
-    getEffectiveModel,
   } = useChat();
 
   // Search engine state
@@ -141,17 +139,6 @@ const Chat: React.FC = () => {
     isStreaming,
     sessionPlanMode,
   ]);
-
-  // Claude empty home: derive user name and effective model label.
-  const claudeHomeUserName = useUserStore((s) => s.user?.name) ?? "你";
-  const claudeHomeModelLabel = useMemo(() => {
-    if (messages.length !== 0) return undefined;
-    if (interactionProfile === "codex") return undefined;
-    const eff = getEffectiveModel();
-    if (!eff) return undefined;
-    const label = `${eff.provider.name} · ${eff.model.name}`;
-    return label.length > 20 ? `${label.slice(0, 20)}…` : label;
-  }, [messages.length, interactionProfile, getEffectiveModel]);
 
   // Slash commands
   const slash = useSlashCommands({
@@ -347,18 +334,11 @@ const Chat: React.FC = () => {
                     (interactionProfile === "claude-code" ||
                       interactionProfile === "hybrid") ? (
                       <ClaudeEmptyChatHome
-                        userName={claudeHomeUserName}
-                        modelLabel={claudeHomeModelLabel}
                         onSend={(text) => {
                           setInput(text);
                           handleSend(text);
                         }}
                         isStreaming={isStreaming}
-                        onOpenModelSwitcher={() =>
-                          window.dispatchEvent(
-                            new Event("chat:open-model-switcher"),
-                          )
-                        }
                       />
                     ) : (
                       <ChatWelcomeScreen

@@ -14,12 +14,8 @@ import { ComposerStatusBar } from "./ComposerStatusBar";
 const { useToken } = theme;
 
 export interface ClaudeEmptyChatHomeProps {
-  userName?: string;
-  modelLabel?: string;
   onSend: (text: string) => void;
   isStreaming?: boolean;
-  onOpenModelSwitcher?: () => void;
-  onOpenAttachment?: () => void;
 }
 
 /**
