@@ -61,8 +61,6 @@
 - `src/renderer/src/styles/composer.css`（或既有 composer 样式文件）
   - 新增 `.composer-stack`、`.composer-context-bar` 类
   - `.composer-stack` 内部 `.chat-composer-card` 圆角下方为 0；`.composer-context-bar` 圆角上方为 0
-- `src/renderer/src/components/chat/ClaudeEmptyChatHome.tsx`
-  - 移除 `infoBar` prop 中的 `<ComposerStatusBar />` 直传，改为放进 InfoBar 的 ⋯ 槽（已经是这样）
 - `src/renderer/src/components/chat/ChatInputArea.tsx`
   - 删除原 footer 内 mic 按钮
   - 接入新 InfoBar；删除任何与旧 InfoBar 重复的 workspace 标签
@@ -91,7 +89,7 @@ interface ProjectPillProps {
 数据源：
 
 - `useProjectStore` 已有 `projects` 列表
-- 写回：复用 `chatStore` 既有 `setConversationWorkspace(conversationId, projectId)` 路径（如不存在则新增 action，调用 `window.electron.chat.updateConversation` 更新 `workspaceId`）
+- **写回（已知约束）**：当前 `chatStore.updateConversationMetadata` 注释明确「workspaceId 在新模型里不再可改，忽略」。本 spec 选择**扩展该 action 支持修改 projectId**：在 `metaPatch` 里增加 `projectId` 字段映射（`workspaceId === "default"` → `projectId = null`），并在 `ConversationStorageService` 层支持 projectId patch。这样 ProjectPill 可对当前会话生效；旧会话切换项目走同一路径
 
 ### 下拉内容
 
@@ -221,7 +219,7 @@ export interface GitStatusResult {
 - 实现：
   - `listBranches` = `git for-each-ref --format='%(refname:short)|%(HEAD)|%(upstream:short)' refs/heads refs/remotes`
   - `switchBranch` = `git checkout <name>`，前置校验 `git status --porcelain` 无冲突；冲突时抛 `{ ok: false, error: "uncommitted changes" }`
-  - `getStatus` = `git status --porcelain | wc -l`，并返回 `dirty`
+  - `getStatus` = `execFile("git", ["status", "--porcelain"])`，在 Node 端拆 `\n` 计行（项目不走 shell，无管道）；返回 `{ uncommittedCount, dirty: count > 0 }`
 - 与 `getBranchInfo` 一样使用 2s 缓存，但 `switchBranch` 调用后立即失效缓存
 
 ### 显示条件
@@ -268,7 +266,9 @@ export interface GitStatusResult {
 |------|------|------|
 | `request` | 按需审批 | 编辑外部文件和使用互联网时始终询问 |
 | `auto-safe` | 替我审批 | 仅对检测到的风险操作请求批准 |
-| `full-access` | 完全放行 | 可不受限制地访问互联网和您电脑上的任何文件 |
+| `full-access` | 完全访问权限 | 可不受限制地访问互联网和您电脑上的任何文件 |
+
+> 与既有 `approvalModeLabel` 中的「完全放行」存在出入；本 spec 以截图为准，更新 `ApprovalModePill.approvalModeLabel('full-access')` 返回值为「完全访问权限」。受影响测试用例同步更新。
 
 ---
 
@@ -345,7 +345,7 @@ Add
 
 ### 指定目标（Goal）
 
-- 新增字段：`conversation.metadata.persistentGoal?: string`（持久化）
+- **存储位置选定**：直接在 `SessionMeta` 顶层加 `persistentGoal?: string` 字段（不引入新的 `metadata` 容器，避免再造一层结构）。`shared-types/chat.ts` 的 `SessionMeta` / `ConversationSummary` / `ConversationSummaryUpdate` 同步加字段；`updateConversationMetadata` 的 `metaPatch` 增加映射
 - 点击菜单项 → 弹 Modal/Popover：textarea + 保存 + 清除
 - 实现：每条 user message 发送前在 `useChat.sendMessage` 拼接前缀：`# 持续目标\n${goal}\n\n# 本次请求\n${userText}`
 - Empty home 与 ChatInputArea 共享同一行为
@@ -362,7 +362,7 @@ Add
 | `git:get-status` | `{ cwd }` | `GitStatusResult` | 未提交计数 | 新 |
 | `git:get-branch-info` | `{ cwd }` | `GitBranchInfo` | 已有 | 不改 |
 | `git:create-worktree` | `{ cwd, worktreePath, branchName }` | `CreateWorktreeResult` | 已有 | 不改 |
-| `chat:update-conversation` | partial | conversation | workspaceId / worktreePath / reasoningEffort / metadata.persistentGoal | 改（字段扩展）|
+| `chat:update-conversation` | partial | conversation | projectId / worktreePath / reasoningEffort / persistentGoal（均扩展 `metaPatch` 映射） | 改（字段扩展）|
 
 按 CLAUDE.md「IPC 6 步」流程逐一落地。
 
@@ -378,7 +378,7 @@ Add
 | `worktreePath` | `string?` | LaunchMode = worktree 时存在 |
 | `reasoningEffort` | `"low" \| "medium" \| "high" \| "max"?` | ModelPill |
 | `chatMode` | `"direct" \| "agent" \| "plan"` | ChatMode 扩展 plan |
-| `metadata.persistentGoal` | `string?` | + 菜单 Goal |
+| `persistentGoal` | `string?` | + 菜单 Goal（顶层字段，非 metadata 容器） |
 
 ### 仅渲染态（不持久化）
 
@@ -425,8 +425,9 @@ chat.composer.tools.goal.placeholder → Codex 将持续努力实现的目标 / 
 | **P2** | § 2 ProjectPill 完整功能 | P1 | ✅ |
 | **P3** | § 5 ApprovalPill 视觉 + § 6 ModelPill 紧凑形态（reasoning 占位） | P1 | ✅ |
 | **P4** | § 7 + 菜单 Plan / Goal | P1；ChatMode 扩展 | ✅ |
-| **P5** | § 4 BranchPill + 3 个新 IPC | P1；§ 8 IPC 落地 | ✅ |
-| **P6** | § 3 LaunchModePill 「新工作树」 + reasoning 真实写回 | P5 IPC；既有 createWorktree | ✅ |
+| **P5** | § 4 BranchPill + 4 个新 IPC（list-branches / switch-branch / create-branch / get-status） | P1；§ 8 IPC 落地 | ✅ |
+| **P6a** | § 3 LaunchModePill 「新工作树」 | P5 不强依赖；只用既有 `createWorktree` | ✅ |
+| **P6b** | reasoning 真实写回（拆出独立任务） | P3 占位 UI | ✅ |
 
 每期通过后做一次手测：
 - ClaudeEmptyChatHome 渲染对照截图
