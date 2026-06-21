@@ -25,11 +25,12 @@ import { ChatComposer } from "./composer/ChatComposer";
 import { ChatComposerInfoBar } from "./composer/ChatComposerInfoBar";
 import { ChatModePill } from "./composer/ChatModePill";
 import { ChatToolsMenu } from "./composer/ChatToolsMenu";
+import { ModelPill } from "./composer/ModelPill";
 import { ComposerStatusBar } from "./ComposerStatusBar";
 import { useChatStore } from "../../stores/chatStore";
 import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
-import type { ChatMode } from "../../hooks/useChat";
+import { useChat, type ChatMode } from "../../hooks/useChat";
 import { SearchEnginePanel } from "./SearchEnginePanel";
 import type { SlashItem } from "./SlashCommandPanel";
 import { SlashCommandPanel } from "./SlashCommandPanel";
@@ -322,6 +323,16 @@ export function ChatInputArea({
   const projectSettings = useProjectSettings(projectId);
   const approvalMode = projectSettings?.runtimePolicy?.approvalMode;
 
+  const { getEffectiveModel } = useChat();
+  const effective = getEffectiveModel();
+  const modelLabel = effective
+    ? `${effective.provider.name} · ${effective.model.name || effective.model.id}`
+    : null;
+
+  const handleOpenModelSwitcher = useCallback(() => {
+    window.dispatchEvent(new Event("chat:open-model-switcher"));
+  }, []);
+
   const existingFooterFn = useCallback(
     (
       _footerNode: React.ReactNode,
@@ -424,6 +435,10 @@ export function ChatInputArea({
 
           {/* Send or Stop button */}
           <Flex align="center" gap={8}>
+            <ModelPill
+              label={modelLabel}
+              onClick={handleOpenModelSwitcher}
+            />
             {isStreaming ? (
               <Tooltip title={t("actions.stop", "终止", { ns: "chat" })}>
                 <Button
@@ -465,6 +480,8 @@ export function ChatInputArea({
       currentEngine,
       handleAttachmentClick,
       closeAllToolPanels,
+      modelLabel,
+      handleOpenModelSwitcher,
     ],
   );
 
