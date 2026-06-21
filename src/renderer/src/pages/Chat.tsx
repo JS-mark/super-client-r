@@ -334,9 +334,9 @@ const Chat: React.FC = () => {
                     (interactionProfile === "claude-code" ||
                       interactionProfile === "hybrid") ? (
                       <ClaudeEmptyChatHome
-                        onSend={(text) => {
+                        onSend={(text, attachmentIds) => {
                           setInput(text);
-                          handleSend(text);
+                          handleSend(text, attachmentIds);
                         }}
                         isStreaming={isStreaming}
                       />
