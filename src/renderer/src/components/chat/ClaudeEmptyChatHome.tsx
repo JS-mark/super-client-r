@@ -2,6 +2,8 @@ import { CloseOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import { theme } from "antd";
 import { useCallback, useMemo, useState } from "react";
 import { useUserStore } from "../../stores/userStore";
+import { useChatStore } from "../../stores/chatStore";
+import { useProjectStore } from "../../stores/projectStore";
 import { ChatComposer } from "./composer/ChatComposer";
 
 const { useToken } = theme;
@@ -67,6 +69,22 @@ export function ClaudeEmptyChatHome({
     [],
   );
 
+  const currentConvId = useChatStore((s) => s.currentConversationId);
+  const conversation = useChatStore((s) =>
+    s.conversations.find((c) => c.id === currentConvId),
+  );
+  const projectId =
+    conversation?.workspaceId && conversation.workspaceId !== "default"
+      ? conversation.workspaceId
+      : null;
+  const project = useProjectStore((s) =>
+    projectId ? s.projects.find((p) => p.id === projectId) : null,
+  );
+
+  const titleText = project
+    ? `我们应该在 ${project.name} 中构建什么?`
+    : "今天想做什么?";
+
   const handleChipClick = useCallback((chip: QuickChip) => {
     if (chip.more) return;
     setText((prev) => (prev ? prev : chip.prefill));
@@ -91,12 +109,10 @@ export function ClaudeEmptyChatHome({
           color: token.colorTextHeading,
           opacity: 0.88,
           marginBottom: 44,
+          textAlign: "center",
         }}
       >
-        <span style={{ fontFamily: SERIF_FONT_FAMILY, fontStyle: "italic" }}>
-          {timeWord}
-        </span>
-        <span>，{displayName}</span>
+        {titleText}
       </h1>
 
       <div className="mx-auto w-full" style={{ maxWidth: 680 }}>
