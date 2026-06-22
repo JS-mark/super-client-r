@@ -6,16 +6,13 @@
 
 import { ipcMain } from "electron";
 import * as path from "path";
-import { conversationStorage } from "../../services/chat/ConversationStorageService";
+import { resolveConversationCwd } from "../../services/runtime/conversationCwd";
 import { llmService } from "../../services/llm";
 import { mcpService } from "../../services/mcp/McpService";
 import { getSkillService } from "../../services/skill/SkillService";
 import { logger } from "../../utils/logger";
 import { LLM_CHANNELS } from "../channels";
-import type {
-	ChatCompletionRequest,
-	IPCResponse,
-} from "../types";
+import type { ChatCompletionRequest, IPCResponse } from "../types";
 
 const log = logger.withContext("ModelHandlers");
 
@@ -24,13 +21,16 @@ const PATH_ARG_KEYS = ["path", "source", "destination"];
 const SERVERS_WITH_STORAGE = new Set(["@scp/plan", "@scp/task"]);
 
 /**
- * Get the workspace directory for a conversation.
- * Returns undefined if no conversation ID is provided.
+ * Get the working directory used as `cwd` for tools in a chat completion.
+ *
+ * R-4: routes through `resolveConversationCwd` which prefers
+ * `WorkspaceConfig.path` (the user's project dir) when set, else falls back to
+ * the per-conversation sandbox dir. Single source of truth across all consumers.
  */
-function getWorkspaceDir(conversationId?: string): string | undefined {
+function getConversationCwd(conversationId?: string): string | undefined {
 	if (!conversationId) return undefined;
 	try {
-		return conversationStorage.getWorkspaceDir(conversationId);
+		return resolveConversationCwd(conversationId);
 	} catch {
 		return undefined;
 	}
@@ -71,6 +71,20 @@ function resolveToolPaths(
 	return resolved;
 }
 
+function resolveToolMapping(
+	toolMapping: NonNullable<ChatCompletionRequest["toolMapping"]>,
+	name: string,
+): { serverId: string; toolName: string } | undefined {
+	const exact = toolMapping[name];
+	if (exact) return exact;
+
+	const matches = Object.entries(toolMapping).filter(
+		([prefixedName, mapping]) =>
+			mapping.toolName === name || prefixedName.endsWith(`__${name}`),
+	);
+	return matches.length === 1 ? matches[0][1] : undefined;
+}
+
 export function registerModelHandlers(): void {
 	// Model CRUD (9 channels) → migrated to api-impl.ts
 	// Only LLM streaming handlers remain here
@@ -81,14 +95,14 @@ export function registerModelHandlers(): void {
 		LLM_CHANNELS.CHAT_COMPLETION,
 		async (_event, request: ChatCompletionRequest): Promise<IPCResponse> => {
 			try {
-				// Resolve workspace directory from conversation ID (main process is source of truth)
-				const workspaceDir = getWorkspaceDir(request.conversationId);
+				// Resolve conversation cwd (main process is source of truth)
+				const workspaceDir = getConversationCwd(request.conversationId);
 
 				// Build a tool executor that maps prefixed tool names back to MCP servers
 				const toolTimeoutMs = (request.toolTimeout ?? 180) * 1000;
 				const toolExecutor = request.toolMapping
 					? async (name: string, args: Record<string, unknown>) => {
-							const mapping = request.toolMapping![name];
+							const mapping = resolveToolMapping(request.toolMapping!, name);
 							if (!mapping) throw new Error(`Unknown tool: ${name}`);
 
 							const timeoutPromise = new Promise<never>((_, reject) => {

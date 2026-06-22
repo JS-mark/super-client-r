@@ -1,19 +1,41 @@
 /**
  * 请求日志追踪服务
- * 拦截 global.fetch 和 axios 请求，记录到环形缓冲区并实时推送到 renderer
+ *
+ * Wraps `globalThis.fetch` + axios so every outbound HTTP request from the
+ * main process is captured, persisted to a ring buffer, and streamed live to
+ * any renderer window that's listening.
+ *
+ * Streaming semantics (the important part for LLM SSE):
+ *  1. As soon as response headers arrive, push the entry with `state:
+ *     "streaming"` so the UI shows it immediately — NOT after the whole body
+ *     finishes draining.
+ *  2. Body chunks are appended via `network:request-log-update` events
+ *     (`appendBody` field); renderer concatenates them into its local copy.
+ *  3. When the source stream ends or errors, send a final update with
+ *     `state: "complete" | "error"` and timing.
+ *
+ * Previously this service called `await response.clone().text()` which blocks
+ * until the whole SSE stream finishes — meaning a 30s LLM response would only
+ * show up in the request log 30s after it started, with no incremental body
+ * visibility. The new implementation tees the body via a `TransformStream`.
  */
 
 import { EventEmitter } from "events";
+import { app } from "electron";
 import axios from "axios";
 import { broadcastEvent } from "../../ipc/events";
 import { storeManager } from "../../store/StoreManager";
-import type { RequestLogEntry } from "../../ipc/types";
+import type {
+	RequestLogEntry,
+	RequestLogEntryUpdate,
+} from "../../ipc/types";
 import { logger as rootLogger } from "../../utils/logger";
 
 const logger = rootLogger.withContext("RequestLogService");
 
 const MAX_ENTRIES = 500;
-const BODY_PREVIEW_MAX = 1024; // 1KB
+const BODY_PREVIEW_MAX = 32 * 1024; // 32KB per body — enough to see full LLM payloads
+const STREAM_TOTAL_MAX = 256 * 1024; // 256KB cap on streamed body to avoid memory blow-up
 
 export class RequestLogService extends EventEmitter {
 	private entries: RequestLogEntry[] = [];
@@ -22,17 +44,29 @@ export class RequestLogService extends EventEmitter {
 	private axiosRequestInterceptorId: number | null = null;
 	private axiosResponseInterceptorId: number | null = null;
 	/** Map requestId → partial entry for axios (correlate request ↔ response) */
-	private pendingAxios = new Map<string, { entry: RequestLogEntry; startTime: number }>();
+	private pendingAxios = new Map<
+		string,
+		{ entry: RequestLogEntry; startTime: number }
+	>();
 	private idCounter = 0;
 
 	/**
 	 * 初始化：包装 fetch + axios interceptor
+	 *
+	 * In dev (`!app.isPackaged`) we force-enable logging so a fresh checkout
+	 * immediately shows requests in the drawer without needing to flip the
+	 * setting first. Prod defaults to the persisted setting (off by default).
 	 */
 	initialize(): void {
-		this.enabled = storeManager.getRequestLogEnabled();
+		const persisted = storeManager.getRequestLogEnabled();
+		const isDev = !app.isPackaged;
+		this.enabled = isDev ? true : persisted;
 		this.wrapFetch();
 		this.installAxiosInterceptors();
-		logger.info("RequestLogService initialized", { enabled: this.enabled });
+		logger.info("RequestLogService initialized", {
+			enabled: this.enabled,
+			devForcedOn: isDev && !persisted,
+		});
 	}
 
 	/**
@@ -86,32 +120,153 @@ export class RequestLogService extends EventEmitter {
 			}
 
 			const entry = self.createEntry(input, init, "fetch");
+			entry.state = "pending";
 			const startTime = performance.now();
 
 			try {
 				const response = await self.originalFetch.call(globalThis, input, init);
-				entry.durationMs = Math.round(performance.now() - startTime);
+				const headersObj = self.headersToObject(response.headers);
+				const contentType = (headersObj["content-type"] || "").toLowerCase();
+				const transferEncoding = (
+					headersObj["transfer-encoding"] || ""
+				).toLowerCase();
+				const isStreaming =
+					contentType.includes("text/event-stream") ||
+					contentType.includes("application/x-ndjson") ||
+					transferEncoding.includes("chunked");
+
 				entry.responseStatus = response.status;
 				entry.responseStatusText = response.statusText;
+				entry.responseHeaders = headersObj;
+				entry.contentType = contentType || undefined;
+				entry.isStreaming = isStreaming;
+				entry.state = "streaming";
+				entry.durationMs = Math.round(performance.now() - startTime);
 
-				// 克隆 response 读取 body（不影响原始消费）
-				try {
-					const cloned = response.clone();
-					const text = await cloned.text();
-					entry.responseBodyPreview = self.truncateBody(text);
-				} catch {
-					// 某些 response 无法读取 body
+				// Push the entry NOW so the UI sees it without waiting for the body.
+				self.pushEntry(entry);
+
+				// If there's no body to stream, mark complete and return as-is.
+				if (!response.body) {
+					self.pushUpdate({
+						id: entry.id,
+						state: "complete",
+						durationMs: entry.durationMs,
+					});
+					return response;
 				}
 
-				self.pushEntry(entry);
-				return response;
+				// Tee the body through a TransformStream so we observe chunks
+				// without blocking the original consumer. The renderer-facing
+				// updates fire as data flows; the actual caller continues to
+				// read the response normally.
+				const decoder = new TextDecoder("utf-8", { fatal: false });
+				let receivedBytes = 0;
+				let bodyTruncated = false;
+				const accumulated: string[] = [];
+
+				const tap = new TransformStream<Uint8Array, Uint8Array>({
+					transform(chunk, controller) {
+						try {
+							if (receivedBytes < STREAM_TOTAL_MAX) {
+								const room = STREAM_TOTAL_MAX - receivedBytes;
+								const visible =
+									chunk.byteLength <= room
+										? chunk
+										: chunk.subarray(0, room);
+								const text = decoder.decode(visible, { stream: true });
+								if (text) {
+									accumulated.push(text);
+									self.pushUpdate({
+										id: entry.id,
+										appendBody: text,
+										state: "streaming",
+									});
+								}
+								receivedBytes += visible.byteLength;
+								if (chunk.byteLength > room && !bodyTruncated) {
+									bodyTruncated = true;
+									self.pushUpdate({
+										id: entry.id,
+										appendBody: `\n…[truncated at ${STREAM_TOTAL_MAX} bytes]\n`,
+									});
+								}
+							} else if (!bodyTruncated) {
+								bodyTruncated = true;
+								self.pushUpdate({
+									id: entry.id,
+									appendBody: `\n…[truncated at ${STREAM_TOTAL_MAX} bytes]\n`,
+								});
+							}
+						} catch (err) {
+							logger.warn("stream tap transform failed", {
+								error: err instanceof Error ? err.message : String(err),
+							});
+						}
+						// Always forward the chunk so the real caller is unaffected.
+						controller.enqueue(chunk);
+					},
+					flush() {
+						// Drain any decoder state into one final chunk.
+						const tail = decoder.decode();
+						if (tail) {
+							accumulated.push(tail);
+							self.pushUpdate({
+								id: entry.id,
+								appendBody: tail,
+							});
+						}
+						// Persist the final body preview on the canonical entry so
+						// later refetches via getEntries() include it.
+						const fullBody = accumulated.join("");
+						entry.responseBodyPreview = self.truncateBody(fullBody);
+						entry.durationMs = Math.round(performance.now() - startTime);
+						entry.state = "complete";
+						self.pushUpdate({
+							id: entry.id,
+							state: "complete",
+							durationMs: entry.durationMs,
+						});
+					},
+				});
+
+				const tapped = response.body.pipeThrough(tap);
+				// Return a new Response that wraps the teed stream. Status,
+				// headers, etc. are preserved.
+				return new Response(tapped, {
+					status: response.status,
+					statusText: response.statusText,
+					headers: response.headers,
+				});
 			} catch (error) {
 				entry.durationMs = Math.round(performance.now() - startTime);
 				entry.error = error instanceof Error ? error.message : String(error);
-				self.pushEntry(entry);
+				entry.state = "error";
+				if (!self.entries.includes(entry)) {
+					self.pushEntry(entry);
+				} else {
+					self.pushUpdate({
+						id: entry.id,
+						state: "error",
+						durationMs: entry.durationMs,
+						error: entry.error,
+					});
+				}
 				throw error;
 			}
 		};
+	}
+
+	/**
+	 * Convert Fetch `Headers` to a plain lower-cased object with sensitive
+	 * values masked. Lower-casing keys avoids casing surprises in the UI.
+	 */
+	private headersToObject(headers: Headers): Record<string, string> {
+		const out: Record<string, string> = {};
+		headers.forEach((value, key) => {
+			out[key.toLowerCase()] = this.maskSensitiveHeader(key, value);
+		});
+		return out;
 	}
 
 	// ============ axios interceptor ============
@@ -130,7 +285,9 @@ export class RequestLogService extends EventEmitter {
 					timestamp: Date.now(),
 					method: (config.method || "GET").toUpperCase(),
 					url,
-					requestHeaders: self.sanitizeHeaders(config.headers as Record<string, string>),
+					requestHeaders: self.sanitizeHeaders(
+						config.headers as Record<string, string>,
+					),
 					requestBodyPreview: self.truncateBody(config.data),
 					durationMs: 0,
 					source: "axios",
@@ -156,7 +313,20 @@ export class RequestLogService extends EventEmitter {
 					entry.durationMs = Math.round(performance.now() - startTime);
 					entry.responseStatus = response.status;
 					entry.responseStatusText = response.statusText;
+					const headers = response.headers ?? {};
+					entry.responseHeaders = self.sanitizeHeaders(
+						headers as Record<string, string>,
+					);
+					entry.contentType =
+						typeof headers === "object" &&
+						headers &&
+						"content-type" in headers
+							? String((headers as Record<string, string>)["content-type"])
+									.toLowerCase()
+									.split(";")[0]
+							: undefined;
 					entry.responseBodyPreview = self.truncateBody(response.data);
+					entry.state = "complete";
 					self.pushEntry(entry);
 				}
 				return response;
@@ -172,6 +342,7 @@ export class RequestLogService extends EventEmitter {
 					entry.responseStatusText = error?.response?.statusText;
 					entry.responseBodyPreview = self.truncateBody(error?.response?.data);
 					entry.error = error instanceof Error ? error.message : String(error);
+					entry.state = "error";
 					self.pushEntry(entry);
 				}
 				return Promise.reject(error);
@@ -271,7 +442,7 @@ export class RequestLogService extends EventEmitter {
 		}
 
 		if (str.length > BODY_PREVIEW_MAX) {
-			return `${str.slice(0, BODY_PREVIEW_MAX)}... (${str.length} bytes total)`;
+			return `${str.slice(0, BODY_PREVIEW_MAX)}…[preview capped at ${BODY_PREVIEW_MAX} bytes of ${str.length}]`;
 		}
 		return str;
 	}
@@ -288,6 +459,48 @@ export class RequestLogService extends EventEmitter {
 		broadcastEvent("network:request-log-entry", entry);
 
 		this.emit("entry", entry);
+	}
+
+	/**
+	 * Broadcast an incremental update for an already-pushed entry. Renderer
+	 * matches by `id` and merges fields locally (appending `appendBody`).
+	 *
+	 * We also keep `this.entries` in sync so that a late-arriving renderer
+	 * pulling `getEntries()` sees the latest state.
+	 */
+	private pushUpdate(update: RequestLogEntryUpdate): void {
+		const target = this.entries.find((e) => e.id === update.id);
+		if (target) {
+			if (update.state) target.state = update.state;
+			if (update.responseStatus !== undefined) {
+				target.responseStatus = update.responseStatus;
+			}
+			if (update.responseStatusText !== undefined) {
+				target.responseStatusText = update.responseStatusText;
+			}
+			if (update.responseHeaders) {
+				target.responseHeaders = update.responseHeaders;
+			}
+			if (update.contentType) target.contentType = update.contentType;
+			if (typeof update.isStreaming === "boolean") {
+				target.isStreaming = update.isStreaming;
+			}
+			if (typeof update.durationMs === "number") {
+				target.durationMs = update.durationMs;
+			}
+			if (update.error) target.error = update.error;
+			if (update.appendBody) {
+				const existing = target.responseBodyPreview ?? "";
+				const next = existing + update.appendBody;
+				target.responseBodyPreview =
+					next.length > BODY_PREVIEW_MAX
+						? `${next.slice(0, BODY_PREVIEW_MAX)}…[preview capped at ${BODY_PREVIEW_MAX} bytes]`
+						: next;
+			}
+		}
+
+		broadcastEvent("network:request-log-update", update);
+		this.emit("update", update);
 	}
 }
 

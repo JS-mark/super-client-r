@@ -17,6 +17,10 @@ import { homedir } from "os";
 import { join } from "path";
 import { registerIpcHandlers } from "./ipc";
 import {
+	bootstrapAgentRuntime,
+	disposeAgentRuntime,
+} from "./services/agent/runtime/bootstrap";
+import {
 	setFloatingWindow,
 	setLogViewerOpener,
 	setIMBotService,
@@ -38,12 +42,19 @@ import {
 } from "./services/protocolService";
 import { getSkillService } from "./services/skill/SkillService";
 import { conversationStorage } from "./services/chat/ConversationStorageService";
+import { initializeProjectStorage } from "./services/storage/ProjectStorageService";
+import {
+	initializeSessionStorage,
+	getSessionStorage,
+} from "./services/storage/SessionStorageService";
+import { initializeLegacyImporter } from "./services/storage/LegacyImporter";
 import { storeManager } from "./store/StoreManager";
 import { updateService } from "./services/updateService";
 import { logger } from "./utils/logger";
 import { internalMcpService } from "./services/mcp/internal";
 import { mcpService } from "./services/mcp/McpService";
 import { appConfigService } from "./services/config/AppConfigService";
+import { ptyService } from "./services/pty/PtyService";
 
 // 仅在开发环境禁用沙箱以避免 "Operation not permitted" 错误
 // 生产环境启用沙箱以提高安全性
@@ -99,8 +110,8 @@ function createWindow(): void {
 	mainWindow = new BrowserWindow({
 		width: 1024,
 		height: 750,
-    minWidth: 1024,
-    minHeight: 750,
+		minWidth: 1024,
+		minHeight: 750,
 		show: false, // 延迟显示，避免闪烁
 		icon: getAppIconPath(),
 		frame: false, // 隐藏默认标题栏，使用自定义标题栏
@@ -387,6 +398,14 @@ function createMenu(): void {
 							createLogViewerWindow();
 						},
 					},
+					{
+						label: "网络请求日志",
+						accelerator: "CommandOrControl+Shift+N",
+						click: () => {
+							mainWindow?.show();
+							mainWindow?.webContents.send("network:open-log-drawer");
+						},
+					},
 					{ type: "separator" },
 					{
 						label: "发送反馈",
@@ -442,6 +461,20 @@ function registerWindowHandlers(): void {
  * 应用就绪
  */
 app.whenReady().then(async () => {
+	// macOS / Linux GUI 进程从 Finder/Dock 启动时拿到的 PATH 极简（不含
+	// /usr/local/bin、/opt/homebrew/bin、/opt/local/bin 等），会导致后续
+	// execFile("git", ...) 等命令 ENOENT，UI 显示「非 git 仓库」之类的误报。
+	// 在 whenReady 最前面、任何依赖 PATH 的 service 启动之前修一次。
+	// fix-path v5 是 ESM-only，main bundle 是 CJS，所以必须走动态 import。
+	if (process.platform !== "win32") {
+		try {
+			const { default: fixPath } = await import("fix-path");
+			fixPath();
+		} catch (err) {
+			logger.warn("[fix-path] failed to extend PATH", err);
+		}
+	}
+
 	// Initialize log database before anything else
 	logDatabaseService.initialize();
 
@@ -460,11 +493,58 @@ app.whenReady().then(async () => {
 		logger.warn("Failed to initialize app config, using defaults", error);
 	});
 
-	// Initialize per-conversation storage (runs migration from legacy chat-history.json)
+	// E-7: ConversationStorageService 仍被 main 端 5 个 runtime 服务（SessionRuntimeResolver
+	// / AttachmentContextResolver / ApprovalGrantStore / RemoteChatBridge / conversationCwd）
+	// 用作"目录工具"层；保留 initialize 但不再走旧 chat.* IPC（已删）。
 	conversationStorage.initialize();
+
+	// Project / session storage —— project-session-redesign 主存储。
+	const psBaseDir = join(app.getPath("userData"), "super-client");
+	const psUserId = conversationStorage.getCurrentUserDir();
+	const projectStorage = initializeProjectStorage(psBaseDir, psUserId);
+	const sessionStorage = initializeSessionStorage(
+		psBaseDir,
+		psUserId,
+		projectStorage,
+	);
+
+	// Crash recovery sweep: if the previous run crashed / was killed
+	// mid-tool-execution, the jsonl will have a `tool_call` with no matching
+	// `tool_result`. The renderer reducer leaves such tool calls in
+	// "pending" / "执行中..." forever. Seal them now with a synthetic
+	// `tool_result(isError: true)` so the UI loads in a consistent terminal
+	// state. Best-effort: errors are logged but don't block app startup.
+	try {
+		const swept = sessionStorage.sealAllInflightToolCalls(
+			"中断：应用未正常退出（上次会话被强制结束）",
+		);
+		if (swept.toolCalls > 0) {
+			logger.warn(
+				`Crash recovery: sealed ${swept.toolCalls} in-flight tool call(s) across ${swept.sessions} session(s)`,
+			);
+		}
+		if (swept.errors > 0) {
+			logger.warn(
+				`Crash recovery: ${swept.errors} session(s) failed to sweep (jsonl corrupt?)`,
+			);
+		}
+	} catch (error) {
+		logger.error(
+			"Crash recovery sweep failed",
+			error instanceof Error ? error : new Error(String(error)),
+		);
+	}
+
+	// G-3 老数据导入器：detect 在启动时就绪，import 由 renderer Modal 触发。
+	initializeLegacyImporter(getSessionStorage(), storeManager, psUserId);
 
 	// 启动本地服务
 	await localServer.start();
+
+	// 启动 AgentRuntime 适配层（spec: 2026-06-21-agent-runtime-adapter-design）
+	// 必须在 IPC handlers 注册之前——handler 依赖 registry / collector 单例
+	bootstrapAgentRuntime();
+	logger.info("AgentRuntime registry + trace collector booted");
 
 	// 注册 IPC 处理器
 	registerIpcHandlers();
@@ -637,14 +717,57 @@ app.on("before-quit", () => {
 	internalMcpService.cleanup().catch((error) => {
 		logger.error("Failed to cleanup internal MCP servers", error);
 	});
+
+	// 关闭 AgentRuntime 适配层（trace sniffer / registry / collector）
+	disposeAgentRuntime().catch((error) => {
+		logger.error("Failed to dispose AgentRuntime", error);
+	});
+
+	// 关闭所有 pty 终端会话
+	try {
+		ptyService.disposeAll();
+	} catch (error) {
+		logger.error(
+			"Failed to dispose pty sessions",
+			error instanceof Error ? error : undefined,
+		);
+	}
+
 	logDatabaseService.close();
 });
+
+/**
+ * Best-effort: when an unhandled error reaches the main process we may be on
+ * the way to crashing. Try to seal any in-flight tool calls synchronously so
+ * the next launch doesn't re-show "执行中..." for tools that were torn down
+ * with the process. All I/O is wrapped — we never let the seal itself throw.
+ *
+ * Note: the startup sweep on the next launch is the real safety net. This
+ * hook just narrows the recovery window for the common case where the
+ * process actually keeps running after `uncaughtException` (Electron does
+ * not exit by default).
+ */
+function bestEffortSealInflight(reason: string): void {
+	try {
+		// SessionStorage may not be initialised yet if the crash happens very
+		// early (before whenReady resolves). Guard with try/catch.
+		const swept = getSessionStorage().sealAllInflightToolCalls(reason);
+		if (swept.toolCalls > 0) {
+			logger.warn(
+				`Best-effort seal on crash hook: ${swept.toolCalls} tool call(s) sealed across ${swept.sessions} session(s)`,
+			);
+		}
+	} catch {
+		// Ignore — startup sweep on next launch will catch anything missed.
+	}
+}
 
 /**
  * 处理未捕获的异常
  */
 process.on("uncaughtException", (error) => {
 	logger.error("Uncaught exception", error);
+	bestEffortSealInflight("中断：主进程未捕获异常");
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -652,4 +775,5 @@ process.on("unhandledRejection", (reason) => {
 		"Unhandled rejection",
 		reason instanceof Error ? reason : new Error(String(reason)),
 	);
+	bestEffortSealInflight("中断：主进程 Promise 拒绝未处理");
 });

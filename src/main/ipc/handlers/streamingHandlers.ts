@@ -13,18 +13,17 @@ import type { IpcMainInvokeEvent } from "electron";
 import { ipcMain } from "electron";
 import { agentService } from "../../services/agent/AgentService";
 import { agentSDKService } from "../../services/agent/AgentSDKService";
+import { logger } from "../../utils/logger";
 import type { AgentStreamEvent, AgentSDKQueryRequest } from "../types";
+
+const log = logger.withContext("AgentSDKIPC");
 
 export function registerStreamingHandlers(): void {
 	// ─── Agent: sendMessage ──────────────────
 	// 流式转发 agent events 到发起请求的 renderer
 	ipcMain.handle(
 		"agent:send-message",
-		async (
-			_event: IpcMainInvokeEvent,
-			sessionId: string,
-			content: string,
-		) => {
+		async (_event: IpcMainInvokeEvent, sessionId: string, content: string) => {
 			try {
 				const events: AgentStreamEvent[] = [];
 
@@ -56,8 +55,26 @@ export function registerStreamingHandlers(): void {
 			request: AgentSDKQueryRequest,
 		) => {
 			try {
+				log.info("agent-sdk:create-query received", {
+					requestId,
+					sessionId: request.sessionId,
+					resumeSessionId: request.resumeSessionId,
+					cwd: request.cwd,
+					model: request.model,
+					providerId: request.providerId,
+					mcpServerCount: request.mcpServerNames?.length ?? 0,
+					promptLength: request.prompt.length,
+				});
 				const onStreamEvent = (event: { requestId: string }) => {
 					if (event.requestId === requestId) {
+						const typed = event as { type?: string; error?: string };
+						if (typed.type && typed.type !== "chunk") {
+							log.info("agent-sdk:stream-event forwarded", {
+								requestId,
+								type: typed.type,
+								error: typed.error,
+							});
+						}
 						_event.sender.send("agent-sdk:stream-event", event);
 					}
 				};
@@ -65,21 +82,20 @@ export function registerStreamingHandlers(): void {
 				agentSDKService.on("stream-event", onStreamEvent);
 
 				// 异步执行查询（不等待完成）
-				agentSDKService
-					.createQuery(requestId, request)
-					.finally(() => {
-						agentSDKService.removeListener(
-							"stream-event",
-							onStreamEvent,
-						);
-					});
+				agentSDKService.createQuery(requestId, request).finally(() => {
+					log.info("agent-sdk:create-query finished", { requestId });
+					agentSDKService.removeListener("stream-event", onStreamEvent);
+				});
 
 				return { success: true, data: { requestId } };
 			} catch (error) {
 				const message =
-					error instanceof Error
-						? error.message
-						: "Failed to create query";
+					error instanceof Error ? error.message : "Failed to create query";
+				log.error(
+					"agent-sdk:create-query handler failed",
+					error instanceof Error ? error : undefined,
+					{ requestId, error: message },
+				);
 				return { success: false, error: message };
 			}
 		},

@@ -12,9 +12,64 @@ import type {
 	TestConnectionResponse,
 	ToolPermissionConfig,
 } from "../../ipc/types";
+import { getApprovalGrantStore } from "../runtime/ApprovalGrantStore";
+import { getRuntimePolicyService } from "../runtime/RuntimePolicyService";
+import { getSessionRuntimeResolver } from "../runtime/SessionRuntimeResolver";
 import { normalizeModels } from "./modelNormalizer";
+import type {
+	PlanMode,
+	RuntimeOperationKind,
+} from "@super-client/shared-types/chat";
 
 const MAX_TOOL_ROUNDS = 10;
+
+// ─── Runtime policy audit helpers (private) ──────────────────────────────────
+
+function classifyToolKind(toolName: string): RuntimeOperationKind {
+	// toolName might be prefixed (e.g. "@scp/file-system:write_file") or bare.
+	const bare = toolName.includes(":")
+		? (toolName.split(":").pop() ?? toolName)
+		: toolName;
+	if (
+		bare.includes("write") ||
+		bare.includes("create_file") ||
+		bare.includes("edit")
+	)
+		return "file-write";
+	if (bare.includes("delete") || bare.includes("remove")) return "file-delete";
+	if (bare.includes("read") || bare.includes("list") || bare.includes("info"))
+		return "file-read";
+	if (bare === "bash" || bare === "exec" || bare.includes("execute"))
+		return "command-exec";
+	if (
+		bare.includes("fetch") ||
+		bare.includes("request") ||
+		bare.includes("http")
+	)
+		return "network-request";
+	return "tool-execute";
+}
+
+function extractTarget(_toolName: string, args: unknown): string | undefined {
+	if (!args || typeof args !== "object") return undefined;
+	const obj = args as Record<string, unknown>;
+	for (const key of ["path", "file", "filePath", "filename", "url"]) {
+		if (typeof obj[key] === "string") return obj[key] as string;
+	}
+	return undefined;
+}
+
+function safeParseArgs(raw: string | undefined): Record<string, unknown> {
+	if (!raw) return {};
+	try {
+		const parsed = JSON.parse(raw);
+		return parsed && typeof parsed === "object"
+			? (parsed as Record<string, unknown>)
+			: {};
+	} catch {
+		return {};
+	}
+}
 
 export type ToolExecutor = (
 	name: string,
@@ -95,7 +150,39 @@ ${toolDescriptions}`;
  * Pattern that matches <tool_call>…</tool_call> or <tool_use>…</tool_use>
  * (case-insensitive).
  */
-const TOOL_BLOCK_RE = /<(tool_call|tool_use)>\s*([\s\S]*?)\s*<\/\1>/gi;
+const TOOL_BLOCK_RE =
+	/(?:<\s*)?(tool_call|tool_use)\s*>\s*([\s\S]*?)(?:<\s*\/\s*\1\s*>|$)/gi;
+
+function extractJsonObject(raw: string): string {
+	const start = raw.indexOf("{");
+	if (start < 0) return raw.trim();
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = start; i < raw.length; i += 1) {
+		const ch = raw[i];
+		if (inString) {
+			if (escaped) {
+				escaped = false;
+			} else if (ch === "\\") {
+				escaped = true;
+			} else if (ch === '"') {
+				inString = false;
+			}
+			continue;
+		}
+		if (ch === '"') {
+			inString = true;
+			continue;
+		}
+		if (ch === "{") depth += 1;
+		if (ch === "}") {
+			depth -= 1;
+			if (depth === 0) return raw.slice(start, i + 1);
+		}
+	}
+	return raw.slice(start).trim();
+}
 
 /**
  * Try to extract a valid tool call from a raw JSON string found inside
@@ -104,7 +191,7 @@ const TOOL_BLOCK_RE = /<(tool_call|tool_use)>\s*([\s\S]*?)\s*<\/\1>/gi;
 function tryParseToolPayload(raw: string, idx: number): ParsedToolCall | null {
 	let obj: Record<string, unknown>;
 	try {
-		obj = JSON.parse(raw);
+		obj = JSON.parse(extractJsonObject(raw));
 	} catch {
 		return null;
 	}
@@ -168,7 +255,42 @@ function parseToolCallsFromText(text: string): {
  * Quick check: does the text contain any tool invocation blocks?
  */
 function hasToolBlocks(text: string): boolean {
-	return /<(?:tool_call|tool_use)>/i.test(text);
+	TOOL_BLOCK_RE.lastIndex = 0;
+	return TOOL_BLOCK_RE.test(text);
+}
+
+function createToolOutcomeEvent(params: {
+	requestId: string;
+	toolCallId: string;
+	name: string;
+	result: unknown;
+	isError: boolean;
+	duration?: number;
+	code?: string;
+}): ChatStreamEvent {
+	if (params.isError) {
+		return {
+			requestId: params.requestId,
+			type: "tool_error",
+			toolError: {
+				toolCallId: params.toolCallId,
+				name: params.name,
+				error: params.result,
+				code: params.code,
+				duration: params.duration,
+			},
+		};
+	}
+	return {
+		requestId: params.requestId,
+		type: "tool_result",
+		toolResult: {
+			toolCallId: params.toolCallId,
+			name: params.name,
+			result: params.result,
+			duration: params.duration,
+		},
+	};
 }
 
 export class LLMService {
@@ -204,6 +326,7 @@ export class LLMService {
 		toolCallId: string,
 		toolName: string,
 		toolArgs: string,
+		conversationId?: string,
 	): Promise<boolean> {
 		if (!permission || permission.mode === "auto") return true;
 		if (permission.mode === "none") return false;
@@ -213,15 +336,36 @@ export class LLMService {
 		) {
 			return true;
 		}
+		// Consult existing approval grants before prompting the user.
+		const operationType = `tool:${toolName}`;
+		if (conversationId) {
+			const grant = getApprovalGrantStore().findGrant({
+				conversationId,
+				operationType,
+			});
+			if (grant) {
+				return true;
+			}
+		}
 		// approve_always or approve_except_authorized with unauthorized tool
 		this.broadcast({
 			requestId,
 			type: "tool_approval_request",
 			toolApproval: { toolCallId, name: toolName, arguments: toolArgs },
 		});
-		return new Promise<boolean>((resolve) => {
+		const approved = await new Promise<boolean>((resolve) => {
 			this.pendingApprovals.set(toolCallId, { resolve });
 		});
+		if (!approved && conversationId) {
+			getApprovalGrantStore().recordDeny(
+				conversationId,
+				"",
+				operationType,
+				undefined,
+				"user-rejected",
+			);
+		}
+		return approved;
 	}
 
 	/**
@@ -283,10 +427,108 @@ export class LLMService {
 		return normalizeModels(rawModels, preset);
 	}
 
-	async chatCompletion(
+	/**
+	 * R-5 — Plan-mode gate.
+	 *
+	 * Runs before the provider-specific chat-completion path. When the session's
+	 * `planMode` is `plan-only`, we:
+	 *   - drop the tool list and toolExecutor so the model cannot call tools
+	 *   - prepend a one-line instruction to the system message so the model
+	 *     understands it should describe a plan without invoking anything
+	 *   - record a single audit deny so the gate is observable in the runtime
+	 *     inspector
+	 *
+	 * Other plan modes (`chat`, `plan-then-ask`, `auto-execute-safe`,
+	 * `full-agent`) are informational at this stage; the chip writes them to
+	 * conversation metadata and the resolver exposes them, but nothing is gated
+	 * here. Their enforcement is a separate task.
+	 */
+	private applyPlanModeGate(
 		request: ChatCompletionRequest,
-		toolExecutor?: ToolExecutor,
+		toolExecutor: ToolExecutor | undefined,
+	): {
+		request: ChatCompletionRequest;
+		toolExecutor: ToolExecutor | undefined;
+	} {
+		const sessionId = request.conversationId;
+		if (!sessionId) {
+			return { request, toolExecutor };
+		}
+		let planMode: PlanMode = "chat";
+		try {
+			const runtime = getSessionRuntimeResolver().resolve({ sessionId });
+			planMode = runtime.planMode;
+		} catch {
+			// Resolver failure is non-fatal — treat as "chat" so legacy paths
+			// keep working. The audit log will still see no deny here.
+			return { request, toolExecutor };
+		}
+
+		if (planMode !== "plan-only") {
+			return { request, toolExecutor };
+		}
+
+		// Audit-record the gate firing once per request.
+		try {
+			getRuntimePolicyService().record(
+				{
+					workspaceId: "",
+					sessionId,
+					source: "llm",
+					operation: "plan-mode:strip-tools",
+					kind: "tool-execute",
+				},
+				"denied",
+				"plan-only-mode",
+			);
+		} catch {
+			/* never let audit failure block the user */
+		}
+
+		// Prepend a system note so the model knows to plan, not act.
+		const PLAN_NOTE =
+			"You are in PLAN ONLY mode. Describe the plan you would carry out, but do NOT call any tools. If tool input is needed for planning, list the calls and arguments you would make in prose.";
+		const messages = request.messages.slice();
+		const first = messages[0];
+		if (
+			first &&
+			(first as { role?: string }).role === "system" &&
+			typeof (first as { content?: unknown }).content === "string"
+		) {
+			messages[0] = {
+				...(first as object),
+				content: `${PLAN_NOTE}\n\n${(first as { content: string }).content}`,
+			} as ChatCompletionRequest["messages"][number];
+		} else {
+			messages.unshift({
+				role: "system",
+				content: PLAN_NOTE,
+			} as ChatCompletionRequest["messages"][number]);
+		}
+
+		return {
+			request: {
+				...request,
+				messages,
+				tools: undefined,
+				toolMapping: undefined,
+				toolPermission: undefined,
+			},
+			toolExecutor: undefined,
+		};
+	}
+
+	async chatCompletion(
+		rawRequest: ChatCompletionRequest,
+		rawToolExecutor?: ToolExecutor,
 	): Promise<void> {
+		// R-5: enforce `plan-only` plan mode by stripping tools before either
+		// provider path runs. Model plans in prose; nothing executes. Audit log
+		// records the deny so users can verify the gate fired.
+		const gated = this.applyPlanModeGate(rawRequest, rawToolExecutor);
+		const request = gated.request;
+		const toolExecutor = gated.toolExecutor;
+
 		if (request.providerPreset === "anthropic") {
 			return this.chatCompletionAnthropic(request, toolExecutor);
 		}
@@ -579,28 +821,39 @@ export class LLMService {
 							tc.id,
 							tc.function.name,
 							tc.function.arguments,
+							request.conversationId,
 						);
 
 						let toolResult: unknown;
 						let isError = false;
 
-						if (!approved) {
-							isError = true;
-							toolResult = "Tool call was rejected by user.";
-							this.broadcast({
-								requestId: request.requestId,
-								type: "tool_rejected",
-								toolResult: {
+							if (!approved) {
+								isError = true;
+								toolResult = "Tool call was rejected by user.";
+								this.broadcast(createToolOutcomeEvent({
+									requestId: request.requestId,
 									toolCallId: tc.id,
 									name: tc.function.name,
 									result: toolResult,
 									isError: true,
+									code: "TOOL_REJECTED",
+								}));
+							} else {
+							const parsedArgs = safeParseArgs(tc.function.arguments);
+							getRuntimePolicyService().record(
+								{
+									workspaceId: "",
+									sessionId: request.conversationId,
+									source: "llm",
+									operation: tc.function.name,
+									kind: classifyToolKind(tc.function.name),
+									target: extractTarget(tc.function.name, parsedArgs),
+									input: parsedArgs,
 								},
-							});
-						} else {
+								"audit-only",
+							);
 							const toolStart = Date.now();
 							try {
-								const parsedArgs = JSON.parse(tc.function.arguments || "{}");
 								toolResult = await toolExecutor(tc.function.name, parsedArgs);
 							} catch (err) {
 								isError = true;
@@ -608,19 +861,15 @@ export class LLMService {
 							}
 							const toolDuration = Date.now() - toolStart;
 
-							// Broadcast tool_result event
-							this.broadcast({
-								requestId: request.requestId,
-								type: "tool_result",
-								toolResult: {
+								this.broadcast(createToolOutcomeEvent({
+									requestId: request.requestId,
 									toolCallId: tc.id,
 									name: tc.function.name,
 									result: toolResult,
 									isError,
 									duration: toolDuration,
-								},
-							});
-						}
+								}));
+							}
 
 						// Append tool result message to conversation
 						conversationMessages.push({
@@ -646,7 +895,7 @@ export class LLMService {
 						// Add assistant message (with clean text) to conversation
 						conversationMessages.push({
 							role: "assistant",
-							content: accumulatedContent,
+							content: cleanText,
 						} as ChatCompletionMessageParam);
 
 						const toolResultParts: string[] = [];
@@ -672,25 +921,36 @@ export class LLMService {
 								tc.id,
 								tc.name,
 								JSON.stringify(tc.arguments),
+								request.conversationId,
 							);
 
 							let toolResult: unknown;
 							let isError = false;
 
-							if (!approved) {
-								isError = true;
-								toolResult = "Tool call was rejected by user.";
-								this.broadcast({
-									requestId: request.requestId,
-									type: "tool_rejected",
-									toolResult: {
+								if (!approved) {
+									isError = true;
+									toolResult = "Tool call was rejected by user.";
+									this.broadcast(createToolOutcomeEvent({
+										requestId: request.requestId,
 										toolCallId: tc.id,
 										name: tc.name,
 										result: toolResult,
 										isError: true,
+										code: "TOOL_REJECTED",
+									}));
+								} else {
+								getRuntimePolicyService().record(
+									{
+										workspaceId: "",
+										sessionId: request.conversationId,
+										source: "llm",
+										operation: tc.name,
+										kind: classifyToolKind(tc.name),
+										target: extractTarget(tc.name, tc.arguments),
+										input: tc.arguments,
 									},
-								});
-							} else {
+									"audit-only",
+								);
 								const toolStart = Date.now();
 								try {
 									toolResult = await toolExecutor(tc.name, tc.arguments);
@@ -700,18 +960,15 @@ export class LLMService {
 								}
 								const toolDuration = Date.now() - toolStart;
 
-								this.broadcast({
-									requestId: request.requestId,
-									type: "tool_result",
-									toolResult: {
+									this.broadcast(createToolOutcomeEvent({
+										requestId: request.requestId,
 										toolCallId: tc.id,
 										name: tc.name,
 										result: toolResult,
 										isError,
 										duration: toolDuration,
-									},
-								});
-							}
+									}));
+								}
 
 							const resultStr =
 								typeof toolResult === "string"
@@ -801,33 +1058,81 @@ export class LLMService {
 		const hasTools = request.tools && request.tools.length > 0 && toolExecutor;
 
 		// Convert OpenAI-format messages to Anthropic format
-		// Extract system prompt and convert message roles
+		// - system messages are concatenated into `systemPrompt` (Anthropic top-level field)
+		// - assistant.tool_calls become `tool_use` content blocks
+		// - role:"tool" messages become `tool_result` blocks, coalesced into a single
+		//   user turn alongside any consecutive tool results (Anthropic groups
+		//   multiple tool_results in one user message)
 		let systemPrompt: string | undefined;
 		const anthropicMessages: Anthropic.MessageParam[] = [];
 
+		const appendToolResult = (block: Anthropic.ToolResultBlockParam) => {
+			const last = anthropicMessages[anthropicMessages.length - 1];
+			if (last && last.role === "user" && Array.isArray(last.content)) {
+				(last.content as Anthropic.ContentBlockParam[]).push(block);
+			} else {
+				anthropicMessages.push({ role: "user", content: [block] });
+			}
+		};
+
 		for (const msg of request.messages) {
-			if (
-				"role" in msg &&
-				msg.role === "system" &&
-				"content" in msg &&
-				typeof msg.content === "string"
-			) {
-				// Concatenate system messages
+			if (!("role" in msg)) continue;
+
+			if (msg.role === "system" && typeof msg.content === "string") {
 				systemPrompt = systemPrompt
 					? `${systemPrompt}\n\n${msg.content}`
 					: msg.content;
-			} else if (
-				"role" in msg &&
-				(msg.role === "user" || msg.role === "assistant") &&
-				"content" in msg &&
-				typeof msg.content === "string"
-			) {
-				anthropicMessages.push({
-					role: msg.role,
+				continue;
+			}
+
+			if (msg.role === "tool" && "tool_call_id" in msg) {
+				appendToolResult({
+					type: "tool_result",
+					tool_use_id: msg.tool_call_id,
 					content: msg.content,
 				});
+				continue;
 			}
-			// Skip tool/tool_calls messages from history — fresh conversation
+
+			if (msg.role === "assistant") {
+				const blocks: Anthropic.ContentBlockParam[] = [];
+				if (typeof msg.content === "string" && msg.content) {
+					blocks.push({ type: "text", text: msg.content });
+				}
+				const toolCalls =
+					"tool_calls" in msg && Array.isArray(msg.tool_calls)
+						? msg.tool_calls
+						: undefined;
+				if (toolCalls) {
+					for (const tc of toolCalls) {
+						if (tc.type !== "function") continue;
+						let input: Record<string, unknown> = {};
+						try {
+							input = tc.function.arguments
+								? (JSON.parse(tc.function.arguments) as Record<string, unknown>)
+								: {};
+						} catch {
+							/* fall back to empty input */
+						}
+						blocks.push({
+							type: "tool_use",
+							id: tc.id,
+							name: tc.function.name,
+							input,
+						});
+					}
+				}
+				if (blocks.length > 0) {
+					anthropicMessages.push({ role: "assistant", content: blocks });
+				}
+				continue;
+			}
+
+			if (msg.role === "user" && typeof msg.content === "string") {
+				anthropicMessages.push({ role: "user", content: msg.content });
+				continue;
+			}
+			// Other shapes (e.g. multi-modal user content arrays) are not yet handled.
 		}
 
 		// Convert OpenAI tools format to Anthropic tools format
@@ -847,11 +1152,13 @@ export class LLMService {
 			for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
 				if (controller.signal.aborted) break;
 
-				const createParams: Anthropic.MessageCreateParamsStreaming = {
+				// `messages.stream()` accepts MessageStreamParams (same shape as
+				// MessageCreateParams but without the `stream` discriminator — the
+				// helper is stream-only by construction).
+				const createParams: Anthropic.MessageStreamParams = {
 					model: request.model,
 					max_tokens: request.maxTokens ?? 4096,
 					messages: anthropicMessages,
-					stream: true,
 				};
 
 				if (systemPrompt) {
@@ -991,25 +1298,40 @@ export class LLMService {
 							tb.id,
 							tb.name,
 							JSON.stringify(tb.input),
+							request.conversationId,
 						);
 
 						let toolResult: unknown;
 						let isError = false;
 
-						if (!approved) {
-							isError = true;
-							toolResult = "Tool call was rejected by user.";
-							this.broadcast({
-								requestId: request.requestId,
-								type: "tool_rejected",
-								toolResult: {
+							if (!approved) {
+								isError = true;
+								toolResult = "Tool call was rejected by user.";
+								this.broadcast(createToolOutcomeEvent({
+									requestId: request.requestId,
 									toolCallId: tb.id,
 									name: tb.name,
 									result: toolResult,
 									isError: true,
+									code: "TOOL_REJECTED",
+								}));
+							} else {
+							const tbInputObj =
+								tb.input && typeof tb.input === "object"
+									? (tb.input as Record<string, unknown>)
+									: {};
+							getRuntimePolicyService().record(
+								{
+									workspaceId: "",
+									sessionId: request.conversationId,
+									source: "llm",
+									operation: tb.name,
+									kind: classifyToolKind(tb.name),
+									target: extractTarget(tb.name, tbInputObj),
+									input: tbInputObj,
 								},
-							});
-						} else {
+								"audit-only",
+							);
 							const toolStart = Date.now();
 							try {
 								toolResult = await toolExecutor(tb.name, tb.input);
@@ -1019,19 +1341,15 @@ export class LLMService {
 							}
 							const toolDuration = Date.now() - toolStart;
 
-							// Broadcast tool_result event
-							this.broadcast({
-								requestId: request.requestId,
-								type: "tool_result",
-								toolResult: {
+								this.broadcast(createToolOutcomeEvent({
+									requestId: request.requestId,
 									toolCallId: tb.id,
 									name: tb.name,
 									result: toolResult,
 									isError,
 									duration: toolDuration,
-								},
-							});
-						}
+								}));
+							}
 
 						toolResults.push({
 							type: "tool_result",

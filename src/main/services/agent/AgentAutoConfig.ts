@@ -57,6 +57,29 @@ const TASK_PROFILES: Record<AgentSDKTaskType, TaskProfile> = {
 /** 默认配置（fallback） */
 const DEFAULT_PROFILE = TASK_PROFILES.chat;
 
+/**
+ * Agent SDK runs the Claude Code tool protocol. Non-Claude chat models can
+ * answer text through compatible gateways, but they usually do not emit
+ * tool_use blocks, so treating them as Agent models silently disables tools.
+ */
+export function isAgentToolCompatibleModel(modelId?: string): boolean {
+	if (!modelId) return false;
+	const id = modelId.toLowerCase();
+	return (
+		id.includes("claude") ||
+		id.includes("anthropic/") ||
+		id.includes("sonnet") ||
+		id.includes("opus") ||
+		id.includes("haiku")
+	);
+}
+
+export function firstAgentCompatibleModel(
+	...candidates: Array<string | undefined>
+): string | undefined {
+	return candidates.find(isAgentToolCompatibleModel);
+}
+
 /** 代码相关关键词 */
 const CODING_KEYWORDS =
 	/\b(debug|fix|implement|refactor|code|function|class|component|test|bug|error|compile|build|deploy|api|endpoint|migration|schema)\b/i;
@@ -120,15 +143,22 @@ export function resolveOptimalConfig(
 	const profile = TASK_PROFILES[taskType] || DEFAULT_PROFILE;
 
 	return {
-		// 优先级: request 显式值 > Agent Settings 覆盖 > Provider 模型 > 硬编码 fallback
-		model: request.model || userConfig?.defaultModel || providerModel || profile.model,
+		// 优先级: request 显式兼容值 > Provider Agent 模型 > Agent Settings 覆盖 > 硬编码 fallback
+		// 但 Agent SDK 必须使用 Claude Code tool protocol 兼容模型；否则会退化为
+		// 纯文本回答或被 Claude Code CLI 直接拒绝，工具/审批事件不会出现。
+		model:
+			firstAgentCompatibleModel(
+				request.model,
+				providerModel,
+				userConfig?.defaultModel,
+				profile.model,
+			) || profile.model,
 		effort: request.effort || userConfig?.defaultEffort || profile.effort,
 		thinking:
 			request.thinking || userConfig?.defaultThinking || profile.thinking,
 		maxTurns:
 			request.maxTurns ?? userConfig?.defaultMaxTurns ?? profile.maxTurns,
-		maxBudgetUsd:
-			request.maxBudgetUsd ?? userConfig?.defaultMaxBudgetUsd,
+		maxBudgetUsd: request.maxBudgetUsd ?? userConfig?.defaultMaxBudgetUsd,
 		persistSession: request.persistSession ?? true,
 		includePartialMessages: request.includePartialMessages ?? true,
 	};

@@ -307,7 +307,7 @@ export class AuthService {
 						reject(
 							new Error(
 								parsed.searchParams.get("error_description") ||
-								`OAuth error: ${error}`,
+									`OAuth error: ${error}`,
 							),
 						);
 						this.closeAuthWindow();

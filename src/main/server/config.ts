@@ -8,6 +8,7 @@ export const SERVER_CONFIG = {
 		"/health",
 		"/favicon.ico",
 		"/api-docs",
+		"/plugin-dev",
 		"/swagger.json",
 		"/swagger-ui/",
 		"/v1/app/init-config",

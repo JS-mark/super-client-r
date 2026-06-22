@@ -101,33 +101,21 @@ export const BUILTIN_TEAMS: AgentTeam[] = [
 		id: "builtin_fullstack",
 		name: "全栈开发",
 		description: "架构师 → 程序员 → 审查员，适用于编码任务",
-		agents: [
-			"builtin_architect",
-			"builtin_programmer",
-			"builtin_reviewer",
-		],
+		agents: ["builtin_architect", "builtin_programmer", "builtin_reviewer"],
 		isBuiltin: true,
 	},
 	{
 		id: "builtin_research",
 		name: "研究助理",
 		description: "研究员 → 分析师 → 撰稿人，适用于信息收集任务",
-		agents: [
-			"builtin_researcher",
-			"builtin_analyst",
-			"builtin_writer",
-		],
+		agents: ["builtin_researcher", "builtin_analyst", "builtin_writer"],
 		isBuiltin: true,
 	},
 	{
 		id: "builtin_creative",
 		name: "创意写作",
 		description: "策划 → 作者 → 编辑，适用于创作内容",
-		agents: [
-			"builtin_planner",
-			"builtin_author",
-			"builtin_editor",
-		],
+		agents: ["builtin_planner", "builtin_author", "builtin_editor"],
 		isBuiltin: true,
 	},
 ];

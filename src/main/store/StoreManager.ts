@@ -98,17 +98,22 @@ function normalizeWorkspaceConfig(config: WorkspaceConfig): WorkspaceConfig {
 	const defaults = createDefaultWorkspaceConfig();
 	return {
 		...config,
-		interactionProfile: isOneOf(
-			config.interactionProfile,
-			["claude-code", "codex", "hybrid"],
-		)
+		// R-1: 显式收编 icon/order，避免被 spread 接受任意类型。
+		icon: typeof config.icon === "string" ? config.icon : undefined,
+		order: typeof config.order === "number" ? config.order : undefined,
+		interactionProfile: isOneOf(config.interactionProfile, [
+			"claude-code",
+			"codex",
+			"hybrid",
+		])
 			? config.interactionProfile
 			: defaults.interactionProfile,
 		runtimePolicy: {
-			approvalMode: isOneOf(
-				config.runtimePolicy?.approvalMode,
-				["request", "auto-safe", "full-access"],
-			)
+			approvalMode: isOneOf(config.runtimePolicy?.approvalMode, [
+				"request",
+				"auto-safe",
+				"full-access",
+			])
 				? config.runtimePolicy.approvalMode
 				: defaults.runtimePolicy.approvalMode,
 			sandboxMode:
@@ -138,12 +143,7 @@ function normalizeWorkspaceConfig(config: WorkspaceConfig): WorkspaceConfig {
 		contextPolicy: {
 			defaultAttachmentMode: isOneOf(
 				config.contextPolicy?.defaultAttachmentMode,
-				[
-					"include-content",
-					"reference-only",
-					"ask-before-read",
-					"ignore",
-				],
+				["include-content", "reference-only", "ask-before-read", "ignore"],
 			)
 				? config.contextPolicy.defaultAttachmentMode
 				: defaults.contextPolicy.defaultAttachmentMode,
@@ -240,12 +240,20 @@ export interface AppConfig {
 	workspaceConfigs?: WorkspaceConfig[];
 	currentWorkspaceId?: string;
 	defaultWorkspaceId?: string;
+	workspaceBackfillDone?: boolean;
 	// App Config 缓存
 	appInitConfigCache?: {
 		config: any;
 		cachedAt: number;
 		version: string;
 	};
+	// project-session-redesign A-7 (S7) — §9.5 picker sticky 默认值。
+	newConversationDefaults?: {
+		lastKind: "casual" | "project";
+		lastProjectId?: string;
+	};
+	// project-session-redesign B-4 — runMigration 幂等 flag
+	migrationV2Done?: boolean;
 }
 
 export interface AppData {
@@ -340,9 +348,7 @@ export class StoreManager {
 		};
 		const nextConfigs =
 			existingIndex >= 0
-				? configs.map((item) =>
-						item.id === nextConfig.id ? nextConfig : item,
-					)
+				? configs.map((item) => (item.id === nextConfig.id ? nextConfig : item))
 				: [...configs, nextConfig];
 
 		this.configStore.set("workspaceConfigs", nextConfigs);
@@ -353,6 +359,78 @@ export class StoreManager {
 			this.configStore.set("currentWorkspaceId", nextConfig.id);
 		}
 		return nextConfig;
+	}
+
+	/**
+	 * One-time backfill of renderer-persisted Workspace[] into main-process
+	 * WorkspaceConfig[]. Idempotent: only runs when this main process has
+	 * never received a backfill AND the only workspace currently stored is
+	 * the auto-created default placeholder. After backfill, the renderer
+	 * store transitions to a read-through cache.
+	 *
+	 * Renderer's `defaultModel: string` cannot be safely mapped to
+	 * `ModelSelection { providerId, modelId }` without a split rule, so it
+	 * is dropped on backfill — users will reset model defaults in the new
+	 * workspace settings UI.
+	 */
+	backfillWorkspaceConfigsFromRenderer(
+		payload: Array<{
+			id: string;
+			name: string;
+			createdAt?: number;
+			updatedAt?: number;
+			icon?: string;
+			order?: number;
+		}>,
+	): { applied: boolean; reason?: string } {
+		if (this.configStore.get("workspaceBackfillDone")) {
+			return { applied: false, reason: "already-done" };
+		}
+
+		const existing = this.configStore.get("workspaceConfigs") || [];
+		const isFreshDefault =
+			existing.length === 0 ||
+			(existing.length === 1 &&
+				existing[0].id === DEFAULT_WORKSPACE_ID &&
+				existing[0].createdAt === existing[0].updatedAt);
+		if (!isFreshDefault) {
+			this.configStore.set("workspaceBackfillDone", true);
+			return { applied: false, reason: "user-data-present" };
+		}
+
+		const cleaned = payload.filter((w) => w?.id && w?.name);
+		if (cleaned.length === 0) {
+			this.configStore.set("workspaceBackfillDone", true);
+			return { applied: false, reason: "empty-payload" };
+		}
+
+		const now = Date.now();
+		const defaults = createDefaultWorkspaceConfig();
+		const configs: WorkspaceConfig[] = cleaned.map((w) => ({
+			...defaults,
+			id: w.id,
+			name: w.name,
+			icon: typeof w.icon === "string" ? w.icon : undefined,
+			order: typeof w.order === "number" ? w.order : undefined,
+			createdAt: w.createdAt || now,
+			updatedAt: w.updatedAt || now,
+		}));
+
+		// Ensure a default workspace always exists; if the renderer payload
+		// did not include one with id "default", keep the placeholder.
+		if (!configs.some((c) => c.id === DEFAULT_WORKSPACE_ID)) {
+			configs.unshift(defaults);
+		}
+
+		this.configStore.set("workspaceConfigs", configs);
+		if (!this.configStore.get("defaultWorkspaceId")) {
+			this.configStore.set("defaultWorkspaceId", configs[0].id);
+		}
+		if (!this.configStore.get("currentWorkspaceId")) {
+			this.configStore.set("currentWorkspaceId", configs[0].id);
+		}
+		this.configStore.set("workspaceBackfillDone", true);
+		return { applied: true };
 	}
 
 	deleteWorkspaceConfig(id: string): boolean {
@@ -396,7 +474,8 @@ export class StoreManager {
 		if (defaultId && this.getWorkspaceConfig(defaultId)) {
 			return defaultId;
 		}
-		const fallback = this.ensureWorkspaceConfigs()[0]?.id || DEFAULT_WORKSPACE_ID;
+		const fallback =
+			this.ensureWorkspaceConfigs()[0]?.id || DEFAULT_WORKSPACE_ID;
 		this.configStore.set("defaultWorkspaceId", fallback);
 		return fallback;
 	}
@@ -717,6 +796,36 @@ export class StoreManager {
 		this.configStore.set("agentSDKConfig", config);
 	}
 
+	// ============ project-session-redesign A-7: §9.5 picker sticky ============
+
+	getNewConversationDefaults(): {
+		lastKind: "casual" | "project";
+		lastProjectId?: string;
+	} {
+		return (
+			this.configStore.get("newConversationDefaults") || {
+				lastKind: "casual",
+			}
+		);
+	}
+
+	setNewConversationDefaults(value: {
+		lastKind: "casual" | "project";
+		lastProjectId?: string;
+	}): void {
+		this.configStore.set("newConversationDefaults", value);
+	}
+
+	// ============ project-session-redesign B-4: 迁移幂等 flag ============
+
+	isMigrationV2Done(): boolean {
+		return this.configStore.get("migrationV2Done") === true;
+	}
+
+	markMigrationV2Done(): void {
+		this.configStore.set("migrationV2Done", true);
+	}
+
 	// ============ Agent Profiles & Teams 相关 ============
 
 	getAgentProfiles(): AgentProfile[] {
@@ -754,7 +863,10 @@ export class StoreManager {
 		// 迁移旧配置: protocol (string) → protocols (string[])
 		if (typeof raw.protocol === "string" && !raw.protocols) {
 			const { protocol: _, ...rest } = raw;
-			const migrated = { ...rest, protocols: ["http", "https"] } as unknown as ProxyConfig;
+			const migrated = {
+				...rest,
+				protocols: ["http", "https"],
+			} as unknown as ProxyConfig;
 			this.configStore.set("proxyConfig", migrated);
 			return migrated;
 		}

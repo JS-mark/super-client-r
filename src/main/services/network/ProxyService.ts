@@ -31,7 +31,10 @@ export class ProxyService extends EventEmitter {
 			try {
 				this.applyProxy(config);
 			} catch (error) {
-				logger.error("Failed to apply saved proxy config", error instanceof Error ? error : new Error(String(error)));
+				logger.error(
+					"Failed to apply saved proxy config",
+					error instanceof Error ? error : new Error(String(error)),
+				);
 			}
 		}
 		logger.info("ProxyService initialized", {
@@ -113,9 +116,14 @@ export class ProxyService extends EventEmitter {
 			}
 
 			this.currentConfig = config;
-			logger.info(`Proxy applied: ${config.host}:${config.port} [${protocols.join(",")}]`);
+			logger.info(
+				`Proxy applied: ${config.host}:${config.port} [${protocols.join(",")}]`,
+			);
 		} catch (error) {
-			logger.error("Failed to apply proxy", error instanceof Error ? error : new Error(String(error)));
+			logger.error(
+				"Failed to apply proxy",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -145,19 +153,30 @@ export class ProxyService extends EventEmitter {
 			this.currentConfig = null;
 			logger.info("Proxy disabled");
 		} catch (error) {
-			logger.error("Failed to disable proxy", error instanceof Error ? error : new Error(String(error)));
+			logger.error(
+				"Failed to disable proxy",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 		}
 	}
 
 	/**
 	 * TCP 探测：检测代理端口是否可达
 	 */
-	private tcpProbe(host: string, port: number, timeoutMs = 5000): Promise<void> {
+	private tcpProbe(
+		host: string,
+		port: number,
+		timeoutMs = 5000,
+	): Promise<void> {
 		return new Promise((resolve, reject) => {
 			const socket = net.createConnection({ host, port });
 			const timer = setTimeout(() => {
 				socket.destroy();
-				reject(new Error(`TCP connect to ${host}:${port} timed out (${timeoutMs}ms)`));
+				reject(
+					new Error(
+						`TCP connect to ${host}:${port} timed out (${timeoutMs}ms)`,
+					),
+				);
 			}, timeoutMs);
 
 			socket.on("connect", () => {
@@ -177,7 +196,9 @@ export class ProxyService extends EventEmitter {
 	/**
 	 * 测试代理连接（两阶段：TCP 探测 → HTTP 代理请求）
 	 */
-	async testConnection(config: ProxyConfig): Promise<{ success: boolean; latencyMs: number; error?: string }> {
+	async testConnection(
+		config: ProxyConfig,
+	): Promise<{ success: boolean; latencyMs: number; error?: string }> {
 		const start = Date.now();
 
 		// Phase 1: TCP 探测代理端口
@@ -222,7 +243,10 @@ export class ProxyService extends EventEmitter {
 				signal: AbortSignal.timeout(10000),
 			});
 		} catch (error) {
-			const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : "";
+			const cause =
+				error instanceof Error && error.cause instanceof Error
+					? error.cause.message
+					: "";
 			const msg = error instanceof Error ? error.message : String(error);
 			return {
 				success: false,
@@ -243,7 +267,9 @@ export class ProxyService extends EventEmitter {
 	 */
 	private buildProxyUrl(config: ProxyConfig): string {
 		const { host, port, auth, username } = config;
-		const pw = (config as unknown as Record<string, unknown>)["password"] as string | undefined;
+		const pw = (config as unknown as Record<string, unknown>)["password"] as
+			| string
+			| undefined;
 
 		if (auth && username && pw) {
 			return `http://${encodeURIComponent(username)}:${encodeURIComponent(pw)}@${host}:${port}`;
