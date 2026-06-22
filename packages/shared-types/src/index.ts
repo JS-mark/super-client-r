@@ -13,6 +13,12 @@ export * from "./agent";
 // ============ Agent SDK 相关类型 ============
 export * from "./agent-sdk";
 
+// ============ Agent Runtime 适配层（spec: 2026-06-21-agent-runtime-adapter-design）============
+export * from "./agent-runtime";
+
+// ============ Agent Trace 调试 / 追踪 ============
+export * from "./agent-trace";
+
 // ============ Skill 相关类型 ============
 export * from "./skill";
 
@@ -27,3 +33,18 @@ export * from "./ipc";
 
 // ============ Remote Protocol 类型 ============
 export * from "./remote-protocol";
+
+// ============ Extension Descriptor 类型 ============
+export * from "./extensions";
+
+// ============ Git 分支信息类型 ============
+export * from "./git";
+
+// ============ Project / Session 重设计（project-session-redesign A-1） ============
+export * from "./project";
+
+// ============ Message ⇄ SessionEvent converter ============
+export * from "./messageConverter";
+
+// ============ ElectronAPI 共享契约 ============
+export * from "./electron-api";

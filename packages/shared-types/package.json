@@ -12,7 +12,14 @@
 		"./mcp": "./src/mcp.ts",
 		"./chat": "./src/chat.ts",
 		"./ipc": "./src/ipc.ts",
-		"./remote-protocol": "./src/remote-protocol.ts"
+		"./remote-protocol": "./src/remote-protocol.ts",
+		"./extensions": "./src/extensions.ts",
+		"./git": "./src/git.ts",
+		"./project": "./src/project.ts",
+		"./messageConverter": "./src/messageConverter.ts",
+		"./electron-api": "./src/electron-api.ts",
+		"./agent-runtime": "./src/agent-runtime.ts",
+		"./agent-trace": "./src/agent-trace.ts"
 	},
 	"files": [
 		"src"

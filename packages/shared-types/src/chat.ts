@@ -34,12 +34,17 @@ export interface ChatMessagePersist {
 		result?: unknown;
 		error?: string;
 		duration?: number;
+		approval?: ToolCallApproval;
 	};
 	metadata?: {
 		model?: string;
 		tokens?: number;
 		inputTokens?: number;
 		outputTokens?: number;
+		/** Anthropic prompt-cache 读取的 token 数（已缓存命中部分） */
+		cacheReadTokens?: number;
+		/** Anthropic prompt-cache 本轮新建的 token 数 */
+		cacheCreationTokens?: number;
 		duration?: number;
 		firstTokenMs?: number;
 		tokensPerSecond?: number;
@@ -103,7 +108,12 @@ export interface CreateConversationOptions {
 export type InteractionProfile = "claude-code" | "codex" | "hybrid";
 
 /** 计划模式 */
-export type PlanMode = "off" | "auto" | "plan";
+export type PlanMode =
+	| "chat"
+	| "plan-only"
+	| "plan-then-ask"
+	| "auto-execute-safe"
+	| "full-agent";
 
 /** 审批模式 */
 export type ApprovalMode = "request" | "auto-safe" | "full-access";
@@ -149,7 +159,13 @@ export interface WorkspaceContextPolicy {
 /** 启用的能力 */
 export interface EnabledCapability {
 	id: string;
-	type: "mcp" | "skill" | "hook" | "app-plugin" | "theme" | "capability-package";
+	type:
+		| "mcp"
+		| "skill"
+		| "hook"
+		| "app-plugin"
+		| "theme"
+		| "capability-package";
 	scope: "global" | "workspace" | "session";
 	enabled: boolean;
 }
@@ -165,6 +181,29 @@ export interface SessionApprovalGrant {
 	expiresAt?: number;
 }
 
+/** R-9: lifecycle flags grouped under `SessionMetadata.flags`. */
+export interface SessionFlags {
+	/** plan §23.4: 置顶后的会话排序到所属项目顶部 */
+	pinned?: boolean;
+	/** plan §23.2: 归档后会话从主列表隐藏，仅在 "已归档" 折叠组中可见 */
+	archived?: boolean;
+	/** plan §23.4: 未读小圆点指示 */
+	unread?: boolean;
+}
+
+/** R-9: fork lineage info grouped under `SessionMetadata.lineage`. */
+export interface SessionLineage {
+	/** plan §23.2: 派生而来的源会话 id（"派生到本地" / "派生到新工作树" 都填） */
+	forkOriginId?: string;
+	/** plan §23.2: "派生到新工作树" 创建的 git worktree 绝对路径 */
+	worktreePath?: string;
+	/**
+	 * project-session-redesign §10 #5 + §9.10：编辑历史 = fork。在该位置记录
+	 * 从源会话的哪条消息开始派生。其它 fork（local 复制 / worktree）留空。
+	 */
+	forkOriginMessageId?: string;
+}
+
 /** Conversation 迁移期承载的 Session 元数据 */
 export interface SessionMetadata {
 	id: string;
@@ -176,7 +215,25 @@ export interface SessionMetadata {
 	runtimePolicyOverride?: Partial<WorkspaceRuntimePolicy>;
 	enabledCapabilityOverrides?: EnabledCapability[];
 	attachmentIds: string[];
-	approvalGrants: SessionApprovalGrant[];
+	/**
+	 * 仅在用户授予会话级审批时写入。Phase 2（approval adapter）才会接入读路径；
+	 * 在那之前保持 optional，避免在每个会话 metadata 里写入空数组造成死字段。
+	 */
+	approvalGrants?: SessionApprovalGrant[];
+	/**
+	 * R-9: lifecycle flags collected under one nested object so future
+	 * additions (e.g. `starred`) don't keep growing the top-level shape.
+	 * Stored only when at least one inner flag is truthy; older on-disk data
+	 * with flat `pinned/archived/unread` is auto-translated by
+	 * `normalizeSessionMetadata` on first read.
+	 */
+	flags?: SessionFlags;
+	/**
+	 * R-9: fork lineage. Same nesting rationale as `flags`; legacy flat
+	 * `forkOriginId/worktreePath` are still accepted on read and rewritten
+	 * into `lineage` on next save.
+	 */
+	lineage?: SessionLineage;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -186,6 +243,14 @@ export interface WorkspaceConfig {
 	id: string;
 	name: string;
 	path?: string;
+	/**
+	 * R-1: 显示用图标（emoji 或 icon id）。Phase 1 之前由 renderer 的
+	 * useWorkspaceStore 独家持有，是 dual-source-of-truth 的一处。这里加成 optional，
+	 * 让 main 可作为权威；renderer 写时双写，未来切到 read-through 时移除 renderer 写。
+	 */
+	icon?: string;
+	/** R-1: 列表排序权重；同上从 renderer 移到 main 配置以收口。 */
+	order?: number;
 	interactionProfile: InteractionProfile;
 	defaultModel?: ModelSelection;
 	runtimePolicy: WorkspaceRuntimePolicy;
@@ -193,6 +258,170 @@ export interface WorkspaceConfig {
 	contextPolicy: WorkspaceContextPolicy;
 	createdAt: number;
 	updatedAt: number;
+}
+
+/** Runtime policy 操作分类 */
+export type RuntimeOperationKind =
+	| "tool-execute"
+	| "file-read"
+	| "file-write"
+	| "file-delete"
+	| "command-exec"
+	| "network-request"
+	| "external-app";
+
+/** Runtime policy 风险评级 */
+export type RuntimeRiskLevel = "low" | "medium" | "high";
+
+/** Runtime policy 作用域 */
+export type RuntimeScope =
+	| "conversation-workspace"
+	| "workspace"
+	| "external"
+	| "network"
+	| "system";
+
+/** Runtime policy 决策 */
+export type RuntimeDecision = "allowed" | "denied" | "audit-only";
+
+/** 操作上下文（caller 提供） */
+export interface RuntimeOperationContext {
+	workspaceId: string;
+	sessionId?: string;
+	source:
+		| "llm"
+		| "agent-sdk"
+		| "mcp"
+		| "skill"
+		| "app-plugin"
+		| "user"
+		| "system";
+	operation: string;
+	kind: RuntimeOperationKind;
+	target?: string;
+	input?: Record<string, unknown>;
+}
+
+/** Service 分类后的操作 */
+export interface ClassifiedRuntimeOperation extends RuntimeOperationContext {
+	risk: RuntimeRiskLevel;
+	scope: RuntimeScope;
+}
+
+/** Audit 条目 */
+export interface RuntimeAuditEntry extends ClassifiedRuntimeOperation {
+	id: string;
+	timestamp: number;
+	decision: RuntimeDecision;
+	reason?: string;
+}
+
+/** Resolver 输入：单条消息发送时的临时覆盖 */
+export interface SessionMessageOverride {
+	model?: ModelSelection;
+	planMode?: PlanMode;
+	interactionProfile?: InteractionProfile;
+}
+
+/** Resolver 输入参数 */
+export interface ResolveSessionRuntimeInput {
+	/** 显式指定的工作区 ID；省略时由 sessionId 关联的 conversation 决定 */
+	workspaceId?: string;
+	/** 当前迁移期 sessionId 等于 conversationId */
+	sessionId: string;
+	/** 单条消息级别的临时覆盖，不写回 metadata */
+	messageOverride?: SessionMessageOverride;
+}
+
+/** 解析后的附件上下文（骨架阶段为占位，待 Phase 3 attachment resolver 填充） */
+export interface ResolvedAttachmentContext {
+	attachmentId: string;
+	contextMode:
+		| "include-content"
+		| "reference-only"
+		| "ask-before-read"
+		| "ignore";
+	mimeType?: string;
+	bytes?: number;
+}
+
+/**
+ * Attachment context resolver 的解析结果（§14 minimal slice）。
+ *
+ * - `text`：附件内容已读取到 `text` 字段，可直接拼接到 prompt；
+ *   `truncated` 为 true 时表示文件超出字节预算被截断。
+ * - `reference`：未读取内容，仅暴露元信息；上层应使用 `<attachment-ref>`
+ *   形式提示模型，避免传输二进制或超大文本。
+ */
+export interface ResolvedAttachmentBlock {
+	attachmentId: string;
+	fileName: string;
+	mimeType?: string;
+	size: number;
+	resolution: "text" | "reference";
+	text?: string;
+	truncated?: boolean;
+}
+
+/** 解析后的有效 Session 运行时快照 */
+export interface EffectiveSessionRuntime {
+	workspaceId: string;
+	sessionId: string;
+	model: ModelSelection;
+	interactionProfile: InteractionProfile;
+	planMode: PlanMode;
+	runtimePolicy: WorkspaceRuntimePolicy;
+	contextPolicy: WorkspaceContextPolicy;
+	enabledCapabilities: EnabledCapability[];
+	attachments: ResolvedAttachmentContext[];
+	approvalGrants: SessionApprovalGrant[];
+}
+
+/** Chat 文件打开目标 */
+export interface FileOpenTarget {
+	id: string;
+	label: string;
+	kind: "editor" | "terminal" | "finder" | "custom";
+	available: boolean;
+	/** Absolute path to .app bundle (macOS) or executable (other platforms). */
+	appPath?: string;
+}
+
+/** Chat 文件工件（由工具调用、Agent 或附件产生/引用的文件） */
+export interface ChatFileArtifact {
+	id: string;
+	conversationId: string;
+	messageId: string;
+	path: string;
+	relativePath?: string;
+	name: string;
+	extension?: string;
+	mimeType?: string;
+	kind: "created" | "modified" | "read" | "referenced" | "attached";
+	source: "tool" | "agent" | "attachment" | "user" | "plugin";
+	openTargets: FileOpenTarget[];
+	policy: {
+		canOpen: boolean;
+		canReveal: boolean;
+		canDiff: boolean;
+		requiresApproval?: boolean;
+	};
+}
+
+/** Chat 文件变更集（聚合一次工具/Agent 运行涉及的多个文件改动） */
+export interface ChatFileChangeSet {
+	id: string;
+	conversationId: string;
+	messageId: string;
+	files: Array<{
+		path: string;
+		status: "added" | "modified" | "deleted" | "renamed";
+		additions: number;
+		deletions: number;
+		diffPreview?: string;
+	}>;
+	additions: number;
+	deletions: number;
 }
 
 /** 对话摘要 */
@@ -214,6 +443,18 @@ export interface ConversationSummary {
 	session?: SessionMetadata;
 }
 
+/**
+ * 增量更新 ConversationSummary 时使用的形状。`session` 字段允许只传需要变更的
+ * 子字段，由 main 端 `mergeSessionMetadata` 与现有 metadata 浅合并，避免每次
+ * 调用都要构造完整 `SessionMetadata`。
+ */
+export type ConversationSummaryUpdate = Omit<
+	Partial<ConversationSummary>,
+	"session"
+> & {
+	session?: Partial<SessionMetadata>;
+};
+
 /** 对话数据 */
 export interface ConversationData extends ConversationSummary {
 	messages: ChatMessagePersist[];
@@ -221,3 +462,82 @@ export interface ConversationData extends ConversationSummary {
 
 /** IM 平台 */
 export type IMPlatform = "dingtalk" | "lark" | "telegram";
+
+// ─────────────────────────────────────────────────────────────────────
+// Renderer Message canonical types (project-session-redesign A-1)
+//
+// 之前 Message / ToolCall / MessageRole / MessageType / ChatSessionStatus
+// 定义在 src/renderer/src/stores/chatMessageStore.ts。新存储层（main 进程
+// SessionStorageService + JSONL 事件）也要消费同一个 Message 形状，所以
+// 把这几个类型提升到 shared-types 作为 canonical。renderer 仍可从
+// chatMessageStore re-export 以向后兼容。
+// ─────────────────────────────────────────────────────────────────────
+
+export type MessageRole = "user" | "assistant" | "system" | "tool";
+export type MessageType = "text" | "tool_use" | "tool_result" | "error";
+
+/**
+ * Chat session lifecycle states (live request state, NOT historical):
+ * - idle: 空闲 — waiting for user input (also the state after completion/stop/error)
+ * - preparing: 创建中 — building request (fetching MCP tools, constructing system prompt)
+ * - streaming: 聊天中 — receiving streamed response chunks from LLM
+ * - tool_calling: 工具调用中 — model is executing MCP tool calls
+ */
+export type ChatSessionStatus =
+	| "idle"
+	| "preparing"
+	| "streaming"
+	| "tool_calling";
+
+export interface ToolCall {
+	id: string;
+	name: string;
+	input: Record<string, unknown>;
+	status: "pending" | "awaiting_approval" | "success" | "error";
+	result?: unknown;
+	error?: string;
+	duration?: number;
+	approval?: ToolCallApproval;
+}
+
+export interface ToolCallApproval {
+	title?: string;
+	description?: string;
+	displayName?: string;
+	kind?: "ask-user-question" | "permission" | "tool";
+	suggestions?: Array<Record<string, unknown>>;
+	blockedPath?: string;
+	decisionReason?: string;
+	agentId?: string;
+}
+
+export interface Message {
+	id: string;
+	role: MessageRole;
+	content: string;
+	timestamp: number;
+	type?: MessageType;
+	toolCall?: ToolCall;
+	metadata?: {
+		model?: string;
+		providerPreset?: string;
+		providerName?: string;
+		tokens?: number;
+		inputTokens?: number;
+		outputTokens?: number;
+		/** Anthropic prompt-cache 读取的 token 数（已缓存命中部分） */
+		cacheReadTokens?: number;
+		/** Anthropic prompt-cache 本轮新建的 token 数 */
+		cacheCreationTokens?: number;
+		duration?: number;
+		firstTokenMs?: number;
+		tokensPerSecond?: number;
+		source?: "local" | "remote";
+		remoteSender?: { id: string; name: string };
+		remotePlatform?: string;
+		attachmentIds?: string[];
+		agentSDKSessionId?: string;
+		totalCostUsd?: number;
+		numTurns?: number;
+	};
+}

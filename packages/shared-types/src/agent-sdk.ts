@@ -14,6 +14,13 @@ export interface AgentSDKQueryRequest {
 	cwd?: string;
 	/** 模型覆盖（不传则由 AutoConfig 推断） */
 	model?: string;
+	/**
+	 * 会话/项目级选定的 provider id。传入后 `resolveAnthropicEnv` 优先用该
+	 * provider 的 `baseUrl + apiKey` 作为 Anthropic 第三方网关，确保
+	 * `(model, baseUrl)` 配对一致——避免出现"选了阿里云的 deepseek-r1，但 SDK
+	 * 仍走 Anthropic provider 的 baseUrl 找不到模型"的 bug。
+	 */
+	providerId?: string;
 	/** 努力程度覆盖 */
 	effort?: AgentSDKEffort;
 	/** 思考模式覆盖 */
@@ -77,6 +84,12 @@ export interface AgentSDKStreamEvent {
 	error?: string;
 	/** 工具使用摘要 */
 	toolSummary?: string;
+	/** 工具使用摘要对应的 tool_use ids */
+	precedingToolUseIds?: string[];
+	/** 工具调用 */
+	toolCall?: AgentSDKToolCallEventData;
+	/** 工具错误 */
+	toolError?: AgentSDKToolErrorEventData;
 	/** 结果数据 */
 	result?: AgentSDKResultData;
 	/** 权限请求 */
@@ -91,12 +104,46 @@ export type AgentSDKStreamEventType =
 	| "init" // session 初始化完成
 	| "chunk" // 流式文本块
 	| "assistant" // 完整 assistant 消息
+	| "tool_call" // 工具调用
+	| "tool_error" // 工具失败
 	| "tool_use_summary" // 工具使用摘要
 	| "status" // 状态更新
 	| "permission_request" // 权限请求
+	| "permission_denied" // 权限被自动拒绝
 	| "rate_limit" // 速率限制
 	| "result" // 最终结果
 	| "error"; // 错误
+
+export type AgentSDKToolCallKind = "ask-user-question" | "permission" | "tool";
+
+export interface AgentSDKPermissionUpdate {
+	type: string;
+	[key: string]: unknown;
+}
+
+/** 工具调用事件数据 */
+export interface AgentSDKToolCallEventData {
+	id: string;
+	name: string;
+	input: Record<string, unknown>;
+	title?: string;
+	description?: string;
+	displayName?: string;
+	kind: AgentSDKToolCallKind;
+}
+
+/** 工具错误事件数据 */
+export interface AgentSDKToolErrorEventData {
+	id: string;
+	name: string;
+	input?: Record<string, unknown>;
+	error: unknown;
+	code?: string;
+	title?: string;
+	description?: string;
+	displayName?: string;
+	kind: AgentSDKToolCallKind;
+}
 
 /** 最终结果数据 */
 export interface AgentSDKResultData {
@@ -125,6 +172,10 @@ export interface AgentSDKPermissionRequest {
 	title?: string;
 	description?: string;
 	displayName?: string;
+	suggestions?: AgentSDKPermissionUpdate[];
+	blockedPath?: string;
+	decisionReason?: string;
+	agentId?: string;
 }
 
 /** Agent SDK session 信息（映射自 SDK 的 SDKSessionInfo） */
