@@ -102,6 +102,7 @@ export interface ChatStreamEvent {
 		| "error"
 		| "tool_call"
 		| "tool_result"
+		| "tool_error"
 		| "tool_approval_request"
 		| "tool_rejected";
 	content?: string;
@@ -116,6 +117,13 @@ export interface ChatStreamEvent {
 		name: string;
 		result: unknown;
 		isError?: boolean;
+		duration?: number;
+	};
+	toolError?: {
+		toolCallId: string;
+		name: string;
+		error: unknown;
+		code?: string;
 		duration?: number;
 	};
 	toolApproval?: {

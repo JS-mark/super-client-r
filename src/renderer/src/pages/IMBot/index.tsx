@@ -558,9 +558,7 @@ export default function RemoteControlPage() {
 			key: "duration",
 			width: 80,
 			render: (duration: number) =>
-				duration >= 1000
-					? `${(duration / 1000).toFixed(1)}s`
-					: `${duration}ms`,
+				duration >= 1000 ? `${(duration / 1000).toFixed(1)}s` : `${duration}ms`,
 		},
 		{
 			title: "时间",
@@ -940,7 +938,7 @@ export default function RemoteControlPage() {
 					}}
 					footer={null}
 					width={720}
-          destroyOnHidden
+					destroyOnHidden
 				>
 					{selectedDevice && (
 						<Tabs
@@ -1089,33 +1087,21 @@ export default function RemoteControlPage() {
 															color: token.colorTextDescription,
 														}}
 													>
-														请输入设备认证 Token
-														以验证操作权限
+														请输入设备认证 Token 以验证操作权限
 													</div>
 													<div className="flex items-center gap-2 w-72">
 														<Input.Password
-															value={
-																authTokenInput
-															}
+															value={authTokenInput}
 															onChange={(e) =>
-																setAuthTokenInput(
-																	e.target
-																		.value,
-																)
+																setAuthTokenInput(e.target.value)
 															}
-															onPressEnter={
-																handleAuthorize
-															}
+															onPressEnter={handleAuthorize}
 															placeholder="输入设备 Token"
 														/>
 														<Button
 															type="primary"
-															onClick={
-																handleAuthorize
-															}
-															disabled={
-																!authTokenInput.trim()
-															}
+															onClick={handleAuthorize}
+															disabled={!authTokenInput.trim()}
 														>
 															验证
 														</Button>
@@ -1124,16 +1110,9 @@ export default function RemoteControlPage() {
 											) : (
 												<DeviceTerminal
 													ref={terminalRef}
-													deviceId={
-														selectedDevice.id
-													}
-													disabled={
-														selectedDevice.status !==
-														"online"
-													}
-													onCommand={
-														handleTerminalCommand
-													}
+													deviceId={selectedDevice.id}
+													disabled={selectedDevice.status !== "online"}
+													onCommand={handleTerminalCommand}
 												/>
 											)}
 										</div>
@@ -1148,12 +1127,9 @@ export default function RemoteControlPage() {
 										</span>
 									),
 									children: (() => {
-										const deviceHistory =
-											commandHistory.filter(
-												(h) =>
-													h.deviceId ===
-													selectedDevice.id,
-											);
+										const deviceHistory = commandHistory.filter(
+											(h) => h.deviceId === selectedDevice.id,
+										);
 										return deviceHistory.length > 0 ? (
 											<Table
 												columns={historyColumns}
@@ -1162,9 +1138,7 @@ export default function RemoteControlPage() {
 													`${record.timestamp}-${record.command}`
 												}
 												pagination={
-													deviceHistory.length > 10
-														? { pageSize: 10 }
-														: false
+													deviceHistory.length > 10 ? { pageSize: 10 } : false
 												}
 												size="small"
 											/>
@@ -1176,9 +1150,7 @@ export default function RemoteControlPage() {
 												}}
 											>
 												<ClockCircleOutlined className="text-3xl mb-3" />
-												<div className="text-sm">
-													暂无命令执行记录
-												</div>
+												<div className="text-sm">暂无命令执行记录</div>
 											</div>
 										);
 									})(),

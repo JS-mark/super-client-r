@@ -3,7 +3,7 @@ import { XMarkdown } from "@ant-design/x-markdown";
 import { type FC, memo, useCallback, useRef } from "react";
 import "@ant-design/x-markdown/es/XMarkdown/index.css";
 import { cn } from "../lib/utils";
-import { useChatStore } from "../stores/chatStore";
+import { useChatMessageStore } from "../stores/chatMessageStore";
 import { EChartsBlock } from "./EChartsBlock";
 import { MermaidChart } from "./MermaidChart";
 import { CopyButton } from "./markdown/CopyButton";
@@ -155,9 +155,11 @@ interface StreamingMarkdownProps {
 
 export const StreamingMarkdown: FC<StreamingMarkdownProps> = memo(
 	({ fallbackContent, className }) => {
-		const streamingContent = useChatStore((s) => s.streamingContent);
-		const isStreaming = useChatStore((s) => s.isStreaming);
-		const content = isStreaming ? (streamingContent || fallbackContent) : fallbackContent;
+		const streamingContent = useChatMessageStore((s) => s.streamingContent);
+		const isStreaming = useChatMessageStore((s) => s.isStreaming);
+		const content = isStreaming
+			? streamingContent || fallbackContent
+			: fallbackContent;
 
 		return (
 			<div className={cn("markdown-content", className)}>

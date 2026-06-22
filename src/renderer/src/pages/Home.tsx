@@ -16,7 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
 import { type ApiStatus, apiService } from "../services/apiService";
-import { useChatStore } from "../stores/chatStore";
+import { useChatMessageStore } from "../stores/chatMessageStore";
 import { useMcpStore } from "../stores/mcpStore";
 import { useModelStore } from "../stores/modelStore";
 import { useSkillStore } from "../stores/skillStore";
@@ -55,7 +55,7 @@ const Home = () => {
 		[t, token.colorText],
 	);
 	useTitle(pageTitle);
-	const messages = useChatStore((state) => state.messages);
+	const messages = useChatMessageStore((state) => state.messages);
 	const servers = useMcpStore((state) => state.servers);
 	const installedSkills = useSkillStore((state) => state.installedSkills);
 	const getAllEnabledModels = useModelStore(

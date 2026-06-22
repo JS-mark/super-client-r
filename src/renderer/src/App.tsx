@@ -5,12 +5,20 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { LegacyImportPrompt } from "./components/legacy/LegacyImportPrompt";
 import { PluginWindowHandler } from "./components/plugin/PluginWindowHandler";
+import { GlobalRequestLogHost } from "./components/settings/GlobalRequestLogHost";
 import { TitleProvider } from "./hooks/useTitle";
 import { router } from "./router";
+import { featureFlagsService } from "./services/featureFlagsService";
 import { useChatStore } from "./stores/chatStore";
+import {
+	getFeatureFlagsSnapshot,
+	useFeatureFlagsStore,
+} from "./stores/featureFlagsStore";
 import { useSkinStore } from "./stores/skinStore";
 import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
+import { useProjectStore } from "./stores/projectStore";
 
 const ANTD_LOCALES: Record<string, typeof zhCN> = {
 	zh: zhCN,
@@ -50,6 +58,28 @@ function App() {
 	// 初始化主题
 	useEffect(() => {
 		initSystemThemeDetection();
+	}, []);
+
+	// §22 rollback flags: 把 renderer 端的 flags 同步到 main，
+	// 让 RuntimePolicyService 等主进程消费方读取到最新 enforcement 位。
+	useEffect(() => {
+		featureFlagsService.push(getFeatureFlagsSnapshot()).catch(() => {});
+		const unsubscribe = useFeatureFlagsStore.subscribe((state) => {
+			featureFlagsService
+				.push({
+					unifiedNavigation: state.unifiedNavigation,
+					runtimeEnforcement: state.runtimeEnforcement,
+					fileArtifacts: state.fileArtifacts,
+					profileLayouts: state.profileLayouts,
+				})
+				.catch(() => {});
+		});
+		return unsubscribe;
+	}, []);
+
+	// E-5: load Project registry for sidebar / TitleBar / NewConversationModal.
+	useEffect(() => {
+		void useProjectStore.getState().load();
 	}, []);
 
 	// 同步 body 背景色到当前主题（确保 Error 等全屏页面背景正确）
@@ -237,6 +267,8 @@ function App() {
 			<TitleProvider>
 				<AntdApp className="h-full w-full" message={{ maxCount: 3, top: 48 }}>
 					<PluginWindowHandler />
+					<LegacyImportPrompt />
+					<GlobalRequestLogHost />
 					<ErrorBoundary>
 						<RouterProvider router={router} />
 					</ErrorBoundary>

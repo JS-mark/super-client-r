@@ -80,8 +80,12 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
 	const [manageModalOpen, setManageModalOpen] = useState(false);
 	const [claudeCodeEnabled, setClaudeCodeEnabled] = useState(false);
-	const [claudeCodeModel, setClaudeCodeModel] = useState<string | undefined>(undefined);
-	const watchedPreset = Form.useWatch("preset", form) as ModelProviderPreset | undefined;
+	const [claudeCodeModel, setClaudeCodeModel] = useState<string | undefined>(
+		undefined,
+	);
+	const watchedPreset = Form.useWatch("preset", form) as
+		| ModelProviderPreset
+		| undefined;
 
 	const isZh = i18n.language?.startsWith("zh");
 
@@ -418,7 +422,11 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			{/* Split Panel Layout */}
 			<div
 				className="flex rounded-xl border overflow-hidden"
-				style={{ height: "calc(100vh - 180px)", minHeight: 400, borderColor: token.colorBorderSecondary }}
+				style={{
+					height: "calc(100vh - 180px)",
+					minHeight: 400,
+					borderColor: token.colorBorderSecondary,
+				}}
 			>
 				{/* Left Panel - Provider List */}
 				<div
@@ -545,223 +553,228 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				>
 					{showRightPanel ? (
 						<>
-						<div className="flex-1 overflow-y-auto p-6">
-							{/* Header */}
-							<div className="flex items-center justify-between mb-6">
-								<h3
-									className="text-lg font-semibold m-0"
-									style={{ color: token.colorText }}
-								>
-									{isAdding
-										? t("addProvider", { ns: "models" })
-										: selectedProvider?.name}
-								</h3>
-								<Space>
-									{!isAdding && selectedProvider && (
-										<>
-											<Switch
-												checked={selectedProvider.enabled}
-												onChange={(checked) =>
-													handleToggleEnabled(selectedProvider, checked)
-												}
-												checkedChildren={t("providerEnabled", { ns: "models" })}
-												unCheckedChildren={t("providerDisabled", {
-													ns: "models",
-												})}
-											/>
-											<Popconfirm
-												title={t("confirmDelete", { ns: "models" })}
-												onConfirm={() => handleDelete(selectedProvider.id)}
-											>
-												<Button
-													type="text"
-													danger
-													icon={<DeleteOutlined />}
-													size="small"
-												/>
-											</Popconfirm>
-										</>
-									)}
-								</Space>
-							</div>
-
-							{/* Form */}
-							<Form form={form} layout="vertical" onFinish={handleSave}>
-								<Form.Item
-									name="preset"
-									label={t("form.preset", { ns: "models" })}
-									rules={[
-										{
-											required: true,
-											message: t("form.presetRequired", { ns: "models" }),
-										},
-									]}
-								>
-									<Select
-										placeholder={t("form.presetPlaceholder", { ns: "models" })}
-										onChange={handlePresetChange}
-										showSearch
-										optionFilterProp="label"
-										disabled={!isAdding && !!selectedProvider}
-										options={PRESET_PROVIDERS.map((p: PresetProviderInfo) => ({
-											label: isZh ? `${p.nameZh} (${p.name})` : p.name,
-											value: p.id,
-										}))}
-									/>
-								</Form.Item>
-
-								<Form.Item
-									name="name"
-									label={t("form.name", { ns: "models" })}
-									rules={[
-										{
-											required: true,
-											message: t("form.nameRequired", { ns: "models" }),
-										},
-									]}
-								>
-									<Input
-										placeholder={t("form.namePlaceholder", { ns: "models" })}
-									/>
-								</Form.Item>
-
-								<Form.Item
-									name="apiKey"
-									label={t("form.apiKey", { ns: "models" })}
-									help={t("form.apiKeyHelp", { ns: "models" })}
-								>
-									<Input.Password placeholder="sk-..." />
-								</Form.Item>
-
-								<Form.Item
-									name="baseUrl"
-									label={t("form.baseUrl", { ns: "models" })}
-									rules={[
-										{
-											required: true,
-											message: t("form.baseUrlRequired", { ns: "models" }),
-										},
-									]}
-								>
-									<Input placeholder="https://api.example.com/v1" />
-								</Form.Item>
-
-								{/* Test Connection */}
-								<div className="flex items-center gap-3 mb-4">
-									<Button
-										icon={isTesting ? <LoadingOutlined /> : <LinkOutlined />}
-										onClick={handleTestConnection}
-										loading={isTesting}
+							<div className="flex-1 overflow-y-auto p-6">
+								{/* Header */}
+								<div className="flex items-center justify-between mb-6">
+									<h3
+										className="text-lg font-semibold m-0"
+										style={{ color: token.colorText }}
 									>
-										{t("test", { ns: "models" })}
-									</Button>
-									{testResult && (
-										<span
-											className="text-sm"
-											style={{
-												color: testResult.success
-													? token.colorSuccess
-													: token.colorError,
-											}}
-										>
-											{testResult.success ? (
-												<>
-													<CheckCircleOutlined className="mr-1" />
-													{testResult.latencyMs > 0 &&
-														`${testResult.latencyMs}ms`}
-													{testResult.latencyMs === 0 &&
-														t("messages.testSuccess", { ns: "models" })}
-												</>
-											) : (
-												<>
-													<CloseCircleOutlined className="mr-1" />
-													{testResult.error ||
-														t("messages.testError", { ns: "models" })}
-												</>
-											)}
-										</span>
-									)}
-								</div>
-
-								{/* Claude Code / Agent Section */}
-								<ClaudeCodeSection
-									preset={watchedPreset}
-									claudeCodeEnabled={claudeCodeEnabled}
-									onClaudeCodeChange={setClaudeCodeEnabled}
-									claudeCodeModel={claudeCodeModel}
-									onClaudeCodeModelChange={setClaudeCodeModel}
-									models={
-										fetchedModels.length > 0
-											? fetchedModels
-											: selectedProvider?.models ?? []
-									}
-									testPassed={testResult?.success === true}
-									currentProviderId={selectedProvider?.id}
-									providers={providers}
-									token={token}
-								/>
-
-								</Form>
-						</div>
-
-						{/* Fixed bottom bar */}
-						<div
-							className="shrink-0 px-6 py-3 border-t flex items-center justify-between"
-							style={{ borderColor: token.colorBorderSecondary }}
-						>
-							{/* Left: model management buttons */}
-							<div>
-								{testResult?.success && (
+										{isAdding
+											? t("addProvider", { ns: "models" })
+											: selectedProvider?.name}
+									</h3>
 									<Space>
-										<Button
-											icon={
-												isFetchingModels ? (
-													<LoadingOutlined />
-												) : (
-													<ThunderboltOutlined />
-												)
-											}
-											onClick={handleFetchModels}
-											loading={isFetchingModels}
-											size="small"
-										>
-											{t("fetchModels", { ns: "models" })}
-										</Button>
-										{(fetchedModels.length > 0 ||
-											(selectedProvider &&
-												selectedProvider.models.length > 0)) && (
-											<Button
-												icon={<AppstoreOutlined />}
-												onClick={() => setManageModalOpen(true)}
-												size="small"
-												type="primary"
-												ghost
-											>
-												{t("manageModels", { ns: "models" })}
-											</Button>
+										{!isAdding && selectedProvider && (
+											<>
+												<Switch
+													checked={selectedProvider.enabled}
+													onChange={(checked) =>
+														handleToggleEnabled(selectedProvider, checked)
+													}
+													checkedChildren={t("providerEnabled", {
+														ns: "models",
+													})}
+													unCheckedChildren={t("providerDisabled", {
+														ns: "models",
+													})}
+												/>
+												<Popconfirm
+													title={t("confirmDelete", { ns: "models" })}
+													onConfirm={() => handleDelete(selectedProvider.id)}
+												>
+													<Button
+														type="text"
+														danger
+														icon={<DeleteOutlined />}
+														size="small"
+													/>
+												</Popconfirm>
+											</>
 										)}
 									</Space>
-								)}
-							</div>
-							{/* Right: save/cancel */}
-							<Space>
-								{isAdding && (
-									<Button
-										onClick={() => {
-											setIsAdding(false);
-											if (providers.length > 0) {
-												setSelectedProviderId(providers[0].id);
-											}
-										}}
+								</div>
+
+								{/* Form */}
+								<Form form={form} layout="vertical" onFinish={handleSave}>
+									<Form.Item
+										name="preset"
+										label={t("form.preset", { ns: "models" })}
+										rules={[
+											{
+												required: true,
+												message: t("form.presetRequired", { ns: "models" }),
+											},
+										]}
 									>
-										{t("cancel", { ns: "models" })}
+										<Select
+											placeholder={t("form.presetPlaceholder", {
+												ns: "models",
+											})}
+											onChange={handlePresetChange}
+											showSearch
+											optionFilterProp="label"
+											disabled={!isAdding && !!selectedProvider}
+											options={PRESET_PROVIDERS.map(
+												(p: PresetProviderInfo) => ({
+													label: isZh ? `${p.nameZh} (${p.name})` : p.name,
+													value: p.id,
+												}),
+											)}
+										/>
+									</Form.Item>
+
+									<Form.Item
+										name="name"
+										label={t("form.name", { ns: "models" })}
+										rules={[
+											{
+												required: true,
+												message: t("form.nameRequired", { ns: "models" }),
+											},
+										]}
+									>
+										<Input
+											placeholder={t("form.namePlaceholder", { ns: "models" })}
+										/>
+									</Form.Item>
+
+									<Form.Item
+										name="apiKey"
+										label={t("form.apiKey", { ns: "models" })}
+										help={t("form.apiKeyHelp", { ns: "models" })}
+									>
+										<Input.Password placeholder="sk-..." />
+									</Form.Item>
+
+									<Form.Item
+										name="baseUrl"
+										label={t("form.baseUrl", { ns: "models" })}
+										rules={[
+											{
+												required: true,
+												message: t("form.baseUrlRequired", { ns: "models" }),
+											},
+										]}
+									>
+										<Input placeholder="https://api.example.com/v1" />
+									</Form.Item>
+
+									{/* Test Connection */}
+									<div className="flex items-center gap-3 mb-4">
+										<Button
+											icon={isTesting ? <LoadingOutlined /> : <LinkOutlined />}
+											onClick={handleTestConnection}
+											loading={isTesting}
+										>
+											{t("test", { ns: "models" })}
+										</Button>
+										{testResult && (
+											<span
+												className="text-sm"
+												style={{
+													color: testResult.success
+														? token.colorSuccess
+														: token.colorError,
+												}}
+											>
+												{testResult.success ? (
+													<>
+														<CheckCircleOutlined className="mr-1" />
+														{testResult.latencyMs > 0 &&
+															`${testResult.latencyMs}ms`}
+														{testResult.latencyMs === 0 &&
+															t("messages.testSuccess", { ns: "models" })}
+													</>
+												) : (
+													<>
+														<CloseCircleOutlined className="mr-1" />
+														{testResult.error ||
+															t("messages.testError", { ns: "models" })}
+													</>
+												)}
+											</span>
+										)}
+									</div>
+
+									{/* Claude Code / Agent Section */}
+									<ClaudeCodeSection
+										preset={watchedPreset}
+										claudeCodeEnabled={claudeCodeEnabled}
+										onClaudeCodeChange={setClaudeCodeEnabled}
+										claudeCodeModel={claudeCodeModel}
+										onClaudeCodeModelChange={setClaudeCodeModel}
+										models={
+											fetchedModels.length > 0
+												? fetchedModels
+												: (selectedProvider?.models ?? [])
+										}
+										testPassed={testResult?.success === true}
+										currentProviderId={selectedProvider?.id}
+										providers={providers}
+										token={token}
+									/>
+								</Form>
+							</div>
+
+							{/* Fixed bottom bar */}
+							<div
+								className="shrink-0 px-6 py-3 border-t flex items-center justify-between"
+								style={{ borderColor: token.colorBorderSecondary }}
+							>
+								{/* Left: model management buttons */}
+								<div>
+									{testResult?.success && (
+										<Space>
+											<Button
+												icon={
+													isFetchingModels ? (
+														<LoadingOutlined />
+													) : (
+														<ThunderboltOutlined />
+													)
+												}
+												onClick={handleFetchModels}
+												loading={isFetchingModels}
+												size="small"
+											>
+												{t("fetchModels", { ns: "models" })}
+											</Button>
+											{(fetchedModels.length > 0 ||
+												(selectedProvider &&
+													selectedProvider.models.length > 0)) && (
+												<Button
+													icon={<AppstoreOutlined />}
+													onClick={() => setManageModalOpen(true)}
+													size="small"
+													type="primary"
+													ghost
+												>
+													{t("manageModels", { ns: "models" })}
+												</Button>
+											)}
+										</Space>
+									)}
+								</div>
+								{/* Right: save/cancel */}
+								<Space>
+									{isAdding && (
+										<Button
+											onClick={() => {
+												setIsAdding(false);
+												if (providers.length > 0) {
+													setSelectedProviderId(providers[0].id);
+												}
+											}}
+										>
+											{t("cancel", { ns: "models" })}
+										</Button>
+									)}
+									<Button type="primary" onClick={() => form.submit()}>
+										{t("save", { ns: "models" })}
 									</Button>
-								)}
-								<Button type="primary" onClick={() => form.submit()}>
-									{t("save", { ns: "models" })}
-								</Button>
-							</Space>
-						</div>
+								</Space>
+							</div>
 						</>
 					) : (
 						<div className="flex flex-col items-center justify-center h-full text-center px-8">
@@ -838,9 +851,7 @@ function ClaudeCodeSection({
 	// Find if another provider already has claudeCodeEnabled
 	const existingCCProvider = useMemo(
 		() =>
-			providers.find(
-				(p) => p.claudeCodeEnabled && p.id !== currentProviderId,
-			),
+			providers.find((p) => p.claudeCodeEnabled && p.id !== currentProviderId),
 		[providers, currentProviderId],
 	);
 
@@ -861,10 +872,7 @@ function ClaudeCodeSection({
 				>
 					<div className="flex items-center justify-between">
 						<div>
-							<div
-								className="text-[13px]"
-								style={{ color: token.colorText }}
-							>
+							<div className="text-[13px]" style={{ color: token.colorText }}>
 								{t("claudeCode.useForAgent", { ns: "models" })}
 							</div>
 							<div
@@ -884,38 +892,38 @@ function ClaudeCodeSection({
 						/>
 					</div>
 					{claudeCodeEnabled && (
-					<div className="mt-2">
-						<div
-							className="text-[11px] mb-1"
-							style={{ color: token.colorTextSecondary }}
-						>
-							{t("claudeCode.agentModel", { ns: "models" })}
+						<div className="mt-2">
+							<div
+								className="text-[11px] mb-1"
+								style={{ color: token.colorTextSecondary }}
+							>
+								{t("claudeCode.agentModel", { ns: "models" })}
+							</div>
+							<Select
+								size="small"
+								variant="borderless"
+								placeholder={t("claudeCode.modelPlaceholder", { ns: "models" })}
+								value={claudeCodeModel}
+								onChange={onClaudeCodeModelChange}
+								allowClear
+								showSearch
+								options={models
+									.filter((m) => m.enabled)
+									.map((m) => ({
+										label: m.name || m.id,
+										value: m.id,
+									}))}
+								className="w-full"
+							/>
+							<div
+								className="text-[11px] mt-0.5"
+								style={{ color: token.colorTextQuaternary }}
+							>
+								{t("claudeCode.modelHint", { ns: "models" })}
+							</div>
 						</div>
-						<Select
-							size="small"
-							variant="borderless"
-							placeholder={t("claudeCode.modelPlaceholder", { ns: "models" })}
-							value={claudeCodeModel}
-							onChange={onClaudeCodeModelChange}
-							allowClear
-							showSearch
-							options={models
-								.filter((m) => m.enabled)
-								.map((m) => ({
-									label: m.name || m.id,
-									value: m.id,
-								}))}
-							className="w-full"
-						/>
-						<div
-							className="text-[11px] mt-0.5"
-							style={{ color: token.colorTextQuaternary }}
-						>
-							{t("claudeCode.modelHint", { ns: "models" })}
-						</div>
-					</div>
-				)}
-				{claudeCodeEnabled && existingCCProvider && (
+					)}
+					{claudeCodeEnabled && existingCCProvider && (
 						<div
 							className="text-[11px] mt-1.5"
 							style={{ color: token.colorWarning }}

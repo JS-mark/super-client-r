@@ -21,7 +21,11 @@ import { useSkillStore } from "../stores/skillStore";
 import type { SkillManifest } from "../types/electron";
 import type { Skill } from "../types/skills";
 
-const Skills: React.FC = () => {
+interface SkillsProps {
+	embedded?: boolean;
+}
+
+const Skills: React.FC<SkillsProps> = ({ embedded = false }) => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const navigate = useNavigate();
@@ -41,7 +45,7 @@ const Skills: React.FC = () => {
 			</div>
 		);
 	}, [t, token.colorText]);
-	useTitle(pageTitle);
+	useTitle(embedded ? null : pageTitle);
 
 	const {
 		installedSkills,
@@ -176,7 +180,12 @@ const Skills: React.FC = () => {
 							className="py-20"
 						/>
 					) : (
-						<div className="grid gap-4 pb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+						<div
+							className="grid gap-4 pb-4"
+							style={{
+								gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+							}}
+						>
 							{builtinSkills.map((skill) => (
 								<BuiltinSkillCard
 									key={skill.id}
@@ -229,7 +238,12 @@ const Skills: React.FC = () => {
 								className="py-20"
 							/>
 						) : (
-							<div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+							<div
+								className="grid gap-4"
+								style={{
+									gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+								}}
+							>
 								{marketSkills.map((item) => (
 									<SkillCard
 										key={item.id}
@@ -277,7 +291,12 @@ const Skills: React.FC = () => {
 							className="py-20"
 						/>
 					) : (
-						<div className="grid gap-4 pb-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+						<div
+							className="grid gap-4 pb-4"
+							style={{
+								gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+							}}
+						>
 							{filterInstalledSkills(installedSkills).map((item) => (
 								<SkillCard
 									key={item.id}
@@ -292,26 +311,32 @@ const Skills: React.FC = () => {
 		},
 	];
 
+	const content = (
+		<div className="p-4 h-full flex flex-col overflow-hidden">
+			<Tabs
+				defaultActiveKey="builtin"
+				items={items}
+				className="flex-1 min-h-0 flex flex-col [&_.ant-tabs-content-holder]:flex-1 [&_.ant-tabs-content-holder]:min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
+			/>
+			<SkillDetailModal
+				skill={selectedSkill}
+				open={modalOpen}
+				onClose={handleCloseModal}
+			/>
+			<BuiltinSkillDetailModal
+				skill={selectedBuiltinSkill}
+				open={builtinModalOpen}
+				onClose={handleCloseBuiltinModal}
+				onUse={handleUseBuiltinSkill}
+			/>
+		</div>
+	);
+
+	if (embedded) return content;
+
 	return (
 		<MainLayout>
-			<div className="p-4 h-full flex flex-col overflow-hidden">
-				<Tabs
-					defaultActiveKey="builtin"
-					items={items}
-					className="flex-1 min-h-0 flex flex-col [&_.ant-tabs-content-holder]:flex-1 [&_.ant-tabs-content-holder]:min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
-				/>
-				<SkillDetailModal
-					skill={selectedSkill}
-					open={modalOpen}
-					onClose={handleCloseModal}
-				/>
-				<BuiltinSkillDetailModal
-					skill={selectedBuiltinSkill}
-					open={builtinModalOpen}
-					onClose={handleCloseBuiltinModal}
-					onUse={handleUseBuiltinSkill}
-				/>
-			</div>
+			{content}
 		</MainLayout>
 	);
 };

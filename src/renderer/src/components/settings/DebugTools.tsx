@@ -1,4 +1,5 @@
 import {
+	BugOutlined,
 	CodeOutlined,
 	CopyOutlined,
 	DeleteOutlined,
@@ -67,6 +68,11 @@ const QuickActionsTab: React.FC = () => {
 		);
 	};
 
+	const handleOpenAgentTraces = () => {
+		// 走 hash router；新窗口避免污染当前 session
+		window.open("#/debug/agent-traces", "_blank");
+	};
+
 	const actions = [
 		{
 			key: "devTools",
@@ -78,6 +84,19 @@ const QuickActionsTab: React.FC = () => {
 			onClick: handleOpenDevTools,
 			iconBg: token.colorPrimaryBg,
 			iconColor: token.colorPrimary,
+		},
+		{
+			key: "agentTraces",
+			icon: <BugOutlined />,
+			label: t("openAgentTraces", "Agent 调用追踪", { ns: "settings" }),
+			description: t(
+				"openAgentTracesDesc",
+				"打开 /debug/agent-traces 调试页，查看 Agent 实时事件流与历史 trace",
+				{ ns: "settings" },
+			),
+			onClick: handleOpenAgentTraces,
+			iconBg: token.colorInfoBg,
+			iconColor: token.colorInfo,
 		},
 		{
 			key: "relaunch",

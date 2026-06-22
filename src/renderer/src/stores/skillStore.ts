@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { skillService } from "../services/skillService";
 import type { Skill } from "../types/skills";
 
@@ -142,6 +142,7 @@ export const useSkillStore = create<SkillState>()(
 		}),
 		{
 			name: "skill-storage",
+			storage: createJSONStorage(() => localStorage),
 			partialize: (state) => ({ installedSkills: state.installedSkills }),
 		},
 	),

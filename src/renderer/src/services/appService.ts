@@ -2,6 +2,7 @@ const APP_CHANNELS = {
 	GET_INFO: "app:get-info",
 	GET_USER_DATA_PATH: "app:get-user-data-path",
 	OPEN_PATH: "app:open-path",
+	SHOW_IN_FOLDER: "app:show-in-folder",
 	OPEN_EXTERNAL: "app:open-external",
 	CHECK_UPDATE: "app:check-update",
 	QUIT: "app:quit",
@@ -52,29 +53,61 @@ const api = window.electron.ipc;
 
 export const appService = {
 	getInfo: async () =>
-		unwrap<AppInfo>(await api.invoke(APP_CHANNELS.GET_INFO) as IPCResult<AppInfo>),
+		unwrap<AppInfo>(
+			(await api.invoke(APP_CHANNELS.GET_INFO)) as IPCResult<AppInfo>,
+		),
 	getUserDataPath: async () =>
-		unwrap<string>(await api.invoke(APP_CHANNELS.GET_USER_DATA_PATH) as IPCResult<string>),
+		unwrap<string>(
+			(await api.invoke(APP_CHANNELS.GET_USER_DATA_PATH)) as IPCResult<string>,
+		),
 	openPath: async (path: string) =>
-		unwrap<boolean>(await api.invoke(APP_CHANNELS.OPEN_PATH, path) as IPCResult<boolean>),
+		unwrap<boolean>(
+			(await api.invoke(APP_CHANNELS.OPEN_PATH, path)) as IPCResult<boolean>,
+		),
+	/** F-2: 在系统文件管理器中显示并选中指定路径 */
+	showInFolder: async (path: string) =>
+		unwrap<boolean>(
+			(await api.invoke(
+				APP_CHANNELS.SHOW_IN_FOLDER,
+				path,
+			)) as IPCResult<boolean>,
+		),
 	checkUpdate: () =>
 		window.electron.update.check() as Promise<UpdateCheckResult>,
 	quit: async () =>
-		unwrap<void>(await api.invoke(APP_CHANNELS.QUIT) as IPCResult<void>),
+		unwrap<void>((await api.invoke(APP_CHANNELS.QUIT)) as IPCResult<void>),
 	relaunch: async () =>
-		unwrap<void>(await api.invoke(APP_CHANNELS.RELAUNCH) as IPCResult<void>),
+		unwrap<void>((await api.invoke(APP_CHANNELS.RELAUNCH)) as IPCResult<void>),
 	openDevTools: async () =>
-		unwrap<void>(await api.invoke(APP_CHANNELS.OPEN_DEV_TOOLS) as IPCResult<void>),
+		unwrap<void>(
+			(await api.invoke(APP_CHANNELS.OPEN_DEV_TOOLS)) as IPCResult<void>,
+		),
 	getLogs: async (filePath?: string, tail?: number) =>
-		unwrap<string>(await api.invoke(APP_CHANNELS.GET_LOGS, filePath, tail) as IPCResult<string>),
+		unwrap<string>(
+			(await api.invoke(
+				APP_CHANNELS.GET_LOGS,
+				filePath,
+				tail,
+			)) as IPCResult<string>,
+		),
 	getLogsPath: async () =>
-		unwrap<string>(await api.invoke(APP_CHANNELS.GET_LOGS_PATH) as IPCResult<string>),
+		unwrap<string>(
+			(await api.invoke(APP_CHANNELS.GET_LOGS_PATH)) as IPCResult<string>,
+		),
 	listLogFiles: async () =>
-		unwrap<LogFileInfo[]>(await api.invoke(APP_CHANNELS.LIST_LOG_FILES) as IPCResult<LogFileInfo[]>),
+		unwrap<LogFileInfo[]>(
+			(await api.invoke(APP_CHANNELS.LIST_LOG_FILES)) as IPCResult<
+				LogFileInfo[]
+			>,
+		),
 	clearLogs: async () =>
-		unwrap<boolean>(await api.invoke(APP_CHANNELS.CLEAR_LOGS) as IPCResult<boolean>),
+		unwrap<boolean>(
+			(await api.invoke(APP_CHANNELS.CLEAR_LOGS)) as IPCResult<boolean>,
+		),
 	openExternal: async (url: string) =>
-		unwrap<boolean>(await api.invoke(APP_CHANNELS.OPEN_EXTERNAL, url) as IPCResult<boolean>),
+		unwrap<boolean>(
+			(await api.invoke(APP_CHANNELS.OPEN_EXTERNAL, url)) as IPCResult<boolean>,
+		),
 	// Update methods using typed preload API
 	downloadUpdate: () => window.electron.update.download(),
 	installUpdate: () => window.electron.update.install(),

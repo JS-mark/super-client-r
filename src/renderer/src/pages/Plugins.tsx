@@ -48,15 +48,11 @@ import {
 
 const { Search } = Input;
 
-// Template result from command execution
-interface TemplateResult {
-	id: string;
-	name: string;
-	description: string;
-	template: string;
+interface PluginsProps {
+	embedded?: boolean;
 }
 
-export default function Plugins() {
+export default function Plugins({ embedded = false }: PluginsProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const navigate = useNavigate();
@@ -85,7 +81,7 @@ export default function Plugins() {
 		),
 		[t, token.colorText],
 	);
-	useTitle(pageTitle);
+	useTitle(embedded ? null : pageTitle);
 
 	// 状态
 	const [activeTab, setActiveTab] = useState("market");
@@ -356,7 +352,7 @@ export default function Plugins() {
 					onOk: async () => {
 						try {
 							setLoading(true);
-							const plugin = await pluginService.downloadPlugin(pluginId);
+							await pluginService.downloadPlugin(pluginId);
 							// Grant permissions after install
 							await pluginService.grantPermissions(pluginId, permissions);
 							message.success(
@@ -903,12 +899,12 @@ export default function Plugins() {
 	const tabContent = [
 		{
 			key: "market",
-			label: t("plugins.market", "插件市场", { ns: "plugins" }),
+			label: t("plugins.market", "应用插件市场", { ns: "plugins" }),
 			children: (
 				<>
 					<div className="mb-4">
 						<Search
-							placeholder={t("plugins.searchPlaceholder", "搜索插件...", {
+							placeholder={t("plugins.searchPlaceholder", "搜索应用插件...", {
 								ns: "plugins",
 							})}
 							allowClear
@@ -924,7 +920,7 @@ export default function Plugins() {
 						</div>
 					) : marketPlugins.length === 0 ? (
 						<Empty
-							description={t("plugins.noMarketPlugins", "暂无可用插件", {
+							description={t("plugins.noMarketPlugins", "暂无可用应用插件", {
 								ns: "plugins",
 							})}
 						/>
@@ -1069,11 +1065,14 @@ export default function Plugins() {
 						</div>
 					) : installedPlugins.length === 0 ? (
 						<Empty
-							description={t("plugins.noInstalledPlugins", "暂无已安装插件")}
+							description={t(
+								"plugins.noInstalledPlugins",
+								"暂无已安装的应用插件",
+							)}
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
 						>
 							<Button type="primary" onClick={() => setActiveTab("market")}>
-								{t("plugins.browseMarket", "浏览插件市场", {
+								{t("plugins.browseMarket", "浏览应用插件市场", {
 									ns: "plugins",
 								})}
 							</Button>
@@ -1094,8 +1093,8 @@ export default function Plugins() {
 		loadMarketPlugins();
 	}, [loadInstalledPlugins, loadMarketPlugins]);
 
-	return (
-		<MainLayout>
+	const content = (
+		<>
 			<div
 				className="h-full flex flex-col"
 				style={{ backgroundColor: token.colorBgLayout }}
@@ -1114,13 +1113,13 @@ export default function Plugins() {
 								className="text-xl font-semibold"
 								style={{ color: token.colorText }}
 							>
-								{t("plugins.title", "插件中心", { ns: "plugins" })}
+								{t("plugins.title", "应用插件中心", { ns: "plugins" })}
 							</h1>
 							<p
 								className="text-xs mt-1"
 								style={{ color: token.colorTextTertiary }}
 							>
-								{t("plugins.subtitle", "管理和安装插件以扩展应用功能", {
+								{t("plugins.subtitle", "管理和安装应用插件以扩展客户端功能", {
 									ns: "plugins",
 								})}
 							</p>
@@ -1142,7 +1141,7 @@ export default function Plugins() {
 								icon={<PlusOutlined />}
 								onClick={handleInstallPlugin}
 							>
-								{t("plugins.installLocal", "安装本地插件", {
+								{t("plugins.installLocal", "安装本地应用插件", {
 									ns: "plugins",
 								})}
 							</Button>
@@ -1239,6 +1238,14 @@ export default function Plugins() {
 						);
 					})()}
 			</Modal>
+		</>
+	);
+
+	if (embedded) return content;
+
+	return (
+		<MainLayout>
+			{content}
 		</MainLayout>
 	);
 }

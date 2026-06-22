@@ -81,15 +81,18 @@ export function ShortcutItem({
 	const displayKey = formatShortcut(shortcut.currentKey, isMac);
 
 	// 录制状态：实时按键显示 + 超限检测
-	const recordingDisplay = isThisRecording && recordingKeys
-		? formatShortcut(recordingKeys, isMac)
-		: "";
-	const recordingExceeded = isThisRecording && recordingKeys
-		? recordingKeys.split("+").length > MAX_SHORTCUT_KEYS
-		: false;
-	const recordingOnlyModifiers = isThisRecording && recordingKeys
-		? recordingKeys.split("+").every((part) => isModifierKey(part))
-		: true;
+	const recordingDisplay =
+		isThisRecording && recordingKeys
+			? formatShortcut(recordingKeys, isMac)
+			: "";
+	const recordingExceeded =
+		isThisRecording && recordingKeys
+			? recordingKeys.split("+").length > MAX_SHORTCUT_KEYS
+			: false;
+	const recordingOnlyModifiers =
+		isThisRecording && recordingKeys
+			? recordingKeys.split("+").every((part) => isModifierKey(part))
+			: true;
 
 	return (
 		<div
@@ -131,12 +134,14 @@ export function ShortcutItem({
 								recordingDisplay ? "" : "animate-pulse"
 							}`}
 							style={{
-								backgroundColor: hasConflict || recordingExceeded
-									? token.colorErrorBg
-									: token.colorPrimaryBg,
-								color: hasConflict || recordingExceeded
-									? token.colorError
-									: token.colorPrimary,
+								backgroundColor:
+									hasConflict || recordingExceeded
+										? token.colorErrorBg
+										: token.colorPrimaryBg,
+								color:
+									hasConflict || recordingExceeded
+										? token.colorError
+										: token.colorPrimary,
 								border: `1px solid ${
 									hasConflict || recordingExceeded
 										? token.colorError
@@ -159,7 +164,9 @@ export function ShortcutItem({
 							icon={<CheckOutlined />}
 							onClick={onStopRecording}
 							className="h-7! w-7! min-w-0!"
-							disabled={!recordingDisplay || recordingOnlyModifiers || recordingExceeded}
+							disabled={
+								!recordingDisplay || recordingOnlyModifiers || recordingExceeded
+							}
 						/>
 					</div>
 				) : (

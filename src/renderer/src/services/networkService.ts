@@ -3,7 +3,11 @@
  * 代理配置 + 请求日志追踪
  */
 
-import type { ProxyConfig, RequestLogEntry } from "../types/electron";
+import type {
+	ProxyConfig,
+	RequestLogEntry,
+	RequestLogEntryUpdate,
+} from "../types/electron";
 
 export const networkService = {
 	// ============ 代理配置 ============
@@ -13,8 +17,7 @@ export const networkService = {
 	setProxyConfig: (config: ProxyConfig) =>
 		window.electron.network.setProxyConfig(config),
 
-	testProxy: (config: ProxyConfig) =>
-		window.electron.network.testProxy(config),
+	testProxy: (config: ProxyConfig) => window.electron.network.testProxy(config),
 
 	// ============ 请求日志 ============
 
@@ -29,4 +32,7 @@ export const networkService = {
 
 	onRequestLogEntry: (callback: (entry: RequestLogEntry) => void) =>
 		window.electron.network.onRequestLogEntry(callback),
+
+	onRequestLogUpdate: (callback: (update: RequestLogEntryUpdate) => void) =>
+		window.electron.network.onRequestLogUpdate(callback),
 };

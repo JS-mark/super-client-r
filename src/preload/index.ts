@@ -4,11 +4,17 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+import type { ElectronAPIMigrated } from "@super-client/shared-types/electron-api";
 import { createBridge } from "./bridge";
 
 // ============ 类型定义 ============
 
-export interface ElectronAPI {
+/**
+ * 完整 ElectronAPI 契约。已迁移到 `@super-client/shared-types/electron-api` 的
+ * 部分通过 `ElectronAPIMigrated` 强制对齐；尚未迁移的 namespace 仍以本地内联
+ * 形式存在，迁移完成后将逐步替换为来自共享契约的类型。
+ */
+export interface ElectronAPI extends ElectronAPIMigrated {
 	// 窗口控制
 	window: {
 		minimize: () => Promise<IPCResponse>;
@@ -138,59 +144,6 @@ export interface ElectronAPI {
 		};
 	};
 
-	// Chat History API
-	chat: {
-		listConversations: () => Promise<IPCResponse<ConversationSummary[]>>;
-		createConversation: (
-			name: string,
-			options?: CreateConversationOptions,
-		) => Promise<IPCResponse<ConversationSummary>>;
-		deleteConversation: (id: string) => Promise<IPCResponse>;
-		renameConversation: (
-			conversationId: string,
-			name: string,
-		) => Promise<IPCResponse>;
-		getMessages: (
-			conversationId: string,
-		) => Promise<IPCResponse<ChatMessagePersist[]>>;
-		saveMessages: (
-			conversationId: string,
-			messages: ChatMessagePersist[],
-		) => Promise<IPCResponse>;
-		appendMessage: (
-			conversationId: string,
-			message: ChatMessagePersist,
-		) => Promise<IPCResponse>;
-		updateMessage: (
-			conversationId: string,
-			messageId: string,
-			updates: Partial<ChatMessagePersist>,
-		) => Promise<IPCResponse>;
-		clearMessages: (conversationId: string) => Promise<IPCResponse>;
-		getLastConversation: () => Promise<IPCResponse<string | undefined>>;
-		setLastConversation: (id: string) => Promise<IPCResponse>;
-		getConversationDir: (id: string) => Promise<IPCResponse<string>>;
-		getWorkspaceDir: (id: string) => Promise<IPCResponse<string>>;
-		updateConversationMetadata: (
-			id: string,
-			updates: Partial<ConversationSummary>,
-		) => Promise<IPCResponse>;
-	};
-
-	// Workspace Runtime API
-	workspaceRuntime: {
-		listConfigs: () => Promise<IPCResponse<WorkspaceConfig[]>>;
-		getConfig: (id: string) => Promise<IPCResponse<WorkspaceConfig | null>>;
-		saveConfig: (
-			config: WorkspaceConfig,
-		) => Promise<IPCResponse<WorkspaceConfig>>;
-		deleteConfig: (id: string) => Promise<IPCResponse<boolean>>;
-		getCurrentId: () => Promise<IPCResponse<string>>;
-		setCurrentId: (id: string) => Promise<IPCResponse<string>>;
-		getDefaultId: () => Promise<IPCResponse<string>>;
-		setDefaultId: (id: string) => Promise<IPCResponse<string>>;
-	};
-
 	// 主题 API
 	theme: {
 		get: () => Promise<IPCResponse<string>>;
@@ -237,6 +190,13 @@ export interface ElectronAPI {
 			conversationId?: string;
 			messageId?: string;
 			customName?: string;
+		}) => Promise<IPCResponse<AttachmentInfo>>;
+		saveAttachmentBytes: (data: {
+			bytes: ArrayBuffer | Uint8Array;
+			fileName: string;
+			mimeType?: string;
+			conversationId?: string;
+			messageId?: string;
 		}) => Promise<IPCResponse<AttachmentInfo>>;
 		deleteAttachment: (attachmentPath: string) => Promise<IPCResponse>;
 		listAttachments: (filter?: {
@@ -329,9 +289,7 @@ export interface ElectronAPI {
 		) => Promise<IPCResponse<{ requestId: string }>>;
 		interrupt: (requestId: string) => Promise<IPCResponse<boolean>>;
 		close: (requestId: string) => Promise<IPCResponse<boolean>>;
-		listSessions: (
-			dir?: string,
-		) => Promise<IPCResponse<AgentSDKSessionInfo[]>>;
+		listSessions: (dir?: string) => Promise<IPCResponse<AgentSDKSessionInfo[]>>;
 		getSessionInfo: (
 			sessionId: string,
 		) => Promise<IPCResponse<AgentSDKSessionInfo | null>>;
@@ -343,6 +301,7 @@ export interface ElectronAPI {
 			toolUseId: string,
 			allowed: boolean,
 			updatedInput?: Record<string, unknown>,
+			updatedPermissions?: Array<Record<string, unknown>>,
 		) => Promise<IPCResponse<boolean>>;
 		onStreamEvent: (
 			callback: (event: AgentSDKStreamEvent) => void,
@@ -543,10 +502,7 @@ export interface ElectronAPI {
 				data: string;
 			}) => void,
 		) => () => void;
-		killCommand: (
-			deviceId: string,
-			requestId: string,
-		) => Promise<IPCResponse>;
+		killCommand: (deviceId: string, requestId: string) => Promise<IPCResponse>;
 		tabComplete: (
 			deviceId: string,
 			line: string,
@@ -555,6 +511,23 @@ export interface ElectronAPI {
 		getCwd: (deviceId: string) => Promise<IPCResponse<string>>;
 		getRelayConfig: () => Promise<IPCResponse<RelayConfig | null>>;
 		setRelayConfig: (config: RelayConfig) => Promise<IPCResponse>;
+	};
+
+	// PTY (本地终端) API
+	pty: {
+		create: (
+			request: PtyCreateRequest,
+		) => Promise<IPCResponse<PtyCreateResult>>;
+		write: (sessionId: string, data: string) => Promise<IPCResponse>;
+		resize: (
+			sessionId: string,
+			cols: number,
+			rows: number,
+		) => Promise<IPCResponse>;
+		kill: (sessionId: string) => Promise<IPCResponse>;
+		list: () => Promise<IPCResponse<PtyInfo[]>>;
+		onData: (callback: (event: PtyDataEvent) => void) => () => void;
+		onExit: (callback: (event: PtyExitEvent) => void) => () => void;
 	};
 
 	// Remote Control Events API
@@ -591,7 +564,9 @@ export interface ElectronAPI {
 	network: {
 		getProxyConfig: () => Promise<IPCResponse<ProxyConfig | null>>;
 		setProxyConfig: (config: ProxyConfig) => Promise<IPCResponse>;
-		testProxy: (config: ProxyConfig) => Promise<
+		testProxy: (
+			config: ProxyConfig,
+		) => Promise<
 			IPCResponse<{ success: boolean; latencyMs: number; error?: string }>
 		>;
 		getLogEnabled: () => Promise<IPCResponse<boolean>>;
@@ -600,6 +575,9 @@ export interface ElectronAPI {
 		clearRequestLog: () => Promise<IPCResponse>;
 		onRequestLogEntry: (
 			callback: (entry: RequestLogEntry) => void,
+		) => () => void;
+		onRequestLogUpdate: (
+			callback: (update: RequestLogEntryUpdate) => void,
 		) => () => void;
 	};
 
@@ -616,6 +594,14 @@ export interface ElectronAPI {
 		getConfig: () => Promise<IPCResponse<AppInitConfig | null>>;
 		refresh: () => Promise<IPCResponse<AppInitConfig | null>>;
 		onConfigUpdated: (callback: (config: AppInitConfig) => void) => () => void;
+		// project-session-redesign A-7 (S7) — §9.5 picker sticky 默认值
+		getNewConversationDefaults: () => Promise<
+			IPCResponse<{ lastKind: "casual" | "project"; lastProjectId?: string }>
+		>;
+		setNewConversationDefaults: (value: {
+			lastKind: "casual" | "project";
+			lastProjectId?: string;
+		}) => Promise<IPCResponse<void>>;
 	};
 
 	// 系统信息 API
@@ -769,18 +755,47 @@ export interface AgentSDKPermissionRequest {
 	title?: string;
 	description?: string;
 	displayName?: string;
+	suggestions?: Array<Record<string, unknown>>;
+	blockedPath?: string;
+	decisionReason?: string;
+	agentId?: string;
 }
 
 export type AgentSDKStreamEventType =
 	| "init"
 	| "chunk"
 	| "assistant"
+	| "tool_call"
+	| "tool_error"
 	| "tool_use_summary"
 	| "status"
 	| "permission_request"
+	| "permission_denied"
 	| "rate_limit"
 	| "result"
 	| "error";
+
+export interface AgentSDKToolCallEventData {
+	id: string;
+	name: string;
+	input: Record<string, unknown>;
+	title?: string;
+	description?: string;
+	displayName?: string;
+	kind: "ask-user-question" | "permission" | "tool";
+}
+
+export interface AgentSDKToolErrorEventData {
+	id: string;
+	name: string;
+	input?: Record<string, unknown>;
+	error: unknown;
+	code?: string;
+	title?: string;
+	description?: string;
+	displayName?: string;
+	kind: "ask-user-question" | "permission" | "tool";
+}
 
 export interface AgentSDKStreamEvent {
 	requestId: string;
@@ -789,6 +804,9 @@ export interface AgentSDKStreamEvent {
 	content?: string;
 	error?: string;
 	toolSummary?: string;
+	precedingToolUseIds?: string[];
+	toolCall?: AgentSDKToolCallEventData;
+	toolError?: AgentSDKToolErrorEventData;
 	result?: AgentSDKResultData;
 	permissionRequest?: AgentSDKPermissionRequest;
 	status?: string;
@@ -1156,6 +1174,7 @@ export interface ChatStreamEvent {
 		| "error"
 		| "tool_call"
 		| "tool_result"
+		| "tool_error"
 		| "tool_approval_request"
 		| "tool_rejected";
 	content?: string;
@@ -1170,6 +1189,13 @@ export interface ChatStreamEvent {
 		name: string;
 		result: unknown;
 		isError?: boolean;
+		duration?: number;
+	};
+	toolError?: {
+		toolCallId: string;
+		name: string;
+		error: unknown;
+		code?: string;
 		duration?: number;
 	};
 	toolApproval?: {
@@ -1192,6 +1218,43 @@ export interface IPCResponse<T = unknown> {
 	success: boolean;
 	data?: T;
 	error?: string;
+}
+
+// ─── PTY (terminal) ─────────────────────────────────────
+export interface PtyCreateRequest {
+	sessionId: string;
+	cwd?: string;
+	cols: number;
+	rows: number;
+	shell?: string;
+	env?: Record<string, string>;
+}
+
+export interface PtyCreateResult {
+	sessionId: string;
+	shell: string;
+	pid: number;
+	cwd: string;
+	user: string;
+	host: string;
+}
+
+export interface PtyDataEvent {
+	sessionId: string;
+	data: string;
+}
+
+export interface PtyExitEvent {
+	sessionId: string;
+	exitCode: number;
+	signal?: number;
+}
+
+export interface PtyInfo {
+	sessionId: string;
+	shell: string;
+	pid: number;
+	cwd: string;
 }
 
 export interface SearchExecuteRequest {
@@ -1256,6 +1319,14 @@ export interface ConversationSummary {
 	session?: SessionMetadata;
 }
 
+/** 增量更新 ConversationSummary 时使用，支持 Partial<SessionMetadata> 子字段。 */
+export type ConversationSummaryUpdate = Omit<
+	Partial<ConversationSummary>,
+	"session"
+> & {
+	session?: Partial<SessionMetadata>;
+};
+
 export type SessionKind = "chat" | "agent" | "plan" | "remote" | "automation";
 
 export interface CreateConversationOptions {
@@ -1266,7 +1337,12 @@ export interface CreateConversationOptions {
 
 export type InteractionProfile = "claude-code" | "codex" | "hybrid";
 
-export type PlanMode = "off" | "auto" | "plan";
+export type PlanMode =
+	| "chat"
+	| "plan-only"
+	| "plan-then-ask"
+	| "auto-execute-safe"
+	| "full-agent";
 
 export type ApprovalMode = "request" | "auto-safe" | "full-access";
 
@@ -1306,7 +1382,13 @@ export interface WorkspaceContextPolicy {
 
 export interface EnabledCapability {
 	id: string;
-	type: "mcp" | "skill" | "hook" | "app-plugin" | "theme" | "capability-package";
+	type:
+		| "mcp"
+		| "skill"
+		| "hook"
+		| "app-plugin"
+		| "theme"
+		| "capability-package";
 	scope: "global" | "workspace" | "session";
 	enabled: boolean;
 }
@@ -1506,10 +1588,27 @@ export interface RequestLogEntry {
 	requestBodyPreview?: string;
 	responseStatus?: number;
 	responseStatusText?: string;
+	responseHeaders?: Record<string, string>;
 	responseBodyPreview?: string;
+	state?: "pending" | "streaming" | "complete" | "error";
+	contentType?: string;
+	isStreaming?: boolean;
 	durationMs: number;
 	error?: string;
 	source: "fetch" | "axios";
+}
+
+export interface RequestLogEntryUpdate {
+	id: string;
+	appendBody?: string;
+	state?: "pending" | "streaming" | "complete" | "error";
+	responseStatus?: number;
+	responseStatusText?: string;
+	responseHeaders?: Record<string, string>;
+	contentType?: string;
+	isStreaming?: boolean;
+	durationMs?: number;
+	error?: string;
 }
 
 // ============ Webhook 相关类型 ============
@@ -1570,95 +1669,284 @@ const electronAPI: ElectronAPI = {
 	// ─── Auto-bridged namespaces ─────────────────
 	// createBridge 根据方法名列表生成普通对象（contextBridge 不支持 Proxy）
 	window: createBridge<ElectronAPI["window"]>("window", [
-		"minimize", "maximize", "close", "isMaximized", "onMaximizeChange",
+		"minimize",
+		"maximize",
+		"close",
+		"isMaximized",
+		"onMaximizeChange",
 	]),
 	agent: createBridge<ElectronAPI["agent"]>("agent", [
-		"createSession", "sendMessage", "getStatus", "stopAgent",
-		"listAgents", "getMessages", "clearMessages", "deleteSession",
+		"createSession",
+		"sendMessage",
+		"getStatus",
+		"stopAgent",
+		"listAgents",
+		"getMessages",
+		"clearMessages",
+		"deleteSession",
 		"onStreamEvent",
 	]),
 	skill: createBridge<ElectronAPI["skill"]>("skill", [
-		"listSkills", "installSkill", "uninstallSkill", "getSkill",
-		"executeSkill", "getAllTools", "enableSkill", "disableSkill",
-		"getSystemPrompt", "getCommandPrompt", "validateSkill",
+		"listSkills",
+		"installSkill",
+		"uninstallSkill",
+		"getSkill",
+		"executeSkill",
+		"getAllTools",
+		"enableSkill",
+		"disableSkill",
+		"getSystemPrompt",
+		"getCommandPrompt",
+		"validateSkill",
 	]),
-	chat: createBridge<ElectronAPI["chat"]>("chat", [
-		"listConversations", "createConversation", "deleteConversation",
-		"renameConversation", "getMessages", "saveMessages", "appendMessage",
-		"updateMessage", "clearMessages", "getLastConversation",
-		"setLastConversation", "getConversationDir", "getWorkspaceDir",
-		"updateConversationMetadata",
+	runtime: createBridge<ElectronAPI["runtime"]>("runtime", [
+		"resolveSession",
+		"getAuditLog",
+		"clearAuditLog",
+		"findGrant",
+		"addGrant",
+		"listGrants",
+		"removeGrant",
+		"recordDeny",
+		"clearGrants",
 	]),
-	workspaceRuntime: createBridge<ElectronAPI["workspaceRuntime"]>(
-		"workspaceRuntime",
-		[
-			"listConfigs", "getConfig", "saveConfig", "deleteConfig",
-			"getCurrentId", "setCurrentId", "getDefaultId", "setDefaultId",
-		],
-	),
+	featureFlags: createBridge<ElectronAPI["featureFlags"]>("featureFlags", [
+		"set",
+		"get",
+	]),
+	fileAction: createBridge<ElectronAPI["fileAction"]>("fileAction", [
+		"open",
+		"reveal",
+		"copyPath",
+		"detectOpenTargets",
+		"openWith",
+		"getAppIcon",
+	]),
+	attachment: createBridge<ElectronAPI["attachment"]>("attachment", [
+		"resolveContext",
+	]),
+	extensions: createBridge<ElectronAPI["extensions"]>("extensions", ["list"]),
+	git: createBridge<ElectronAPI["git"]>("git", [
+		"getBranchInfo",
+		"createWorktree",
+		"listBranches",
+		"switchBranch",
+		"createBranch",
+		"listCommits",
+	]),
+	// project-session-redesign A-6
+	projects: createBridge<ElectronAPI["projects"]>("projects", [
+		"list",
+		"add",
+		"pickAndAdd",
+		"rename",
+		"pin",
+		"markFirstRunSeen",
+		"archive",
+		"createWorktree",
+		"remove",
+		"getSettings",
+		"saveSettings",
+		"listOrphans",
+		"restoreOrphan",
+	]),
+	sessions: createBridge<ElectronAPI["sessions"]>("sessions", [
+		"list",
+		"create",
+		"getMeta",
+		"updateMeta",
+		"rename",
+		"delete",
+		"reassignProject",
+		"appendEvent",
+		"readMessages",
+		"fork",
+	]),
+	cwd: createBridge<ElectronAPI["cwd"]>("cwd", [
+		"resolveSessionCwd",
+		"resolveProjectRoot",
+	]),
+	legacyData: createBridge<ElectronAPI["legacyData"]>("legacyData", [
+		"detect",
+		"importAll",
+	]),
 	theme: createBridge<ElectronAPI["theme"]>("theme", [
-		"get", "set", "onChange",
+		"get",
+		"set",
+		"onChange",
 	]),
 	search: createBridge<ElectronAPI["search"]>("search", [
-		"getConfigs", "saveConfig", "deleteConfig", "setDefault",
-		"getDefault", "validateConfig", "execute",
+		"getConfigs",
+		"saveConfig",
+		"deleteConfig",
+		"setDefault",
+		"getDefault",
+		"validateConfig",
+		"execute",
 	]),
 	file: createBridge<ElectronAPI["file"]>("file", [
-		"selectFiles", "readFile", "saveAttachment", "deleteAttachment",
-		"listAttachments", "openAttachment", "getAttachmentPath", "copyFile",
+		"selectFiles",
+		"readFile",
+		"saveAttachment",
+		"saveAttachmentBytes",
+		"deleteAttachment",
+		"listAttachments",
+		"openAttachment",
+		"getAttachmentPath",
+		"copyFile",
 	]),
 	log: createBridge<ElectronAPI["log"]>("log", [
-		"query", "getStats", "getModules", "rendererLog",
-		"clearDb", "exportLogs", "openViewer",
+		"query",
+		"getStats",
+		"getModules",
+		"rendererLog",
+		"clearDb",
+		"exportLogs",
+		"openViewer",
 	]),
 	auth: createBridge<ElectronAPI["auth"]>("auth", [
-		"login", "logout", "getUser",
+		"login",
+		"logout",
+		"getUser",
 	]),
 	update: createBridge<ElectronAPI["update"]>("update", [
-		"check", "download", "install",
-		"onChecking", "onAvailable", "onNotAvailable",
-		"onProgress", "onDownloaded", "onError",
+		"check",
+		"download",
+		"install",
+		"onChecking",
+		"onAvailable",
+		"onNotAvailable",
+		"onProgress",
+		"onDownloaded",
+		"onError",
 	]),
 	model: createBridge<ElectronAPI["model"]>("model", [
-		"listProviders", "getProvider", "saveProvider", "deleteProvider",
-		"testConnection", "fetchModels", "updateModelConfig",
-		"getActiveModel", "setActiveModel",
+		"listProviders",
+		"getProvider",
+		"saveProvider",
+		"deleteProvider",
+		"testConnection",
+		"fetchModels",
+		"updateModelConfig",
+		"getActiveModel",
+		"setActiveModel",
 	]),
 	agentSDK: createBridge<ElectronAPI["agentSDK"]>("agentSDK", [
-		"createQuery", "interrupt", "close", "listSessions",
-		"getSessionInfo", "setModel", "resolvePermission", "onStreamEvent",
-		"forkSession", "renameSession", "tagSession", "getSessionMessages",
-		"getConfig", "setConfig", "getProfiles", "setProfiles",
-		"getTeams", "setTeams",
+		"createQuery",
+		"interrupt",
+		"close",
+		"listSessions",
+		"getSessionInfo",
+		"setModel",
+		"resolvePermission",
+		"onStreamEvent",
+		"forkSession",
+		"renameSession",
+		"tagSession",
+		"getSessionMessages",
+		"getConfig",
+		"setConfig",
+		"getProfiles",
+		"setProfiles",
+		"getTeams",
+		"setTeams",
 	]),
+	// AgentRuntime 适配层（spec: 2026-06-21-agent-runtime-adapter-design）
+	agentRuntime: createBridge<ElectronAPI["agentRuntime"]>("agentRuntime", [
+		"createQuery",
+		"resolvePermission",
+		"interrupt",
+		"listRuntimes",
+		"listNativeSessions",
+		"forkNativeSession",
+		"onStreamEvent",
+	]),
+	// AgentTrace 调试通道（手工 wiring；channel 名 `debug:agent-traces:*` 不符
+	// createBridge 的 ns:method 规则）
+	agentDebug: {
+		listTraces: (filter) =>
+			ipcRenderer.invoke("debug:agent-traces:list", filter),
+		getTrace: (requestId) =>
+			ipcRenderer.invoke("debug:agent-traces:get", requestId),
+		clearTraces: () => ipcRenderer.invoke("debug:agent-traces:clear"),
+		exportTrace: (requestId) =>
+			ipcRenderer.invoke("debug:agent-traces:export", requestId),
+		getConfig: () => ipcRenderer.invoke("debug:agent-traces:get-config"),
+		setConfig: (patch) =>
+			ipcRenderer.invoke("debug:agent-traces:set-config", patch),
+		onTraceUpdated: (callback) => {
+			const listener = (_: unknown, summary: Parameters<typeof callback>[0]) =>
+				callback(summary);
+			ipcRenderer.on("debug:agent-traces:updated", listener);
+			return () => {
+				ipcRenderer.off("debug:agent-traces:updated", listener);
+			};
+		},
+	},
 	imbot: createBridge<ElectronAPI["imbot"]>("imbot", [
-		"listBots", "startBot", "stopBot", "getBotStatus", "sendMessage",
+		"listBots",
+		"startBot",
+		"stopBot",
+		"getBotStatus",
+		"sendMessage",
 	]),
 	remoteChat: createBridge<ElectronAPI["remoteChat"]>("remoteChat", [
-		"bind", "unbind", "getBinding", "checkBotOnline",
-		"sendMessage", "getRemoteMessages", "onIMMessage",
+		"bind",
+		"unbind",
+		"getBinding",
+		"checkBotOnline",
+		"sendMessage",
+		"getRemoteMessages",
+		"onIMMessage",
 	]),
 	remoteDevice: createBridge<ElectronAPI["remoteDevice"]>("remoteDevice", [
-		"listDevices", "registerDevice", "removeDevice", "getDevice",
-		"executeCommand", "onCommandOutput", "killCommand",
-		"tabComplete", "getCwd", "getRelayConfig", "setRelayConfig",
+		"listDevices",
+		"registerDevice",
+		"removeDevice",
+		"getDevice",
+		"executeCommand",
+		"onCommandOutput",
+		"killCommand",
+		"tabComplete",
+		"getCwd",
+		"getRelayConfig",
+		"setRelayConfig",
 	]),
 	remoteControl: createBridge<ElectronAPI["remoteControl"]>("remoteControl", [
-		"getEvents", "clearEvents", "getConnectionInfo", "onNewEvent",
+		"getEvents",
+		"clearEvents",
+		"getConnectionInfo",
+		"onNewEvent",
 	]),
 	network: createBridge<ElectronAPI["network"]>("network", [
-		"getProxyConfig", "setProxyConfig", "testProxy",
-		"getLogEnabled", "setLogEnabled", "getRequestLog",
-		"clearRequestLog", "onRequestLogEntry",
+		"getProxyConfig",
+		"setProxyConfig",
+		"testProxy",
+		"getLogEnabled",
+		"setLogEnabled",
+		"getRequestLog",
+		"clearRequestLog",
+		"onRequestLogEntry",
+		"onRequestLogUpdate",
 	]),
 	webhook: createBridge<ElectronAPI["webhook"]>("webhook", [
-		"getConfigs", "saveConfig", "deleteConfig", "test",
+		"getConfigs",
+		"saveConfig",
+		"deleteConfig",
+		"test",
 	]),
 	appConfig: createBridge<ElectronAPI["appConfig"]>("appConfig", [
-		"getConfig", "refresh", "onConfigUpdated",
+		"getConfig",
+		"refresh",
+		"onConfigUpdated",
+		// A-7
+		"getNewConversationDefaults",
+		"setNewConversationDefaults",
 	]),
 	system: createBridge<ElectronAPI["system"]>("system", [
-		"getHomedir", "getEnvInfo", "getProcessMetrics",
+		"getHomedir",
+		"getEnvInfo",
+		"getProcessMetrics",
 	]),
 
 	// ─── MCP（嵌套结构，需手动映射到不同 namespace）─────
@@ -1676,48 +1964,28 @@ const electronAPI: ElectronAPI = {
 			ipcRenderer.invoke("mcp:call-tool", serverId, toolName, args),
 		getAllTools: () => ipcRenderer.invoke("mcp:get-all-tools"),
 		builtin: {
-			getDefinitions: () =>
-				ipcRenderer.invoke("mcp-builtin:get-definitions"),
+			getDefinitions: () => ipcRenderer.invoke("mcp-builtin:get-definitions"),
 			createConfig: (definitionId, config) =>
-				ipcRenderer.invoke(
-					"mcp-builtin:create-config",
-					definitionId,
-					config,
-				),
-			search: (params) =>
-				ipcRenderer.invoke("mcp-builtin:search", params),
+				ipcRenderer.invoke("mcp-builtin:create-config", definitionId, config),
+			search: (params) => ipcRenderer.invoke("mcp-builtin:search", params),
 		},
 		thirdParty: {
 			add: (config) => ipcRenderer.invoke("mcp-thirdparty:add", config),
 			proxy: (serverId, request) =>
-				ipcRenderer.invoke(
-					"mcp-thirdparty:proxy",
-					serverId,
-					request,
-				),
+				ipcRenderer.invoke("mcp-thirdparty:proxy", serverId, request),
 		},
 		market: {
-			search: (params) =>
-				ipcRenderer.invoke("mcp-market:search", params),
-			getPopular: (limit) =>
-				ipcRenderer.invoke("mcp-market:popular", limit),
-			getTopRated: (limit) =>
-				ipcRenderer.invoke("mcp-market:top-rated", limit),
-			getNewest: (limit) =>
-				ipcRenderer.invoke("mcp-market:newest", limit),
-			getDetail: (id) =>
-				ipcRenderer.invoke("mcp-market:get-detail", id),
+			search: (params) => ipcRenderer.invoke("mcp-market:search", params),
+			getPopular: (limit) => ipcRenderer.invoke("mcp-market:popular", limit),
+			getTopRated: (limit) => ipcRenderer.invoke("mcp-market:top-rated", limit),
+			getNewest: (limit) => ipcRenderer.invoke("mcp-market:newest", limit),
+			getDetail: (id) => ipcRenderer.invoke("mcp-market:get-detail", id),
 			getTags: () => ipcRenderer.invoke("mcp-market:get-tags"),
 			install: (marketItem, customConfig) =>
-				ipcRenderer.invoke(
-					"mcp-market:install",
-					marketItem,
-					customConfig,
-				),
+				ipcRenderer.invoke("mcp-market:install", marketItem, customConfig),
 			getReadme: (marketItem) =>
 				ipcRenderer.invoke("mcp-market:get-readme", marketItem),
-			setApiUrl: (url) =>
-				ipcRenderer.invoke("mcp-market:set-api-url", url),
+			setApiUrl: (url) => ipcRenderer.invoke("mcp-market:set-api-url", url),
 		},
 	},
 
@@ -1725,14 +1993,9 @@ const electronAPI: ElectronAPI = {
 	llm: {
 		chatCompletion: (request) =>
 			ipcRenderer.invoke("llm:chat-completion", request),
-		stopStream: (requestId) =>
-			ipcRenderer.invoke("llm:stop-stream", requestId),
+		stopStream: (requestId) => ipcRenderer.invoke("llm:stop-stream", requestId),
 		toolApprovalResponse: (toolCallId, approved) =>
-			ipcRenderer.invoke(
-				"llm:tool-approval-response",
-				toolCallId,
-				approved,
-			),
+			ipcRenderer.invoke("llm:tool-approval-response", toolCallId, approved),
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => {
 			const listener = (_event: unknown, data: ChatStreamEvent) =>
 				callback(data);
@@ -1743,8 +2006,7 @@ const electronAPI: ElectronAPI = {
 
 	// ─── Skin（跨 namespace 映射到 plugin:* channels）──
 	skin: {
-		getActiveSkin: () =>
-			ipcRenderer.invoke("plugin:get-active-skin"),
+		getActiveSkin: () => ipcRenderer.invoke("plugin:get-active-skin"),
 		setActiveSkin: (pluginId, themeId) =>
 			ipcRenderer.invoke("plugin:set-active-skin", pluginId, themeId),
 		onTokensChanged: (
@@ -1761,58 +2023,37 @@ const electronAPI: ElectronAPI = {
 
 	// ─── Markdown Theme（跨 namespace 映射到 plugin:* channels）──
 	markdownTheme: {
-		getActive: () =>
-			ipcRenderer.invoke("plugin:get-active-markdown-theme"),
+		getActive: () => ipcRenderer.invoke("plugin:get-active-markdown-theme"),
 		setActive: (pluginId, themeId) =>
-			ipcRenderer.invoke(
-				"plugin:set-active-markdown-theme",
-				pluginId,
-				themeId,
-			),
-		getCSS: () =>
-			ipcRenderer.invoke("plugin:get-markdown-theme-css"),
+			ipcRenderer.invoke("plugin:set-active-markdown-theme", pluginId, themeId),
+		getCSS: () => ipcRenderer.invoke("plugin:get-markdown-theme-css"),
 		onCSSChanged: (callback: (css: string | null) => void) => {
-			const listener = (_event: unknown, css: string | null) =>
-				callback(css);
+			const listener = (_event: unknown, css: string | null) => callback(css);
 			ipcRenderer.on("markdown-theme:css-changed", listener);
-			return () =>
-				ipcRenderer.off("markdown-theme:css-changed", listener);
+			return () => ipcRenderer.off("markdown-theme:css-changed", listener);
 		},
 	},
 
 	// ─── Plugin（事件 channel 使用 camelCase，需手动映射）──
 	plugin: {
 		grantPermissions: (pluginId, permissions) =>
-			ipcRenderer.invoke(
-				"plugin:grant-permissions",
-				pluginId,
-				permissions,
-			),
+			ipcRenderer.invoke("plugin:grant-permissions", pluginId, permissions),
 		getPermissions: (pluginId) =>
 			ipcRenderer.invoke("plugin:get-permissions", pluginId),
-		getUIContributions: () =>
-			ipcRenderer.invoke("plugin:get-ui-contributions"),
+		getUIContributions: () => ipcRenderer.invoke("plugin:get-ui-contributions"),
 		getPluginPageHTML: (pluginId, pagePath) =>
-			ipcRenderer.invoke(
-				"plugin:get-plugin-page-html",
-				pluginId,
-				pagePath,
-			),
+			ipcRenderer.invoke("plugin:get-plugin-page-html", pluginId, pagePath),
 		installDev: (sourcePath) =>
 			ipcRenderer.invoke("plugin:install-dev", sourcePath),
-		reloadDev: (pluginId) =>
-			ipcRenderer.invoke("plugin:reload-dev", pluginId),
+		reloadDev: (pluginId) => ipcRenderer.invoke("plugin:reload-dev", pluginId),
 		checkUpdates: () => ipcRenderer.invoke("plugin:check-updates"),
 		updatePlugin: (pluginId) =>
 			ipcRenderer.invoke("plugin:update-plugin", pluginId),
-		onUIContributionsChanged: (
-			callback: (contributions: unknown) => void,
-		) => {
+		onUIContributionsChanged: (callback: (contributions: unknown) => void) => {
 			const listener = (_event: unknown, contributions: unknown) =>
 				callback(contributions);
 			ipcRenderer.on("plugin:ui-contributions-changed", listener);
-			return () =>
-				ipcRenderer.off("plugin:ui-contributions-changed", listener);
+			return () => ipcRenderer.off("plugin:ui-contributions-changed", listener);
 		},
 		onShowMessage: (callback) => {
 			const listener = (_event: unknown, data: unknown) =>
@@ -1834,12 +2075,31 @@ const electronAPI: ElectronAPI = {
 		},
 	},
 
+	// ─── PTY（本地终端，需 event.sender 单播）──────────
+	pty: {
+		create: (request) => ipcRenderer.invoke("pty:create", request),
+		write: (sessionId, data) =>
+			ipcRenderer.invoke("pty:write", sessionId, data),
+		resize: (sessionId, cols, rows) =>
+			ipcRenderer.invoke("pty:resize", sessionId, cols, rows),
+		kill: (sessionId) => ipcRenderer.invoke("pty:kill", sessionId),
+		list: () => ipcRenderer.invoke("pty:list"),
+		onData: (callback: (event: PtyDataEvent) => void) => {
+			const listener = (_event: unknown, data: PtyDataEvent) => callback(data);
+			ipcRenderer.on("pty:data", listener);
+			return () => ipcRenderer.off("pty:data", listener);
+		},
+		onExit: (callback: (event: PtyExitEvent) => void) => {
+			const listener = (_event: unknown, data: PtyExitEvent) => callback(data);
+			ipcRenderer.on("pty:exit", listener);
+			return () => ipcRenderer.off("pty:exit", listener);
+		},
+	},
+
 	// ─── 通用 IPC ──────────────────────────────
 	ipc: {
 		on: (channel, listener) =>
-			ipcRenderer.on(channel, (event, ...args) =>
-				listener(event, ...args),
-			),
+			ipcRenderer.on(channel, (event, ...args) => listener(event, ...args)),
 		off: (channel, listener) => ipcRenderer.off(channel, listener),
 		send: (channel, ...args) => ipcRenderer.send(channel, ...args),
 		invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),

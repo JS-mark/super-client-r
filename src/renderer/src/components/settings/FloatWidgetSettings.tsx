@@ -66,7 +66,7 @@ export const FloatWidgetSettings: React.FC = () => {
 				<Switch
 					checked={enabled}
 					onChange={handleToggle}
-          size="medium"
+					size="medium"
 					disabled={loading}
 				/>
 			</div>

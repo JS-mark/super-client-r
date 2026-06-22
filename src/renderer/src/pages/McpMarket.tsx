@@ -75,7 +75,11 @@ function findBuiltinDefinition(
 	});
 }
 
-const McpMarket: React.FC = () => {
+interface McpMarketProps {
+	embedded?: boolean;
+}
+
+const McpMarket: React.FC<McpMarketProps> = ({ embedded = false }) => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 
@@ -95,7 +99,7 @@ const McpMarket: React.FC = () => {
 		),
 		[t, token.colorText],
 	);
-	useTitle(pageTitle);
+	useTitle(embedded ? null : pageTitle);
 
 	const {
 		servers,
@@ -140,15 +144,19 @@ const McpMarket: React.FC = () => {
 		window.electron.mcp.listServers().then((res) => {
 			if (res.success && res.data) {
 				const { servers: storeServers, setServers } = useMcpStore.getState();
-				const internalConfigs = res.data.filter((c: McpServerConfig) => c.type === "internal");
+				const internalConfigs = res.data.filter(
+					(c: McpServerConfig) => c.type === "internal",
+				);
 				if (internalConfigs.length > 0) {
 					// 移除 store 中旧的 internal 服务器，用主进程最新的替换
 					const nonInternal = storeServers.filter((s) => s.type !== "internal");
-					const internalServers: McpServer[] = internalConfigs.map((c: McpServerConfig) => ({
-						...c,
-						status: "connected" as const,
-						enabled: true,
-					}));
+					const internalServers: McpServer[] = internalConfigs.map(
+						(c: McpServerConfig) => ({
+							...c,
+							status: "connected" as const,
+							enabled: true,
+						}),
+					);
 					setServers([...internalServers, ...nonInternal]);
 				}
 			}
@@ -476,64 +484,70 @@ const McpMarket: React.FC = () => {
 		},
 	];
 
+	const content = (
+		<div className="p-4 h-full overflow-auto">
+			<Tabs
+				defaultActiveKey="market"
+				items={tabItems}
+				className="flex-1 min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
+			/>
+
+			<McpDetailModal
+				item={selectedItem}
+				open={modalOpen}
+				onClose={() => {
+					setModalOpen(false);
+					setSelectedItem(null);
+				}}
+				onInstall={handleInstall}
+				onConfigure={handleOpenConfig}
+			/>
+
+			<McpServerDetailModal
+				server={detailServer}
+				open={detailModalOpen}
+				onClose={() => {
+					setDetailModalOpen(false);
+					setDetailServer(null);
+				}}
+			/>
+
+			<ThirdPartyFormModal
+				open={thirdPartyModalOpen}
+				editingServer={editingServer}
+				form={thirdPartyForm}
+				onCancel={() => setThirdPartyModalOpen(false)}
+				onFinish={handleSaveThirdParty}
+			/>
+
+			<McpConfigModal
+				open={configModalOpen}
+				server={configuringServer}
+				configSchema={
+					configuringServer
+						? findBuiltinDefinition(configuringServer, builtinDefinitions)
+								?.configSchema
+						: undefined
+				}
+				builtinDefinition={
+					configuringServer
+						? findBuiltinDefinition(configuringServer, builtinDefinitions)
+						: undefined
+				}
+				onSave={handleSaveConfig}
+				onCancel={() => {
+					setConfigModalOpen(false);
+					setConfiguringServer(null);
+				}}
+			/>
+		</div>
+	);
+
+	if (embedded) return content;
+
 	return (
 		<MainLayout>
-			<div className="p-4 h-full overflow-auto">
-				<Tabs
-					defaultActiveKey="market"
-					items={tabItems}
-					className="flex-1 min-h-0 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
-				/>
-
-				<McpDetailModal
-					item={selectedItem}
-					open={modalOpen}
-					onClose={() => {
-						setModalOpen(false);
-						setSelectedItem(null);
-					}}
-					onInstall={handleInstall}
-					onConfigure={handleOpenConfig}
-				/>
-
-				<McpServerDetailModal
-					server={detailServer}
-					open={detailModalOpen}
-					onClose={() => {
-						setDetailModalOpen(false);
-						setDetailServer(null);
-					}}
-				/>
-
-				<ThirdPartyFormModal
-					open={thirdPartyModalOpen}
-					editingServer={editingServer}
-					form={thirdPartyForm}
-					onCancel={() => setThirdPartyModalOpen(false)}
-					onFinish={handleSaveThirdParty}
-				/>
-
-				<McpConfigModal
-					open={configModalOpen}
-					server={configuringServer}
-					configSchema={
-						configuringServer
-							? findBuiltinDefinition(configuringServer, builtinDefinitions)
-									?.configSchema
-							: undefined
-					}
-					builtinDefinition={
-						configuringServer
-							? findBuiltinDefinition(configuringServer, builtinDefinitions)
-							: undefined
-					}
-					onSave={handleSaveConfig}
-					onCancel={() => {
-						setConfigModalOpen(false);
-						setConfiguringServer(null);
-					}}
-				/>
-			</div>
+			{content}
 		</MainLayout>
 	);
 };
@@ -840,7 +854,7 @@ function McpLogoIcon({
 			className={className}
 			style={{ flexShrink: 0 }}
 		>
-			{MCP_LOGO_PATHS.map((d, i) => (
+			{MCP_LOGO_PATHS.map((d) => (
 				<path
 					key={d}
 					d={d}

@@ -27,8 +27,9 @@ describe("Skill Store", () => {
 
 			store.installSkill(skill);
 
-			expect(store.installedSkills).toHaveLength(1);
-			expect(store.installedSkills[0].name).toBe("Test Skill");
+			const next = useSkillStore.getState();
+			expect(next.installedSkills).toHaveLength(1);
+			expect(next.installedSkills[0].name).toBe("Test Skill");
 		});
 
 		it("should not add duplicate skills", () => {
@@ -45,7 +46,7 @@ describe("Skill Store", () => {
 			store.installSkill(skill);
 			store.installSkill(skill);
 
-			expect(store.installedSkills).toHaveLength(1);
+			expect(useSkillStore.getState().installedSkills).toHaveLength(1);
 		});
 
 		it("should uninstall a skill", () => {
@@ -82,8 +83,9 @@ describe("Skill Store", () => {
 
 			store.setMarketItems(marketItems);
 
-			expect(store.marketSkills).toHaveLength(1);
-			expect(store.marketSkills[0].name).toBe("Market Skill");
+			const next = useSkillStore.getState();
+			expect(next.marketSkills).toHaveLength(1);
+			expect(next.marketSkills[0].name).toBe("Market Skill");
 		});
 	});
 

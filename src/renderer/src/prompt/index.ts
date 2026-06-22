@@ -49,8 +49,15 @@ export interface EnvInfo {
 	cwd: string;
 	appVersion: string;
 	locale: string;
-	/** Per-conversation file workspace directory */
+	/** Per-conversation file workspace directory（AI 子进程实际 cwd） */
 	workspaceDir?: string;
+	/**
+	 * G-2: 项目根路径。项目会话才有；casual 会话为 undefined。
+	 * 注入系统提示词作为"可操作范围"约束 —— AI 仅可在此目录内进行
+	 * 读写、不得越界。该路径**不**作为子进程 cwd（cwd 走 workspaceDir
+	 * 沙箱），是与 cwd 解耦的范围声明。
+	 */
+	projectRoot?: string;
 }
 
 /**
@@ -68,6 +75,17 @@ function buildEnvContext(envInfo: EnvInfo): string {
 		hour12: false,
 	});
 
+	const projectScopeBlock = envInfo.projectRoot
+		? `
+
+--- Project Scope ---
+Project Root: ${envInfo.projectRoot}
+You are bound to this project for the duration of this conversation.
+- All file reads, writes, edits, runs, and tool invocations MUST stay within \`${envInfo.projectRoot}\` and its subdirectories.
+- Do not access, list, or modify files outside this directory unless the user explicitly asks for it in this turn.
+- Treat the working directory above as a per-session sandbox for transient outputs (todo state, scratch files). For project work, reference files via their absolute paths under the project root.`
+		: "";
+
 	return `--- Local Environment ---
 OS: ${envInfo.os} (${envInfo.platform}/${envInfo.arch})
 Runtime: Node.js ${envInfo.nodeVersion}, Electron ${envInfo.electronVersion}
@@ -75,7 +93,7 @@ App Version: ${envInfo.appVersion}
 User Home: ${envInfo.homedir}
 Working Directory: ${envInfo.workspaceDir || envInfo.cwd}
 Current Time: ${timeStr}
-Locale: ${envInfo.locale}`;
+Locale: ${envInfo.locale}${projectScopeBlock}`;
 }
 
 /**

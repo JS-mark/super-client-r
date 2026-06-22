@@ -13,6 +13,40 @@ import {
 } from "../../stores/attachmentStore";
 import { FileIcon, formatFileSize } from "./FileIcon";
 
+async function persistFileViaIpc(
+	file: File,
+	conversationId?: string,
+	messageId?: string,
+): Promise<Attachment | null> {
+	const arrayBuffer = await file.arrayBuffer();
+	const bytes = new Uint8Array(arrayBuffer);
+	const result = await window.electron.file.saveAttachmentBytes({
+		bytes,
+		fileName: file.name,
+		mimeType: file.type || undefined,
+		conversationId,
+		messageId,
+	});
+	if (!result.success || !result.data) {
+		throw new Error(result.error || "saveAttachmentBytes failed");
+	}
+	const info = result.data;
+	const ext = (file.name.split(".").pop() || "").toLowerCase();
+	const attachment: Attachment = {
+		id: info.id,
+		name: info.name ?? file.name,
+		originalName: info.originalName ?? file.name,
+		path: info.path,
+		size: info.size ?? file.size,
+		mimeType: info.mimeType ?? file.type ?? "application/octet-stream",
+		type: getFileType(info.mimeType ?? file.type ?? "", ext),
+		createdAt: info.createdAt ?? new Date().toISOString(),
+		conversationId: info.conversationId ?? conversationId,
+		messageId: info.messageId ?? messageId,
+	};
+	return attachment;
+}
+
 interface FileUploadProps {
 	onUploadComplete?: (attachments: Attachment[]) => void;
 	onUploadError?: (error: string) => void;
@@ -98,9 +132,6 @@ export function FileUpload({
 				const uploadingFile = newUploadingFiles[i];
 
 				try {
-					// Create a temporary URL for the file
-					const tempUrl = URL.createObjectURL(file);
-
 					// Update progress simulation
 					const progressInterval = setInterval(() => {
 						setUploadingFiles((prev) =>
@@ -112,31 +143,17 @@ export function FileUpload({
 						);
 					}, 100);
 
-					// In a real app, you would upload to server here
-					// For now, we'll create a data URL for the file
-					const reader = new FileReader();
-					const fileContent = await new Promise<string>((resolve) => {
-						reader.onloadend = () => resolve(reader.result as string);
-						reader.readAsDataURL(file);
-					});
+					const attachment = await persistFileViaIpc(
+						file,
+						conversationId,
+						messageId,
+					);
 
 					clearInterval(progressInterval);
 
-					// Create attachment object
-					const ext = file.name.split(".").pop() || "";
-					const attachment: Attachment = {
-						id: uploadingFile.id,
-						name: file.name,
-						originalName: file.name,
-						path: tempUrl,
-						size: file.size,
-						mimeType: file.type || "application/octet-stream",
-						type: getFileType(file.type, ext),
-						createdAt: new Date().toISOString(),
-						conversationId,
-						messageId,
-						url: fileContent,
-					};
+					if (!attachment) {
+						throw new Error("Failed to persist attachment");
+					}
 
 					completedAttachments.push(attachment);
 
@@ -151,13 +168,19 @@ export function FileUpload({
 					// Add to store
 					useAttachmentStore.getState().addAttachment(attachment);
 				} catch (error) {
-					const errorMsg = String(error);
+					const errorMsg =
+						error instanceof Error ? error.message : String(error);
 					setUploadingFiles((prev) =>
 						prev.map((f) =>
 							f.id === uploadingFile.id
 								? { ...f, status: "error", error: errorMsg }
 								: f,
 						),
+					);
+					message.error(
+						t("attachment.upload.error", "上传失败：{{error}}", {
+							error: errorMsg,
+						}),
 					);
 					onUploadError?.(errorMsg);
 				}
@@ -384,6 +407,7 @@ export function FileUploadButton({
 	className,
 }: FileUploadButtonProps) {
 	const { t } = useTranslation();
+	const { message } = App.useApp();
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const handleFileSelect = async (files: FileList | null) => {
@@ -394,32 +418,23 @@ export function FileUploadButton({
 
 		for (const file of fileArray) {
 			try {
-				const tempUrl = URL.createObjectURL(file);
-				const reader = new FileReader();
-				const fileContent = await new Promise<string>((resolve) => {
-					reader.onloadend = () => resolve(reader.result as string);
-					reader.readAsDataURL(file);
-				});
-
-				const ext = file.name.split(".").pop() || "";
-				const attachment: Attachment = {
-					id: `upload_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-					name: file.name,
-					originalName: file.name,
-					path: tempUrl,
-					size: file.size,
-					mimeType: file.type || "application/octet-stream",
-					type: getFileType(file.type, ext),
-					createdAt: new Date().toISOString(),
+				const attachment = await persistFileViaIpc(
+					file,
 					conversationId,
 					messageId,
-					url: fileContent,
-				};
-
-				completedAttachments.push(attachment);
-				useAttachmentStore.getState().addAttachment(attachment);
+				);
+				if (attachment) {
+					completedAttachments.push(attachment);
+					useAttachmentStore.getState().addAttachment(attachment);
+				}
 			} catch (error) {
+				const errorMsg = error instanceof Error ? error.message : String(error);
 				console.error("Failed to upload file:", error);
+				message.error(
+					t("attachment.upload.error", "上传失败：{{error}}", {
+						error: errorMsg,
+					}),
+				);
 			}
 		}
 

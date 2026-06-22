@@ -373,11 +373,19 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 			},
 
 			startRecording: (shortcutId) => {
-				set({ isRecording: true, recordingShortcutId: shortcutId, recordingKeys: "" });
+				set({
+					isRecording: true,
+					recordingShortcutId: shortcutId,
+					recordingKeys: "",
+				});
 			},
 
 			stopRecording: () => {
-				set({ isRecording: false, recordingShortcutId: null, recordingKeys: "" });
+				set({
+					isRecording: false,
+					recordingShortcutId: null,
+					recordingKeys: "",
+				});
 			},
 
 			setRecordingKeys: (keys) => {

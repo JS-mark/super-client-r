@@ -6,14 +6,14 @@ import ErrorPage from "./pages/Error";
 import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
 import McpMarket from "./pages/McpMarket";
-import Plugins from "./pages/Plugins";
 import PluginPage from "./pages/PluginPage";
+import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import Skills from "./pages/Skills";
-import Workspaces from "./pages/Workspaces";
 import IMBot from "./pages/IMBot";
 
 const LogViewer = lazy(() => import("./pages/LogViewer"));
+const AgentTraces = lazy(() => import("./pages/AgentTraces"));
 
 export const router = createHashRouter([
 	{
@@ -59,12 +59,6 @@ export const router = createHashRouter([
 		handle: { title: "收藏" },
 	},
 	{
-		path: "/workspaces",
-		element: <Workspaces />,
-		errorElement: <ErrorPage />,
-		handle: { title: "工作区" },
-	},
-	{
 		path: "/imbot",
 		element: <IMBot />,
 		errorElement: <ErrorPage />,
@@ -81,6 +75,14 @@ export const router = createHashRouter([
 		element: <LogViewer />,
 		errorElement: <ErrorPage />,
 		handle: { title: "日志查看器" },
+	},
+	{
+		// AgentRuntime 调用追踪调试页（spec §17）。
+		// dev 模式下从菜单进入；prod 仅在开启调试模式时可访问。
+		path: "/debug/agent-traces",
+		element: <AgentTraces />,
+		errorElement: <ErrorPage />,
+		handle: { title: "Agent Traces" },
 	},
 	{
 		path: "/plugin/:pluginId/*",
