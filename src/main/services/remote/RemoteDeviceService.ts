@@ -288,13 +288,8 @@ export class RemoteDeviceService extends EventEmitter {
 	): void {
 		if (this.mode === "relay") {
 			// relay 模式：注入 deviceId，通过 relayWs 发送
-			if (
-				this.relayWs &&
-				this.relayWs.readyState === WebSocket.OPEN
-			) {
-				this.relayWs.send(
-					JSON.stringify({ ...message, deviceId }),
-				);
+			if (this.relayWs && this.relayWs.readyState === WebSocket.OPEN) {
+				this.relayWs.send(JSON.stringify({ ...message, deviceId }));
 			}
 		} else {
 			// local 模式：通过 deviceConnections 直连发送
@@ -320,17 +315,13 @@ export class RemoteDeviceService extends EventEmitter {
 				this.handleDeviceHeartbeat(message as WSHeartbeatMessage);
 				break;
 			case "command_output_chunk":
-				this.handleCommandOutputChunk(
-					message as WSCommandOutputChunkMessage,
-				);
+				this.handleCommandOutputChunk(message as WSCommandOutputChunkMessage);
 				break;
 			case "command_result":
 				this.handleCommandResult(message as WSCommandResultMessage);
 				break;
 			case "tab_complete_result":
-				this.handleTabCompleteResult(
-					message as WSTabCompleteResultMessage,
-				);
+				this.handleTabCompleteResult(message as WSTabCompleteResultMessage);
 				break;
 			case "get_cwd_result":
 				this.handleGetCwdResult(message as WSGetCwdResultMessage);
@@ -422,9 +413,7 @@ export class RemoteDeviceService extends EventEmitter {
 	/**
 	 * 处理命令输出流式 chunk，广播到所有窗口
 	 */
-	private handleCommandOutputChunk(
-		message: WSCommandOutputChunkMessage,
-	): void {
+	private handleCommandOutputChunk(message: WSCommandOutputChunkMessage): void {
 		const { requestId, deviceId, stream, data } = message;
 
 		// 只转发有效请求的输出
@@ -610,9 +599,7 @@ export class RemoteDeviceService extends EventEmitter {
 	/**
 	 * 处理 Tab 补全结果
 	 */
-	private handleTabCompleteResult(
-		message: WSTabCompleteResultMessage,
-	): void {
+	private handleTabCompleteResult(message: WSTabCompleteResultMessage): void {
 		const { requestId, matches, wordStart } = message;
 		const pending = this.pendingCompletions.get(requestId);
 		if (pending) {

@@ -63,8 +63,7 @@ const PLATFORM_GUIDES: Record<
 		],
 	},
 	dingtalk: {
-		docUrl:
-			"https://open.dingtalk.com/document/orgapp/robot-overview",
+		docUrl: "https://open.dingtalk.com/document/orgapp/robot-overview",
 		docLabel: "钉钉机器人开发文档",
 		credentialUrl: "https://open-dev.dingtalk.com/",
 		credentialLabel: "钉钉开发者后台",
@@ -75,8 +74,7 @@ const PLATFORM_GUIDES: Record<
 		],
 	},
 	lark: {
-		docUrl:
-			"https://open.feishu.cn/document/client-docs/bot-v3/bot-overview",
+		docUrl: "https://open.feishu.cn/document/client-docs/bot-v3/bot-overview",
 		docLabel: "飞书机器人开发文档",
 		credentialUrl: "https://open.feishu.cn/app",
 		credentialLabel: "飞书开发者后台",
@@ -231,10 +229,7 @@ export function RemoteBindingModal({
 							)}
 							description={
 								<div className="mt-2">
-									<Paragraph
-										type="secondary"
-										className="text-xs mb-2"
-									>
+									<Paragraph type="secondary" className="text-xs mb-2">
 										{t(
 											"remoteChat.setupHint",
 											"Create and start an IM Bot first, then come back here to bind it.",
@@ -261,8 +256,7 @@ export function RemoteBindingModal({
 											target="_blank"
 											className="text-xs"
 										>
-											<LinkOutlined />{" "}
-											{t("remoteChat.platform.lark", "Lark")}
+											<LinkOutlined /> {t("remoteChat.platform.lark", "Lark")}
 										</AntLink>
 									</Space>
 								</div>
@@ -295,9 +289,7 @@ export function RemoteBindingModal({
 				{/* Online Status */}
 				{selectedBotId && (
 					<div className="flex items-center gap-2">
-						<Text type="secondary">
-							{t("remoteChat.status", "Status")}:
-						</Text>
+						<Text type="secondary">{t("remoteChat.status", "Status")}:</Text>
 						{isChecking ? (
 							<Text type="secondary">
 								{t("remoteChat.checking", "Checking...")}
@@ -305,16 +297,12 @@ export function RemoteBindingModal({
 						) : isOnline ? (
 							<Space>
 								<CheckCircleFilled style={{ color: token.colorSuccess }} />
-								<Text type="success">
-									{t("remoteChat.online", "Online")}
-								</Text>
+								<Text type="success">{t("remoteChat.online", "Online")}</Text>
 							</Space>
 						) : (
 							<Space>
 								<CloseCircleFilled style={{ color: token.colorError }} />
-								<Text type="danger">
-									{t("remoteChat.offline", "Offline")}
-								</Text>
+								<Text type="danger">{t("remoteChat.offline", "Offline")}</Text>
 							</Space>
 						)}
 					</div>

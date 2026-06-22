@@ -16,7 +16,7 @@ import type { RemoteBinding, RemoteIMMessage } from "../../ipc/types";
 import type { RemoteChatMessage } from "../../ipc/types";
 import type { IMBotService } from "../imbot/IMBotService";
 import type { IMMessage } from "../imbot/types";
-import { conversationStorage } from "../chat/ConversationStorageService";
+import { getSessionStorage } from "../storage/SessionStorageService";
 import { logger } from "../../utils/logger";
 
 /** Platform message length limits */
@@ -167,17 +167,12 @@ export class RemoteChatBridge extends EventEmitter {
 	/**
 	 * Append a remote message to persistent storage
 	 */
-	appendRemoteMessage(
-		conversationId: string,
-		msg: RemoteChatMessage,
-	): void {
+	appendRemoteMessage(conversationId: string, msg: RemoteChatMessage): void {
 		const filePath = this.getRemoteMessagesPath(conversationId);
 		const messages = this.getRemoteMessages(conversationId);
 		messages.push(msg);
 		try {
-			const dir = join(
-				conversationStorage.getConversationDir(conversationId),
-			);
+			const dir = getSessionStorage().getSessionDir(conversationId);
 			if (!existsSync(dir)) {
 				mkdirSync(dir, { recursive: true });
 			}
@@ -194,47 +189,44 @@ export class RemoteChatBridge extends EventEmitter {
 	 * Listen for raw IM messages and route to bound conversations
 	 */
 	private setupIMListener(): void {
-		this.imbotService.on(
-			"raw-message",
-			(botId: string, message: IMMessage) => {
-				const reverseKey = `${botId}:${message.chatId}`;
-				const conversationId = this.reverseIndex.get(reverseKey);
-				if (!conversationId) return;
+		this.imbotService.on("raw-message", (botId: string, message: IMMessage) => {
+			const reverseKey = `${botId}:${message.chatId}`;
+			const conversationId = this.reverseIndex.get(reverseKey);
+			if (!conversationId) return;
 
-				// Skip command messages (start with /)
-				if (message.content.trim().startsWith("/")) return;
+			// Skip command messages (start with /)
+			if (message.content.trim().startsWith("/")) return;
 
-				const binding = this.bindings.get(conversationId);
-				if (!binding) return;
+			const binding = this.bindings.get(conversationId);
+			if (!binding) return;
 
-				const imMessage: RemoteIMMessage = {
-					conversationId,
-					content: message.content,
-					sender: message.sender,
-					platform: binding.platform,
-					chatId: message.chatId,
-					timestamp: message.timestamp,
-				};
+			const imMessage: RemoteIMMessage = {
+				conversationId,
+				content: message.content,
+				sender: message.sender,
+				platform: binding.platform,
+				chatId: message.chatId,
+				timestamp: message.timestamp,
+			};
 
-				// Broadcast to all renderer windows
-				broadcastEvent("remote-chat:im-message", imMessage);
+			// Broadcast to all renderer windows
+			broadcastEvent("remote-chat:im-message", imMessage);
 
-				// Persist as incoming message
-				const inMsg: RemoteChatMessage = {
-					id: `in_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-					direction: "incoming",
-					content: message.content,
-					sender: message.sender,
-					platform: binding.platform,
-					timestamp: message.timestamp,
-				};
-				this.appendRemoteMessage(conversationId, inMsg);
+			// Persist as incoming message
+			const inMsg: RemoteChatMessage = {
+				id: `in_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+				direction: "incoming",
+				content: message.content,
+				sender: message.sender,
+				platform: binding.platform,
+				timestamp: message.timestamp,
+			};
+			this.appendRemoteMessage(conversationId, inMsg);
 
-				logger.info(
-					`[RemoteChatBridge] Routed IM message from ${message.sender.name} to conv=${conversationId}`,
-				);
-			},
-		);
+			logger.info(
+				`[RemoteChatBridge] Routed IM message from ${message.sender.name} to conv=${conversationId}`,
+			);
+		});
 	}
 
 	/**
@@ -242,12 +234,12 @@ export class RemoteChatBridge extends EventEmitter {
 	 */
 	private loadBindingsFromStorage(): void {
 		try {
-			const conversations = conversationStorage.getConversationList();
-			for (const conv of conversations) {
-				if (conv.remote) {
-					this.bindings.set(conv.id, conv.remote);
-					const reverseKey = `${conv.remote.botId}:${conv.remote.chatId}`;
-					this.reverseIndex.set(reverseKey, conv.id);
+			const sessions = getSessionStorage().listAll();
+			for (const meta of sessions) {
+				if (meta.remote) {
+					this.bindings.set(meta.id, meta.remote);
+					const reverseKey = `${meta.remote.botId}:${meta.remote.chatId}`;
+					this.reverseIndex.set(reverseKey, meta.id);
 				}
 			}
 			logger.info(
@@ -262,14 +254,14 @@ export class RemoteChatBridge extends EventEmitter {
 	}
 
 	/**
-	 * Persist binding to conversation metadata.json
+	 * Persist binding to session meta.json
 	 */
 	private persistBinding(
 		conversationId: string,
 		binding: RemoteBinding | undefined,
 	): void {
 		try {
-			conversationStorage.updateConversationMetadata(conversationId, {
+			getSessionStorage().updateMeta(conversationId, {
 				remote: binding,
 			});
 		} catch (error) {
@@ -285,7 +277,7 @@ export class RemoteChatBridge extends EventEmitter {
 	 */
 	private getRemoteMessagesPath(conversationId: string): string {
 		return join(
-			conversationStorage.getConversationDir(conversationId),
+			getSessionStorage().getSessionDir(conversationId),
 			"remote-messages.json",
 		);
 	}

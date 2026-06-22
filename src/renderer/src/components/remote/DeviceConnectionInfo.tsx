@@ -52,24 +52,14 @@ interface DeviceConnectionInfoProps {
 	deviceToken: string;
 }
 
-function StepBadge({
-	step,
-	active,
-}: {
-	step: number;
-	active: boolean;
-}) {
+function StepBadge({ step, active }: { step: number; active: boolean }) {
 	const { token } = theme.useToken();
 	return (
 		<div
 			className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
 			style={{
-				backgroundColor: active
-					? token.colorPrimary
-					: token.colorFillSecondary,
-				color: active
-					? token.colorWhite
-					: token.colorTextSecondary,
+				backgroundColor: active ? token.colorPrimary : token.colorFillSecondary,
+				color: active ? token.colorWhite : token.colorTextSecondary,
 			}}
 		>
 			{step}
@@ -158,9 +148,7 @@ function CommandBlock({
 				}}
 				icon={
 					copiedKey === copyKey ? (
-						<CheckOutlined
-							style={{ color: token.colorSuccess }}
-						/>
+						<CheckOutlined style={{ color: token.colorSuccess }} />
 					) : (
 						<CopyOutlined />
 					)
@@ -176,8 +164,7 @@ export function DeviceConnectionInfo({
 	deviceToken,
 }: DeviceConnectionInfoProps) {
 	const { t } = useTranslation("settings");
-	const { connectionInfo, fetchConnectionInfo } =
-		useRemoteControlEventStore();
+	const { connectionInfo, fetchConnectionInfo } = useRemoteControlEventStore();
 	const [selectedIP, setSelectedIP] = useState<string>("");
 	const [platform, setPlatform] = useState<Platform>("linux");
 	const [copiedKey, setCopiedKey] = useState<string>("");
@@ -207,12 +194,15 @@ export function DeviceConnectionInfo({
 		}
 	}, [connectionInfo, selectedIP]);
 
-	const handleCopy = useCallback((text: string, key: string) => {
-		navigator.clipboard.writeText(text);
-		setCopiedKey(key);
-		message.success(t("relay.copied", "已复制到剪贴板"));
-		setTimeout(() => setCopiedKey(""), 2000);
-	}, [t]);
+	const handleCopy = useCallback(
+		(text: string, key: string) => {
+			navigator.clipboard.writeText(text);
+			setCopiedKey(key);
+			message.success(t("relay.copied", "已复制到剪贴板"));
+			setTimeout(() => setCopiedKey(""), 2000);
+		},
+		[t],
+	);
 
 	const handleSaveRelay = useCallback(async () => {
 		setSaving(true);
@@ -238,9 +228,7 @@ export function DeviceConnectionInfo({
 	if (!connectionInfo && mode === "local") {
 		return (
 			<div className="py-8 text-center">
-				<Text type="secondary">
-					{t("relay.loading", "加载连接信息中...")}
-				</Text>
+				<Text type="secondary">{t("relay.loading", "加载连接信息中...")}</Text>
 			</div>
 		);
 	}
@@ -294,10 +282,7 @@ export function DeviceConnectionInfo({
 					<span className="font-medium text-sm">
 						{t("relay.connectionMode", "连接模式")}
 					</span>
-					<Tag
-						color={mode === "relay" ? "blue" : "green"}
-						className="ml-auto"
-					>
+					<Tag color={mode === "relay" ? "blue" : "green"} className="ml-auto">
 						{mode === "relay"
 							? t("relay.modeRelay", "中继")
 							: t("relay.modeLocal", "局域网")}
@@ -313,8 +298,7 @@ export function DeviceConnectionInfo({
 							{
 								label: (
 									<span className="flex items-center gap-1">
-										<WifiOutlined />{" "}
-										{t("relay.local", "局域网")}
+										<WifiOutlined /> {t("relay.local", "局域网")}
 									</span>
 								),
 								value: "local",
@@ -322,8 +306,7 @@ export function DeviceConnectionInfo({
 							{
 								label: (
 									<span className="flex items-center gap-1">
-										<LinkOutlined />{" "}
-										{t("relay.relay", "中继")}
+										<LinkOutlined /> {t("relay.relay", "中继")}
 									</span>
 								),
 								value: "relay",
@@ -335,18 +318,13 @@ export function DeviceConnectionInfo({
 						<div className="flex flex-col gap-2 mt-3">
 							<div>
 								<Text type="secondary" className="text-xs">
-									{t(
-										"relay.urlLabel",
-										"Relay 服务器地址",
-									)}
+									{t("relay.urlLabel", "Relay 服务器地址")}
 								</Text>
 								<Input
 									size="small"
 									placeholder="wss://relay.example.com:9099"
 									value={relayUrl}
-									onChange={(e) =>
-										setRelayUrl(e.target.value)
-									}
+									onChange={(e) => setRelayUrl(e.target.value)}
 								/>
 							</div>
 							<div>
@@ -355,14 +333,9 @@ export function DeviceConnectionInfo({
 								</Text>
 								<Input
 									size="small"
-									placeholder={t(
-										"relay.keyPlaceholder",
-										"共享密钥",
-									)}
+									placeholder={t("relay.keyPlaceholder", "共享密钥")}
 									value={relayKey}
-									onChange={(e) =>
-										setRelayKey(e.target.value)
-									}
+									onChange={(e) => setRelayKey(e.target.value)}
 								/>
 							</div>
 							<Button
@@ -435,18 +408,12 @@ export function DeviceConnectionInfo({
 								label: (
 									<span className="flex items-center gap-1.5 text-xs font-medium">
 										<DownloadOutlined />{" "}
-										{t(
-											"relay.downloadBinary",
-											"下载预编译文件",
-										)}
+										{t("relay.downloadBinary", "下载预编译文件")}
 									</span>
 								),
 								children: (
 									<div className="flex flex-col gap-1.5">
-										<Text
-											type="secondary"
-											className="text-xs"
-										>
+										<Text type="secondary" className="text-xs">
 											前往{" "}
 											<a
 												className="text-xs"
@@ -475,17 +442,10 @@ export function DeviceConnectionInfo({
 											</CodeBlock>
 										)}
 										{platform === "macos" && (
-											<Text
-												type="secondary"
-												className="text-xs"
-											>
+											<Text type="secondary" className="text-xs">
 												若提示无法打开，运行：
-												<Text
-													code
-													className="text-xs"
-												>
-													xattr -d
-													com.apple.quarantine ./{binary}
+												<Text code className="text-xs">
+													xattr -d com.apple.quarantine ./{binary}
 												</Text>
 											</Text>
 										)}
@@ -496,28 +456,16 @@ export function DeviceConnectionInfo({
 								key: "build",
 								label: (
 									<span className="flex items-center gap-1.5 text-xs font-medium">
-										<CodeOutlined />{" "}
-										{t(
-											"relay.buildFromSource",
-											"从源码构建",
-										)}
+										<CodeOutlined /> {t("relay.buildFromSource", "从源码构建")}
 									</span>
 								),
 								children: (
 									<div className="flex flex-col gap-1.5">
-										<Text
-											type="secondary"
-											className="text-xs"
-										>
+										<Text type="secondary" className="text-xs">
 											需要安装{" "}
 											<a
 												className="text-xs"
-												onClick={() =>
-													handleCopy(
-														"https://bun.sh",
-														"bun",
-													)
-												}
+												onClick={() => handleCopy("https://bun.sh", "bun")}
 											>
 												Bun
 											</a>{" "}
@@ -531,10 +479,7 @@ export function DeviceConnectionInfo({
 										>
 											{buildCommand}
 										</CodeBlock>
-										<Text
-											type="secondary"
-											className="text-xs"
-										>
+										<Text type="secondary" className="text-xs">
 											产物在{" "}
 											<Text code className="text-xs">
 												device-agent/dist/
@@ -562,10 +507,7 @@ export function DeviceConnectionInfo({
 						<div className="flex items-center gap-2 mb-3">
 							<StepBadge step={2} active={localIPs.length > 0} />
 							<span className="font-medium text-sm">
-								{t(
-									"relay.selectAddress",
-									"选择连接地址",
-								)}
+								{t("relay.selectAddress", "选择连接地址")}
 							</span>
 							<Text type="secondary" className="text-xs">
 								端口 {wsPort}
@@ -603,10 +545,7 @@ export function DeviceConnectionInfo({
 								</div>
 							) : (
 								<Text type="secondary" className="text-xs">
-									{t(
-										"relay.noLocalIP",
-										"未检测到局域网 IP 地址",
-									)}
+									{t("relay.noLocalIP", "未检测到局域网 IP 地址")}
 								</Text>
 							)}
 						</div>
@@ -625,10 +564,7 @@ export function DeviceConnectionInfo({
 			{/* Step 2/3: 启动 Agent */}
 			<section>
 				<div className="flex items-center gap-2 mb-3">
-					<StepBadge
-						step={mode === "local" ? 3 : 2}
-						active={!!serverUrl}
-					/>
+					<StepBadge step={mode === "local" ? 3 : 2} active={!!serverUrl} />
 					<span className="font-medium text-sm">
 						{t("relay.startAgent", "启动 Agent")}
 					</span>
@@ -646,10 +582,7 @@ export function DeviceConnectionInfo({
 							copyKey="start"
 							copiedKey={copiedKey}
 							onCopy={() =>
-								handleCopy(
-									startCommand.replace(/\\\n/g, " "),
-									"start",
-								)
+								handleCopy(startCommand.replace(/\\\n/g, " "), "start")
 							}
 						/>
 					) : (
@@ -666,14 +599,8 @@ export function DeviceConnectionInfo({
 							/>
 							<Text type="secondary" className="text-xs">
 								{mode === "relay"
-									? t(
-											"relay.configRelayFirst",
-											"请先配置并保存 Relay 设置",
-										)
-									: t(
-											"relay.selectAddressFirst",
-											"请先在上方选择连接地址",
-										)}
+									? t("relay.configRelayFirst", "请先配置并保存 Relay 设置")
+									: t("relay.selectAddressFirst", "请先在上方选择连接地址")}
 							</Text>
 						</div>
 					)}

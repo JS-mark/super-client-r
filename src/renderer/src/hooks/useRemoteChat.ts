@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { remoteSessionService } from "../services/remoteSessionService";
 import { useChatStore } from "../stores/chatStore";
 import type {
 	RemoteBinding,
@@ -18,9 +19,7 @@ import type {
 export function useRemoteChat() {
 	const [binding, setBinding] = useState<RemoteBinding | null>(null);
 	const [isBindingLoading, setIsBindingLoading] = useState(false);
-	const [remoteMessages, setRemoteMessages] = useState<RemoteChatMessage[]>(
-		[],
-	);
+	const [remoteMessages, setRemoteMessages] = useState<RemoteChatMessage[]>([]);
 
 	const { currentConversationId, conversations } = useChatStore();
 
@@ -39,7 +38,7 @@ export function useRemoteChat() {
 		} else {
 			setBinding(null);
 			// Also fetch from main process in case it's not in the cache
-			window.electron.remoteChat
+			remoteSessionService
 				.getBinding(currentConversationId)
 				.then((res) => {
 					if (res.success && res.data) {
@@ -54,22 +53,19 @@ export function useRemoteChat() {
 	}, [currentConversationId, conversations]);
 
 	// Load remote messages from main process
-	const loadRemoteMessages = useCallback(
-		async (conversationId: string) => {
-			try {
-				const res =
-					await window.electron.remoteChat.getRemoteMessages(conversationId);
-				if (res.success && res.data) {
-					setRemoteMessages(res.data);
-				} else {
-					setRemoteMessages([]);
-				}
-			} catch {
+	const loadRemoteMessages = useCallback(async (conversationId: string) => {
+		try {
+			const res =
+				await window.electron.remoteChat.getRemoteMessages(conversationId);
+			if (res.success && res.data) {
+				setRemoteMessages(res.data);
+			} else {
 				setRemoteMessages([]);
 			}
-		},
-		[],
-	);
+		} catch {
+			setRemoteMessages([]);
+		}
+	}, []);
 
 	// Listen for incoming IM messages from main process
 	useEffect(() => {
@@ -100,7 +96,7 @@ export function useRemoteChat() {
 
 			setIsBindingLoading(true);
 			try {
-				const res = await window.electron.remoteChat.bind(
+				const res = await remoteSessionService.bind(
 					currentConversationId,
 					botId,
 					chatId,
@@ -110,9 +106,7 @@ export function useRemoteChat() {
 					// Update conversation in store
 					useChatStore.setState((state) => ({
 						conversations: state.conversations.map((c) =>
-							c.id === currentConversationId
-								? { ...c, remote: res.data }
-								: c,
+							c.id === currentConversationId ? { ...c, remote: res.data } : c,
 						),
 					}));
 				} else {
@@ -131,17 +125,13 @@ export function useRemoteChat() {
 
 		setIsBindingLoading(true);
 		try {
-			const res = await window.electron.remoteChat.unbind(
-				currentConversationId,
-			);
+			const res = await remoteSessionService.unbind(currentConversationId);
 			if (res.success) {
 				setBinding(null);
 				// Update conversation in store
 				useChatStore.setState((state) => ({
 					conversations: state.conversations.map((c) =>
-						c.id === currentConversationId
-							? { ...c, remote: undefined }
-							: c,
+						c.id === currentConversationId ? { ...c, remote: undefined } : c,
 					),
 				}));
 			}
@@ -152,7 +142,7 @@ export function useRemoteChat() {
 
 	// Check bot online status
 	const checkBotOnline = useCallback(async (botId: string) => {
-		const res = await window.electron.remoteChat.checkBotOnline(botId);
+		const res = await remoteSessionService.checkBotOnline(botId);
 		return res.success && res.data === true;
 	}, []);
 
@@ -182,9 +172,7 @@ export function useRemoteChat() {
 				}
 			} catch (error) {
 				// Remove optimistic message on failure
-				setRemoteMessages((prev) =>
-					prev.filter((m) => m.id !== outMsg.id),
-				);
+				setRemoteMessages((prev) => prev.filter((m) => m.id !== outMsg.id));
 				throw error;
 			}
 		},

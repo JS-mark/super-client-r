@@ -113,7 +113,7 @@ export function RemoteChatPane({
 		return (
 			<div
 				className="flex flex-col items-center justify-center h-full"
-				style={{ backgroundColor: token.colorBgLayout }}
+				style={{ backgroundColor: token.colorBgContainer }}
 			>
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -127,10 +127,7 @@ export function RemoteChatPane({
 					className="text-xs mt-3 max-w-[240px] text-center"
 					style={{ color: token.colorTextDescription }}
 				>
-					{t(
-						"remoteChat.bindPrompt",
-						"绑定一个 IM 机器人以开始收发消息",
-					)}
+					{t("remoteChat.bindPrompt", "绑定一个 IM 机器人以开始收发消息")}
 				</p>
 			</div>
 		);
@@ -141,7 +138,7 @@ export function RemoteChatPane({
 	return (
 		<div
 			className="flex flex-col h-full"
-			style={{ backgroundColor: token.colorBgLayout }}
+			style={{ backgroundColor: token.colorBgContainer }}
 		>
 			{/* Header */}
 			<div
@@ -166,14 +163,13 @@ export function RemoteChatPane({
 					</span>
 					<Badge
 						status={
-							isBotChecking
-								? "processing"
-								: botOnline
-									? "success"
-									: "error"
+							isBotChecking ? "processing" : botOnline ? "success" : "error"
 						}
 						text={
-							<span className="text-xs" style={{ color: token.colorTextSecondary }}>
+							<span
+								className="text-xs"
+								style={{ color: token.colorTextSecondary }}
+							>
 								{isBotChecking
 									? t("remoteChat.checking", "检查中...")
 									: botOnline
@@ -269,9 +265,7 @@ function MessageBubble({
 	const isOutgoing = msg.direction === "outgoing";
 
 	return (
-		<div
-			className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}
-		>
+		<div className={`flex ${isOutgoing ? "justify-end" : "justify-start"}`}>
 			<div
 				className={`flex items-end gap-2 max-w-[90%] ${isOutgoing ? "flex-row-reverse" : ""}`}
 			>

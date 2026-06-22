@@ -80,9 +80,6 @@ export function RemoteBadge({ binding, onUnbind }: RemoteBadgeProps) {
 export function RemoteIndicator() {
 	const { token } = useToken();
 	return (
-		<ApiOutlined
-			className="text-xs"
-			style={{ color: token.colorPrimary }}
-		/>
+		<ApiOutlined className="text-xs" style={{ color: token.colorPrimary }} />
 	);
 }
