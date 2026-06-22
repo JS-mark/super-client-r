@@ -6,8 +6,12 @@ import { useCallback, useMemo } from "react";
 import type { Message } from "../../stores/chatStore";
 import { useMessageStore } from "../../stores/messageStore";
 import { useAttachmentStore } from "../../stores/attachmentStore";
+import { useFeatureFlagsStore } from "../../stores/featureFlagsStore";
+import { useFileArtifactStore } from "../../stores/fileArtifactStore";
 import { Markdown } from "../Markdown";
 import { AttachmentList } from "../attachment";
+import { ChangedFilesSummary } from "./ChangedFilesSummary";
+import { FileArtifactCard } from "./FileArtifactCard";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ToolCallCard } from "./ToolCallCard";
 
@@ -42,8 +46,42 @@ export const MessageBubble: React.FC<{
 		return attachments.filter((a) => attachmentIds.includes(a.id));
 	}, [msg.metadata?.attachmentIds, attachments]);
 
+	// Read raw maps to keep zustand selectors referentially stable, then
+	// derive the per-message lists via useMemo. Returning a freshly-built
+	// array (e.g. via `?? []` or `.filter`) directly from a selector creates
+	// a new reference on every render and triggers an infinite update loop.
+	const artifactsMap = useFileArtifactStore((s) => s.artifacts);
+	const changeSetsMap = useFileArtifactStore((s) => s.changeSets);
+	const toolArtifacts = useMemo(() => {
+		if (!conversationId) return [];
+		return (artifactsMap[conversationId] ?? []).filter(
+			(a) => a.messageId === msg.id,
+		);
+	}, [artifactsMap, conversationId, msg.id]);
+	const toolChangeSets = useMemo(() => {
+		if (!conversationId) return [];
+		return (changeSetsMap[conversationId] ?? []).filter(
+			(c) => c.messageId === msg.id,
+		);
+	}, [changeSetsMap, conversationId, msg.id]);
+
+	// §22 rollback flag: 关闭后只渲染 ToolCallCard，不渲染文件卡 / 变更摘要。
+	const fileArtifactsEnabled = useFeatureFlagsStore((s) => s.fileArtifacts);
+
 	if (isTool && msg.toolCall) {
-		return <ToolCallCard toolCall={msg.toolCall} />;
+		return (
+			<>
+				<ToolCallCard toolCall={msg.toolCall} />
+				{fileArtifactsEnabled &&
+					toolArtifacts.map((a) => (
+						<FileArtifactCard key={a.id} artifact={a} />
+					))}
+				{fileArtifactsEnabled &&
+					toolChangeSets.map((cs) => (
+						<ChangedFilesSummary key={cs.id} changeSet={cs} />
+					))}
+			</>
+		);
 	}
 
 	const renderContent = useCallback(

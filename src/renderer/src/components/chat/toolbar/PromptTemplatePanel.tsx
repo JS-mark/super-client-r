@@ -31,10 +31,9 @@ export function PromptTemplatePanel({
 		let cancelled = false;
 		(async () => {
 			try {
-				const result =
-					await pluginService.executeCommand<PromptTemplate[]>(
-						"prompt-templates.list",
-					);
+				const result = await pluginService.executeCommand<PromptTemplate[]>(
+					"prompt-templates.list",
+				);
 				if (!cancelled && Array.isArray(result)) {
 					setTemplates(result);
 				}
@@ -101,9 +100,7 @@ export function PromptTemplatePanel({
 							onClick={() => handleSelect(template)}
 						>
 							<List.Item.Meta
-								title={
-									<span className="text-sm">{template.name}</span>
-								}
+								title={<span className="text-sm">{template.name}</span>}
 								description={
 									<span className="text-xs text-gray-500">
 										{template.description}

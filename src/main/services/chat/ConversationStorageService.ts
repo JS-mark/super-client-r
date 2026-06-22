@@ -30,10 +30,37 @@ import type {
 	ChatMessagePersist,
 	ConversationData,
 	ConversationSummary,
+	ConversationSummaryUpdate,
 	CreateConversationOptions,
+	PlanMode,
 	SessionKind,
 	SessionMetadata,
 } from "../../ipc/types";
+
+/**
+ * Translate persisted planMode values into the current 5-value union.
+ * Legacy persisted strings ("off"/"auto"/"plan") were used before the
+ * Phase 2 plan-mode taxonomy landed; they're translated here for back-
+ * compat. Unknown values fall back to "chat".
+ */
+function normalizePlanMode(value: unknown): PlanMode {
+	switch (value) {
+		case "chat":
+		case "plan-only":
+		case "plan-then-ask":
+		case "auto-execute-safe":
+		case "full-agent":
+			return value;
+		case "off":
+			return "chat";
+		case "auto":
+			return "auto-execute-safe";
+		case "plan":
+			return "plan-only";
+		default:
+			return "chat";
+	}
+}
 import { logger } from "../../utils/logger";
 
 interface LegacyChatStoreData {
@@ -143,21 +170,58 @@ export class ConversationStorageService {
 			DEFAULT_WORKSPACE_ID;
 		const now = Date.now();
 
+		const session = metadata.session as
+			| (SessionMetadata & {
+					// R-9: legacy flat fields accepted on read for one transition.
+					pinned?: boolean;
+					archived?: boolean;
+					unread?: boolean;
+					forkOriginId?: string;
+					worktreePath?: string;
+			  })
+			| undefined;
+
+		// R-9: collapse legacy flat fields + new nested shape into a single
+		// nested form. New writes (next save) persist nested only.
+		const flags: SessionMetadata["flags"] = {
+			...(session?.pinned ? { pinned: true } : {}),
+			...(session?.archived ? { archived: true } : {}),
+			...(session?.unread ? { unread: true } : {}),
+			...(session?.flags?.pinned ? { pinned: true } : {}),
+			...(session?.flags?.archived ? { archived: true } : {}),
+			...(session?.flags?.unread ? { unread: true } : {}),
+		};
+		const lineage: SessionMetadata["lineage"] = {
+			...(session?.forkOriginId ? { forkOriginId: session.forkOriginId } : {}),
+			...(session?.worktreePath ? { worktreePath: session.worktreePath } : {}),
+			...(session?.lineage?.forkOriginId
+				? { forkOriginId: session.lineage.forkOriginId }
+				: {}),
+			...(session?.lineage?.worktreePath
+				? { worktreePath: session.lineage.worktreePath }
+				: {}),
+		};
+
 		return {
-			id: metadata.session?.id || metadata.id,
+			id: session?.id || metadata.id,
 			workspaceId,
 			kind: this.deriveSessionKind(metadata),
-			planMode: metadata.session?.planMode || "off",
-			modelOverride: metadata.session?.modelOverride,
-			interactionProfileOverride:
-				metadata.session?.interactionProfileOverride,
-			runtimePolicyOverride: metadata.session?.runtimePolicyOverride,
-			enabledCapabilityOverrides:
-				metadata.session?.enabledCapabilityOverrides,
-			attachmentIds: metadata.session?.attachmentIds || [],
-			approvalGrants: metadata.session?.approvalGrants || [],
-			createdAt: metadata.session?.createdAt || metadata.createdAt || now,
-			updatedAt: metadata.updatedAt || metadata.session?.updatedAt || now,
+			planMode: normalizePlanMode(session?.planMode),
+			modelOverride: session?.modelOverride,
+			interactionProfileOverride: session?.interactionProfileOverride,
+			runtimePolicyOverride: session?.runtimePolicyOverride,
+			enabledCapabilityOverrides: session?.enabledCapabilityOverrides,
+			attachmentIds: session?.attachmentIds || [],
+			// Only carry approvalGrants when present; field stays absent on
+			// fresh sessions until Phase 2 wires the approval adapter.
+			...(session?.approvalGrants
+				? { approvalGrants: session.approvalGrants }
+				: {}),
+			// R-9 nested groups — only persisted when at least one inner key is set.
+			...(Object.keys(flags).length > 0 ? { flags } : {}),
+			...(Object.keys(lineage).length > 0 ? { lineage } : {}),
+			createdAt: session?.createdAt || metadata.createdAt || now,
+			updatedAt: metadata.updatedAt || session?.updatedAt || now,
 		};
 	}
 
@@ -193,14 +257,50 @@ export class ConversationStorageService {
 			base.workspaceId ||
 			DEFAULT_WORKSPACE_ID;
 
-		return {
+		const merged: SessionMetadata = {
 			...base,
 			...updates,
 			workspaceId,
 			attachmentIds: updates.attachmentIds || base.attachmentIds,
-			approvalGrants: updates.approvalGrants || base.approvalGrants,
 			updatedAt: now,
 		};
+		const grants = updates.approvalGrants || base.approvalGrants;
+		if (grants && grants.length > 0) {
+			merged.approvalGrants = grants;
+		} else {
+			delete merged.approvalGrants;
+		}
+
+		// R-9: deep-merge nested flags/lineage so callers can patch a single
+		// inner key (e.g. `{ flags: { pinned: true } }`) without wiping siblings.
+		// Drop the nested object entirely if all its inner keys end up falsy
+		// to keep the on-disk metadata clean.
+		const mergedFlags = { ...base.flags, ...updates.flags };
+		const flagsHasTruthy = Object.values(mergedFlags).some(Boolean);
+		if (flagsHasTruthy) {
+			// Strip explicit `false` so the on-disk shape only carries truthy keys.
+			merged.flags = Object.fromEntries(
+				Object.entries(mergedFlags).filter(([, v]) => Boolean(v)),
+			) as SessionMetadata["flags"];
+		} else {
+			delete merged.flags;
+		}
+
+		const mergedLineage = { ...base.lineage, ...updates.lineage };
+		const lineageHasValue = Object.values(mergedLineage).some(
+			(v) => typeof v === "string" && v.length > 0,
+		);
+		if (lineageHasValue) {
+			merged.lineage = Object.fromEntries(
+				Object.entries(mergedLineage).filter(
+					([, v]) => typeof v === "string" && v.length > 0,
+				),
+			) as SessionMetadata["lineage"];
+		} else {
+			delete merged.lineage;
+		}
+
+		return merged;
 	}
 
 	// ============ Migration ============
@@ -257,14 +357,15 @@ export class ConversationStorageService {
 				mkdirSync(join(convDir, "attachments"), { recursive: true });
 				mkdirSync(join(convDir, "tool-outputs"), { recursive: true });
 
-				const metadata: ConversationSummary = this.normalizeConversationMetadata({
-					id: conv.id,
-					name: conv.name,
-					createdAt: conv.createdAt,
-					updatedAt: conv.updatedAt,
-					messageCount: conv.messageCount,
-					preview: conv.preview || "",
-				});
+				const metadata: ConversationSummary =
+					this.normalizeConversationMetadata({
+						id: conv.id,
+						name: conv.name,
+						createdAt: conv.createdAt,
+						updatedAt: conv.updatedAt,
+						messageCount: conv.messageCount,
+						preview: conv.preview || "",
+					});
 
 				writeFileSync(
 					join(convDir, "metadata.json"),
@@ -374,12 +475,9 @@ export class ConversationStorageService {
 			session: {
 				id,
 				workspaceId,
-				kind:
-					options.kind ||
-					(options.chatMode === "agent" ? "agent" : "chat"),
-				planMode: "off",
+				kind: options.kind || (options.chatMode === "agent" ? "agent" : "chat"),
+				planMode: "chat",
 				attachmentIds: [],
-				approvalGrants: [],
 				createdAt: now,
 				updatedAt: now,
 			},
@@ -434,7 +532,7 @@ export class ConversationStorageService {
 	 */
 	updateConversationMetadata(
 		id: string,
-		updates: Partial<ConversationSummary>,
+		updates: ConversationSummaryUpdate,
 	): void {
 		const metadataPath = join(this.chatsDir, id, "metadata.json");
 		if (!existsSync(metadataPath)) {
@@ -638,12 +736,26 @@ export class ConversationStorageService {
 		return dir;
 	}
 
-	getWorkspaceDir(conversationId: string): string {
+	/**
+	 * Returns the per-conversation execution working directory used by tools,
+	 * MCP servers, and the Agent SDK as `cwd`. Distinct from the user-facing
+	 * Workspace entity (see `WorkspaceConfig`).
+	 *
+	 * The on-disk folder is still named `workspace/` for backward
+	 * compatibility with existing user data. A future migration can rename
+	 * it to `cwd/`; the API name is the canonical reference going forward.
+	 */
+	getConversationCwd(conversationId: string): string {
 		const dir = join(this.chatsDir, conversationId, "workspace");
 		if (!existsSync(dir)) {
 			mkdirSync(dir, { recursive: true });
 		}
 		return dir;
+	}
+
+	/** @deprecated Use `getConversationCwd` instead. */
+	getWorkspaceDir(conversationId: string): string {
+		return this.getConversationCwd(conversationId);
 	}
 }
 

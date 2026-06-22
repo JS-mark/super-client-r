@@ -12,12 +12,13 @@ import type {
 	AskUserQuestionInput,
 	AskUserQuestionItem,
 } from "../../types/electron";
+import { ApprovalDecisionCard } from "./ApprovalDecisionCard";
 
 const { useToken } = theme;
 const { TextArea } = Input;
 
 /** Per-question answer state */
-interface QuestionAnswer {
+export interface QuestionAnswer {
 	selected: number[]; // option indices, -1 = "Other"
 	otherText: string;
 }
@@ -40,6 +41,41 @@ function parseQuestions(
 	const questions = (input as unknown as AskUserQuestionInput).questions;
 	if (!Array.isArray(questions) || questions.length === 0) return null;
 	return questions;
+}
+
+export function isAskUserQuestionComplete(
+	questions: AskUserQuestionItem[] | null,
+	answers: Map<number, QuestionAnswer>,
+): boolean {
+	if (!questions) return false;
+	for (let i = 0; i < questions.length; i++) {
+		const ans = answers.get(i);
+		if (!ans || ans.selected.length === 0) return false;
+		if (ans.selected.includes(-1) && !ans.otherText.trim()) {
+			return false;
+		}
+	}
+	return true;
+}
+
+export function buildAskUserQuestionOutput(
+	questions: AskUserQuestionItem[],
+	answers: Map<number, QuestionAnswer>,
+): { questions: AskUserQuestionItem[]; answers: Record<string, string> } {
+	const answersPayload: Record<string, string> = {};
+	for (const [qIdx, ans] of answers.entries()) {
+		const q = questions[qIdx];
+		if (!q) continue;
+		if (ans.selected.includes(-1)) {
+			answersPayload[q.question] = ans.otherText;
+		} else {
+			answersPayload[q.question] = ans.selected
+				.map((i) => q.options[i]?.label)
+				.filter(Boolean)
+				.join(", ");
+		}
+	}
+	return { questions, answers: answersPayload };
 }
 
 /**
@@ -107,6 +143,7 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 	});
 
 	const isInteractive = toolCall.status === "awaiting_approval";
+	const isWaiting = toolCall.status === "pending" && !toolCall.result;
 	const isCompleted =
 		toolCall.status === "pending" || toolCall.status === "success";
 	const isSkipped = toolCall.status === "error";
@@ -154,34 +191,16 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 
 	const handleSubmit = useCallback(() => {
 		if (!questions) return;
-		const answersPayload: Record<string, string> = {};
-		for (const [qIdx, ans] of answers.entries()) {
-			const q = questions[qIdx];
-			if (!q) continue;
-			if (ans.selected.includes(-1)) {
-				// "Other" selected
-				answersPayload[q.question] = ans.otherText;
-			} else {
-				answersPayload[q.question] = ans.selected
-					.map((i) => q.options[i]?.label)
-					.filter(Boolean)
-					.join(", ");
-			}
-		}
-		onSubmit(toolCall.id, true, { answers: answersPayload });
+		onSubmit(toolCall.id, true, buildAskUserQuestionOutput(questions, answers));
 	}, [questions, answers, onSubmit, toolCall.id]);
 
 	const handleSkip = useCallback(() => {
 		onSubmit(toolCall.id, false);
 	}, [onSubmit, toolCall.id]);
 
-	// Check if at least one question has a selection
-	const hasAnySelection = useMemo(() => {
-		for (const ans of answers.values()) {
-			if (ans.selected.length > 0) return true;
-		}
-		return false;
-	}, [answers]);
+	const canSubmit = useMemo(() => {
+		return isAskUserQuestionComplete(questions, answers);
+	}, [answers, questions]);
 
 	if (!questions) return null;
 
@@ -217,10 +236,7 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 							{t("askUserQuestion.answered")}
 						</div>
 						{Object.entries(result.answers).map(([q, a]) => (
-							<div
-								key={q}
-								style={{ fontSize: 12, lineHeight: 1.6 }}
-							>
+							<div key={q} style={{ fontSize: 12, lineHeight: 1.6 }}>
 								<span
 									style={{
 										color: token.colorTextSecondary,
@@ -237,9 +253,7 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 								>
 									&rarr;
 								</span>
-								<span style={{ color: token.colorText }}>
-									{a || "—"}
-								</span>
+								<span style={{ color: token.colorText }}>{a || "—"}</span>
 							</div>
 						))}
 					</div>
@@ -250,39 +264,39 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 	};
 
 	return (
-		<div
-			className="my-2 rounded-lg overflow-hidden"
-			style={{
-				border: `1px solid ${token.colorBorderSecondary}`,
-				backgroundColor: token.colorBgContainer,
-				maxWidth: 560,
-			}}
+		<ApprovalDecisionCard
+			icon={<QuestionCircleOutlined style={{ fontSize: 13 }} />}
+			title={t("askUserQuestion.title")}
+			tone="success"
+			footer={
+				isInteractive ? (
+					<>
+						<Button
+							size="small"
+							icon={<ForwardOutlined />}
+							onClick={handleSkip}
+						>
+							{t("askUserQuestion.skip")}
+						</Button>
+						<Button
+							type="primary"
+							size="small"
+							icon={<SendOutlined />}
+							disabled={!canSubmit}
+							onClick={handleSubmit}
+							style={{
+								backgroundColor: canSubmit ? token.colorSuccess : undefined,
+								borderColor: canSubmit ? token.colorSuccess : undefined,
+							}}
+						>
+							{t("askUserQuestion.submit")}
+						</Button>
+					</>
+				) : undefined
+			}
 		>
-			{/* Header */}
-			<div
-				className="flex items-center gap-2 px-3 py-2"
-				style={{
-					borderBottom: `1px solid ${token.colorBorderSecondary}`,
-					backgroundColor: token.colorFillQuaternary,
-				}}
-			>
-				<QuestionCircleOutlined
-					style={{ fontSize: 13, color: token.colorSuccess }}
-				/>
-				<span
-					style={{
-						fontSize: 12,
-						fontWeight: 600,
-						color: token.colorText,
-					}}
-				>
-					{t("askUserQuestion.title")}
-				</span>
-			</div>
-
-			{/* Body */}
-			{isInteractive ? (
-				<div className="px-3 py-3 flex flex-col gap-4">
+			{isInteractive || isWaiting ? (
+				<div className="flex flex-col gap-4">
 					{questions.map((q, qIdx) => (
 						<div key={q.question} className="flex flex-col gap-2">
 							{/* Divider between questions */}
@@ -331,23 +345,19 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 													? `${token.colorSuccessBg}`
 													: "transparent",
 												border: `1px solid ${isSelected ? token.colorSuccessBorder : "transparent"}`,
+												cursor: isInteractive ? "pointer" : "default",
+												opacity: isInteractive ? 1 : 0.72,
 												transition: "all 0.15s",
 											}}
 											onClick={() =>
-												handleToggleOption(
-													qIdx,
-													optIdx,
-													q.multiSelect,
-												)
+												handleToggleOption(qIdx, optIdx, q.multiSelect)
 											}
 										>
 											<SelectionDot
 												selected={isSelected}
 												multi={q.multiSelect}
 												color={token.colorSuccess}
-												borderColor={
-													token.colorBorder
-												}
+												borderColor={token.colorBorder}
 											/>
 											<div className="flex flex-col gap-0.5 min-w-0">
 												<span
@@ -371,6 +381,25 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 														{opt.description}
 													</span>
 												)}
+												{opt.preview && (
+													<pre
+														style={{
+															margin: "4px 0 0",
+															padding: "6px 8px",
+															borderRadius: 4,
+															whiteSpace: "pre-wrap",
+															wordBreak: "break-word",
+															backgroundColor: token.colorFillQuaternary,
+															color: token.colorTextSecondary,
+															fontSize: 11,
+															lineHeight: 1.45,
+															fontFamily:
+																'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+														}}
+													>
+														{opt.preview}
+													</pre>
+												)}
 											</div>
 										</div>
 									);
@@ -385,28 +414,23 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 											<div
 												className="flex gap-2.5 rounded-md px-2.5 py-2 cursor-pointer"
 												style={{
-													backgroundColor:
-														isOtherSelected
-															? `${token.colorSuccessBg}`
-															: "transparent",
+													backgroundColor: isOtherSelected
+														? `${token.colorSuccessBg}`
+														: "transparent",
 													border: `1px solid ${isOtherSelected ? token.colorSuccessBorder : "transparent"}`,
+													cursor: isInteractive ? "pointer" : "default",
+													opacity: isInteractive ? 1 : 0.72,
 													transition: "all 0.15s",
 												}}
 												onClick={() =>
-													handleToggleOption(
-														qIdx,
-														-1,
-														q.multiSelect,
-													)
+													handleToggleOption(qIdx, -1, q.multiSelect)
 												}
 											>
 												<SelectionDot
 													selected={isOtherSelected}
 													multi={q.multiSelect}
 													color={token.colorSuccess}
-													borderColor={
-														token.colorBorder
-													}
+													borderColor={token.colorBorder}
 												/>
 												<span
 													style={{
@@ -416,9 +440,7 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 														lineHeight: 1.4,
 													}}
 												>
-													{t(
-														"askUserQuestion.other",
-													)}
+													{t("askUserQuestion.other")}
 												</span>
 											</div>
 											{isOtherSelected && (
@@ -433,19 +455,11 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 															minRows: 2,
 															maxRows: 4,
 														}}
-														placeholder={t(
-															"askUserQuestion.otherPlaceholder",
-														)}
-														value={
-															answers.get(qIdx)
-																?.otherText ||
-															""
-														}
+														placeholder={t("askUserQuestion.otherPlaceholder")}
+														value={answers.get(qIdx)?.otherText || ""}
+														disabled={!isInteractive}
 														onChange={(e) =>
-															handleOtherTextChange(
-																qIdx,
-																e.target.value,
-															)
+															handleOtherTextChange(qIdx, e.target.value)
 														}
 														style={{
 															fontSize: 12,
@@ -463,41 +477,6 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 			) : (
 				renderSummary()
 			)}
-
-			{/* Footer actions */}
-			{isInteractive && (
-				<div
-					className="flex items-center justify-end gap-2 px-3 py-2"
-					style={{
-						borderTop: `1px solid ${token.colorBorderSecondary}`,
-					}}
-				>
-					<Button
-						size="small"
-						icon={<ForwardOutlined />}
-						onClick={handleSkip}
-					>
-						{t("askUserQuestion.skip")}
-					</Button>
-					<Button
-						type="primary"
-						size="small"
-						icon={<SendOutlined />}
-						disabled={!hasAnySelection}
-						onClick={handleSubmit}
-						style={{
-							backgroundColor: hasAnySelection
-								? token.colorSuccess
-								: undefined,
-							borderColor: hasAnySelection
-								? token.colorSuccess
-								: undefined,
-						}}
-					>
-						{t("askUserQuestion.submit")}
-					</Button>
-				</div>
-			)}
-		</div>
+		</ApprovalDecisionCard>
 	);
 };

@@ -1,68 +1,136 @@
-import { create } from "zustand";
-import { chatHistoryService } from "../services/chatHistoryService";
-import type { ConversationSummary } from "../types/electron";
-import { useWorkspaceStore } from "./workspaceStore";
+/**
+ * useChatStore — conversation list + page-level cross-cutting state.
+ *
+ * R-3 step 2: messages + streaming state moved to `useChatMessageStore`. This
+ * store now owns:
+ *   - Conversation list and the `currentConversationId` pointer
+ *   - Pending input / auto-send / skill / team selection (cross-cutting page state)
+ *   - Conversation lifecycle: create, switch, delete, rename, fork, metadata
+ *
+ * For backward compatibility, message-shape types are re-exported from
+ * `chatMessageStore` so existing `import type { Message } from "../stores/chatStore"`
+ * keeps working through the migration.
+ */
 
-export type MessageRole = "user" | "assistant" | "system" | "tool";
-export type MessageType = "text" | "tool_use" | "tool_result" | "error";
+import { message } from "antd";
+import { create } from "zustand";
+import type { ChatMode, SessionMeta } from "@super-client/shared-types/project";
+import { gitService } from "../services/gitService";
+import { remoteSessionService } from "../services/remoteSessionService";
+import type {
+	ConversationSummary,
+	ConversationSummaryUpdate,
+} from "../types/electron";
+import { useChatMessageStore } from "./chatMessageStore";
+import type { Message } from "./chatMessageStore";
+import { useFileArtifactStore } from "./fileArtifactStore";
+import { useProjectStore } from "./projectStore";
+import { useSessionListStore } from "./sessionListStore";
+
+// R-3 step 2: re-export message-related types for backward-compat with existing
+// `import type { Message } from "../stores/chatStore"` callsites. New code
+// should import from `chatMessageStore` directly.
+export type {
+	ChatSessionStatus,
+	Message,
+	MessageRole,
+	MessageType,
+	ToolCall,
+} from "./chatMessageStore";
 
 /**
- * Chat session lifecycle states:
- * - idle: 空闲 — waiting for user input (also the state after completion/stop/error)
- * - preparing: 创建中 — building request (fetching MCP tools, constructing system prompt)
- * - streaming: 聊天中 — receiving streamed response chunks from LLM
- * - tool_calling: 工具调用中 — model is executing MCP tool calls
+ * D-1: SessionMeta → ConversationSummary 适配器。
+ *
+ * Sidebars / TitleBar / chat 渲染层仍消费 `ConversationSummary` 形态。新存储
+ * 层（sessions.*）返回 `SessionMeta`。本适配器把两个形态对齐，避免 Phase D
+ * 阶段动 23 个 consumer 文件。
+ *
+ * 字段映射：
+ *  - `projectId === null` → workspaceId = "default"（兼容老 sidebar 分组逻辑）
+ *  - `projectId === <id>` → workspaceId = <id>（兼容；Phase E 后用 projectId 直读）
+ *  - `chatMode` 折叠后是 5 值；老 `ConversationSummary.chatMode` 仅 'direct' | 'agent'
+ *    → ChatMode='agent' 映射 'agent'，其它都映射 'direct'
+ *  - `session.kind` 反向推：projectId / chatMode / remote 综合得出
  */
-export type ChatSessionStatus =
-	| "idle"
-	| "preparing"
-	| "streaming"
-	| "tool_calling";
-
-export interface ToolCall {
-	id: string;
-	name: string;
-	input: Record<string, unknown>;
-	status: "pending" | "awaiting_approval" | "success" | "error";
-	result?: unknown;
-	error?: string;
-	duration?: number;
-}
-
-export interface Message {
-	id: string;
-	role: MessageRole;
-	content: string;
-	timestamp: number;
-	type?: MessageType;
-	toolCall?: ToolCall;
-	metadata?: {
-		model?: string;
-		providerPreset?: string;
-		providerName?: string;
-		tokens?: number;
-		inputTokens?: number;
-		outputTokens?: number;
-		duration?: number;
-		firstTokenMs?: number;
-		tokensPerSecond?: number;
-		source?: "local" | "remote";
-		remoteSender?: { id: string; name: string };
-		remotePlatform?: string;
-		attachmentIds?: string[];
-		agentSDKSessionId?: string;
-		totalCostUsd?: number;
-		numTurns?: number;
+function metaToConversation(meta: SessionMeta): ConversationSummary {
+	const isAgent = true;
+	return {
+		id: meta.id,
+		name: meta.name ?? "",
+		createdAt: meta.createdAt,
+		updatedAt: meta.updatedAt,
+		messageCount: meta.messageCount,
+		preview: meta.preview ?? "",
+		workspaceId: meta.projectId ?? "default",
+		chatMode: isAgent ? "agent" : "direct",
+		remote: meta.remote,
+		session: {
+			id: meta.id,
+			workspaceId: meta.projectId ?? "default",
+			kind: meta.remote
+				? "remote"
+				: meta.chatMode === "agent"
+					? "agent"
+					: meta.chatMode === "plan"
+						? "plan"
+						: meta.chatMode === "automation"
+							? "automation"
+							: "chat",
+			planMode: meta.planMode ?? "chat",
+			interactionProfileOverride: meta.interactionProfileOverride,
+			modelOverride: meta.modelOverride,
+			attachmentIds: [],
+			flags: meta.flags,
+			lineage: meta.lineage,
+			createdAt: meta.createdAt,
+			updatedAt: meta.updatedAt,
+		},
 	};
 }
 
-interface ChatState {
-	// Messages
-	messages: Message[];
-	sessionStatus: ChatSessionStatus;
-	isStreaming: boolean;
-	streamingContent: string;
+/**
+ * 把老 `chatMode: 'direct' | 'agent'` 映射到新 `ChatMode`。
+ * direct → 'chat'（B7 折叠后的默认）；agent → 'agent'。
+ */
+function oldChatModeToNew(_old?: "direct" | "agent"): ChatMode {
+	return "agent";
+}
 
+/**
+ * 老 caller 传 `opts.workspaceId` 字符串；映射到 SessionMeta.projectId。
+ *  - "default" / undefined → null（普通对话）
+ *  - 其它 → 当 projectId 直接用（要求 useProjectStore 已 load 过 / 该 id 存在）
+ */
+function workspaceIdToProjectId(workspaceId?: string): string | null {
+	if (!workspaceId || workspaceId === "default") return null;
+	return workspaceId;
+}
+
+/**
+ * G-6 收口 helper：从 ConversationSummary 派生项目 id。
+ * `workspaceId === "default" / 空 / undefined` → `null`（普通对话），其它当 projectId。
+ *
+ * 用 `Pick<...>` 不锁死整个 ConversationSummary，方便 RemoteChatMessage / SessionMeta
+ * 等其它形态也能传（只要有 workspaceId 字段）。
+ */
+export function getProjectIdFromConversation(
+	conv: { workspaceId?: string } | null | undefined,
+): string | null {
+	if (!conv?.workspaceId || conv.workspaceId === "default") return null;
+	return conv.workspaceId;
+}
+
+async function readSessionMessages(conversationId: string): Promise<Message[]> {
+	try {
+		const res = await window.electron.sessions.readMessages(conversationId);
+		if (res.success && res.data) return res.data;
+	} catch (err) {
+		console.error("[chatStore] sessions.readMessages failed:", err);
+	}
+	return [];
+}
+
+interface ChatState {
 	// Pending input (from plugins, float widget, etc.)
 	pendingInput: string | null;
 	setPendingInput: (input: string | null) => void;
@@ -82,42 +150,33 @@ interface ChatState {
 	currentConversationId: string | null;
 	isLoadingConversations: boolean;
 
-	// Message actions
-	addMessage: (message: Message) => void;
-	updateLastMessage: (content: string) => void;
-	updateMessageToolCall: (
-		messageId: string,
-		toolCall: Partial<ToolCall>,
-	) => void;
-	updateMessageMetadata: (
-		messageId: string,
-		metadata: Partial<NonNullable<Message["metadata"]>>,
-	) => void;
-	setSessionStatus: (status: ChatSessionStatus) => void;
-	setStreaming: (streaming: boolean) => void;
-	setStreamingContent: (content: string) => void;
-	appendStreamingContent: (content: string) => void;
-	clearMessages: () => void;
-	deleteMessage: (messageId: string) => void;
-	updateMessageContent: (messageId: string, content: string) => void;
-	deleteMessagesFrom: (messageId: string) => void;
-
 	// Conversation actions
 	loadConversations: () => Promise<void>;
-	createConversation: (name?: string, chatMode?: "direct" | "agent") => Promise<string | null>;
+	createConversation: (
+		name?: string,
+		chatMode?: "direct" | "agent",
+		opts?: { workspaceId?: string },
+	) => Promise<string | null>;
+	/** Plan §25.3 — explicit advanced creation that may also bind a remote bot. */
+	createConversationAdvanced: (input: {
+		workspaceId: string;
+		chatMode: "direct" | "agent";
+		name?: string;
+		remote?: { botId: string; chatId: string };
+	}) => Promise<string | null>;
 	switchConversation: (conversationId: string) => Promise<void>;
 	deleteConversation: (conversationId: string) => Promise<void>;
+	deleteProjectConversationsLocally: (projectId: string) => Promise<void>;
 	renameConversation: (conversationId: string, name: string) => Promise<void>;
-
-	// Persistence helpers
-	persistMessages: () => void;
+	updateConversationMetadata: (
+		conversationId: string,
+		updates: ConversationSummaryUpdate,
+	) => Promise<void>;
+	forkConversationLocal: (sourceId: string) => Promise<string | null>;
+	forkConversationWorktree: (sourceId: string) => Promise<string | null>;
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
-	messages: [],
-	sessionStatus: "idle",
-	isStreaming: false,
-	streamingContent: "",
 	pendingInput: null,
 	setPendingInput: (input) => set({ pendingInput: input }),
 	pendingAutoSend: false,
@@ -130,262 +189,425 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	currentConversationId: null,
 	isLoadingConversations: false,
 
-	addMessage: (message) => {
-		set((state) => ({ messages: [...state.messages, message] }));
-		// Fire-and-forget persist
-		const { currentConversationId } = get();
-		if (currentConversationId) {
-			chatHistoryService
-				.appendMessage(currentConversationId, message)
-				.catch(() => {});
-		}
-	},
-
-	updateLastMessage: (content) =>
-		set((state) => {
-			const lastMsg = state.messages[state.messages.length - 1];
-			if (!lastMsg) return state;
-			const newMessages = [...state.messages];
-			newMessages[newMessages.length - 1] = { ...lastMsg, content };
-			return { messages: newMessages };
-		}),
-
-	updateMessageToolCall: (messageId, toolCallUpdate) =>
-		set((state) => {
-			const messageIndex = state.messages.findIndex((m) => m.id === messageId);
-			if (messageIndex === -1) return state;
-
-			const newMessages = [...state.messages];
-			const message = newMessages[messageIndex];
-			newMessages[messageIndex] = {
-				...message,
-				toolCall: { ...message.toolCall, ...toolCallUpdate } as ToolCall,
-			};
-			return { messages: newMessages };
-		}),
-
-	updateMessageMetadata: (messageId, metadataUpdate) => {
-		set((state) => {
-			const messageIndex = state.messages.findIndex((m) => m.id === messageId);
-			if (messageIndex === -1) return state;
-
-			const newMessages = [...state.messages];
-			const message = newMessages[messageIndex];
-			newMessages[messageIndex] = {
-				...message,
-				metadata: { ...message.metadata, ...metadataUpdate },
-			};
-			return { messages: newMessages };
-		});
-		// Persist updated message
-		const { currentConversationId, messages } = get();
-		if (currentConversationId) {
-			const msg = messages.find((m) => m.id === messageId);
-			if (msg) {
-				chatHistoryService
-					.updateMessage(currentConversationId, messageId, {
-						metadata: msg.metadata,
-					})
-					.catch(() => {});
-			}
-		}
-	},
-
-	setSessionStatus: (status) =>
-		set({ sessionStatus: status, isStreaming: status !== "idle" }),
-
-	setStreaming: (streaming) =>
-		set({
-			isStreaming: streaming,
-			sessionStatus: streaming ? "streaming" : "idle",
-		}),
-
-	setStreamingContent: (content) => set({ streamingContent: content }),
-
-	appendStreamingContent: (content) =>
-		set((state) => ({
-			streamingContent: state.streamingContent + content,
-		})),
-
-	clearMessages: () => {
-		const { currentConversationId } = get();
-		set({ messages: [] });
-		if (currentConversationId) {
-			chatHistoryService.clearMessages(currentConversationId).catch(() => {});
-		}
-	},
-
-	deleteMessage: (messageId) => {
-		set((state) => ({
-			messages: state.messages.filter((m) => m.id !== messageId),
-		}));
-		get().persistMessages();
-	},
-
-	updateMessageContent: (messageId, content) => {
-		set((state) => {
-			const idx = state.messages.findIndex((m) => m.id === messageId);
-			if (idx === -1) return state;
-			const newMessages = [...state.messages];
-			newMessages[idx] = { ...newMessages[idx], content };
-			return { messages: newMessages };
-		});
-		const { currentConversationId } = get();
-		if (currentConversationId) {
-			chatHistoryService
-				.updateMessage(currentConversationId, messageId, { content })
-				.catch(() => {});
-		}
-	},
-
-	deleteMessagesFrom: (messageId) => {
-		set((state) => {
-			const idx = state.messages.findIndex((m) => m.id === messageId);
-			if (idx === -1) return state;
-			return { messages: state.messages.slice(0, idx) };
-		});
-		get().persistMessages();
-	},
-
 	// ============ Conversation actions ============
 
 	loadConversations: async () => {
 		set({ isLoadingConversations: true });
 		try {
-			const res = await chatHistoryService.listConversations();
-			if (res.success && res.data) {
-				set({ conversations: res.data });
-			}
+			// D-1: 老 chat.listConversations 替换为 projects.list + 各 bucket 的
+			// sessions.list 联合查。新存储是分桶的，conversation 列表是聚合 view。
+			await useProjectStore.getState().load();
+			const projects = useProjectStore.getState().projects;
+			await useSessionListStore.getState().loadCasual();
+			await Promise.all(
+				projects.map((p) => useSessionListStore.getState().loadProject(p.id)),
+			);
+			const sl = useSessionListStore.getState();
+			const allMeta: SessionMeta[] = [
+				...sl.casual,
+				...projects.flatMap((p) => sl.byProject[p.id] ?? []),
+			];
+			const conversations = allMeta
+				.map(metaToConversation)
+				.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+			set({ conversations });
 		} finally {
 			set({ isLoadingConversations: false });
 		}
 	},
 
-	createConversation: async (name, chatMode) => {
+	createConversation: async (name, chatMode, opts) => {
 		try {
-			const workspaceState = useWorkspaceStore.getState();
-			const workspaceId =
-				workspaceState.currentWorkspaceId ||
-				workspaceState.defaultWorkspaceId ||
-				"default";
-			const res = await chatHistoryService.createConversation(
-				name || "New Chat",
-				{
-					workspaceId,
-					kind: chatMode === "agent" ? "agent" : "chat",
-					chatMode,
-				},
-			);
-			if (res.success && res.data) {
-				const conv = chatMode
-					? { ...res.data, chatMode }
-					: res.data;
-				set((state) => ({
-					conversations: [conv, ...state.conversations],
-					currentConversationId: conv.id,
-					messages: [],
-				}));
-				chatHistoryService.setLastConversation(conv.id).catch(() => {});
-				workspaceState.addSessionToWorkspace(workspaceId, conv.id);
-				workspaceState.setActiveSession(workspaceId, conv.id);
-				// Persist chatMode to metadata immediately so it survives restart
-				if (chatMode) {
-					chatHistoryService
-						.updateConversationMetadata(conv.id, { chatMode })
-						.catch(() => {});
-				}
-				return conv.id;
+			// D-1: opts.workspaceId 翻译为 SessionMeta.projectId（"default" → null）
+			const projectId = workspaceIdToProjectId(opts?.workspaceId);
+			const res = await window.electron.sessions.create({
+				projectId,
+				name: name || "新对话",
+				chatMode: "agent",
+			});
+			if (!res.success || !res.data) {
+				console.error(
+					"[chatStore] sessions.create failed:",
+					res.error ?? "unknown",
+				);
+				return null;
 			}
+			const meta = res.data;
+			const conv = metaToConversation(meta);
+			set((state) => ({
+				conversations: [conv, ...state.conversations],
+				currentConversationId: conv.id,
+			}));
+			useChatMessageStore.getState().setMessages([]);
+			useSessionListStore.setState((s) => {
+				if (meta.projectId === null) {
+					return {
+						casual: [meta, ...s.casual.filter((m) => m.id !== meta.id)],
+					};
+				}
+				const projectId = meta.projectId;
+				return {
+					byProject: {
+						...s.byProject,
+						[projectId]: [
+							meta,
+							...(s.byProject[projectId] ?? []).filter((m) => m.id !== meta.id),
+						],
+					},
+				};
+			});
+			useSessionListStore.getState().setCurrent(meta.id);
+			return meta.id;
 		} catch (error) {
 			console.error("[chatStore] Failed to create conversation:", error);
 		}
 		return null;
 	},
 
+	// Plan §25.3 — invoked by <NewConversationModal>. Wraps `createConversation`
+	// with an optional remote-bind step so the user can spin up a 远端对话 in
+	// one operation. Switches the workspace if the chosen one differs from the
+	// currently-focused workspace, so the new conversation lands in view.
+	createConversationAdvanced: async ({
+		workspaceId,
+		chatMode,
+		name,
+		remote,
+	}) => {
+		try {
+			// D-1: workspaceId 兼容仍传字符串；createConversation 内部会翻译。
+			const newId = await get().createConversation(
+				name || (remote ? "远端对话" : "新对话"),
+				chatMode,
+				{ workspaceId },
+			);
+			if (!newId) {
+				message.error("创建对话失败");
+				return null;
+			}
+			if (remote) {
+				try {
+					const res = await remoteSessionService.bind(
+						newId,
+						remote.botId,
+						remote.chatId,
+					);
+					if (!res.success) {
+						message.warning(
+							`对话已创建，但绑定 IM bot 失败：${res.error || "unknown"}`,
+						);
+					} else {
+						set((state) => ({
+							conversations: state.conversations.map((c) =>
+								c.id === newId && res.data ? { ...c, remote: res.data } : c,
+							),
+						}));
+					}
+				} catch (err) {
+					message.warning("对话已创建，但绑定 IM bot 失败");
+					console.warn("[chatStore] remoteChat.bind failed:", err);
+				}
+			}
+			return newId;
+		} catch (error) {
+			console.error("[chatStore] createConversationAdvanced failed:", error);
+			message.error("创建对话失败");
+			return null;
+		}
+	},
+
 	switchConversation: async (conversationId) => {
-		const { sessionStatus, currentConversationId } = get();
-		if (sessionStatus !== "idle") return; // Don't switch while active
+		// Don't switch while active. R-3 step 2: status now lives in chatMessageStore.
+		const sessionStatus = useChatMessageStore.getState().sessionStatus;
+		if (sessionStatus !== "idle") return;
+
+		const { currentConversationId } = get();
 		if (conversationId === currentConversationId) return;
 
-		set({ currentConversationId: conversationId, messages: [] });
+		set({ currentConversationId: conversationId });
+		useChatMessageStore.getState().setMessages([]);
 
 		try {
-			const res = await chatHistoryService.getMessages(conversationId);
-			if (res.success && res.data) {
-				set({ messages: res.data as Message[] });
-			}
+			const messages = await readSessionMessages(conversationId);
+			useChatMessageStore.getState().setMessages(messages);
 		} catch (error) {
 			console.error("[chatStore] Failed to load messages:", error);
 		}
-
-		chatHistoryService.setLastConversation(conversationId).catch(() => {});
 	},
 
+	// Plan §25.4: deletion link.
+	//   1. Resolve "next current" BEFORE physical delete (only when deleting
+	//      the currently focused conversation).
+	//   2. Auto-unbind remote (so the IM bot side does not retain orphans).
+	//   3. Physical delete via main.
+	//   4. Local cleanup: chatStore.conversations + file artifacts.
 	deleteConversation: async (conversationId) => {
+		const state = get();
+		const target = state.conversations.find((c) => c.id === conversationId);
+		const isCurrent = state.currentConversationId === conversationId;
+
+		// Resolve next conversation to focus.
+		let nextId: string | null = null;
+		if (isCurrent) {
+			const remaining = state.conversations.filter(
+				(c) => c.id !== conversationId && !c.session?.flags?.archived,
+			);
+			const sameWorkspace = target?.workspaceId
+				? remaining.filter((c) => c.workspaceId === target.workspaceId)
+				: [];
+			const pool = sameWorkspace.length > 0 ? sameWorkspace : remaining;
+			pool.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+			nextId = pool[0]?.id ?? null;
+		}
+
 		try {
-			const res = await chatHistoryService.deleteConversation(conversationId);
-			if (res.success) {
-				set((state) => {
-					const newConversations = state.conversations.filter(
-						(c) => c.id !== conversationId,
+			if (target?.remote) {
+				try {
+					await remoteSessionService.unbind(conversationId);
+				} catch (err) {
+					console.warn(
+						"[chatStore] remote unbind failed; continuing delete:",
+						err,
 					);
-					const isCurrent = state.currentConversationId === conversationId;
-					return {
-						conversations: newConversations,
-						currentConversationId: isCurrent
-							? null
-							: state.currentConversationId,
-						messages: isCurrent ? [] : state.messages,
-					};
-				});
+				}
+			}
+
+			// D-1: useSessionListStore.delete 同时调 IPC + 清理 store 状态
+			await useSessionListStore.getState().delete(conversationId);
+			useFileArtifactStore.getState().clearForConversation(conversationId);
+
+			set((s) => ({
+				conversations: s.conversations.filter((c) => c.id !== conversationId),
+				currentConversationId: isCurrent ? nextId : s.currentConversationId,
+			}));
+			if (isCurrent) {
+				useChatMessageStore.getState().setMessages([]);
+			}
+
+			if (isCurrent && nextId) {
+				try {
+					const messages = await readSessionMessages(nextId);
+					useChatMessageStore.getState().setMessages(messages);
+				} catch (err) {
+					console.error("[chatStore] failed to load next messages:", err);
+				}
 			}
 		} catch (error) {
 			console.error("[chatStore] Failed to delete conversation:", error);
 		}
 	},
 
+	deleteProjectConversationsLocally: async (projectId) => {
+		const state = get();
+		const removed = state.conversations.filter(
+			(c) => getProjectIdFromConversation(c) === projectId,
+		);
+		if (removed.length === 0) return;
+		const removedIds = new Set(removed.map((c) => c.id));
+		const remaining = state.conversations
+			.filter((c) => !removedIds.has(c.id) && !c.session?.flags?.archived)
+			.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+		const currentRemoved = state.currentConversationId
+			? removedIds.has(state.currentConversationId)
+			: false;
+		const nextId = currentRemoved
+			? (remaining[0]?.id ?? null)
+			: state.currentConversationId;
+
+		for (const conversationId of removedIds) {
+			useFileArtifactStore.getState().clearForConversation(conversationId);
+		}
+
+		useSessionListStore.setState((s) => {
+			const nextByProject = { ...s.byProject };
+			delete nextByProject[projectId];
+			return {
+				byProject: nextByProject,
+				currentSessionId:
+					s.currentSessionId && removedIds.has(s.currentSessionId)
+						? nextId
+						: s.currentSessionId,
+			};
+		});
+
+		set((s) => ({
+			conversations: s.conversations.filter((c) => !removedIds.has(c.id)),
+			currentConversationId: currentRemoved ? nextId : s.currentConversationId,
+		}));
+
+		if (!currentRemoved) return;
+		const messageStore = useChatMessageStore.getState();
+		messageStore.setSessionStatus("idle");
+		messageStore.setStreamingContent("");
+		if (!nextId) {
+			messageStore.setMessages([]);
+			return;
+		}
+		try {
+			messageStore.setMessages(await readSessionMessages(nextId));
+		} catch (err) {
+			console.error("[chatStore] failed to load fallback messages:", err);
+			messageStore.setMessages([]);
+		}
+	},
+
 	renameConversation: async (conversationId, name) => {
 		try {
-			const res = await chatHistoryService.renameConversation(
-				conversationId,
-				name,
-			);
-			if (res.success) {
-				set((state) => ({
-					conversations: state.conversations.map((c) =>
-						c.id === conversationId ? { ...c, name } : c,
-					),
-				}));
-			}
+			// D-1: 走 sessions.rename。useSessionListStore.rename 同时调 IPC + sync state。
+			await useSessionListStore.getState().rename(conversationId, name);
+			set((state) => ({
+				conversations: state.conversations.map((c) =>
+					c.id === conversationId ? { ...c, name } : c,
+				),
+			}));
 		} catch (error) {
 			console.error("[chatStore] Failed to rename conversation:", error);
 		}
 	},
 
-	persistMessages: () => {
-		const { currentConversationId, messages } = get();
-		if (currentConversationId) {
-			chatHistoryService
-				.saveMessages(currentConversationId, messages)
-				.then(() => {
-					// Update conversation summary in local state
-					set((state) => ({
-						conversations: state.conversations.map((c) =>
-							c.id === currentConversationId
-								? {
-										...c,
-										messageCount: messages.length,
-										updatedAt: Date.now(),
-										preview:
-											messages
-												.find((m) => m.role === "user")
-												?.content.slice(0, 100) || c.preview,
-									}
-								: c,
-						),
-					}));
-				})
-				.catch(() => {});
+	updateConversationMetadata: async (conversationId, updates) => {
+		try {
+			// D-1: 把老 ConversationSummaryUpdate 翻译成新 SessionMeta patch。
+			// G-4: 加 planMode / interactionProfileOverride 透传——SessionMeta 现在
+			// 持有这两个字段，SessionRuntimeResolver 会用它们做 overlay。
+			// session.kind / workspaceId 在新模型里折叠掉，忽略。
+			const sessionPatch = updates.session;
+			const metaPatch: Partial<SessionMeta> = {
+				...(updates.name !== undefined ? { name: updates.name } : {}),
+				...(updates.chatMode !== undefined
+					? { chatMode: oldChatModeToNew(updates.chatMode) }
+					: {}),
+				...(updates.remote !== undefined ? { remote: updates.remote } : {}),
+				...(sessionPatch?.flags !== undefined
+					? { flags: sessionPatch.flags }
+					: {}),
+				...(sessionPatch?.lineage !== undefined
+					? { lineage: sessionPatch.lineage }
+					: {}),
+				...(sessionPatch?.modelOverride !== undefined
+					? { modelOverride: sessionPatch.modelOverride }
+					: {}),
+				...(sessionPatch?.planMode !== undefined
+					? { planMode: sessionPatch.planMode }
+					: {}),
+				...(sessionPatch?.interactionProfileOverride !== undefined
+					? {
+							interactionProfileOverride:
+								sessionPatch.interactionProfileOverride,
+						}
+					: {}),
+			};
+			await useSessionListStore
+				.getState()
+				.updateMeta(conversationId, metaPatch);
+			// 本地 conversations 同步
+			set((state) => ({
+				conversations: state.conversations.map((c) => {
+					if (c.id !== conversationId) return c;
+					const { session: sp, ...rest } = updates;
+					const merged: ConversationSummary = { ...c, ...rest };
+					if (sp && c.session) {
+						merged.session = { ...c.session, ...sp };
+					}
+					return merged;
+				}),
+			}));
+		} catch (error) {
+			console.error(
+				"[chatStore] Failed to update conversation metadata:",
+				error,
+			);
+		}
+	},
+
+	// ── Fork actions (plan §23.2) ─────────────────────────────────────────
+	// D-1: 走 sessions.fork。fork 内部复制 jsonl + meta + per-session 子目录，
+	// 并设 lineage.forkOriginId。worktree fork 需要 renderer 先调 git 创建工作树，
+	// 然后 fork（targetProjectId 与源相同 / casual）。
+	forkConversationLocal: async (sourceId: string) => {
+		const source = get().conversations.find((c) => c.id === sourceId);
+		if (!source) {
+			message.error("找不到源会话");
+			return null;
+		}
+		try {
+			const targetProjectId = workspaceIdToProjectId(source.workspaceId);
+			const res = await window.electron.sessions.fork(sourceId, {
+				targetProjectId,
+				name: `${source.name || "未命名会话"} (副本)`,
+			});
+			if (!res.success || !res.data) {
+				message.error(`派生失败：${res.error || "unknown"}`);
+				return null;
+			}
+			await get().loadConversations();
+			message.success("已派生到本地");
+			return res.data.id;
+		} catch (error) {
+			console.error("[chatStore] forkConversationLocal failed:", error);
+			message.error("派生失败");
+			return null;
+		}
+	},
+	forkConversationWorktree: async (sourceId: string) => {
+		const source = get().conversations.find((c) => c.id === sourceId);
+		if (!source) {
+			message.error("找不到源会话");
+			return null;
+		}
+		try {
+			// 1. 解析源 cwd → git rev-parse
+			const cwdRes = await window.electron.cwd.resolveSessionCwd(sourceId);
+			if (!cwdRes.success || !cwdRes.data) {
+				message.error("无法解析会话目录");
+				return null;
+			}
+			const cwd = cwdRes.data;
+			const branchRes = await gitService.getBranchInfo(cwd);
+			if (!branchRes.success || !branchRes.data?.isRepo) {
+				message.error("当前会话目录不是 git 仓库");
+				return null;
+			}
+			const ts = Date.now();
+			const worktreePath = `${cwd}-fork-${ts}`;
+			const branchName = `fork-${ts}`;
+			const wtRes = await gitService.createWorktree(
+				cwd,
+				worktreePath,
+				branchName,
+			);
+			if (!wtRes.success || !wtRes.data?.ok) {
+				message.error(
+					`创建工作树失败：${wtRes.data?.error || wtRes.error || "unknown"}`,
+				);
+				return null;
+			}
+			// 2. fork session（targetProject 与源相同，记 worktreePath 到 lineage）
+			const targetProjectId = workspaceIdToProjectId(source.workspaceId);
+			const forkRes = await window.electron.sessions.fork(sourceId, {
+				targetProjectId,
+				name: `${source.name || "未命名会话"} (工作树)`,
+			});
+			if (!forkRes.success || !forkRes.data) {
+				message.error(`派生失败：${forkRes.error || "unknown"}`);
+				return null;
+			}
+			const newId = forkRes.data.id;
+			// 3. 把 worktreePath 补进 lineage（fork 默认只填 forkOriginId）
+			await window.electron.sessions.updateMeta(newId, {
+				lineage: {
+					...forkRes.data.lineage,
+					forkOriginId: sourceId,
+					worktreePath,
+				},
+			});
+			await get().loadConversations();
+			message.success("已派生到新工作树");
+			return newId;
+		} catch (error) {
+			console.error("[chatStore] forkConversationWorktree failed:", error);
+			message.error("派生到工作树失败");
+			return null;
 		}
 	},
 }));

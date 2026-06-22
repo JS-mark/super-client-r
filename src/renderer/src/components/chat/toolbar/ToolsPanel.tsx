@@ -100,11 +100,7 @@ export function ToolsPanel({ onSelect, onClose }: ToolsPanelProps) {
 							onClick={() => handleSelect(tool)}
 						>
 							<List.Item.Meta
-								title={
-									<span className="text-sm font-mono">
-										{tool.name}
-									</span>
-								}
+								title={<span className="text-sm font-mono">{tool.name}</span>}
 								description={
 									<span className="text-xs text-gray-500">
 										<Tag className="mr-1" bordered={false}>

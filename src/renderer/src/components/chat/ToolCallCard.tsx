@@ -6,18 +6,22 @@ import {
 	CloseOutlined,
 	DownOutlined,
 	ExclamationCircleOutlined,
+	KeyOutlined,
 	LoadingOutlined,
 	RightOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
-import { Button, theme } from "antd";
+import { App, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import JsonView from "react18-json-view";
 import "react18-json-view/src/style.css";
+import { runtimeService } from "../../services/runtimeService";
+import { useChatStore } from "../../stores/chatStore";
 import type { Message } from "../../stores/chatStore";
 import { useThemeStore } from "../../stores/themeStore";
+import { ApprovalDecisionCard } from "./ApprovalDecisionCard";
 
 const { useToken } = theme;
 
@@ -120,6 +124,7 @@ const JsonSection: React.FC<{
 		parsed === null ||
 		parsed === undefined ||
 		(typeof parsed === "object" && Object.keys(parsed as object).length === 0);
+	const preview = JSON.stringify(parsed);
 
 	const handleToggle = useCallback(() => setExpanded((v) => !v), []);
 
@@ -141,20 +146,23 @@ const JsonSection: React.FC<{
 					<RightOutlined style={{ fontSize: 9 }} />
 				)}
 				<span style={{ fontSize: 11, fontWeight: 500 }}>{label}</span>
-				{!expanded && (
-					<span
-						className="truncate"
-						style={{
-							color: token.colorTextQuaternary,
-							fontSize: 11,
-							fontFamily:
-								'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-							maxWidth: 320,
-						}}
-					>
-						{JSON.stringify(parsed).slice(0, 80)}
-					</span>
-				)}
+					{!expanded && (
+						<Tooltip title={preview} mouseEnterDelay={0.35}>
+							<span
+								className="truncate"
+								style={{
+									color: token.colorTextTertiary,
+									fontSize: 11,
+									fontFamily:
+										'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+									maxWidth: 420,
+									minWidth: 0,
+								}}
+							>
+								{preview}
+							</span>
+						</Tooltip>
+					)}
 			</div>
 			{expanded && (
 				<div
@@ -204,21 +212,173 @@ const STATUS_COLOR: Record<string, (token: Record<string, string>) => string> =
 
 export const ToolCallCard: React.FC<{
 	toolCall: NonNullable<Message["toolCall"]>;
-	onApproval?: (toolCallId: string, approved: boolean) => void;
+	onApproval?: (
+		toolCallId: string,
+		approved: boolean,
+		updatedInput?: Record<string, unknown>,
+		updatedPermissions?: Array<Record<string, unknown>>,
+	) => void;
 }> = ({ toolCall, onApproval }) => {
 	const { token } = useToken();
 	const { t } = useTranslation("chat");
+	const { message } = App.useApp();
 	const isDark = useThemeStore((s) => s.actualTheme) === "dark";
+	const [approvalChoice, setApprovalChoice] = useState<
+		"allow_once" | "allow_session"
+	>("allow_once");
+	const conversationId = useChatStore((s) => s.currentConversationId);
 	const { server, tool } = useMemo(
 		() => formatToolName(toolCall.name),
 		[toolCall.name],
 	);
+
+	const handleAllowForSession = useCallback(async () => {
+		if (!conversationId) return;
+		try {
+			const res = await runtimeService.addGrant(conversationId, {
+				operationType: `tool:${toolCall.name}`,
+				scope: "session",
+			});
+			if (res.success) {
+				message.success(t("approval.grantAdded"));
+			} else {
+				message.error(res.error || t("approval.grantFailed"));
+			}
+		} catch (err) {
+			message.error(
+				err instanceof Error ? err.message : t("approval.grantFailed"),
+			);
+		}
+		onApproval?.(toolCall.id, true, undefined, toolCall.approval?.suggestions);
+	}, [
+		conversationId,
+		toolCall.id,
+		toolCall.name,
+		toolCall.approval?.suggestions,
+		onApproval,
+		message,
+		t,
+	]);
+	const handleApprovalConfirm = useCallback(() => {
+		if (approvalChoice === "allow_session") {
+			void handleAllowForSession();
+			return;
+		}
+		onApproval?.(toolCall.id, true);
+	}, [approvalChoice, handleAllowForSession, onApproval, toolCall.id]);
+	const handleApprovalReject = useCallback(() => {
+		onApproval?.(toolCall.id, false);
+	}, [onApproval, toolCall.id]);
 	const statusColor = (STATUS_COLOR[toolCall.status] || STATUS_COLOR.pending)(
 		token as unknown as Record<string, string>,
 	);
 
 	const envType = useMemo(() => getEnvType(server), [server]);
 	const envColors = ENV_COLORS[envType];
+	const approvalOptions = useMemo(
+		() => [
+				{
+					value: "allow_once",
+					label: t("approval.allowOnce", t("approval.approve")),
+					description: t("approval.allowOnceDesc"),
+				},
+				{
+					value: "allow_session",
+					label: t("approval.allowSession"),
+					description: t("approval.allowSessionDesc"),
+					disabled: !conversationId,
+				},
+			],
+			[conversationId, t],
+		);
+		const approvalDescription = useMemo(() => {
+			if (toolCall.approval?.title || toolCall.approval?.description) {
+				return (
+					<div>
+						{toolCall.approval?.title && (
+							<div style={{ fontWeight: 600, color: token.colorText }}>
+								{toolCall.approval.title}
+							</div>
+						)}
+						{toolCall.approval?.description && (
+							<div style={{ marginTop: toolCall.approval.title ? 2 : 0 }}>
+								{toolCall.approval.description}
+							</div>
+						)}
+					</div>
+				);
+			}
+			return t("approval.description");
+		}, [
+			t,
+			token.colorText,
+			toolCall.approval?.description,
+			toolCall.approval?.title,
+		]);
+
+	if (toolCall.status === "awaiting_approval" && onApproval) {
+		return (
+				<ApprovalDecisionCard
+					icon={<ExclamationCircleOutlined />}
+					title={toolCall.approval?.displayName || tool}
+					description={approvalDescription}
+					options={approvalOptions}
+					value={approvalChoice}
+					onChange={(value) =>
+						setApprovalChoice(value as "allow_once" | "allow_session")
+					}
+					rejectLabel={t("approval.reject")}
+					rejectIcon={<CloseOutlined />}
+					onReject={handleApprovalReject}
+					confirmLabel={t("approval.confirm")}
+					confirmIcon={
+						approvalChoice === "allow_session" ? (
+							<KeyOutlined />
+						) : (
+							<CheckOutlined />
+					)
+					}
+					onConfirm={handleApprovalConfirm}
+					tone="warning"
+			>
+				<div className="flex items-center gap-2">
+					{server && (
+						<span
+							style={{
+								fontSize: 10,
+								color: token.colorTextQuaternary,
+								padding: "0 4px",
+								borderRadius: 3,
+								backgroundColor: token.colorFillTertiary,
+								lineHeight: "16px",
+							}}
+						>
+							{server}
+						</span>
+					)}
+					<span
+						style={{
+							fontSize: 10,
+							padding: "0 5px",
+							borderRadius: 3,
+							lineHeight: "16px",
+							fontWeight: 500,
+							backgroundColor: isDark ? envColors.dark : envColors.light,
+							color: isDark ? envColors.darkText : envColors.text,
+						}}
+					>
+						{t(`toolCall.env.${envType}`)}
+					</span>
+				</div>
+				<JsonSection
+					label={t("toolCall.input")}
+					value={toolCall.input}
+					defaultExpanded={false}
+					dark={isDark}
+				/>
+			</ApprovalDecisionCard>
+		);
+	}
 
 	return (
 		<div
@@ -251,7 +411,7 @@ export const ToolCallCard: React.FC<{
 							'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
 					}}
 				>
-					{tool}
+					{toolCall.approval?.displayName || tool}
 				</span>
 				{server && (
 					<span
@@ -294,6 +454,40 @@ export const ToolCallCard: React.FC<{
 
 			{/* Body */}
 			<div className="px-3 py-2 flex flex-col gap-1.5">
+				{(toolCall.approval?.title || toolCall.approval?.description) && (
+					<div
+						className="rounded-md px-3 py-2"
+						style={{
+							backgroundColor: token.colorFillQuaternary,
+							border: `1px solid ${token.colorBorderSecondary}`,
+						}}
+					>
+						{toolCall.approval?.title && (
+							<div
+								style={{
+									fontSize: 12,
+									fontWeight: 600,
+									color: token.colorText,
+									lineHeight: 1.5,
+								}}
+							>
+								{toolCall.approval.title}
+							</div>
+						)}
+						{toolCall.approval?.description && (
+							<div
+								style={{
+									fontSize: 12,
+									color: token.colorTextSecondary,
+									lineHeight: 1.5,
+									marginTop: toolCall.approval.title ? 2 : 0,
+								}}
+							>
+								{toolCall.approval.description}
+							</div>
+						)}
+					</div>
+				)}
 				<JsonSection
 					label={t("toolCall.input")}
 					value={toolCall.input}
@@ -315,46 +509,6 @@ export const ToolCallCard: React.FC<{
 							<span>{t("toolCall.executing")}</span>
 						</div>
 						<div className="tool-call-progress-bar" />
-					</div>
-				)}
-
-				{/* Inline approval UI */}
-				{toolCall.status === "awaiting_approval" && onApproval && (
-					<div
-						className="flex items-center justify-between gap-3 rounded-md px-3 py-2"
-						style={{
-							marginTop: 4,
-							backgroundColor: token.colorWarningBg,
-							border: `1px solid ${token.colorWarningBorder}`,
-						}}
-					>
-						<span
-							style={{
-								fontSize: 12,
-								color: token.colorWarning,
-								fontWeight: 500,
-							}}
-						>
-							<ExclamationCircleOutlined style={{ marginRight: 6 }} />
-							{t("approval.title")}
-						</span>
-						<div className="flex items-center gap-2">
-							<Button
-								size="small"
-								icon={<CloseOutlined />}
-								onClick={() => onApproval(toolCall.id, false)}
-							>
-								{t("approval.reject")}
-							</Button>
-							<Button
-								type="primary"
-								size="small"
-								icon={<CheckOutlined />}
-								onClick={() => onApproval(toolCall.id, true)}
-							>
-								{t("approval.approve")}
-							</Button>
-						</div>
 					</div>
 				)}
 

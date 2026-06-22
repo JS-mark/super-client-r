@@ -1,6 +1,9 @@
 import { Popover, Radio, Space, Tag, Tooltip } from "antd";
 import { useEffectiveInteractionProfile } from "../../hooks/useEffectiveInteractionProfile";
-import { useChatStore } from "../../stores/chatStore";
+import {
+	getProjectIdFromConversation,
+	useChatStore,
+} from "../../stores/chatStore";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import { useProjectSettings } from "../../stores/projectStore";
 import type {
@@ -81,7 +84,7 @@ const ATTACHMENT_MODE_LABEL: Record<
  *
  * Only the model chip is interactive in this iteration — clicking it dispatches
  * a `chat:open-model-switcher` window event which `Chat.tsx` listens for to
- * open the existing `ModelSwitcherModal`.
+ * open `ChatModelPicker`.
  */
 export function ComposerStatusBar() {
 	const currentConversation = useChatStore((s) =>
@@ -92,14 +95,9 @@ export function ComposerStatusBar() {
 	const updateConversationMetadata = useChatStore(
 		(s) => s.updateConversationMetadata,
 	);
-	// E-3: workspaceId === "default" → 普通对话，无 project，没有项目级覆盖。
-	// 其它 workspaceId 视作 projectId（D-1 适配器规则）。
-	const projectIdFromConv =
-		currentConversation?.workspaceId &&
-		currentConversation.workspaceId !== "default"
-			? currentConversation.workspaceId
-			: null;
-	const projectSettings = useProjectSettings(projectIdFromConv);
+	const projectSettings = useProjectSettings(
+		getProjectIdFromConversation(currentConversation),
+	);
 	const interactionProfile: InteractionProfile =
 		useEffectiveInteractionProfile();
 
@@ -184,7 +182,8 @@ export function ComposerStatusBar() {
 
 			<Tooltip title="附件默认处理方式">
 				<Tag className="m-0 text-xs">
-					Context: {attachmentMode ? ATTACHMENT_MODE_LABEL[attachmentMode] : "—"}
+					Context:{" "}
+					{attachmentMode ? ATTACHMENT_MODE_LABEL[attachmentMode] : "—"}
 				</Tag>
 			</Tooltip>
 		</Space>

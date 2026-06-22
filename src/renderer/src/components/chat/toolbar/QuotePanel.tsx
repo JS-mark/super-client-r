@@ -2,8 +2,8 @@ import { MessageOutlined } from "@ant-design/icons";
 import { Empty, List, Tag, theme } from "antd";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useChatStore } from "../../../stores/chatStore";
-import type { Message } from "../../../stores/chatStore";
+import { useChatMessageStore } from "../../../stores/chatMessageStore";
+import type { Message } from "../../../stores/chatMessageStore";
 
 const { useToken } = theme;
 
@@ -21,7 +21,7 @@ function truncate(text: string, maxLen: number): string {
 export function QuotePanel({ onSelect, onClose }: QuotePanelProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
-	const messages = useChatStore((s) => s.messages);
+	const messages = useChatMessageStore((s) => s.messages);
 
 	// Show user and assistant messages only, most recent first
 	const quotableMessages = useMemo(
@@ -67,11 +67,9 @@ export function QuotePanel({ onSelect, onClose }: QuotePanelProps) {
 			{quotableMessages.length === 0 ? (
 				<Empty
 					image={Empty.PRESENTED_IMAGE_SIMPLE}
-					description={t(
-						"toolbar.noMessages",
-						"No messages to quote",
-						{ ns: "chat" },
-					)}
+					description={t("toolbar.noMessages", "No messages to quote", {
+						ns: "chat",
+					})}
 					className="py-6"
 				/>
 			) : (
@@ -92,16 +90,14 @@ export function QuotePanel({ onSelect, onClose }: QuotePanelProps) {
 													ns: "chat",
 												})}
 										{" · "}
-										{new Date(msg.timestamp).toLocaleTimeString(
-											[],
-											{ hour: "2-digit", minute: "2-digit" },
-										)}
+										{new Date(msg.timestamp).toLocaleTimeString([], {
+											hour: "2-digit",
+											minute: "2-digit",
+										})}
 									</span>
 								}
 								description={
-									<span className="text-sm">
-										{truncate(msg.content, 120)}
-									</span>
+									<span className="text-sm">{truncate(msg.content, 120)}</span>
 								}
 							/>
 						</List.Item>
