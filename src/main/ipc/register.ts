@@ -75,9 +75,7 @@ export function registerAPI(
 
 			ipcMain.handle(channel, async (_event, ...args: unknown[]) => {
 				try {
-					const result = await (fn as (...a: unknown[]) => unknown)(
-						...args,
-					);
+					const result = await (fn as (...a: unknown[]) => unknown)(...args);
 					return { success: true, data: result };
 				} catch (error) {
 					const message =

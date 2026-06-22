@@ -19,7 +19,9 @@ export function setIMBotService(service: any): void {
 
 export function getIMBotService(): any {
 	if (!imbotServiceInstance) {
-		throw new Error("IMBotService not initialized. Call setIMBotService first.");
+		throw new Error(
+			"IMBotService not initialized. Call setIMBotService first.",
+		);
 	}
 	return imbotServiceInstance;
 }

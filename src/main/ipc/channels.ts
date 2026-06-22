@@ -28,6 +28,19 @@ export const UPDATE_CHANNELS = {
 	ERROR: "update:error",
 } as const;
 
+// PTY (终端) 通道（ptyHandlers.ts + PtyService.ts 使用）
+export const PTY_CHANNELS = {
+	// renderer → main
+	CREATE: "pty:create",
+	WRITE: "pty:write",
+	RESIZE: "pty:resize",
+	KILL: "pty:kill",
+	LIST: "pty:list",
+	// main → renderer
+	DATA: "pty:data",
+	EXIT: "pty:exit",
+} as const;
+
 // 插件事件通道（PluginManager 服务直接发送，保留 camelCase）
 export const PLUGIN_EVENT_CHANNELS = {
 	SHOW_MESSAGE: "plugin:showMessage",

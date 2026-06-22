@@ -41,6 +41,19 @@ import { storeManager } from "../store/StoreManager";
 import { webhookService } from "../services/market/WebhookService";
 import { authService } from "../services/auth/AuthService";
 import { conversationStorage } from "../services/chat/ConversationStorageService";
+import { getApprovalGrantStore } from "../services/runtime/ApprovalGrantStore";
+import { getAttachmentContextResolver } from "../services/runtime/AttachmentContextResolver";
+import { getFileActionService } from "../services/runtime/FileActionService";
+import { getGitInfoService } from "../services/runtime/GitInfoService";
+import { getRuntimePolicyService } from "../services/runtime/RuntimePolicyService";
+import { getSessionRuntimeResolver } from "../services/runtime/SessionRuntimeResolver";
+import { getLegacyImporter } from "../services/storage/LegacyImporter";
+import { getProjectStorage } from "../services/storage/ProjectStorageService";
+import { getSessionStorage } from "../services/storage/SessionStorageService";
+import {
+	resolveConversationCwd,
+	resolveConversationProjectRoot,
+} from "../services/runtime/conversationCwd";
 import { appConfigService } from "../services/config/AppConfigService";
 import { searchService } from "../services/search/SearchService";
 import { getSkillService } from "../services/skill/SkillService";
@@ -71,6 +84,7 @@ import {
 	BUILTIN_MARKET_PLUGINS,
 	BUILTIN_PLUGIN_SOURCES,
 } from "../services/plugin/builtin";
+import { getExtensionDescriptorService } from "../services/extensions/ExtensionDescriptorService";
 
 // ─── Service Holders ───────────────────────
 import {
@@ -89,8 +103,8 @@ import type {
 	WebhookConfig,
 	SearchExecuteRequest,
 	AuthProvider,
-	ConversationSummary,
-	CreateConversationOptions,
+	ResolveSessionRuntimeInput,
+	SessionApprovalGrant,
 	ProxyConfig,
 	ModelProvider,
 	ModelProviderPreset,
@@ -106,8 +120,11 @@ import type {
 	AgentSDKConfig,
 	AgentProfile,
 	AgentTeam,
-	WorkspaceConfig,
 } from "./types";
+import type {
+	RuntimeOperationContext,
+	WorkspaceRuntimePolicy,
+} from "@super-client/shared-types/chat";
 import type { SearchConfig, SearchProviderType } from "../store";
 
 // ─── Helper Functions ──────────────────────
@@ -121,6 +138,34 @@ function validatePort(port: number): void {
 	if (port < PORT_MIN || port > PORT_MAX) {
 		throw new Error(`Port must be between ${PORT_MIN} and ${PORT_MAX}`);
 	}
+}
+
+const DEFAULT_PROJECT_RUNTIME_POLICY: WorkspaceRuntimePolicy = {
+	approvalMode: "request",
+	sandboxMode: "workspace-write",
+	writableRoots: [],
+	networkAccess: "approval-required",
+	externalAppAccess: "approval-required",
+};
+
+function resolveProjectRuntimePolicy(
+	projectId: string,
+): WorkspaceRuntimePolicy {
+	const settings = getProjectStorage().getSettings(projectId);
+	const override = settings.runtimePolicy;
+	return {
+		approvalMode:
+			override?.approvalMode ?? DEFAULT_PROJECT_RUNTIME_POLICY.approvalMode,
+		sandboxMode:
+			override?.sandboxMode ?? DEFAULT_PROJECT_RUNTIME_POLICY.sandboxMode,
+		writableRoots:
+			override?.writableRoots ?? DEFAULT_PROJECT_RUNTIME_POLICY.writableRoots,
+		networkAccess:
+			override?.networkAccess ?? DEFAULT_PROJECT_RUNTIME_POLICY.networkAccess,
+		externalAppAccess:
+			override?.externalAppAccess ??
+			DEFAULT_PROJECT_RUNTIME_POLICY.externalAppAccess,
+	};
 }
 
 /**
@@ -304,18 +349,22 @@ const apiImpl = {
 	appConfig: {
 		getConfig: () => appConfigService.getConfig(),
 		refresh: () => appConfigService.refresh(),
+		// A-7 (S7) — §9.5 picker sticky
+		getNewConversationDefaults: () => storeManager.getNewConversationDefaults(),
+		setNewConversationDefaults: (value: {
+			lastKind: "casual" | "project";
+			lastProjectId?: string;
+		}) => storeManager.setNewConversationDefaults(value),
 	},
 
 	// ─── Search ───────────────────────────────
 	search: {
-		execute: (request: SearchExecuteRequest) =>
-			searchService.execute(request),
+		execute: (request: SearchExecuteRequest) => searchService.execute(request),
 		getConfigs: () => ({
 			configs: storeManager.getSearchConfigs(),
 			defaultProvider: storeManager.getDefaultSearchProvider(),
 		}),
-		saveConfig: (config: SearchConfig) =>
-			storeManager.saveSearchConfig(config),
+		saveConfig: (config: SearchConfig) => storeManager.saveSearchConfig(config),
 		deleteConfig: (id: string) => storeManager.deleteSearchConfig(id),
 		setDefault: (provider: SearchProviderType | null) =>
 			storeManager.setDefaultSearchProvider(provider),
@@ -349,87 +398,112 @@ const apiImpl = {
 			} catch (error) {
 				return {
 					valid: false,
-					error:
-						error instanceof Error
-							? error.message
-							: "Validation failed",
+					error: error instanceof Error ? error.message : "Validation failed",
 				};
 			}
 		},
 	},
 
-	// ─── Chat ─────────────────────────────────
-	chat: {
-		listConversations: () => conversationStorage.getConversationList(),
-		createConversation: (
-			name: string,
-			options: CreateConversationOptions = {},
-		) =>
-			conversationStorage.createConversation(name || "New Chat", {
-				...options,
-				workspaceId:
-					options.workspaceId || storeManager.getCurrentWorkspaceId(),
-			}),
-		deleteConversation: (id: string) =>
-			conversationStorage.deleteConversation(id),
-		renameConversation: (conversationId: string, name: string) =>
-			conversationStorage.renameConversation(conversationId, name),
-		getMessages: (conversationId: string) =>
-			conversationStorage.getMessages(conversationId),
-		saveMessages: (conversationId: string, messages: unknown[]) =>
-			conversationStorage.saveMessages(conversationId, messages as any),
-		appendMessage: (conversationId: string, message: unknown) =>
-			conversationStorage.appendMessage(conversationId, message as any),
-		updateMessage: (
+	// ─── Session Runtime ──────────────────────
+	runtime: {
+		resolveSession: (input: ResolveSessionRuntimeInput) =>
+			getSessionRuntimeResolver().resolve(input),
+		getAuditLog: (limit?: number) =>
+			getRuntimePolicyService().getAuditLog(limit),
+		clearAuditLog: () => {
+			getRuntimePolicyService().clearAuditLog();
+			return true;
+		},
+		findGrant: (
 			conversationId: string,
-			messageId: string,
-			updates: Record<string, unknown>,
+			operationType: string,
+			target?: string,
 		) =>
-			conversationStorage.updateChatMessage(
+			getApprovalGrantStore().findGrant({
 				conversationId,
-				messageId,
-				updates as any,
-			),
-		clearMessages: (conversationId: string) =>
-			conversationStorage.clearConversationMessages(conversationId),
-		getLastConversation: () =>
-			conversationStorage.getChatLastConversationId(),
-		setLastConversation: (id: string) =>
-			conversationStorage.setChatLastConversationId(id),
-		getConversationDir: (conversationId: string) =>
-			conversationStorage.getConversationDir(conversationId),
-		getWorkspaceDir: (conversationId: string) =>
-			conversationStorage.getWorkspaceDir(conversationId),
-		updateConversationMetadata: (
-			id: string,
-			updates: Partial<ConversationSummary>,
-		) => conversationStorage.updateConversationMetadata(id, updates),
+				operationType,
+				target,
+			}),
+		addGrant: (
+			conversationId: string,
+			input: Omit<SessionApprovalGrant, "id" | "grantedAt">,
+		) => getApprovalGrantStore().addGrant(conversationId, input),
+		listGrants: (conversationId: string) =>
+			getApprovalGrantStore().listGrants(conversationId),
+		removeGrant: (conversationId: string, grantId: string) =>
+			getApprovalGrantStore().removeGrant(conversationId, grantId),
+		recordDeny: (
+			conversationId: string,
+			workspaceId: string,
+			operationType: string,
+			target?: string,
+			reason?: string,
+		) => {
+			getApprovalGrantStore().recordDeny(
+				conversationId,
+				workspaceId,
+				operationType,
+				target,
+				reason,
+			);
+			return true;
+		},
+		clearGrants: (conversationId: string) => {
+			getApprovalGrantStore().clearGrants(conversationId);
+			return true;
+		},
 	},
 
-	workspaceRuntime: {
-		listConfigs: () => storeManager.getWorkspaceConfigs(),
-		getConfig: (id: string) =>
-			storeManager.getWorkspaceConfig(id) || null,
-		saveConfig: (config: WorkspaceConfig) =>
-			storeManager.saveWorkspaceConfig(config),
-		deleteConfig: (id: string) =>
-			storeManager.deleteWorkspaceConfig(id),
-		getCurrentId: () => storeManager.getCurrentWorkspaceId(),
-		setCurrentId: (id: string) => storeManager.setCurrentWorkspaceId(id),
-		getDefaultId: () => storeManager.getDefaultWorkspaceId(),
-		setDefaultId: (id: string) => storeManager.setDefaultWorkspaceId(id),
+	// ─── Feature Flags（§22 rollback flags — renderer 主导，main 仅同步 enforcement 位）──
+	featureFlags: {
+		set: (flags: {
+			unifiedNavigation: boolean;
+			runtimeEnforcement: boolean;
+			fileArtifacts: boolean;
+			profileLayouts: boolean;
+		}) => {
+			getRuntimePolicyService().setEnforcementEnabled(
+				!!flags.runtimeEnforcement,
+			);
+			return true;
+		},
+		get: () => ({
+			runtimeEnforcement: getRuntimePolicyService().isEnforcementEnabled(),
+		}),
+	},
+
+	// ─── Attachment Context Resolver（§14 minimal slice）──
+	attachment: {
+		resolveContext: (args: {
+			conversationId: string;
+			attachmentIds: string[];
+			maxBytesPerAttachment?: number;
+		}) => getAttachmentContextResolver().resolve(args),
+	},
+
+	// ─── File Action（policy-aware shell ops for chat file artifact UI）──
+	fileAction: {
+		open: (filePath: string, workspaceId?: string) =>
+			getFileActionService().open(filePath, workspaceId ?? ""),
+		reveal: (filePath: string, workspaceId?: string) =>
+			getFileActionService().reveal(filePath, workspaceId ?? ""),
+		copyPath: (filePath: string, workspaceId?: string) =>
+			getFileActionService().copyPath(filePath, workspaceId ?? ""),
+		detectOpenTargets: (filePath: string, workspaceId?: string) =>
+			getFileActionService().detectOpenTargets(filePath, workspaceId ?? ""),
+		openWith: (filePath: string, targetId: string, workspaceId?: string) =>
+			getFileActionService().openWith(filePath, targetId, workspaceId ?? ""),
+		getAppIcon: (appPath: string) =>
+			getFileActionService().getAppIcon({ id: "", appPath }),
 	},
 
 	// ─── Network ──────────────────────────────
 	network: {
 		getProxyConfig: () => proxyService.getConfig() ?? null,
-		setProxyConfig: (config: ProxyConfig) =>
-			proxyService.updateConfig(config),
-		testProxy: (config: ProxyConfig) =>
-			proxyService.testConnection(config),
+		setProxyConfig: (config: ProxyConfig) => proxyService.updateConfig(config),
+		testProxy: (config: ProxyConfig) => proxyService.testConnection(config),
 		getLogEnabled: () => requestLogService.getEnabled(),
-		setLogEnabled: (enabled: boolean) =>
-			requestLogService.setEnabled(enabled),
+		setLogEnabled: (enabled: boolean) => requestLogService.setEnabled(enabled),
 		getRequestLog: () => requestLogService.getEntries(),
 		clearRequestLog: () => requestLogService.clearEntries(),
 	},
@@ -452,23 +526,14 @@ const apiImpl = {
 			apiKey: string,
 			preset?: ModelProviderPreset,
 		) => {
-			const models = await llmService.fetchModels(
-				baseUrl,
-				apiKey,
-				preset,
-			);
+			const models = await llmService.fetchModels(baseUrl, apiKey, preset);
 			return { models };
 		},
 		updateModelConfig: (
 			providerId: string,
 			modelId: string,
 			config: Record<string, unknown>,
-		) =>
-			storeManager.updateModelConfig(
-				providerId,
-				modelId,
-				config as any,
-			),
+		) => storeManager.updateModelConfig(providerId, modelId, config as any),
 		getActiveModel: () => storeManager.getActiveModelSelection(),
 		setActiveModel: (selection: ActiveModelSelection | null) =>
 			storeManager.setActiveModelSelection(selection),
@@ -477,8 +542,7 @@ const apiImpl = {
 	// ─── Skill ────────────────────────────────
 	skill: {
 		listSkills: () => getSkillService().listSkills(),
-		installSkill: (source: string) =>
-			getSkillService().installSkill(source),
+		installSkill: (source: string) => getSkillService().installSkill(source),
 		uninstallSkill: (id: string) => getSkillService().uninstallSkill(id),
 		getSkill: (id: string) => {
 			const skill = getSkillService().getSkill(id);
@@ -494,8 +558,7 @@ const apiImpl = {
 			getSkillService().getSystemPrompt(skillId),
 		getCommandPrompt: (skillId: string, commandName: string) =>
 			getSkillService().getCommandPrompt(skillId, commandName),
-		validateSkill: (source: string) =>
-			getSkillService().validateSkill(source),
+		validateSkill: (source: string) => getSkillService().validateSkill(source),
 		getAllTools: () => getSkillService().getAllAvailableTools(),
 		enableSkill: (id: string) => getSkillService().enableSkill(id),
 		disableSkill: (id: string) => getSkillService().disableSkill(id),
@@ -539,8 +602,7 @@ const apiImpl = {
 	remoteControl: {
 		getEvents: () => getRemoteControlEventService().getEvents(),
 		clearEvents: () => getRemoteControlEventService().clearEvents(),
-		getConnectionInfo: () =>
-			getRemoteControlEventService().getConnectionInfo(),
+		getConnectionInfo: () => getRemoteControlEventService().getConnectionInfo(),
 	},
 
 	// ─── IM Bot ───────────────────────────────
@@ -550,15 +612,9 @@ const apiImpl = {
 		stopBot: (botId: string) => getIMBotService().stopBot(botId),
 		getBotStatus: (botId: string) => {
 			const statuses = getIMBotService().getBotStatuses();
-			return (
-				statuses.find((s: BotStatus) => s.id === botId) || null
-			);
+			return statuses.find((s: BotStatus) => s.id === botId) || null;
 		},
-		sendMessage: async (
-			botId: string,
-			chatId: string,
-			content: string,
-		) => {
+		sendMessage: async (botId: string, chatId: string, content: string) => {
 			const bot = getIMBotService()["bots"].get(botId);
 			if (!bot) throw new Error("Bot not found or not running");
 			await bot.sendMessage(chatId, content);
@@ -608,22 +664,13 @@ const apiImpl = {
 		},
 		getDevice: (deviceId: string) =>
 			getRemoteDeviceService().getDevice(deviceId) || null,
-		executeCommand: (
-			deviceId: string,
-			command: string,
-			timeout?: number,
-		) =>
-			getRemoteDeviceService().executeCommand(
-				deviceId,
-				command,
-				timeout,
-			),
+		executeCommand: (deviceId: string, command: string, timeout?: number) =>
+			getRemoteDeviceService().executeCommand(deviceId, command, timeout),
 		killCommand: (deviceId: string, requestId: string) =>
 			getRemoteDeviceService().killCommand(deviceId, requestId),
 		tabComplete: (deviceId: string, line: string, cursorPos: number) =>
 			getRemoteDeviceService().tabComplete(deviceId, line, cursorPos),
-		getCwd: (deviceId: string) =>
-			getRemoteDeviceService().getCwd(deviceId),
+		getCwd: (deviceId: string) => getRemoteDeviceService().getCwd(deviceId),
 		getRelayConfig: () => storeManager.getRelayConfig() || null,
 		setRelayConfig: async (config: RelayConfig) => {
 			storeManager.setRelayConfig(config);
@@ -646,8 +693,7 @@ const apiImpl = {
 		close: () => {
 			BrowserWindow.getFocusedWindow()?.close();
 		},
-		isMaximized: () =>
-			BrowserWindow.getFocusedWindow()?.isMaximized() ?? false,
+		isMaximized: () => BrowserWindow.getFocusedWindow()?.isMaximized() ?? false,
 	},
 
 	// ─── Float Widget ─────────────────────────
@@ -719,6 +765,19 @@ const apiImpl = {
 			if (error) throw new Error(error);
 			return true;
 		},
+		/**
+		 * F-2: 在系统文件管理器中"显示并选中"指定路径（macOS Finder / Windows
+		 * Explorer / Linux 默认）。区别于 `openPath`：openPath 会直接打开（目录就
+		 * 进目录、文件就用默认 app 打开），showInFolder 总是定位到父目录并选中。
+		 */
+		showInFolder: async (p: string) => {
+			if (!p) throw new Error("Path is required");
+			if (!existsSync(p)) {
+				throw new Error(`Path does not exist: ${p}`);
+			}
+			shell.showItemInFolder(p);
+			return true;
+		},
 		checkUpdate: () => updateService.checkForUpdates(),
 		quit: () => app.quit(),
 		relaunch: () => {
@@ -735,10 +794,7 @@ const apiImpl = {
 				});
 				const files = await Promise.all(
 					entries
-						.filter(
-							(entry) =>
-								entry.isFile() && entry.name.endsWith(".log"),
-						)
+						.filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
 						.map(async (entry) => {
 							const filePath = join(logsDir, entry.name);
 							const stats = await fsPromises.stat(filePath);
@@ -751,9 +807,7 @@ const apiImpl = {
 							};
 						}),
 				);
-				return files.sort((a, b) =>
-					b.modifiedAt.localeCompare(a.modifiedAt),
-				);
+				return files.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 			} catch {
 				return [];
 			}
@@ -782,15 +836,10 @@ const apiImpl = {
 					withFileTypes: true,
 				});
 				const files = entries
-					.filter(
-						(entry) =>
-							entry.isFile() && entry.name.endsWith(".log"),
-					)
+					.filter((entry) => entry.isFile() && entry.name.endsWith(".log"))
 					.map((entry) => join(logsDir, entry.name));
 				await Promise.all(
-					files.map((fp) =>
-						fsPromises.unlink(fp).catch(() => {}),
-					),
+					files.map((fp) => fsPromises.unlink(fp).catch(() => {})),
 				);
 				return true;
 			} catch {
@@ -813,10 +862,7 @@ const apiImpl = {
 	theme: {
 		get: () => storeManager.getConfig("theme") || "auto",
 		set: (themeMode: string) => {
-			storeManager.setConfig(
-				"theme",
-				themeMode as "light" | "dark" | "auto",
-			);
+			storeManager.setConfig("theme", themeMode as "light" | "dark" | "auto");
 			broadcastEvent("theme:change", themeMode);
 			return true;
 		},
@@ -905,8 +951,7 @@ const apiImpl = {
 			filePath: string,
 			options?: { encoding?: BufferEncoding; maxSize?: number },
 		) => {
-			if (!existsSync(filePath))
-				throw new Error("文件不存在");
+			if (!existsSync(filePath)) throw new Error("文件不存在");
 			const stats = statSync(filePath);
 			const maxSize = options?.maxSize || 10 * 1024 * 1024;
 			if (stats.size > maxSize) throw new Error("文件过大");
@@ -921,8 +966,7 @@ const apiImpl = {
 			customName?: string;
 		}) => {
 			const { sourcePath, conversationId, messageId, customName } = data;
-			if (!existsSync(sourcePath))
-				throw new Error("源文件不存在");
+			if (!existsSync(sourcePath)) throw new Error("源文件不存在");
 			const attachmentsDir = getAttachmentsDir(conversationId);
 			const originalName = customName || basename(sourcePath);
 			const uniqueName = generateUniqueFileName(originalName);
@@ -939,6 +983,39 @@ const apiImpl = {
 				size: stats.size,
 				mimeType,
 				type: getFileType(mimeType),
+				createdAt: new Date().toISOString(),
+				conversationId,
+				messageId,
+			};
+		},
+		saveAttachmentBytes: async (data: {
+			bytes: ArrayBuffer | Uint8Array;
+			fileName: string;
+			mimeType?: string;
+			conversationId?: string;
+			messageId?: string;
+		}) => {
+			const { bytes, fileName, mimeType, conversationId, messageId } = data;
+			const attachmentsDir = getAttachmentsDir(conversationId);
+			const originalName = fileName || "file";
+			const uniqueName = generateUniqueFileName(originalName);
+			const targetPath = join(attachmentsDir, uniqueName);
+			const buffer =
+				bytes instanceof Uint8Array
+					? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+					: Buffer.from(bytes);
+			await fsPromises.writeFile(targetPath, buffer);
+			const stats = statSync(targetPath);
+			const ext = extname(originalName).toLowerCase();
+			const resolvedMime = mimeType || inferMimeType(ext);
+			return {
+				id: uniqueName.replace(extname(uniqueName), ""),
+				name: uniqueName,
+				originalName,
+				path: targetPath,
+				size: stats.size,
+				mimeType: resolvedMime,
+				type: getFileType(resolvedMime),
 				createdAt: new Date().toISOString(),
 				conversationId,
 				messageId,
@@ -974,29 +1051,25 @@ const apiImpl = {
 				.filter(Boolean);
 			attachments.sort(
 				(a: any, b: any) =>
-					new Date(b.createdAt).getTime() -
-					new Date(a.createdAt).getTime(),
+					new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
 			);
 			return attachments;
 		},
 		openAttachment: async (attachmentPath: string) => {
-			if (!existsSync(attachmentPath))
-				throw new Error("文件不存在");
+			if (!existsSync(attachmentPath)) throw new Error("文件不存在");
 			const error = await shell.openPath(attachmentPath);
 			if (error) throw new Error(error);
 		},
 		getAttachmentPath: () => getAttachmentsDir(),
 		copyFile: (filePath: string) => {
-			if (!existsSync(filePath))
-				throw new Error("文件不存在");
+			if (!existsSync(filePath)) throw new Error("文件不存在");
 			return true;
 		},
 	},
 
 	// ─── Agent (RPC only, streaming in streamingHandlers) ─
 	agent: {
-		createSession: (config: AgentConfig) =>
-			agentService.createSession(config),
+		createSession: (config: AgentConfig) => agentService.createSession(config),
 		getStatus: (sessionId: string) => {
 			const session = agentService.getSession(sessionId);
 			if (!session) throw new Error("Session not found");
@@ -1004,21 +1077,16 @@ const apiImpl = {
 		},
 		stopAgent: (sessionId: string) => agentService.stopAgent(sessionId),
 		listAgents: () => agentService.listSessions(),
-		getMessages: (sessionId: string) =>
-			agentService.getMessages(sessionId),
-		clearMessages: (sessionId: string) =>
-			agentService.clearMessages(sessionId),
-		deleteSession: (sessionId: string) =>
-			agentService.deleteSession(sessionId),
+		getMessages: (sessionId: string) => agentService.getMessages(sessionId),
+		clearMessages: (sessionId: string) => agentService.clearMessages(sessionId),
+		deleteSession: (sessionId: string) => agentService.deleteSession(sessionId),
 	},
 
 	// ─── Agent SDK (RPC only, streaming in streamingHandlers) ─
 	agentSDK: {
-		interrupt: (requestId: string) =>
-			agentSDKService.interruptQuery(requestId),
+		interrupt: (requestId: string) => agentSDKService.interruptQuery(requestId),
 		close: (requestId: string) => agentSDKService.closeQuery(requestId),
-		listSessions: (dir?: string) =>
-			agentSDKService.listSDKSessions(dir),
+		listSessions: (dir?: string) => agentSDKService.listSDKSessions(dir),
 		getSessionInfo: (sessionId: string) =>
 			agentSDKService.getSDKSessionInfo(sessionId),
 		setModel: (requestId: string, model: string) =>
@@ -1027,12 +1095,16 @@ const apiImpl = {
 			toolUseId: string,
 			allowed: boolean,
 			updatedInput?: Record<string, unknown>,
-		) => agentSDKService.resolvePermission(toolUseId, allowed, updatedInput),
-		forkSession: (sessionId: string, dir?: string) =>
-			agentSDKService.forkSDKSession(
-				sessionId,
-				dir ? { dir } : undefined,
+			updatedPermissions?: Array<Record<string, unknown>>,
+		) =>
+			agentSDKService.resolvePermission(
+				toolUseId,
+				allowed,
+				updatedInput,
+				updatedPermissions,
 			),
+		forkSession: (sessionId: string, dir?: string) =>
+			agentSDKService.forkSDKSession(sessionId, dir ? { dir } : undefined),
 		renameSession: (sessionId: string, title: string, dir?: string) =>
 			agentSDKService.renameSDKSession(
 				sessionId,
@@ -1040,11 +1112,7 @@ const apiImpl = {
 				dir ? { dir } : undefined,
 			),
 		tagSession: (sessionId: string, tag: string, dir?: string) =>
-			agentSDKService.tagSDKSession(
-				sessionId,
-				tag,
-				dir ? { dir } : undefined,
-			),
+			agentSDKService.tagSDKSession(sessionId, tag, dir ? { dir } : undefined),
 		getSessionMessages: (sessionId: string, dir?: string) =>
 			agentSDKService.getSDKSessionMessages(
 				sessionId,
@@ -1082,10 +1150,7 @@ const apiImpl = {
 	// ─── MCP Builtin ─────────────────────────
 	mcpBuiltin: {
 		getDefinitions: () => builtinMcpService.getAllDefinitions(),
-		createConfig: (
-			definitionId: string,
-			config?: Record<string, unknown>,
-		) => {
+		createConfig: (definitionId: string, config?: Record<string, unknown>) => {
 			const serverConfig = builtinMcpService.createServerConfig(
 				definitionId,
 				config,
@@ -1096,8 +1161,7 @@ const apiImpl = {
 		search: (params: { keyword?: string; tags?: string[] }) => {
 			if (params.keyword)
 				return builtinMcpService.searchByKeyword(params.keyword);
-			if (params.tags)
-				return builtinMcpService.searchByTags(params.tags);
+			if (params.tags) return builtinMcpService.searchByTags(params.tags);
 			return builtinMcpService.getAllDefinitions();
 		},
 	},
@@ -1120,8 +1184,7 @@ const apiImpl = {
 
 	// ─── MCP Market ──────────────────────────
 	mcpMarket: {
-		search: (params: McpMarketSearchParams) =>
-			mcpMarketService.search(params),
+		search: (params: McpMarketSearchParams) => mcpMarketService.search(params),
 		popular: (limit?: number) => mcpMarketService.getPopular(limit),
 		topRated: (limit?: number) => mcpMarketService.getTopRated(limit),
 		newest: (limit?: number) => mcpMarketService.getNewest(limit),
@@ -1135,10 +1198,7 @@ const apiImpl = {
 				url?: string;
 			},
 		) => {
-			const config = await mcpMarketService.install(
-				marketItem,
-				customConfig,
-			);
+			const config = await mcpMarketService.install(marketItem, customConfig);
 			mcpService.addServer(config);
 			return config;
 		},
@@ -1200,16 +1260,12 @@ const apiImpl = {
 				);
 			}
 			if (category) {
-				results = results.filter((p) =>
-					p.categories.includes(category),
-				);
+				results = results.filter((p) => p.categories.includes(category));
 			}
 			return results;
 		},
 		getMarketPlugin: (pluginId: string) => {
-			const plugin = BUILTIN_MARKET_PLUGINS.find(
-				(p) => p.id === pluginId,
-			);
+			const plugin = BUILTIN_MARKET_PLUGINS.find((p) => p.id === pluginId);
 			if (!plugin) throw new Error("Plugin not found in market");
 			const installed = getPluginManager()
 				.getAllPlugins()
@@ -1217,9 +1273,7 @@ const apiImpl = {
 			return { ...plugin, installed };
 		},
 		downloadPlugin: async (pluginId: string) => {
-			const pluginData = BUILTIN_MARKET_PLUGINS.find(
-				(p) => p.id === pluginId,
-			);
+			const pluginData = BUILTIN_MARKET_PLUGINS.find((p) => p.id === pluginId);
 			if (!pluginData) throw new Error("Plugin not found in market");
 			const existing = getPluginManager().getPlugin(pluginId);
 			if (existing) throw new Error("Plugin is already installed");
@@ -1231,9 +1285,7 @@ const apiImpl = {
 			await fsPromises.mkdir(tmpDir, { recursive: true });
 
 			const builtinSource =
-				BUILTIN_PLUGIN_SOURCES[
-					pluginId as keyof typeof BUILTIN_PLUGIN_SOURCES
-				];
+				BUILTIN_PLUGIN_SOURCES[pluginId as keyof typeof BUILTIN_PLUGIN_SOURCES];
 			if (builtinSource) {
 				await fsPromises.writeFile(
 					path.join(tmpDir, "package.json"),
@@ -1301,25 +1353,19 @@ module.exports = {
 			getPluginManager().executeCommand(command, ...(args || [])),
 		getStorage: (pluginId: string, key: string) => {
 			const pluginsData = storeManager.getConfig("pluginsData") || {};
-			return (pluginsData as Record<string, unknown>)[
-				`${pluginId}.${key}`
-			];
+			return (pluginsData as Record<string, unknown>)[`${pluginId}.${key}`];
 		},
 		setStorage: (pluginId: string, key: string, value: unknown) => {
 			const pluginsData =
-				(storeManager.getConfig("pluginsData") as Record<
-					string,
-					unknown
-				>) || {};
+				(storeManager.getConfig("pluginsData") as Record<string, unknown>) ||
+				{};
 			pluginsData[`${pluginId}.${key}`] = value;
 			storeManager.setConfig("pluginsData", pluginsData);
 		},
 		deleteStorage: (pluginId: string, key: string) => {
 			const pluginsData =
-				(storeManager.getConfig("pluginsData") as Record<
-					string,
-					unknown
-				>) || {};
+				(storeManager.getConfig("pluginsData") as Record<string, unknown>) ||
+				{};
 			delete pluginsData[`${pluginId}.${key}`];
 			storeManager.setConfig("pluginsData", pluginsData);
 		},
@@ -1327,10 +1373,7 @@ module.exports = {
 		setKeybindings: (keybindings: Record<string, string>) =>
 			storeManager.setConfig("keybindings", keybindings),
 		getActiveSkin: () => getPluginManager().getActiveSkinId(),
-		setActiveSkin: async (
-			pluginId: string | null,
-			themeId?: string,
-		) => {
+		setActiveSkin: async (pluginId: string | null, themeId?: string) => {
 			const pm = getPluginManager();
 			if (pluginId === null) {
 				await pm.removeSkinCSS();
@@ -1344,8 +1387,7 @@ module.exports = {
 			if (!pm.isPluginActive(pluginId)) await pm.enablePlugin(pluginId);
 			await pm.applySkinCSS(pluginInfo, themeId);
 		},
-		getActiveMarkdownTheme: () =>
-			getPluginManager().getActiveMarkdownThemeId(),
+		getActiveMarkdownTheme: () => getPluginManager().getActiveMarkdownThemeId(),
 		setActiveMarkdownTheme: async (
 			pluginId: string | null,
 			themeId?: string,
@@ -1359,14 +1401,11 @@ module.exports = {
 			const pluginInfo = pm.getPlugin(pluginId);
 			if (!pluginInfo) throw new Error(`Plugin ${pluginId} not found`);
 			if (!pm.isMarkdownThemePlugin(pluginInfo))
-				throw new Error(
-					`Plugin ${pluginId} is not a markdown theme plugin`,
-				);
+				throw new Error(`Plugin ${pluginId} is not a markdown theme plugin`);
 			if (!pm.isPluginActive(pluginId)) await pm.enablePlugin(pluginId);
 			await pm.applyMarkdownCSS(pluginInfo, themeId);
 		},
-		getMarkdownThemeCSS: () =>
-			getPluginManager().getActiveMarkdownThemeCSS(),
+		getMarkdownThemeCSS: () => getPluginManager().getActiveMarkdownThemeCSS(),
 		grantPermissions: (pluginId: string, permissions: string[]) =>
 			getPluginManager().grantPermissions(pluginId, permissions as any),
 		getPermissions: (pluginId: string) =>
@@ -1378,8 +1417,7 @@ module.exports = {
 			const pages = pm.uiContributionRegistry.getAllPages();
 			const page = pages.find(
 				(p) =>
-					p.pluginId === pluginId &&
-					(p.path === pagePath || p.id === pagePath),
+					p.pluginId === pluginId && (p.path === pagePath || p.id === pagePath),
 			);
 			if (!page) throw new Error("Page not found");
 			const pluginInfo = pm.getPlugin(pluginId);
@@ -1390,11 +1428,177 @@ module.exports = {
 		},
 		installDev: (sourcePath: string) =>
 			getPluginManager().installDev(sourcePath),
-		reloadDev: (pluginId: string) =>
-			getPluginManager().reloadDev(pluginId),
+		reloadDev: (pluginId: string) => getPluginManager().reloadDev(pluginId),
 		checkUpdates: () => getPluginManager().checkForUpdates(),
 		updatePlugin: (pluginId: string) =>
 			getPluginManager().updatePlugin(pluginId),
+	},
+
+	// ─── Extensions（§20 统一只读视图）───────────
+	extensions: {
+		list: () => getExtensionDescriptorService().list(),
+	},
+
+	// ─── Git（read-only branch info via `git` CLI + checkout）─
+	git: {
+		getBranchInfo: (cwd: string) => getGitInfoService().getBranchInfo(cwd),
+		createWorktree: (cwd: string, worktreePath: string, branchName?: string) =>
+			getGitInfoService().createWorktree(cwd, worktreePath, branchName),
+		listBranches: (cwd: string) => getGitInfoService().listBranches(cwd),
+		switchBranch: (cwd: string, branch: string) =>
+			getGitInfoService().switchBranch(cwd, branch),
+		createBranch: (cwd: string, branch: string) =>
+			getGitInfoService().createBranch(cwd, branch),
+		listCommits: (cwd: string, opts?: { limit?: number }) =>
+			getGitInfoService().listCommits(cwd, opts ?? {}),
+	},
+
+	// ─── Projects（A-6: project-session-redesign）─
+	projects: {
+		list: () => getProjectStorage().list(),
+		add: (cwd: string, name?: string) => getProjectStorage().add(cwd, name),
+		/**
+		 * Open a native directory picker and register the chosen path as a project.
+		 * Returns null when the user cancels; otherwise returns the new/existing project.
+		 */
+		pickAndAdd: async (name?: string) => {
+			const result = await dialog.showOpenDialog({
+				properties: ["openDirectory", "createDirectory"],
+				title: "选择项目目录",
+				buttonLabel: "添加项目",
+			});
+			if (result.canceled || result.filePaths.length === 0) return null;
+			return getProjectStorage().add(result.filePaths[0], name);
+		},
+		rename: (id: string, name: string) => getProjectStorage().rename(id, name),
+		pin: (id: string, pinned: boolean) => getProjectStorage().pin(id, pinned),
+		markFirstRunSeen: (id: string) => getProjectStorage().markFirstRunSeen(id),
+		archive: (id: string, archived: boolean) =>
+			getProjectStorage().archive(id, archived),
+		/**
+		 * F-2 / F-9: 在源项目 cwd 下 `git worktree add`，成功后把新 cwd 也注册成项目。
+		 * 失败回滚 worktree 创建，避免脏 git 状态。
+		 */
+		createWorktree: async (
+			sourceId: string,
+			opts: { worktreePath: string; branchName?: string },
+		) => {
+			const ps = getProjectStorage();
+			const source = ps.list().find((p) => p.id === sourceId);
+			if (!source) {
+				throw new Error(`source project not found: ${sourceId}`);
+			}
+			const branch = opts.branchName ?? `worktree-${Date.now()}`;
+			const op: RuntimeOperationContext = {
+				workspaceId: sourceId,
+				source: "user",
+				operation: "git.worktree.add",
+				kind: "command-exec",
+				target: opts.worktreePath,
+				input: { cwd: source.cwd, branch },
+			};
+			const policy = resolveProjectRuntimePolicy(sourceId);
+			const evaluation = getRuntimePolicyService().evaluate(op, policy);
+			if (
+				evaluation.decision === "deny" ||
+				evaluation.decision === "needs-approval"
+			) {
+				getRuntimePolicyService().record(op, "denied", evaluation.reason);
+				const err = new Error(
+					evaluation.reason ?? "runtime-policy-denied",
+				) as Error & { code?: string; details?: Record<string, unknown> };
+				err.code = evaluation.code ?? "runtime.commandNeedsApproval";
+				err.details = { messageKey: err.code, target: opts.worktreePath };
+				throw err;
+			}
+			const wt = await getGitInfoService().createWorktree(
+				source.cwd,
+				opts.worktreePath,
+				branch,
+			);
+			if (!wt.ok || !wt.worktreePath) {
+				throw new Error(wt.error ?? "git worktree add failed");
+			}
+			try {
+				return ps.add(wt.worktreePath, undefined, {
+					lineage: {
+						kind: "worktree-of",
+						sourceProjectId: sourceId,
+						branch,
+					},
+				});
+			} catch (err) {
+				// 回滚：尝试 git worktree remove，避免脏状态（best-effort）
+				try {
+					await getGitInfoService().removeWorktree(source.cwd, wt.worktreePath);
+				} catch {
+					// best effort
+				}
+				throw err;
+			}
+		},
+		remove: (id: string, opts?: { keepFiles?: boolean }) =>
+			getProjectStorage().remove(id, opts),
+		getSettings: (id: string) => getProjectStorage().getSettings(id),
+		saveSettings: (
+			id: string,
+			patch: Parameters<
+				ReturnType<typeof getProjectStorage>["saveSettings"]
+			>[1],
+		) => getProjectStorage().saveSettings(id, patch),
+		listOrphans: () => getProjectStorage().listOrphans(),
+		restoreOrphan: (id: string) => getProjectStorage().restoreOrphan(id),
+	},
+
+	// ─── Sessions（A-6: project-session-redesign）─
+	sessions: {
+		list: (projectId: string | null) => getSessionStorage().list(projectId),
+		listDeleted: (projectId?: string | null) =>
+			getSessionStorage().listDeleted(projectId),
+		create: (
+			input: Parameters<ReturnType<typeof getSessionStorage>["create"]>[0],
+		) => getSessionStorage().create(input),
+		getMeta: (sessionId: string) => getSessionStorage().getMeta(sessionId),
+		updateMeta: (
+			sessionId: string,
+			patch: Parameters<ReturnType<typeof getSessionStorage>["updateMeta"]>[1],
+		) => getSessionStorage().updateMeta(sessionId, patch),
+		rename: (sessionId: string, name: string) =>
+			getSessionStorage().rename(sessionId, name),
+		delete: (sessionId: string) => getSessionStorage().delete(sessionId),
+		restoreDeleted: (sessionId: string) =>
+			getSessionStorage().restoreDeleted(sessionId),
+		reassignProject: (sessionId: string, nextProjectId: string | null) =>
+			getSessionStorage().reassignProject(sessionId, nextProjectId),
+		appendEvent: (
+			sessionId: string,
+			event: Parameters<ReturnType<typeof getSessionStorage>["appendEvent"]>[1],
+		) => getSessionStorage().appendEvent(sessionId, event),
+		readMessages: (
+			sessionId: string,
+			range?: Parameters<
+				ReturnType<typeof getSessionStorage>["readMessages"]
+			>[1],
+		) => getSessionStorage().readMessages(sessionId, range),
+		fork: (
+			sourceId: string,
+			opts: Parameters<ReturnType<typeof getSessionStorage>["fork"]>[1],
+		) => getSessionStorage().fork(sourceId, opts),
+	},
+
+	// ─── cwd resolution ──────────────────────────────
+	// G-2: 会话 cwd 改成 per-session 沙箱（userData/chats/<user>/(<project>/)session/<sid>）。
+	// 项目根目录改由 `resolveProjectRoot` 暴露，给前端组装系统提示词时引用。
+	cwd: {
+		resolveSessionCwd: (sessionId: string) => resolveConversationCwd(sessionId),
+		resolveProjectRoot: (sessionId: string) =>
+			resolveConversationProjectRoot(sessionId),
+	},
+
+	// ─── G-3 老数据导入 ───────────────────────
+	legacyData: {
+		detect: () => getLegacyImporter().detect(),
+		importAll: () => getLegacyImporter().importAll(),
 	},
 };
 
@@ -1423,8 +1627,7 @@ export function registerProxyHandlers(): void {
 			});
 			return { success: true, data: undefined };
 		} catch (error) {
-			const message =
-				error instanceof Error ? error.message : String(error);
+			const message = error instanceof Error ? error.message : String(error);
 			return { success: false, error: message };
 		}
 	});

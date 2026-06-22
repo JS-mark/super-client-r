@@ -93,6 +93,11 @@ export type {
 	EnabledCapability,
 	SessionApprovalGrant,
 	SessionMetadata,
+	SessionMessageOverride,
+	ResolveSessionRuntimeInput,
+	ResolvedAttachmentContext,
+	EffectiveSessionRuntime,
+	ConversationSummaryUpdate,
 } from "@super-client/shared-types/chat";
 
 export type {
@@ -130,6 +135,16 @@ export type {
 	TabCompleteResult,
 	CommandOutputChunk,
 } from "@super-client/shared-types/remote-protocol";
+
+export type {
+	// Extension descriptors
+	ExtensionDescriptor,
+	ExtensionType,
+	ExtensionSource,
+	ExtensionScope,
+	ExtensionHealth,
+	ExtensionBackingRef,
+} from "@super-client/shared-types/extensions";
 
 // ============ Main 进程独有的类型 ============
 
@@ -371,6 +386,7 @@ export interface ChatStreamEvent {
 		| "error"
 		| "tool_call"
 		| "tool_result"
+		| "tool_error"
 		| "tool_approval_request"
 		| "tool_rejected";
 	content?: string;
@@ -385,6 +401,13 @@ export interface ChatStreamEvent {
 		name: string;
 		result: unknown;
 		isError?: boolean;
+		duration?: number;
+	};
+	toolError?: {
+		toolCallId: string;
+		name: string;
+		error: unknown;
+		code?: string;
 		duration?: number;
 	};
 	toolApproval?: {
@@ -497,13 +520,48 @@ export interface RequestLogEntry {
 	method: string;
 	url: string;
 	requestHeaders?: Record<string, string>;
-	requestBodyPreview?: string; // 截取前 1KB
+	requestBodyPreview?: string; // 截取前 N KB
 	responseStatus?: number;
 	responseStatusText?: string;
+	responseHeaders?: Record<string, string>;
 	responseBodyPreview?: string;
+	/**
+	 * Whether the request is still receiving data. The entry is pushed to the
+	 * UI as soon as response headers arrive; for streaming responses (SSE /
+	 * chunked transfer) the body is appended progressively via
+	 * `network:request-log-update` events. UI should reflect "streaming…"
+	 * state until `state === 'complete'` or `error` is set.
+	 */
+	state?: "pending" | "streaming" | "complete" | "error";
+	/** Detected `content-type` of the response, normalised lower-case. */
+	contentType?: string;
+	/** True when content-type is text/event-stream or response is chunked. */
+	isStreaming?: boolean;
 	durationMs: number;
 	error?: string;
 	source: "fetch" | "axios";
+}
+
+/**
+ * Incremental update for an entry already broadcast via
+ * `network:request-log-entry`. Renderer matches by `id` and merges fields.
+ *
+ *  - For streaming responses, `appendBody` carries new chunk text (raw, may
+ *    include SSE `data:` framing). Renderer appends to its accumulated body.
+ *  - For completion, `state: 'complete' | 'error'` plus final `durationMs`,
+ *    `responseStatus`, etc. are sent.
+ */
+export interface RequestLogEntryUpdate {
+	id: string;
+	appendBody?: string;
+	state?: "pending" | "streaming" | "complete" | "error";
+	responseStatus?: number;
+	responseStatusText?: string;
+	responseHeaders?: Record<string, string>;
+	contentType?: string;
+	isStreaming?: boolean;
+	durationMs?: number;
+	error?: string;
 }
 
 // ============ App Config 相关类型 ============
