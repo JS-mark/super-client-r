@@ -1,5 +1,13 @@
 # Workspace / Session Implementation Audit
 
+> 当前重构总入口：[refactor-plan](./refactor-plan.md) ·
+> 当前 project/session 主计划：[project-session-redesign-plan](./project-session-redesign-plan.md) ·
+> 旧索引：[workspace-session-index.md](./workspace-session-index.md) ·
+> 主计划：[ui-plan](./workspace-session-ui-plan.md) ·
+> 计划审查：[plan-review](./workspace-session-plan-review.md)
+>
+> 注意：本文是历史实现审计。新任务先读 `refactor-plan.md`，再按需查本文对应代码现状。
+
 ## Purpose
 
 This is the Phase 0 technical audit for implementing the workspace/session core runtime, feature, and UI plan. It verifies how the current code actually models workspaces, conversations, models, attachments, permissions, MCP, skills, and app plugins before development starts.

@@ -2,6 +2,8 @@
 
 **日期**：2026-06-21
 **状态**：spec
+**重构总入口**：[../../refactor-plan.md](../../refactor-plan.md)
+**执行门禁**：[../../refactor-execution-gates.md](../../refactor-execution-gates.md)
 **前置**：[2026-06-20-chat-composer-redesign-design.md](./2026-06-20-chat-composer-redesign-design.md)
 **参考**：用户提供的 6 张 Codex 截图（项目下拉、模式下拉、分支下拉、+ 菜单、approval、model+reasoning）
 

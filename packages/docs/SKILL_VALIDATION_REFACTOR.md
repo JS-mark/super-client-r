@@ -1,5 +1,9 @@
 # Skill 校验机制整改方案：从 manifest.json 迁移到 Claude Code 规范
 
+> 重构总入口：[../../docs/refactor-plan.md](../../docs/refactor-plan.md)。
+>
+> 本文是独立重构计划，范围仅限 Skill 校验与加载机制；project/session 主线以总入口索引为准。
+>
 > **目标**：将 Skill 校验的核心依据从 `manifest.json` 切换为 Claude Code 标准规范（`SKILL.md` + `plugin.json` + `commands/*.md`），使校验逻辑与项目实际的双运行时 Skill 体系对齐。
 
 ---

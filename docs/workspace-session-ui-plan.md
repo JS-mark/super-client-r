@@ -1,10 +1,73 @@
 # Workspace / Session Core Runtime, Feature, and UI Plan
 
+> 当前重构总入口：[refactor-plan](./refactor-plan.md) ·
+> 当前 project/session 主计划：[project-session-redesign-plan](./project-session-redesign-plan.md) ·
+> 旧索引：[workspace-session-index.md](./workspace-session-index.md) ·
+> 实现差距：[implementation-audit](./workspace-session-implementation-audit.md) ·
+> 计划审查：[plan-review](./workspace-session-plan-review.md)
+>
+> 注意：本文是历史 Workspace/Session 主计划。所有"Workspace 作为独立配置实体"的章节已被 `project-session-redesign-plan.md` supersede；后续不要继续向本文追加新功能章节。
+
 ## 1. Review Summary
 
-This document is the reviewed and corrected implementation plan for reshaping Super Client R around a `Workspace -> Session` model, with Claude Code / Codex style interaction profiles, unified extension management, session-level model switching, attachments, plan modes, permissions, and sandboxing.
+This document is the reviewed and corrected implementation plan for reshaping Super Client R around a `Workspace -> Session` model, with Claude desktop / Codex desktop style interaction profiles, unified extension management, session-level model switching, attachments, plan modes, permissions, and sandboxing.
 
 The scope is not a UI refresh. The expected result requires kernel-level product behavior: durable workspace/session state, main-process-enforced runtime policy, real attachment context resolution, unified approval semantics across execution paths, and an extension model that controls both app UI contributions and agent/runtime capabilities.
+
+### UI Reference Benchmark
+
+The UI target is explicitly based on the provided Codex desktop and Claude desktop screenshots. These are product interaction references, not only visual references.
+
+#### Codex Desktop Reference
+
+Use Codex as the primary reference for coding-agent sessions and task execution.
+
+Required interaction shape:
+
+- A persistent left sidebar with global actions at the top, project-grouped sessions in the middle, and account/settings actions at the bottom.
+- Project groups are visible first-class containers. Sessions are nested under their project and show recency/status inline.
+- The active session is highlighted with a soft selected row, not a heavy card.
+- The main content column is calm and sparse, with a narrow readable transcript width inside a larger canvas.
+- The composer is bottom-anchored, wide, rounded, and always shows the current approval/permission mode plus model/effort controls.
+- Running work is shown inline in the transcript with elapsed time and step status.
+- A right environment panel is available for coding sessions. It summarizes changed files, local mode, branch, commit/push action, and sources/context.
+- Right-panel status is operational, not decorative. File changes, branch, local/runtime mode, approvals, and source context must update from real runtime state.
+
+Codex mode must not be reduced to larger spacing or green tags. It needs a real task workbench: project sessions on the left, transcript/timeline in the center, and environment/changes/context on the right.
+
+#### Claude Desktop Reference
+
+Use Claude as the primary reference for general chat, new-session start state, and lightweight non-coding sessions.
+
+Required interaction shape:
+
+- A persistent left sidebar with top mode tabs (`Chat`, `Cowork`, `Code`), quick actions, recent sessions, and account/status at the bottom.
+- The new-session state is centered and welcoming, with a large greeting, a prominent composer, and quick intent chips.
+- The composer is the main object on the page: large textarea, attachment button, model selector, effort selector, voice/action buttons, and subtle rounded border.
+- Global plan/account notices can sit above the composer as compact banners.
+- Recent sessions are simple rows with hover actions, not full cards.
+- The visual tone is almost monochrome: white canvas, light gray panels, restrained borders, minimal shadows, strong typography.
+
+Claude mode should feel like a fast personal assistant surface. It should not show the full Codex environment panel until the user enters a coding, plan, or tool-heavy workflow.
+
+#### Product Mapping
+
+The app should use these references by mode:
+
+| App mode | Primary reference | Expected shell |
+| --- | --- | --- |
+| New chat / empty chat | Claude desktop | Center greeting + large composer + quick intent chips |
+| General chat | Claude desktop | Left recents sidebar + centered transcript/composer |
+| Code / agent / plan session | Codex desktop | Project/session sidebar + transcript/timeline + environment panel |
+| Hybrid session | Claude first, Codex on demand | Start simple; reveal timeline/environment panel when tools, files, approvals, or plan state appear |
+
+Design guardrails:
+
+- Do not introduce marketing-page hero treatment, colorful gradients, or decorative cards.
+- Keep the palette quiet: white/off-white background, gray text hierarchy, black primary text, one restrained accent.
+- Prefer rows, panels, split panes, and status chips over card grids.
+- Icons should be thin, functional, and paired with text where the action is not obvious.
+- The shell must be responsive, but desktop behavior is the priority because the product is Electron-first.
 
 The original plan was directionally correct, but several points needed tightening before development:
 
@@ -15,8 +78,8 @@ The original plan was directionally correct, but several points needed tightenin
 | Model switching was described as a control, but not as a first-class chat workflow. | A small dropdown would not support provider comparison, capability warnings, or session override behavior. | Add a command-palette style `Model Switcher` modal with provider list, model list, advanced parameters, and explicit session/workspace actions. |
 | Attachments did not define context behavior. | Large files or external resources could be silently injected into context or read without clear consent. | Every attachment gets a source, status, and context mode: include content, reference only, ask before read, or ignore for model. |
 | Extension unification could blur agent capabilities with app UI plugins. | App UI extensions and agent runtime capabilities require different trust and permission models. | Rename existing app-level plugins to `App Plugins`. Keep MCP, Skills, Hooks, and capability packages under `Extensions`, but make their type and scope visible. |
-| Interaction profile could become cosmetic only. | Claude Code / Codex mode would not meaningfully change behavior. | Define concrete layout, density, approval, timeline, command, and inspector differences per profile. |
-| The plan still leaned too much toward UI aggregation. | The app could look like Claude Code / Codex while still running on old, inconsistent model, permission, attachment, and extension paths. | Move kernel work earlier: persistence, runtime policy, approval adapter, attachment resolver, and extension descriptors must land before final UI polish. |
+| Interaction profile could become cosmetic only. | Claude desktop / Codex desktop mode would not meaningfully change behavior. | Define concrete layout, density, approval, timeline, command, and inspector differences per profile. |
+| The plan still leaned too much toward UI aggregation. | The app could look like Claude desktop / Codex desktop while still running on old, inconsistent model, permission, attachment, and extension paths. | Move kernel work earlier: persistence, runtime policy, approval adapter, attachment resolver, and extension descriptors must land before final UI polish. |
 | Migration was too broad. | A large rewrite would destabilize existing chat, MCP, skill, and plugin flows. | Use phased migration: stabilize the runtime contract first, then expose it through UI, then migrate backing services gradually. |
 | Plan review found parallel implementations and missing wiring. | Types such as `WorkspaceConfig`, `ModelSelection`, approval grants, and runtime policy could exist without being authoritative. | Add explicit source-of-truth, API contract, resolver, dependency, rollback, and adapter boundaries before continuing feature work. |
 
@@ -158,26 +221,31 @@ Interaction profile is a workspace setting with optional session override.
 type InteractionProfile = "claude-code" | "codex" | "hybrid";
 ```
 
-### Claude Code Mode
+### Claude Desktop Mode (`claude-code` profile id)
 
-Use this profile for command-first, compact interaction.
+Use this profile for command-first, compact interaction. Visual and interaction density should be closer to Claude desktop than to a dense IDE.
 
 - Input composer is the primary control surface.
+- Empty state uses a centered greeting, large composer, model/effort controls, attachment action, and quick intent chips.
+- Left sidebar shows mode tabs, quick actions, projects/artifacts/customization, recent sessions, and account controls.
 - Slash commands are first-class: `/config`, `/model`, `/mcp`, `/skills`, `/permissions`, `/plan`, `/hooks`.
 - Tool calls render as compact inline blocks.
 - Approvals render inline when possible.
 - Sidebar is minimized and session-focused.
 - Status line is always visible.
+- The right Codex-style environment panel is hidden by default and only appears when tools, files, approvals, or plan state need inspection.
 
 ### Codex Mode
 
 Use this profile for task-first, inspectable workflows.
 
-- Left pane: sessions and tasks.
+- Left pane: global actions plus project-grouped sessions, matching the Codex desktop project/session hierarchy.
 - Center pane: conversation plus execution timeline.
-- Right pane: inspector for plan, files, tools, approvals, logs, and context.
+- Right pane: environment inspector for changes, local/runtime mode, branch, commit/push action, source context, plan, files, tools, approvals, and logs.
+- Composer: bottom-anchored rounded input with attachment action, approval mode, model/effort selector, voice/action affordances, and stop/send control.
 - Approvals are queued in the inspector.
 - Plan, command execution, diff, test, and summary states are visually separated.
+- Changed files and source/context state must come from real runtime data, not static UI placeholders.
 
 ### Hybrid Mode
 
@@ -186,16 +254,16 @@ Default profile.
 - Composer and slash commands remain fast.
 - Task timeline and inspector are available when a session enters plan or agent mode.
 - Approval UI favors inline blocks for simple actions and inspector queue for multi-step work.
+- Empty/new-session state follows Claude. Active coding/session execution follows Codex.
 
 ## 6. Chat Page Layout
 
 Target layout:
 
 ```text
-Workspace / Session Header
-Session Sidebar | Conversation or Timeline | Inspector
-Composer
-Status Bar
+App Sidebar | Workspace / Session Header | Runtime Controls
+Project Sessions Sidebar | Conversation or Timeline | Environment Inspector
+Bottom Composer + Status Bar
 ```
 
 Header displays:
@@ -207,6 +275,19 @@ Header displays:
 - approval mode
 - sandbox mode
 - active MCP / skills / capabilities health
+
+Sidebar rules:
+
+- Global app sidebar stays visible on desktop.
+- Project/session sidebar groups conversations under projects/workspaces and shows selected session, recency, and running status.
+- Legacy right-side chat history drawer must be removed from the primary chat shell once the left project/session sidebar exists.
+
+Environment inspector rules:
+
+- Codex profile shows the inspector by default for coding/agent/plan sessions.
+- Claude profile hides the inspector by default for empty and normal chat sessions.
+- Hybrid profile auto-reveals the inspector when there are changes, approvals, active tools, plan steps, or captured sources.
+- Inspector sections must map to runtime state: changes, local/runtime mode, branch, commit/push, sources/context, approvals, and logs.
 
 Status bar displays:
 
@@ -595,7 +676,7 @@ Rules:
 Workspace settings should be organized as:
 
 1. `Overview` - name, path, default session type.
-2. `Interaction` - Claude Code, Codex, or Hybrid.
+2. `Interaction` - Claude desktop, Codex desktop, or Hybrid.
 3. `Models` - default provider, model, reasoning, fallback model.
 4. `Runtime & Permissions` - approval, sandbox, network, external app access.
 5. `Capabilities` - enabled MCP, skills, hooks, app plugins.
@@ -769,10 +850,21 @@ Agent SDK integration should not be assumed complete just because the direct/ski
 
 Required staged behavior:
 
-1. Phase 1: Agent sessions receive `workspaceId`, `sessionId`, and a readonly `EffectiveSessionRuntime` snapshot for display and audit.
-2. Phase 2: Agent SDK permission requests map into the normalized approval model and grant lookup.
-3. Phase 6: Agent SDK model switching remains labelled as limited until the provider/model chain can consume `ModelSelection`.
-4. Final milestone: Agent SDK query setup reads compatible runtime fields for model, sandbox, enabled capabilities, and approval policy.
+1. Phase 1: Agent sessions receive `workspaceId`, `sessionId`, and a readonly `EffectiveSessionRuntime` snapshot for display and audit. **✅ done.**
+2. Phase 2: Agent SDK permission requests map into the normalized approval model and grant lookup. **✅ done** — `canUseTool` consults `ApprovalGrantStore` and writes new grants on user choice.
+3. Phase 6: Agent SDK model switching remains labelled as limited until the provider/model chain can consume `ModelSelection`. Model in/out today still goes through `resolveOptimalConfig` separately. ⏳ pending provider chain refactor.
+4. Final milestone: Agent SDK query setup reads compatible runtime fields for model, sandbox, enabled capabilities, and approval policy. ⚙️ partial — see §29 first slice below.
+
+> **§29 first slice — done (2026-06-19).** `AgentSDKService.createQuery` now consults the resolved runtime to derive defaults the caller didn't supply:
+>
+> - `runtime.planMode === "plan-only"` → `permissionMode = "plan"` (Agent SDK plans without acting). Mirrors the LLMService gate from R-5.
+> - `runtime.runtimePolicy.approvalMode === "full-access"` → `permissionMode = "bypassPermissions"` (skip `canUseTool`).
+> - Other approvalModes → `"default"` (`canUseTool` runs and consults grants).
+> - `cwd` falls back through `resolveConversationCwd(sessionId)` (R-4) before `process.cwd()`, so workspaces with `WorkspaceConfig.path` set drive Agent SDK's working directory too.
+>
+> Caller-supplied `request.permissionMode` and `request.cwd` still win. The runtime resolution is "fill the gaps" only.
+>
+> Out of scope this slice: model/sandbox/capability fields. Model still goes through `resolveOptimalConfig`; sandboxMode and enabledCapabilities aren't read by Agent SDK at all yet — both belong to the larger provider chain refactor.
 
 ## 18. Visual Direction
 
@@ -1001,18 +1093,24 @@ Validation:
 
 ### Phase 9 - Profile-Specific UI
 
-Goal: make Claude Code and Codex profiles real workflow differences.
+Goal: make Claude and Codex references real workflow differences, using the provided screenshots as the benchmark.
 
 Tasks:
 
-- Claude Code mode: compact transcript, command-first composer, inline tools.
-- Codex mode: task sidebar, execution timeline, inspector queue.
-- Hybrid mode: current layout with upgraded composer and optional inspector.
+- Claude mode: centered new-session greeting, large composer, quick intent chips, left recents/project sidebar, compact transcript, command-first composer, inline tools.
+- Codex mode: persistent project/session sidebar, coding task transcript/timeline, right environment inspector, file/change cards, approval queue, branch/local/source status.
+- Hybrid mode: Claude start state with Codex panels revealed when tools, files, approvals, sources, or plan state appear.
+- Remove the legacy right-side chat history drawer from the primary shell after the left project/session sidebar is available.
+- Replace purely cosmetic profile CSS with structural layout changes controlled by the effective interaction profile.
 
 Validation:
 
 - Switching interaction profile changes layout and workflow surfaces.
 - Session override can temporarily switch profile.
+- Empty/new chat visually matches the Claude screenshot: centered greeting, large composer, mode chips, minimal chrome.
+- Coding/agent session visually matches the Codex screenshot: project sessions on the left, transcript/timeline in the center, environment inspector on the right.
+- Codex environment inspector displays real change counts, runtime mode, branch, commit/push action, and source/context state.
+- Claude profile does not show Codex's right inspector for ordinary empty/chat sessions.
 
 ## 20. Phase Dependencies and Rollback
 
@@ -1040,7 +1138,7 @@ Feature flags:
 - `runtimePolicy.enforce`: enforce operation classifier decisions instead of logging only.
 - `extensionsUnified.enabled`: show unified `Extensions` route and migrated navigation.
 - `chatFileArtifacts.enabled`: render file cards and changed-file summaries.
-- `profileLayouts.enabled`: enable Claude Code / Codex profile-specific layout changes.
+- `profileLayouts.enabled`: enable Claude / Codex profile-specific layout changes.
 
 Rollback strategy:
 
@@ -1086,7 +1184,20 @@ Suggested initial task order:
 29. `agent-sdk-runtime-alignment`: route Agent SDK approval first, then model/capability fields when provider-chain support exists.
 30. `approval-ui`: replace modal-first approval with inline/inspector-capable UI.
 31. `app-plugin-copy`: rename user-facing plugin terminology.
-32. `profile-layouts`: implement Claude Code / Codex / Hybrid layout differences.
+32. `claude-empty-chat-shell`: implement Claude-style centered greeting, large composer, quick intent chips, and recents sidebar for new/general chat.
+33. `codex-task-workbench-shell`: implement Codex-style project/session sidebar, transcript/timeline center, and right environment inspector.
+34. `profile-layouts`: wire Claude / Codex / Hybrid structural layout switching through the effective interaction profile.
+
+### Session creation/deletion link refactor (plan §25)
+
+These tasks replace the historical "5 surfaces, 3 implicit types" sprawl with the canonical 3-intent design. Sequence-wise they sit after the per-conversation workspace binding (§4) lands and after the right-click context menu (§23.2) ships, but before any further UI on top of creation flows.
+
+35. `35-link-1` sidebar 新建对话 rebound to `default` workspace (drop "current workspace" semantics).
+36. `35-link-2` remove TitleBar More menu's separate `新建 Agent 对话` / `新建远程对话` items; add unified `新建对话…` that opens the modal.
+37. `35-link-3` build `<NewConversationModal>` (workspace / mode / remote-bot picker) wired to `chat:open-new-conversation` window event.
+38. `35-link-4` add `chatStore.createConversationAdvanced` action that handles workspace switch + create + remote bind in one call.
+39. `35-link-5` refactor `chatStore.deleteConversation` to resolve "next current" before delete, auto-unbind remote, and clear `fileArtifactStore`.
+40. `35-link-6` `SessionContextMenu.handleDelete` surfaces remote-binding warning ("此会话已绑定 IM bot，删除会同时解绑") in the confirm modal.
 
 Each task should be independently buildable and testable.
 
@@ -1114,7 +1225,346 @@ The redesign is complete when:
 - `Allow once` and `Allow for session` are backed by real grant lookup/write behavior.
 - Sandbox policy remains a hard boundary even in full access mode.
 - Operation classification distinguishes internal app writes, conversation execution writes, workspace writes, external writes, commands, network, MCP, plugin, and external app actions.
-- Claude Code and Codex interaction profiles materially change workflow, not only colors.
+- Claude and Codex interaction profiles materially change workflow, not only colors or spacing.
+- Claude-style empty chat has a centered greeting, large composer, quick intent chips, and simple recents/project sidebar.
+- Codex-style coding sessions have project-grouped sessions on the left, transcript/timeline in the center, and an environment inspector on the right.
+- The Codex environment inspector displays real changes, runtime mode, branch, commit/push action, approvals, and source/context state.
 - Existing MCP, skill, plugin, model, and chat flows continue to work during migration.
 - Legacy `/mcp`, `/skills`, and `/plugins` navigation remains compatible while first-level navigation moves to `Extensions`.
 - Rollback flags can disable unified navigation, runtime enforcement, file artifacts, and profile layouts without corrupting stored conversations.
+- Session creation surfaces match the canonical three intents documented in §25.2; legacy "5 ad-hoc surfaces" is gone.
+- Session list items expose the right-click context-menu actions defined in §23.2; deletion follows the §25.4 link (next-focus resolution → remote unbind → physical delete → artifact cleanup).
+- Conversations with a remote binding surface the auto-unbind warning in the delete confirmation modal.
+- `createConversationAdvanced` is the single entry point used by `<NewConversationModal>`; no callsite bypasses `chatStore` actions to write conversations or remote bindings directly.
+- Sidebar exposes a draggable right edge with persisted width; the previously rendered "search" button and the collapse toggle are both removed (the latter per §24.3).
+
+## 23. Session Lifecycle & Interactions
+
+### 23.1 Creation surfaces
+
+> **Authoritative spec moved to §25**. This subsection now only enumerates the surfaces; the contract for each surface (which workspace, which mode, what gets pre-selected) lives in §25.2 so there is one source of truth.
+
+Allowed creation surfaces, post-refactor:
+
+1. **Sidebar quick action 新建对话** — fixed to `default` workspace, `direct` mode. Shortcut `Cmd/Ctrl+N`.
+2. **Sidebar project row hover `+`** — fixed to that project workspace, `direct` mode.
+3. **TitleBar More menu 新建对话…** — opens `<NewConversationModal>` where workspace / mode / remote are explicit user choices.
+4. **Empty home composer (Claude profile)** — first-message lazy creation under the current workspace + `direct` mode.
+
+Removed surfaces (folded into the modal in surface 3):
+- ❌ TitleBar `新建 Agent 对话` (subsumed by modal mode picker)
+- ❌ TitleBar `新建远程对话` (subsumed by modal remote toggle)
+
+Persistence shape, regardless of surface, remains a single `ConversationSummary` + `SessionMetadata` row.
+
+Rules:
+- Workspace inheritance: every surface must explicitly pass `workspaceId`. "Use whichever workspace happens to be current" is the historical bug fixed in §25.
+- Mode lock: once first message is sent, `chatMode` becomes immutable.
+- Session metadata defaults: `planMode = "chat"`, `attachmentIds = []`, `interactionProfile = workspace default`.
+
+### 23.2 Right-click context menu
+
+Right-clicking a session row in the sidebar opens a context menu with the items below. Disabled items render but show a tooltip explaining when they will work. The menu order matches the user-supplied reference design.
+
+| Section | Item | Behavior |
+|---|---|---|
+| 1 | 置顶对话 / 取消置顶 | Toggle `session.pinned` flag. Pinned sessions sort to top within their project group. |
+| 1 | 重命名对话 | Inline input on the row (focus + select). Saves on Enter, cancels on Esc. |
+| 1 | 归档对话 / 取消归档 | Toggle `session.archived`. Archived sessions hide from main lists; visible under a collapsible "已归档" group. |
+| 1 | 标记为未读 / 标记为已读 | Toggle `session.unread`. Renders a small dot on the row when unread. |
+| 2 | 在 Finder 中显示 | `fileAction.reveal(conversationCwd)`. |
+| 2 | 复制工作目录 | Copy `conversationCwd` to clipboard. |
+| 2 | 复制会话 ID | Copy `conversation.id`. |
+| 2 | 复制深度链接 | Copy `superclient://conversation/<id>` to clipboard. App's protocol handler resolves it back to switching to that session. |
+| 3 | 派生到本地 | Create a new conversation in the same workspace whose metadata + messages are deep-cloned, but `cwd` is the same workspace folder (not a new one). Useful for forking a transcript without git. |
+| 3 | 派生到新工作树 | macOS only. Run `git worktree add` from the conversation's cwd, point the new conversation's cwd to the worktree. Disabled when the cwd is not a git working tree. |
+| 4 | 在新窗口中打开 | Open a secondary `BrowserWindow` showing only this conversation. Future task — disable with placeholder tooltip until window manager supports it. |
+| 5 | 删除对话 | Danger style. Confirm modal calls `chatStore.deleteConversation`. Full deletion contract (next-focus resolution, remote auto-unbind, file-artifact cleanup) lives in §25.4. When the conversation has a remote binding the modal must surface "此会话已绑定 IM bot，删除会同时解绑". |
+
+### 23.3 Conversation persistence additions
+
+`SessionMetadata` is extended (optional fields, backward-compatible):
+
+```ts
+interface SessionMetadata {
+  // existing fields
+  pinned?: boolean;
+  archived?: boolean;
+  unread?: boolean;
+  forkOriginId?: string;       // set by 派生到本地 / 派生到新工作树
+  worktreePath?: string;       // set by 派生到新工作树 (absolute path on disk)
+}
+```
+
+### 23.4 Sidebar list rules
+
+- Pinned sessions appear above non-pinned within each project, separated by a thin divider.
+- Archived sessions hide unless the "已归档" toggle is expanded.
+- Unread sessions show a small primary-color dot on the right side of the row.
+- Active session highlighted (already implemented).
+- Session row right-click → context menu above; left-click → switch.
+
+## 24. Sidebar Interactions
+
+### 24.1 Resize handle
+
+The left sidebar exposes an 8px-wide hit area on its right edge. At rest the seam is invisible; on hover a 1px vertical pin fades in (`colorBorder`); during drag the pin switches to `colorPrimary`. Cursor is `col-resize`. Drag adjusts width within `[220, 480]` px; double-click resets to default `280`. Width persists in zustand persist (`sidebarLayoutStore`).
+
+### 24.2 Search button removal
+
+Plan §6 originally listed a "搜索" quick action in the sidebar. With Cmd/Ctrl+K already triggering the same `chat:toggle-search` event globally, the dedicated row creates noise. Removed from both ClaudeSidebar and AppSidebar quick-action lists. Behavior remains accessible via:
+
+- Cmd/Ctrl+K (global)
+- TitleBar More menu (later iteration)
+
+### 24.3 Collapse removed
+
+The collapse toggle button was removed from both sidebars per user feedback ("不要收缩按钮，需要侧边可拖拽"). Resize is the only width-control affordance now. The persisted `collapsed` flag is force-reset to `false` on sidebar mount so legacy users who shipped with `collapsed=true` do not get stuck at 60px. The store key is kept (no schema migration) but treated as dead state; it can be removed in a follow-up cleanup.
+
+## 25. Session Creation & Deletion Link
+
+This section consolidates session lifecycle so creation and deletion stop sprawling across 5 ad-hoc surfaces.
+
+### 25.1 Session-type taxonomy
+
+All sessions persist as one `ConversationSummary` row. They differ along **three independent axes**, not as separate types:
+
+| Axis | Values | Default | Notes |
+|---|---|---|---|
+| `workspaceId` | `default` \| user-created workspace id | current workspace | Every session belongs to exactly one workspace. |
+| `chatMode` | `direct` \| `agent` | `direct` | Locked after first user message. |
+| `remote` | `undefined` \| `RemoteBinding` | undefined | Set only when an IM bot bridges this conversation. |
+
+Three product names from the user reference, mapped to the axes:
+
+| Product name | workspaceId | chatMode | remote |
+|---|---|---|---|
+| 普通对话 (general) | `default` | `direct` | — |
+| 项目对话 (project) | user workspace | `direct` or `agent` | — |
+| 远端对话 (remote) | any workspace | `direct` (typically) | bound |
+
+There is no "session without a workspace" — the seeded `default` workspace is the catch-all.
+
+### 25.2 Creation entry points (canonical, after refactor)
+
+Reduce the surfaces to **three clear intents**:
+
+| Intent | Surface | Workspace | Mode | Remote | Speed |
+|---|---|---|---|---|---|
+| Quick general chat | Sidebar top quick action `新建对话` · `Cmd/Ctrl+N` | `default` | `direct` | — | 0 click after trigger |
+| Project chat | Sidebar project row `+` (hover) | that project | `direct` | — | 0 click after trigger |
+| Advanced (agent / remote / pick workspace) | TitleBar More menu `新建对话…` → modal | user picks | user picks | user picks | 1 modal |
+
+After refactor:
+- **Removed** from sidebars: `搜索` already removed; the standalone "新建对话" handler still exists but **always creates under the `default` workspace** (matches the visible "普通对话" intent — current code creates under whatever workspace happens to be selected, which is confusing).
+- **Removed** from TitleBar More menu: the standalone `新建 Agent 对话` and `新建远程对话` items. They are subsumed by `新建对话…` modal where the user explicitly picks mode + remote.
+- **Kept**: ClaudeEmptyChatHome composer first-message creation continues to lazily create a session in current workspace + `direct` mode. (Same as Cmd+N path.)
+
+### 25.3 Advanced creation modal
+
+Component: `<NewConversationModal>` (new). Trigger: TitleBar More menu, deep-link, or future "+" affordances.
+
+Form fields (Antd `Form`):
+1. **工作区** — Select listing all workspaces, default = current.
+2. **模式** — Radio.Group: `direct (标准对话)` / `agent (Agent SDK，带工具)`.
+3. **远端绑定** — optional Switch + secondary fields. When on, requires picking an IM bot from the registered bots and a chat id (or "create on send"). Disables `agent` mode (mutual exclusion: remote conversations must be `direct` for now).
+4. **名称** — optional text. Defaults to `新对话` if omitted.
+
+Submit:
+- Call `chatStore.createConversationAdvanced({...})` (new wrapper around existing `createConversation` + remote-bind IPC).
+- Switch workspace to the chosen one if different.
+- Switch to the new conversation. Navigate to `/chat`.
+
+### 25.4 Deletion link (unified)
+
+Single deletion source: `SessionContextMenu` → `删除对话` (red) with confirmation modal.
+
+After confirmed delete, `chatStore.deleteConversation(id)` MUST:
+
+1. Resolve "next conversation to focus" BEFORE physically deleting:
+   - If the deleted conversation is NOT the current one, do nothing post-delete.
+   - If the deleted IS the current one, pick the next active (non-archived) conversation in the SAME workspace, sorted by `updatedAt desc`.
+   - Otherwise pick the most-recently-updated active conversation in any workspace.
+   - If still none, set `currentConversationId = null` and route to `/chat` (empty home will render).
+2. If the deleted conversation has `remote` binding: call the existing `remoteChat.unbind(id)` IPC BEFORE physical delete to avoid orphan bindings on the IM bot side.
+3. Physical delete via `chatHistoryService.deleteConversation(id)` (already removes the per-conversation directory).
+4. Local state cleanup: drop from `useChatStore.conversations`, drop attached file artifacts (`useFileArtifactStore.clearForConversation(id)`).
+
+No batch delete in this iteration. Soft delete = `archive`; hard delete = this menu item.
+
+### 25.5 Behavior matrix (post-refactor)
+
+| Trigger | Result |
+|---|---|
+| Sidebar `新建对话` | Create in `default` workspace, `direct`, navigate `/chat`. |
+| Sidebar project row `+` | Create in that workspace, `direct`, expand the project group. |
+| TitleBar `新建对话…` | Open modal. User chooses workspace + mode + remote. |
+| `Cmd/Ctrl+N` | Equivalent to sidebar `新建对话`. |
+| Right-click → 删除对话 | Confirm → unbind remote (if any) → delete → focus next. |
+| Right-click → 派生到本地 | Create copy in same workspace (existing). |
+| Right-click → 派生到新工作树 | Git worktree fork (existing). |
+
+### 25.6 Implementation tasks
+
+| ID | Task | Status |
+|---|---|---|
+| 35-link-1 | Sidebar `新建对话` rebound to `default` workspace path (drop "current workspace" semantics). | ✅ |
+| 35-link-2 | Remove `新建 Agent 对话` / `新建远程对话` items from TitleBar More menu; replace with `新建对话…`. | ✅ |
+| 35-link-3 | Build `<NewConversationModal>` (workspace / mode / remote bot picker). | ✅ |
+| 35-link-4 | `chatStore.createConversationAdvanced` action + wire to modal. | ✅ |
+| 35-link-5 | Refactor `chatStore.deleteConversation` to resolve "next current" and clear file artifacts; auto-unbind remote. | ✅ |
+| 35-link-6 | Update `SessionContextMenu.handleDelete` to surface remote-binding warning when relevant ("此会话已绑定 IM bot，删除会同时解绑"). | ✅ |
+
+Companion deliverable: `docs/workspace-session-creation-flow.md` — flowcharts and sequence diagrams of the post-refactor link.
+
+## 26. Plan Review (2026-06-19)
+
+This is a critical pass over the whole document. The user's framing was "感觉一直在新建功能没有重构" — and after walking the plan top-to-bottom, that's an accurate read of how new sections kept getting bolted on. This section records what's broken, what's redundant, and what should be done next so the plan stops drifting.
+
+### 26.1 Health by section
+
+| Section | State | Concern |
+|---|---|---|
+| §1–§3 product model & nav | Solid | None — these are still the right framing. |
+| §4 Pre-Phase 1 | Partially landed; flagged "complete" in task queue | `useWorkspaceStore` is still authoritative for several fields in renderer code (e.g. order/icon/createdAt); main is source-of-truth only for `currentWorkspaceId / defaultWorkspaceId`. **Refactor needed**: see §26.4 R-1. |
+| §5 interaction profiles | Done | Profile routing is shipping. |
+| §6 chat page layout | Done | `shell-1..6` ✅. |
+| §7 composer | Done structurally; missing capability/scope chips for Agent SDK constraints | Acceptable. |
+| §8 model switcher | Done | Modal exists. |
+| §9 attachments | "Text-only slice" only | Plan calls for include-content / reference-only / ask-before-read / ignore. Only include-content shipped. **Drift between plan and reality.** |
+| §10 chat file results | Done minimal | File card + change set + open/reveal/copy-path; no diff view, no open-with-app via runtime policy. |
+| §11 plan modes | UI only; not enforced | `plan-only` doesn't actually block tool execution. **Enforcement gap.** |
+| §12 permissions/approval | UI present; grant store wired; **enforcement is audit-only** | Sandbox checks aren't actually blocking. Critical gap. |
+| §13 sandbox | Audit-only | Same as above. |
+| §14 extensions | Descriptor adapter + extensions page shipped; Hooks tab empty placeholder | Acceptable for now. |
+| §15 workspace settings | Shell shipped | Some panels are placeholders. |
+| §16 data model direction | Stable | `SessionConfig` interface in §16 is the *future* shape, not what's persisted. Today we still piggyback on `ConversationSummary` + `SessionMetadata`. **Need an explicit "current vs target" note.** |
+| §17 core runtime requirements | Aspirational; partially achieved | EffectiveSessionRuntime resolver exists but only some callsites consume it. **Sweep needed** — see §26.4 R-2. |
+| §18 visual direction | Done | UI matches the references. |
+| §19 phases | Phases 0–9 marked "complete" but a chunk are minimum-viable slices | The phase model encourages "shipped a slice → mark phase done"; reality is enforcement / Agent SDK alignment / advanced approval flows still incomplete. |
+| §20 dependencies & rollback | Stable | Feature flags shipped. |
+| §21 task list | Was 32 tasks; 35-link 1–6 added in §25 | Task IDs in §25 don't match the §21 numbering style (35-link-1 vs `36`). Renumbered in this pass — §21 now lists items 35–40. |
+| §22 acceptance criteria | Updated this pass | Now reflects §25 link refactor + §24.3 collapse removal. |
+| §23 session lifecycle | Updated this pass to delegate creation/deletion contracts to §25 | OK. |
+| §24 sidebar interactions | Updated this pass (resize redesign + collapse removed) | OK. |
+| §25 creation/deletion link | New, fully implemented | OK. |
+
+### 26.2 Things that look like "new features" but should be refactors
+
+The user's instinct that recent work has been net-new rather than cleanup is correct in places. Here's the honest assessment:
+
+| Recent work | New feature or refactor? | Comment |
+|---|---|---|
+| ClaudeEmptyChatHome | New surface | Justified — Phase 9 deliverable. |
+| CodexEnvironmentInspector | New surface | Justified — Phase 9 deliverable. |
+| TitleBar simplify | Refactor | Removed clutter. |
+| IDE switcher in TitleBar | New feature | Convenient but doesn't reduce existing chaos. |
+| Session right-click menu | New feature | Was missing from the product. |
+| §25 creation/deletion link | **Refactor** | This is the first piece of recent work that's purely consolidation. |
+| Sidebar resize handle redesign | Refactor | UI cleanup. |
+| Collapse-button removal | Refactor | Reduce surface. |
+
+So §25 + sidebar cleanup is on the right side of the line, but the body of recent work prior to §25 was net-new. The remaining refactor backlog is in §26.4.
+
+### 26.3 Redundancy and stale content
+
+Cleaned up in this review:
+- §23.1 used to redeclare creation surfaces; now defers to §25.2.
+- §23.2's deletion row used to redeclare next-focus behavior; now defers to §25.4.
+- §24.3 used to describe collapse persistence; collapse is removed, the section now records that.
+- §21 task list now includes items 35–40 (the 35-link refactor) instead of leaving them in §25 only.
+- §22 acceptance criteria updated.
+
+Still redundant after this pass:
+- `SessionConfig` interface in §16 vs `SessionMetadata` actually persisted today. Add a "current shape" block in §16 alongside the target.
+- §17.4 (attachment context pipeline) lists features the implementation hasn't shipped (`reference-only`, `ask-before-read`). Status note needed so the plan stops claiming behavior the code can't deliver.
+
+### 26.4 Refactor backlog (the actual unfinished work)
+
+Each item below is a **refactor**, not a feature. They are sequenced; doing them out of order leaves the contradictions in place.
+
+**R-1 — Workspace store dual-source-of-truth cleanup.** Renderer `useWorkspaceStore` still owns several fields the plan said main should own (workspace order, icon, createdAt/updatedAt). Push these to `WorkspaceConfig` in main, make the renderer read-through. Without this, the §25 work ("always pass workspaceId explicitly") still leaves the underlying state divergent.
+
+> **R-1 phase 1 — done (2026-06-19).** `WorkspaceConfig` extended with optional `icon` / `order`; backfill payload carries them; `useWorkspaceStore.{createWorkspace,updateWorkspace,reorderWorkspaces,deleteWorkspace}` dual-write to main via `workspaceRuntimeService.saveConfig` / `deleteConfig`. Main is now capable-of-truth.
+>
+> **R-1 phase 2 — done (2026-06-19).** `useWorkspaceConfigStore` extended with `defaultId` and a `useSortedWorkspaceConfigs()` hook (memoized; safe to use as a render selector). All simple-display consumers flipped:
+>
+> - TitleBar More-menu workspace switcher
+> - ClaudeSidebar workspace nav and quick-action default workspace lookup
+> - AppSidebar workspace list / per-project create / conversation switch
+> - NewConversationModal workspace picker
+> - useChatPageState float-widget lazy create
+>
+> Switch action goes through `useWorkspaceConfigStore.setCurrent(id)` which round-trips to main and updates the local mirror. The old `useWorkspaceStore.switchWorkspace` (which already chained through `workspaceRuntimeService.setCurrentId` and synced both stores) remains for the legacy rich-UI surfaces.
+>
+> Rich-UI surfaces still on `useWorkspaceStore` (intentional — main config doesn't carry color / description / type / sessionIds / stats yet): `Workspaces.tsx`, `WorkspaceSwitcher.tsx`, `WorkspaceCard.tsx`. Plus `chatStore.createConversation` for the renderer-only bookkeeping pair `addSessionToWorkspace / setActiveSession`. Deleting `useWorkspaceStore` outright is a follow-up (R-1 phase 3, blocked on moving rich UI fields into main and deciding session-id derivation source).
+>
+> Cleanup: dead component `WorkspaceSessionHeader.tsx` removed (no importers; same pattern as the §25 cleanups).
+
+**R-2 — Resolver consumer audit.** `SessionRuntimeResolver` exists; grep for callsites and confirm direct chat send path, agent SDK setup, MCP execution, and approval adapter all consume it. Today only a subset do. Convert remaining consumers; delete the parallel "look up settings ad hoc" code paths.
+
+**R-3 — `chatStore` god-store split.** The store currently owns: messages CRUD, conversations list, session metadata writes, file artifact dependencies, remote bind, worktree fork. Split into:
+- `useMessageStore` — only messages of the current conversation.
+- `useConversationListStore` — list, current id, CRUD, fork, delete.
+- Move remote bind/unbind into a dedicated `remoteSessionService` so chatStore doesn't reach into IM bot APIs directly.
+
+> **R-3 step 1 — done (2026-06-19).** `services/remoteSessionService.ts` introduced with `bind / unbind / getBinding / checkBotOnline`. `chatStore.createConversationAdvanced` and `chatStore.deleteConversation` now go through it; `useRemoteChat` also routes its bind/unbind/getBinding/checkBotOnline calls through the service. The 3 message-streaming calls (`getRemoteMessages / sendMessage / onIMMessage`) remain in `useRemoteChat` directly — extracting those is part of step 2 because they own subscription / optimistic-state shape.
+>
+> **R-3 step 2 — done (2026-06-19).** `useChatMessageStore` extracted (file `stores/chatMessageStore.ts`). Owns `messages / sessionStatus / isStreaming / streamingContent` + every message CRUD + streaming action + `persistMessages`. `useChatStore` keeps the conversation list, pending input, team selection, and conversation lifecycle (create / switch / delete / rename / fork / metadata). The two stores coordinate via `getState()` at action boundaries — `chatStore.switchConversation/deleteConversation/createConversation` call `useChatMessageStore.getState().setMessages()`.
+>
+> Naming: existing `useMessageStore` is for bookmarks/export/search history; the new live-message store is `useChatMessageStore` to avoid the collision.
+>
+> Consumer migration (11 files): `useChat / useAppShortcuts / Home / Markdown / ChatMessageList / CodexEnvironmentInspector / ComposerStatusBar / QuotePanel / AppSidebar` swap to the new store; `chatStore.ts` re-exports `Message / ToolCall / ChatSessionStatus / MessageRole / MessageType` types so existing `import type { Message } from "../stores/chatStore"` keeps working through the migration.
+>
+> Tests: `__tests__/chatStore.test.ts` renamed to `chatMessageStore.test.ts`; the long-standing stale-snapshot anti-pattern (7/8 red on `main`) was rewritten to read fresh state via a `fresh()` helper. All 8 now pass.
+
+**R-4 — Conversation cwd reconciliation.** Today `getConversationCwd` (main IPC) and `WorkspaceConfig.path` are independent. Decide which is authoritative for "where this conversation runs", then collapse to one path resolution helper. Until done, fork-to-worktree, IDE app switcher, and file artifact open all need to know which to read.
+
+> **R-4 — done (2026-06-19).** Audit revealed `WorkspaceConfig.path` was dead state — defined in shared types and persisted but never read anywhere. The "two sources of truth" framing was misread; the real problem was that the project-path field was inert. Fixed:
+>
+> - `src/main/services/runtime/conversationCwd.ts` introduces `resolveConversationCwd(id)` — returns `WorkspaceConfig.path` when the conversation's workspace has it set, else falls back to `ConversationStorageService.getConversationCwd(id)` (the per-conversation sandbox dir).
+> - `chat.getConversationCwd` IPC handler delegates to the resolver, so every downstream consumer (file artifact open, IDE app switcher, fork-to-worktree, renderer-side AgentSDK request.cwd) sees the same answer.
+> - `modelHandlers.ts` (LLM chat-completion tool path) routes through the same helper.
+> - `WorkspaceRuntimeForm` gains a "项目路径 (cwd)" input so users can actually set the project path. Until this UI shipped, the field was unreachable.
+>
+> Behavior change: a workspace with `path` set now runs all tool/agent operations in that path. For users who never set the field, behavior is unchanged (sandbox-dir fallback).
+
+**R-5 — Plan mode actually blocking.** `plan-only` mode is currently a chip; it doesn't gate tool execution. Either implement the gate or label the chip as "informational" until it does. Inconsistency between UI claim and runtime behavior is worse than the missing feature.
+
+> **R-5 first slice — done (2026-06-19).** `LLMService.applyPlanModeGate` runs before either provider path. It resolves `planMode` via `SessionRuntimeResolver`; when `plan-only`, it strips `tools / toolMapping / toolPermission / toolExecutor` and prepends a system note ("You are in PLAN ONLY mode. Describe the plan you would carry out, but do NOT call any tools."). One audit deny is recorded so the gate is observable in the runtime inspector.
+>
+> Anthropic and OpenAI paths share the entry, so both are covered with one wrapper. AgentSDK path is not gated yet — Agent SDK has its own permissionMode/canUseTool surface; align with planMode there as part of the broader Agent SDK runtime alignment task (§29 in the original phase plan).
+>
+> The 4 remaining plan modes (`chat`, `plan-then-ask`, `auto-execute-safe`, `full-agent`) stay informational. Their richer flows (approval-then-execute, auto-approve safe ops only, full-agent unattended) need approval-UI or scheduler work that doesn't fit a small refactor.
+
+**R-6 — Runtime policy enforcement (not audit-only).** `RuntimePolicyService.record` returns `audit-only` for everything. The flag exists (`runtimeEnforcement`); turn it on for the highest-risk classes first (workspace-external write, network egress to non-allowlist) with a fallback path. Pure audit-only is technical debt — it makes the approval UI a lie.
+
+**R-7 — `useChatPageState` vs `chatStore` overlap.** `createConversation` is invoked from both `chatStore.createConversation` and `useChatPageState`'s send-path lazy create. Pick one (chatStore). Remove the parallel codepath — it's a known source of "which workspace did this conversation land in?" bugs.
+
+> **R-7 — done (2026-06-19).** Dead handlers `handleNewChat / handleNewAgentChat / handleNewRemoteChat / handleNewConversation` removed from `useChatPageState` (they were only consumed by the now-unmounted `ChatInlineSidebar.tsx`). Two dead files (`ChatInlineSidebar.tsx`, `ChatPageTitle.tsx`) deleted. The float-widget auto-send lazy create (the only remaining one inside this hook) now explicitly passes `workspaceId: defaultId` per §25.2 contract. Send paths no longer create conversations behind chatStore's back.
+
+**R-8 — Drop dead `collapsed` field after a release.** `sidebarLayoutStore.collapsed` is now always `false`. Remove the field next major release; keeping it as dead state invites future regressions.
+
+> **R-8 — done (2026-06-19).** Field removed from `SidebarLayoutState`; `partialize` set so only `width` is persisted. Both sidebars dropped their force-reset effects and the `useEffect` imports they no longer needed. zustand persist tolerates the leftover localStorage key from older clients without throwing.
+
+**R-9 — `SessionMetadata` field bloat.** `pinned / archived / unread / forkOriginId / worktreePath` were appended to `SessionMetadata` ad-hoc. Consider grouping into nested objects (`flags: { pinned, archived, unread }`, `lineage: { forkOriginId, worktreePath }`) before more fields are added. This is a refactor with visible blast radius (touches storage + types) — schedule it carefully.
+
+> **R-9 — done (2026-06-19).** Schema: `SessionFlags` and `SessionLineage` introduced; flat fields removed from `SessionMetadata`. Persistence: `normalizeSessionMetadata` accepts both shapes (legacy flat OR new nested) on read, emits nested only on write — first read+write cycle migrates each conversation. `mergeSessionMetadata` deep-merges `flags` / `lineage`, so a partial patch like `{ flags: { pinned: true } }` only changes pinned. Renderer reads (4 files / 12 sites) and writes (`SessionContextMenu`, fork actions in chatStore) all updated.
+
+### 26.5 What I will not put back into this plan
+
+To stop the bolt-on pattern, the next planning cycle should either go into a new document or get a major version bump on this one. Specifically don't append:
+- §27, §28… for any "small enhancement". Go through §21 task numbering.
+- New "Session Lifecycle & ..." subsections — those belong inside §23 / §25.
+- New sidebar interaction subsections — those belong inside §24.
+- "Just one more flow chart" docs — append to `workspace-session-creation-flow.md`.
+
+### 26.6 Recommended next 3 moves
+
+If we do nothing else, do these in order:
+
+1. **R-2** — Resolver consumer audit. Cheapest item that pays back the most: confirm or fix the foundation everything else relies on.
+2. **R-6** — Flip runtime enforcement on for the safest-to-block class. Closes the gap between approval UI and runtime reality.
+3. **R-7 + R-1** — Eliminate the two remaining "two sources of truth" pockets in renderer state. After this, the runtime story matches what the plan has been claiming since Phase 1.
+
+Everything else (UI polish, more chips, more inspector content) should wait until those land.

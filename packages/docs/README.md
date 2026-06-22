@@ -28,6 +28,8 @@
 | [PRD.md](./PRD.md) | 产品需求文档 |
 | [FEATURE_ROADMAP.md](./FEATURE_ROADMAP.md) | 功能开发路线图 |
 | [DESIGN.md](./DESIGN.md) | 设计规范文档 |
+| [重构总计划](../../docs/refactor-plan.md) | 当前 project/session 重构主入口与功能 plan 索引 |
+| [重构执行门禁](../../docs/refactor-execution-gates.md) | 开工、合并、标记完成时需要的证据要求 |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | 贡献指南 |
 
 ## 快速导航
@@ -44,6 +46,7 @@
 1. 参考 [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) 确定文件位置
 2. 查看 [API.md](./API.md) 了解通信接口
 3. 遵循 [CODING_STANDARDS.md](./CODING_STANDARDS.md) 代码规范
+4. 涉及 project/session 重构时，先读 [重构总计划](../../docs/refactor-plan.md) 和 [重构执行门禁](../../docs/refactor-execution-gates.md)
 
 ### 如果你要开发插件
 

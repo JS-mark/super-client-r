@@ -37,7 +37,7 @@ features:
     details: 完整的插件生命周期管理，支持命令、视图、主题等扩展点
   - icon: 📁
     title: 工作区
-    details: 多工作区管理，隔离不同场景的对话和配置，支持导入导出
+    details: 当前仍保留工作区文档；project/session 重构将逐步迁移为以目录为核心的 Project 模型
   - icon: ⭐
     title: 收藏功能
     details: 收藏重要消息、添加备注，支持搜索和导出

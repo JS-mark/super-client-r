@@ -374,5 +374,5 @@ npx super-client-skill export ./my-skill --output ./dist
 ## 参考
 
 - [技能开发模板](https://github.com/your-org/skill-template)
-- [API 文档](../api/types)
+- [API 文档](../../api/types)
 - [示例技能集合](https://github.com/your-org/example-skills)
