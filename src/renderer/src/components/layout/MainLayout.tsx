@@ -1,219 +1,22 @@
-import {
-	ApiOutlined,
-	AppstoreOutlined,
-	ClusterOutlined,
-	DesktopOutlined,
-	FolderOutlined,
-	MessageOutlined,
-	MoonOutlined,
-	RobotOutlined,
-	RocketOutlined,
-	SettingOutlined,
-	StarOutlined,
-	SunOutlined,
-} from "@ant-design/icons";
-import { Dropdown, type MenuProps, Tooltip, theme } from "antd";
-import { AnimatePresence, LayoutGroup, motion } from "motion/react";
+import { theme } from "antd";
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
-import { useCallback, useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAppShortcuts } from "../../hooks/useAppShortcuts";
-import { cn } from "../../lib/utils";
+import { useEffectiveInteractionProfile } from "../../hooks/useEffectiveInteractionProfile";
 import { type AppInfo, appService } from "../../services/appService";
+import { useFeatureFlagsStore } from "../../stores/featureFlagsStore";
 import { useMenuStore } from "../../stores/menuStore";
 import { useModelStore } from "../../stores/modelStore";
-import {
-	getAvatarColor,
-	getUserInitials,
-	useUserStore,
-} from "../../stores/userStore";
-import type { MenuItemConfig } from "../../types/menu";
-import { useThemeStore } from "../../stores/themeStore";
 import { AboutModal } from "../AboutModal";
+import { NewConversationModal } from "../chat/NewConversationModal";
+import { TerminalPanel } from "../terminal/TerminalPanel";
+import { AppSidebar } from "./AppSidebar";
+import { ClaudeSidebar } from "./ClaudeSidebar";
 import { TitleBar } from "./TitleBar";
 
 const { useToken } = theme;
-
-/**
- * Icon map: icon name → Ant Design icon component
- */
-const ICON_MAP: Record<string, React.ComponentType<any>> = {
-	MessageOutlined,
-	AppstoreOutlined,
-	RocketOutlined,
-	SettingOutlined,
-	ApiOutlined,
-	StarOutlined,
-	FolderOutlined,
-	RobotOutlined,
-	DesktopOutlined,
-	ClusterOutlined,
-	// Alias for legacy persisted configs
-	PluginOutlined: AppstoreOutlined,
-};
-
-/**
- * Render menu item icon
- */
-function renderMenuItemIcon(item: MenuItemConfig): React.ReactNode {
-	if (!item.enabled) return null;
-
-	if (item.iconType === "emoji") {
-		return <span className="text-xl">{item.iconContent}</span>;
-	}
-	if (item.iconType === "image") {
-		return (
-			<img
-				src={item.iconContent}
-				alt={item.label}
-				className="w-6 h-6 object-contain"
-			/>
-		);
-	}
-	const iconKey = item.iconContent || "MessageOutlined";
-	const IconComponent = ICON_MAP[iconKey] || MessageOutlined;
-	return <IconComponent className="text-xl" />;
-}
-
-// --- Sub-components ---
-
-const springTransition = {
-	type: "spring" as const,
-	stiffness: 400,
-	damping: 17,
-};
-
-interface UserAvatarProps {
-	user: { name: string } | null;
-	isLoggedIn: boolean;
-}
-
-const UserAvatar: React.FC<UserAvatarProps> = ({ user, isLoggedIn }) => {
-	if (isLoggedIn && user) {
-		const initials = getUserInitials(user.name);
-		const bgColor = getAvatarColor(user.name);
-		return (
-			<motion.div
-				whileHover={{ scale: 1.05, rotate: 2 }}
-				transition={springTransition}
-				className={cn(
-					"w-9 h-9 rounded-xl flex items-center justify-center shadow-lg cursor-pointer",
-					bgColor,
-				)}
-			>
-				<span className="text-white font-bold text-sm">{initials}</span>
-			</motion.div>
-		);
-	}
-	return (
-		<motion.div
-			whileHover={{ scale: 1.05, rotate: 2 }}
-			transition={springTransition}
-			className="w-9 h-9 rounded-xl bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/30 cursor-pointer"
-		>
-			<span className="text-white font-bold text-sm">S</span>
-		</motion.div>
-	);
-};
-
-interface SidebarMenuItemProps {
-	item: MenuItemConfig;
-	isSelected: boolean;
-	onClick: () => void;
-	label: string;
-}
-
-const SidebarMenuItem: React.FC<SidebarMenuItemProps> = ({
-	item,
-	isSelected,
-	onClick,
-	label,
-}) => {
-	return (
-		<Tooltip title={label} placement="right" mouseEnterDelay={0.5}>
-			<motion.button
-				type="button"
-				onClick={onClick}
-				whileHover={{ scale: 1.08 }}
-				whileTap={{ scale: 0.92 }}
-				transition={springTransition}
-				className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
-			>
-				<span
-					className={cn(
-						"w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200",
-						isSelected ? "text-white" : "hover:bg-slate-700/50",
-					)}
-				>
-					{renderMenuItemIcon(item)}
-				</span>
-				{isSelected && (
-					<motion.div
-						layoutId="sidebar-active"
-						className="absolute inset-x-2.5 top-1.5 bottom-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/30"
-						transition={{
-							type: "spring",
-							stiffness: 350,
-							damping: 30,
-						}}
-					/>
-				)}
-			</motion.button>
-		</Tooltip>
-	);
-};
-
-/**
- * Theme toggle button — cycles through light → dark → auto.
- * Self-contained component to isolate theme store re-renders.
- */
-const THEME_CYCLE = ["light", "dark", "auto"] as const;
-
-const ThemeToggleButton: React.FC = () => {
-	const { t } = useTranslation();
-	const mode = useThemeStore((s) => s.mode);
-
-	const handleToggle = useCallback(async () => {
-		const { mode: current, setMode } = useThemeStore.getState();
-		const currentIdx = THEME_CYCLE.indexOf(current);
-		const newMode = THEME_CYCLE[(currentIdx + 1) % THEME_CYCLE.length];
-		setMode(newMode);
-		try {
-			await window.electron.theme.set(newMode);
-		} catch (error) {
-			console.error("Failed to sync theme to main:", error);
-		}
-	}, []);
-
-	const icon =
-		mode === "dark" ? (
-			<MoonOutlined className="text-xl" />
-		) : mode === "auto" ? (
-			<DesktopOutlined className="text-xl" />
-		) : (
-			<SunOutlined className="text-xl" />
-		);
-
-	const label = t(`theme.${mode}`, { ns: "settings" });
-
-	return (
-		<Tooltip title={label} placement="right" mouseEnterDelay={0.5}>
-			<motion.button
-				type="button"
-				onClick={handleToggle}
-				whileHover={{ scale: 1.08 }}
-				whileTap={{ scale: 0.92 }}
-				transition={springTransition}
-				className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
-			>
-				<span className="w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200 hover:bg-slate-700/50">
-					{icon}
-				</span>
-			</motion.button>
-		</Tooltip>
-	);
-};
 
 // Page transition config
 const pageTransition = {
@@ -226,19 +29,17 @@ const pageTransition = {
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
-	const { t } = useTranslation();
-	const navigate = useNavigate();
 	const location = useLocation();
 	const { token } = useToken();
 
 	useAppShortcuts();
 
-	const menuItems = useMenuStore((state) => state.items);
-	const pluginItems = useMenuStore((state) => state.pluginItems);
 	const setPluginItems = useMenuStore((state) => state.setPluginItems);
-	const { user, isLoggedIn, logout } = useUserStore();
 	const loadProviders = useModelStore((s) => s.loadProviders);
 	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
+
+	// Effective interactionProfile drives which sidebar to render shell-wide.
+	const interactionProfile = useEffectiveInteractionProfile();
 
 	const [aboutModalOpen, setAboutModalOpen] = useState(false);
 	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
@@ -310,138 +111,23 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 		return unsubscribe;
 	}, [setPluginItems]);
 
-	const enabledItems = menuItems.filter(
-		(item) => item.enabled && item.id !== "settings",
-	);
-
-	const isSettingsSelected = location.pathname.startsWith("/settings");
-
-	const selectedKey =
-		enabledItems.find((item) => location.pathname.startsWith(item.path))?.id ||
-		"";
-
-	const handleMenuClick = useCallback(
-		(item: MenuItemConfig) => {
-			navigate(item.path);
-		},
-		[navigate],
-	);
-
-	const handleLogout = useCallback(() => {
-		logout();
-		navigate("/");
-	}, [logout, navigate]);
-
-	const contextMenuItems: MenuProps["items"] = [
-		{
-			key: "username",
-			label: user?.name || t("guest", "访客", { ns: "user" }),
-			disabled: true,
-		},
-		{ type: "divider" },
-		{
-			key: "logout",
-			label: t("logout", "退出登录", { ns: "user" }),
-			onClick: handleLogout,
-		},
-	];
+	// §22 rollback flag: 关闭 profileLayouts 时强制走 AppSidebar，忽略 profile。
+	const profileLayouts = useFeatureFlagsStore((s) => s.profileLayouts);
+	const useClaudeSidebar =
+		profileLayouts &&
+		(interactionProfile === "claude-code" || interactionProfile === "hybrid");
 
 	return (
-		<div className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10">
-			{/* Sidebar */}
-			<div className="w-20 h-full flex-none bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-slate-700/50 shadow-2xl">
-				<div className="flex flex-col h-full pt-[30px]">
-					{/* Avatar */}
-					<div className="h-16 flex items-center justify-center border-b border-slate-700/50">
-						<Dropdown
-							menu={{ items: contextMenuItems }}
-							placement="bottomLeft"
-							trigger={["contextMenu"]}
-						>
-							<div>
-								<Tooltip
-									title={user?.name || t("name", "Super Client", { ns: "app" })}
-									placement="right"
-									mouseEnterDelay={0.5}
-								>
-									<UserAvatar user={user} isLoggedIn={isLoggedIn} />
-								</Tooltip>
-							</div>
-						</Dropdown>
-					</div>
-
-					{/* Menu items */}
-					<div className="mt-4 px-2 flex flex-col gap-1">
-						<LayoutGroup>
-							{enabledItems.map((item) => (
-								<SidebarMenuItem
-									key={item.id}
-									item={item}
-									isSelected={selectedKey === item.id}
-									onClick={() => handleMenuClick(item)}
-									label={t(item.label, { ns: "menu" })}
-								/>
-							))}
-							{/* Plugin-contributed sidebar items */}
-							{pluginItems.length > 0 && (
-								<div className="my-1 mx-2 border-t border-slate-700/50" />
-							)}
-							{pluginItems.map((item) => (
-								<SidebarMenuItem
-									key={item.id}
-									item={item}
-									isSelected={location.pathname.startsWith(item.path)}
-									onClick={() => handleMenuClick(item)}
-									label={item.label}
-								/>
-							))}
-						</LayoutGroup>
-					</div>
-
-					{/* Theme toggle & Settings - fixed at bottom */}
-					<div className="mt-auto px-2 pb-4 pt-4 border-t border-slate-700/50">
-						<ThemeToggleButton />
-						<LayoutGroup>
-							<Tooltip
-								title={t("settings", { ns: "menu" })}
-								placement="right"
-								mouseEnterDelay={0.5}
-							>
-								<motion.button
-									type="button"
-									onClick={() => navigate("/settings")}
-									whileHover={{ scale: 1.08 }}
-									whileTap={{ scale: 0.92 }}
-									transition={springTransition}
-									className="w-full h-12 flex items-center justify-center text-slate-400 hover:text-white relative"
-								>
-									<span
-										className={cn(
-											"w-9 h-9 rounded-xl flex items-center justify-center relative z-10 transition-colors duration-200",
-											isSettingsSelected
-												? "text-white"
-												: "hover:bg-slate-700/50",
-										)}
-									>
-										<SettingOutlined className="text-xl" />
-									</span>
-									{isSettingsSelected && (
-										<motion.div
-											layoutId="sidebar-settings-active"
-											className="absolute inset-x-2.5 top-1.5 bottom-1.5 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/30"
-											transition={{
-												type: "spring",
-												stiffness: 350,
-												damping: 30,
-											}}
-										/>
-									)}
-								</motion.button>
-							</Tooltip>
-						</LayoutGroup>
-					</div>
-				</div>
-			</div>
+		<div
+			className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10"
+			data-interaction-profile={interactionProfile}
+		>
+			{/* Sidebar — profile-driven routing */}
+			{useClaudeSidebar ? (
+				<ClaudeSidebar onOpenAbout={() => setAboutModalOpen(true)} />
+			) : (
+				<AppSidebar onOpenAbout={() => setAboutModalOpen(true)} />
+			)}
 
 			{/* Right column */}
 			<div className="flex-1 h-full flex flex-col overflow-hidden">
@@ -466,6 +152,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 						</motion.div>
 					</AnimatePresence>
 				</div>
+
+				{/* Bottom-docked terminal panel; renders nothing when closed.
+				    Sits in the right column flex flow so the content area
+				    above naturally shrinks to make room. */}
+				<TerminalPanel />
 			</div>
 
 			{/* About modal */}
@@ -474,6 +165,11 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 				onClose={() => setAboutModalOpen(false)}
 				appInfo={appInfo}
 			/>
+
+			{/* §25.3 advanced "新建对话…" modal — listens for the
+			    `chat:open-new-conversation` window event dispatched by
+			    TitleBar More menu. */}
+			<NewConversationModal />
 		</div>
 	);
 };

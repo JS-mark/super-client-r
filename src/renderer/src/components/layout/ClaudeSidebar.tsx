@@ -1,24 +1,40 @@
 import {
-	AppstoreAddOutlined,
+	ApiOutlined,
+	AppstoreOutlined,
 	ClusterOutlined,
 	DownOutlined,
 	FolderAddOutlined,
 	FolderOutlined,
+	MessageOutlined,
 	PlusOutlined,
-	ReadOutlined,
+	RocketOutlined,
 	SearchOutlined,
 	SettingOutlined,
+	StarOutlined,
 } from "@ant-design/icons";
 import { Input, type InputRef, Tooltip, message, theme } from "antd";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import { getProjectIdFromConversation, useChatStore } from "../../stores/chatStore";
+import {
+	PROJECT_MENU_IDS,
+	getEffectiveMenuItems,
+	getVisibleMenuItems,
+	isMenuItemEnabled,
+} from "../../lib/menuConfig";
+import {
+	getProjectIdFromConversation,
+	useChatStore,
+} from "../../stores/chatStore";
 import { useNewConversation } from "../../hooks/useNewConversation";
 import type { ConversationSummary } from "../../types/electron";
+import type { MenuItemConfig } from "../../types/menu";
 import { SessionContextMenu } from "./SessionContextMenu";
 import { GlobalSessionSearchModal } from "../chat/GlobalSessionSearchModal";
+import { useFeatureFlagsStore } from "../../stores/featureFlagsStore";
+import { useMenuStore } from "../../stores/menuStore";
 import { useSidebarLayoutStore } from "../../stores/sidebarLayoutStore";
 import {
 	getAvatarColor,
@@ -32,13 +48,30 @@ import { SidebarResizeHandle } from "./SidebarResizeHandle";
 
 const { useToken } = theme;
 
-type ChatMode = "chat" | "cowork" | "code";
+const CLAUDE_QUICK_MENU_IDS = new Set([
+	"chat",
+	"skills",
+	"mcp",
+  "bookmarks",
+  "plugins",
+	"imbot",
+]);
 
-const MODE_ORDER: ChatMode[] = ["chat", "cowork", "code"];
-const MODE_LABELS: Record<ChatMode, string> = {
-	chat: "Chat",
-	cowork: "Cowork",
-	code: "Code",
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+	MessageOutlined,
+	ApiOutlined,
+	AppstoreOutlined,
+	RocketOutlined,
+	StarOutlined,
+	ClusterOutlined,
+};
+
+const MENU_ICON_BY_ID: Record<string, string> = {
+	skills: "RocketOutlined",
+	mcp: "ApiOutlined",
+	plugins: "AppstoreOutlined",
+	bookmarks: "StarOutlined",
+	imbot: "ClusterOutlined",
 };
 
 function isMac(): boolean {
@@ -48,6 +81,26 @@ function isMac(): boolean {
 
 function modKey(): string {
 	return isMac() ? "⌘" : "Ctrl";
+}
+
+function renderMenuIcon(item: MenuItemConfig): React.ReactNode {
+	if (item.id === "chat") return <PlusOutlined />;
+	if (item.iconType === "emoji") {
+		return <span className="text-[14px] leading-none">{item.iconContent}</span>;
+	}
+	if (item.iconType === "image") {
+		return (
+			<img
+				src={item.iconContent}
+				alt={item.label}
+				className="w-4 h-4 object-contain"
+			/>
+		);
+	}
+	const iconKey =
+		item.iconContent || MENU_ICON_BY_ID[item.id] || "AppstoreOutlined";
+	const IconComponent = ICON_MAP[iconKey] || AppstoreOutlined;
+	return <IconComponent />;
 }
 
 /**
@@ -203,6 +256,7 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
 
 export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const navigate = useNavigate();
+	const { t } = useTranslation();
 	const { token } = useToken();
 
 	// 折叠按钮 + collapsed 状态已彻底移除（R-8）。
@@ -215,10 +269,25 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const sortedWorkspaces = useSortedProjects();
 	const currentWorkspaceId = useProjectStore((s) => s.currentProjectId);
 	const { user } = useUserStore();
+	const menuItems = useMenuStore((s) => s.items);
+	const unifiedNavigation = useFeatureFlagsStore((s) => s.unifiedNavigation);
+	const effectiveMenuItems = useMemo(
+		() => getEffectiveMenuItems(menuItems, { unifiedNavigation }),
+		[menuItems, unifiedNavigation],
+	);
+	const quickMenuItems = useMemo(
+		() => getVisibleMenuItems(effectiveMenuItems, CLAUDE_QUICK_MENU_IDS),
+		[effectiveMenuItems],
+	);
+	const chatMenuEnabled = isMenuItemEnabled(effectiveMenuItems, "chat", true);
+	const projectsMenuEnabled = isMenuItemEnabled(
+		effectiveMenuItems,
+		PROJECT_MENU_IDS,
+		true,
+	);
 
 	const mac = useMemo(() => isMac(), []);
 
-	const [mode, setMode] = useState<ChatMode>("chat");
 	const [recentsOpen, setRecentsOpen] = useState(true);
 	const [projectsOpen, setProjectsOpen] = useState(true);
 	const [searchModalOpen, setSearchModalOpen] = useState(false);
@@ -283,6 +352,24 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const [settingsProjectId, setSettingsProjectId] = useState<string | null>(
 		null,
 	);
+
+	// F-7 inline rename：当前正在被重命名的 project id
+	const [renamingProjectId, setRenamingProjectId] = useState<string | null>(
+		null,
+	);
+	const handleProjectRenameCommit = useCallback(
+		async (id: string, newName: string) => {
+			const trimmed = newName.trim();
+			if (trimmed) {
+				await useProjectStore.getState().rename(id, trimmed);
+			}
+			setRenamingProjectId(null);
+		},
+		[],
+	);
+	const handleProjectRenameCancel = useCallback(() => {
+		setRenamingProjectId(null);
+	}, []);
 
 	// 项目展开状态（默认当前项目展开）
 	const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => {
@@ -361,21 +448,20 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		}
 	}, []);
 
-	const handleLibrary = useCallback(() => {
-		navigate("/bookmarks");
-	}, [navigate]);
-
-	const handleImBot = useCallback(() => {
-		navigate("/imbot");
-	}, [navigate]);
-
-	const handleExtensions = useCallback(() => {
-		navigate("/extensions");
-	}, [navigate]);
-
 	const handleSessionSearch = useCallback(() => {
 		setSearchModalOpen(true);
 	}, []);
+
+	const handleMenuItemClick = useCallback(
+		async (item: MenuItemConfig) => {
+			if (item.id === "chat") {
+				await handleNewConversation();
+				return;
+			}
+			navigate(item.path);
+		},
+		[handleNewConversation, navigate],
+	);
 
 	const handleConversationClick = useCallback(
 		async (conversationId: string) => {
@@ -421,341 +507,299 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	// 折叠模式已移除（仅保留侧边拖拽）。
 	return (
 		<>
-		<aside
-			className="h-full flex-none flex flex-col"
-			style={{
-				width,
-				position: "relative",
-				background: bg,
-				borderRight: `1px solid ${borderColor}`,
-			}}
-			data-testid="claude-sidebar"
-		>
-			<TrafficLightSpacer mac={mac} />
-
-			{/* Brand row — collapse button removed; 通过侧边拖拽手柄调整宽度 */}
-			<div className="h-12 px-3 flex items-center flex-none">
-				<div className="flex items-center gap-2.5 min-w-0">
-					<div
-						className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[13px] font-semibold flex-none shadow-sm"
-						style={{ background: primaryBg }}
-					>
-						C
-					</div>
-					<span
-						className="text-[15px] font-semibold truncate"
-						style={{ color: textColor, letterSpacing: "-0.01em" }}
-					>
-						Claude
-					</span>
-				</div>
-			</div>
-
-			{/* Mode tabs */}
-			<div className="px-3 pt-0 pb-3 flex-none">
-				<div
-					className="flex items-center p-[3px] rounded-lg"
-					style={{ background: chipBg }}
-					data-testid="mode-tabs"
-				>
-					{MODE_ORDER.map((m) => {
-						const active = mode === m;
-						return (
-							<button
-								key={m}
-								type="button"
-								onClick={() => setMode(m)}
-								className="flex-1 h-7 rounded-[6px] text-[12.5px] font-medium transition-all duration-200"
-								style={{
-									background: active ? token.colorBgContainer : "transparent",
-									color: active ? primaryBg : mutedColor,
-									boxShadow: active
-										? `0 1px 3px rgba(0, 0, 0, 0.08)`
-										: "none",
-								}}
-								data-testid={`mode-tab-${m}`}
-							>
-								{MODE_LABELS[m]}
-							</button>
-						);
-					})}
-				</div>
-			</div>
-
-			{/* Quick actions */}
-			<div
-				className="px-2 pb-2 flex flex-col gap-0.5 flex-none"
-				data-testid="quick-actions"
-			>
-				<QuickActionRow
-					icon={<PlusOutlined />}
-					label="新建对话"
-					shortcut={`${modKey()}N`}
-					onClick={handleNewConversation}
-					hoverBg={hoverBg}
-					textColor={textColor}
-					mutedColor={mutedColor}
-					chipBg={chipBg}
-				/>
-				<QuickActionRow
-					icon={<ReadOutlined />}
-					label="库"
-					onClick={handleLibrary}
-					hoverBg={hoverBg}
-					textColor={textColor}
-					mutedColor={mutedColor}
-					chipBg={chipBg}
-				/>
-				<QuickActionRow
-					icon={<SearchOutlined />}
-					label="会话搜索"
-					shortcut={`${modKey()}P`}
-					onClick={handleSessionSearch}
-					hoverBg={hoverBg}
-					textColor={textColor}
-					mutedColor={mutedColor}
-					chipBg={chipBg}
-				/>
-				<QuickActionRow
-					icon={<ClusterOutlined />}
-					label="IM 机器人"
-					onClick={handleImBot}
-					hoverBg={hoverBg}
-					textColor={textColor}
-					mutedColor={mutedColor}
-					chipBg={chipBg}
-				/>
-				<QuickActionRow
-					icon={<AppstoreAddOutlined />}
-					label="扩展"
-					onClick={handleExtensions}
-					hoverBg={hoverBg}
-					textColor={textColor}
-					mutedColor={mutedColor}
-					chipBg={chipBg}
-				/>
-			</div>
-
-			{/* Subtle divider between quick actions and sections */}
-			<div
-				className="mx-3 my-1 flex-none"
+			<aside
+				className="h-full flex-none flex flex-col"
 				style={{
-					height: 1,
-					background: token.colorBorderSecondary,
-					opacity: 0.5,
+					width,
+					position: "relative",
+					background: bg,
+					borderRight: `1px solid ${borderColor}`,
 				}}
-			/>
-
-			{/* Scrollable section list */}
-			<div
-				className="flex-1 overflow-y-auto px-2 pb-2 pt-2"
-				data-testid="sidebar-sections"
+				data-testid="claude-sidebar"
 			>
-				{/* Recents */}
-				<div>
-					<SectionHeader
-						title="最近对话"
-						expanded={recentsOpen}
-						onToggle={() => setRecentsOpen((v) => !v)}
-						mutedColor={mutedColor}
+				<TrafficLightSpacer mac={mac} />
+
+				{/* Brand row — collapse button removed; 通过侧边拖拽手柄调整宽度 */}
+				<div className="h-12 px-3 flex items-center flex-none">
+					<div className="flex items-center gap-2.5 min-w-0">
+						<div
+							className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[13px] font-semibold flex-none shadow-sm"
+							style={{ background: primaryBg }}
+						>
+							C
+						</div>
+						<span
+							className="text-[15px] font-semibold truncate"
+							style={{ color: textColor, letterSpacing: "-0.01em" }}
+						>
+							Claude
+						</span>
+					</div>
+				</div>
+
+				{/* Quick actions */}
+				<div
+					className="px-2 pb-2 flex flex-col gap-0.5 flex-none"
+					data-testid="quick-actions"
+				>
+					{quickMenuItems.map((item) => (
+						<QuickActionRow
+							key={item.id}
+							icon={renderMenuIcon(item)}
+							label={
+								item.id === "chat" ? "新建对话" : t(item.label, { ns: "menu" })
+							}
+							shortcut={item.id === "chat" ? `${modKey()}N` : undefined}
+							onClick={() => {
+								void handleMenuItemClick(item);
+							}}
+							hoverBg={hoverBg}
+							textColor={textColor}
+							mutedColor={mutedColor}
+							chipBg={chipBg}
+						/>
+					))}
+					<QuickActionRow
+						icon={<SearchOutlined />}
+						label="会话搜索"
+						shortcut={`${modKey()}P`}
+						onClick={handleSessionSearch}
 						hoverBg={hoverBg}
+						textColor={textColor}
+						mutedColor={mutedColor}
+						chipBg={chipBg}
 					/>
-					{recentsOpen && (
-						<div className="mt-1 flex flex-col">
-							{recentConversations.length === 0 ? (
-								<div
-									className="px-3 py-2 text-xs"
-									style={{ color: mutedColor }}
-								>
-									暂无对话
+				</div>
+
+				{/* Subtle divider between quick actions and sections */}
+				{(chatMenuEnabled || projectsMenuEnabled) && (
+					<div
+						className="mx-3 my-1 flex-none"
+						style={{
+							height: 1,
+							background: token.colorBorderSecondary,
+							opacity: 0.5,
+						}}
+					/>
+				)}
+
+				{/* Scrollable section list */}
+				<div
+					className="flex-1 overflow-y-auto px-2 pb-2 pt-2"
+					data-testid="sidebar-sections"
+				>
+					{/* Recents */}
+					{chatMenuEnabled && (
+						<div>
+							<SectionHeader
+								title="最近对话"
+								expanded={recentsOpen}
+								onToggle={() => setRecentsOpen((v) => !v)}
+								mutedColor={mutedColor}
+								hoverBg={hoverBg}
+							/>
+							{recentsOpen && (
+								<div className="mt-1 flex flex-col">
+									{recentConversations.length === 0 ? (
+										<div
+											className="px-3 py-2 text-xs"
+											style={{ color: mutedColor }}
+										>
+											暂无对话
+										</div>
+									) : (
+										recentConversations.map((conv) => (
+											<RecentConversationRow
+												key={conv.id}
+												conv={conv}
+												active={conv.id === currentConversationId}
+												renaming={renamingConversationId === conv.id}
+												textColor={textColor}
+												mutedColor={mutedColor}
+												hoverBg={hoverBg}
+												activeBg={activeBg}
+												activeText={activeText}
+												primaryBg={primaryBg}
+												onClick={() => handleConversationClick(conv.id)}
+												onRenameStart={handleRenameStart}
+												onRenameCommit={handleRenameCommit}
+												onRenameCancel={handleRenameCancel}
+											/>
+										))
+									)}
 								</div>
-							) : (
-								recentConversations.map((conv) => (
-									<RecentConversationRow
-										key={conv.id}
-										conv={conv}
-										active={conv.id === currentConversationId}
-										renaming={renamingConversationId === conv.id}
-										textColor={textColor}
-										mutedColor={mutedColor}
-										hoverBg={hoverBg}
-										activeBg={activeBg}
-										activeText={activeText}
-										primaryBg={primaryBg}
-										onClick={() => handleConversationClick(conv.id)}
-										onRenameStart={handleRenameStart}
-										onRenameCommit={handleRenameCommit}
-										onRenameCancel={handleRenameCancel}
-									/>
-								))
 							)}
 						</div>
 					)}
-				</div>
 
-				{/* Projects */}
-				<div className="mt-4">
-					<SectionHeader
-						title="项目"
-						expanded={projectsOpen}
-						onToggle={() => setProjectsOpen((v) => !v)}
-						mutedColor={mutedColor}
-						hoverBg={hoverBg}
-						action={{
-							icon: <PlusOutlined className="text-[10px]" />,
-							onClick: handleCreateProject,
-							tooltip: "新建项目",
-						}}
-					/>
-					{projectsOpen && (
-						<div className="mt-1 flex flex-col">
-							{sortedWorkspaces.length === 0 ? (
-								<button
-									type="button"
-									onClick={handleCreateProject}
-									className="mx-1 px-2 py-2 flex items-center gap-2 rounded-md text-xs transition-colors"
-									style={{ color: mutedColor }}
-									onMouseEnter={(e) => {
-										e.currentTarget.style.background = hoverBg;
-									}}
-									onMouseLeave={(e) => {
-										e.currentTarget.style.background = "transparent";
-									}}
-								>
-									<FolderAddOutlined />
-									<span>添加目录作为项目</span>
-								</button>
-							) : (
-								sortedWorkspaces.map((ws) => {
-									const active = ws.id === currentWorkspaceId;
-									const expanded = expandedProjects.has(ws.id);
-									const projectConvs =
-										conversationsByProject.get(ws.id) ?? [];
-									return (
-										<div key={ws.id} className="flex flex-col">
-											<ProjectContextMenu
-												project={ws}
-												onRename={(p) => setSettingsProjectId(p.id)}
-											>
-												<ProjectRow
-													name={ws.name}
-													active={active}
-													expanded={expanded}
-													count={projectConvs.length}
-													textColor={textColor}
-													mutedColor={mutedColor}
-													hoverBg={hoverBg}
-													primaryBg={primaryBg}
-													onClick={() => toggleProjectExpand(ws.id)}
-													onAdd={() => handleNewConversationInProject(ws.id)}
-													onSettings={() => setSettingsProjectId(ws.id)}
-												/>
-											</ProjectContextMenu>
-											{expanded && (
-												<div className="ml-5 mt-px mb-1 flex flex-col">
-													{projectConvs.length === 0 ? (
-														<div
-															className="px-3 py-1.5 text-xs italic"
-															style={{ color: mutedColor }}
-														>
-															暂无对话
+					{/* Projects */}
+					{projectsMenuEnabled && (
+						<div className={chatMenuEnabled ? "mt-4" : ""}>
+							<SectionHeader
+								title="项目"
+								expanded={projectsOpen}
+								onToggle={() => setProjectsOpen((v) => !v)}
+								mutedColor={mutedColor}
+								hoverBg={hoverBg}
+								action={{
+									icon: <PlusOutlined className="text-[10px]" />,
+									onClick: handleCreateProject,
+									tooltip: "新建项目",
+								}}
+							/>
+							{projectsOpen && (
+								<div className="mt-1 flex flex-col">
+									{sortedWorkspaces.length === 0 ? (
+										<button
+											type="button"
+											onClick={handleCreateProject}
+											className="mx-1 px-2 py-2 flex items-center gap-2 rounded-md text-xs transition-colors"
+											style={{ color: mutedColor }}
+											onMouseEnter={(e) => {
+												e.currentTarget.style.background = hoverBg;
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.background = "transparent";
+											}}
+										>
+											<FolderAddOutlined />
+											<span>添加目录作为项目</span>
+										</button>
+									) : (
+										sortedWorkspaces.map((ws) => {
+											const active = ws.id === currentWorkspaceId;
+											const expanded = expandedProjects.has(ws.id);
+											const projectConvs =
+												conversationsByProject.get(ws.id) ?? [];
+											return (
+												<div key={ws.id} className="flex flex-col">
+													<ProjectContextMenu
+														project={ws}
+														onRename={(p) => setRenamingProjectId(p.id)}
+													>
+														<ProjectRow
+															id={ws.id}
+															name={ws.name}
+															active={active}
+															expanded={expanded}
+															count={projectConvs.length}
+															textColor={textColor}
+															mutedColor={mutedColor}
+															hoverBg={hoverBg}
+															primaryBg={primaryBg}
+															onClick={() => toggleProjectExpand(ws.id)}
+															onAdd={() =>
+																handleNewConversationInProject(ws.id)
+															}
+															onSettings={() => setSettingsProjectId(ws.id)}
+															renaming={renamingProjectId === ws.id}
+															onRenameCommit={handleProjectRenameCommit}
+															onRenameCancel={handleProjectRenameCancel}
+														/>
+													</ProjectContextMenu>
+													{expanded && (
+														<div className="ml-5 mt-px mb-1 flex flex-col">
+															{projectConvs.length === 0 ? (
+																<div
+																	className="px-3 py-1.5 text-xs italic"
+																	style={{ color: mutedColor }}
+																>
+																	暂无对话
+																</div>
+															) : (
+																projectConvs.map((conv) => (
+																	<RecentConversationRow
+																		key={conv.id}
+																		conv={conv}
+																		active={conv.id === currentConversationId}
+																		renaming={
+																			renamingConversationId === conv.id
+																		}
+																		textColor={textColor}
+																		mutedColor={mutedColor}
+																		hoverBg={hoverBg}
+																		activeBg={activeBg}
+																		activeText={activeText}
+																		primaryBg={primaryBg}
+																		onClick={() =>
+																			handleConversationClick(conv.id)
+																		}
+																		onRenameStart={handleRenameStart}
+																		onRenameCommit={handleRenameCommit}
+																		onRenameCancel={handleRenameCancel}
+																	/>
+																))
+															)}
 														</div>
-													) : (
-														projectConvs.map((conv) => (
-															<RecentConversationRow
-																key={conv.id}
-																conv={conv}
-																active={
-																	conv.id === currentConversationId
-																}
-																renaming={
-																	renamingConversationId === conv.id
-																}
-																textColor={textColor}
-																mutedColor={mutedColor}
-																hoverBg={hoverBg}
-																activeBg={activeBg}
-																activeText={activeText}
-																primaryBg={primaryBg}
-																onClick={() =>
-																	handleConversationClick(conv.id)
-																}
-																onRenameStart={handleRenameStart}
-																onRenameCommit={handleRenameCommit}
-																onRenameCancel={handleRenameCancel}
-															/>
-														))
 													)}
 												</div>
-											)}
-										</div>
-									);
-								})
+											);
+										})
+									)}
+								</div>
 							)}
 						</div>
 					)}
 				</div>
 
-			</div>
-
-			{/* Bottom user/settings */}
-			<div
-				className="h-14 px-3 flex items-center justify-between flex-none"
-				style={{ borderTop: `1px solid ${token.colorBorderSecondary}` }}
-				data-testid="sidebar-user-row"
-			>
-				<div className="flex items-center gap-2.5 min-w-0">
-					<div
-						className={cn(
-							"w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-semibold flex-none shadow-sm",
-							avatarColor,
-						)}
-					>
-						{initials}
+				{/* Bottom user/settings */}
+				<div
+					className="h-14 px-3 flex items-center justify-between flex-none"
+					data-testid="sidebar-user-row"
+				>
+					<div className="flex items-center gap-2.5 min-w-0">
+						<div
+							className={cn(
+								"w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-semibold flex-none shadow-sm",
+								avatarColor,
+							)}
+						>
+							{initials}
+						</div>
+						<span
+							className="text-[13px] font-medium truncate"
+							style={{ color: textColor }}
+						>
+							{user?.name || "访客"}
+						</span>
 					</div>
-					<span
-						className="text-[13px] font-medium truncate"
-						style={{ color: textColor }}
-					>
-						{user?.name || "访客"}
-					</span>
+					<Tooltip title="设置" mouseEnterDelay={0.3}>
+						<button
+							type="button"
+							onClick={handleSettings}
+							className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
+							style={{ color: mutedColor }}
+							data-testid="sidebar-settings"
+							onMouseEnter={(e) => {
+								e.currentTarget.style.background = hoverBg;
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.background = "transparent";
+							}}
+						>
+							<SettingOutlined className="text-[15px]" />
+						</button>
+					</Tooltip>
 				</div>
-				<Tooltip title="设置" mouseEnterDelay={0.3}>
-					<button
-						type="button"
-						onClick={handleSettings}
-						className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
-						style={{ color: mutedColor }}
-						data-testid="sidebar-settings"
-						onMouseEnter={(e) => {
-							e.currentTarget.style.background = hoverBg;
-						}}
-						onMouseLeave={(e) => {
-							e.currentTarget.style.background = "transparent";
-						}}
-					>
-						<SettingOutlined className="text-[15px]" />
-					</button>
-				</Tooltip>
-			</div>
 
-			<SidebarResizeHandle currentWidth={width} onWidthChange={setWidth} />
+				<SidebarResizeHandle currentWidth={width} onWidthChange={setWidth} />
 
-			<ProjectSettingsModal
-				projectId={settingsProjectId}
-				open={settingsProjectId !== null}
-				onClose={() => setSettingsProjectId(null)}
+				<ProjectSettingsModal
+					projectId={settingsProjectId}
+					open={settingsProjectId !== null}
+					onClose={() => setSettingsProjectId(null)}
+				/>
+			</aside>
+			<GlobalSessionSearchModal
+				open={searchModalOpen}
+				onClose={() => setSearchModalOpen(false)}
 			/>
-		</aside>
-		<GlobalSessionSearchModal
-			open={searchModalOpen}
-			onClose={() => setSearchModalOpen(false)}
-		/>
 		</>
 	);
 }
 
 interface ProjectRowProps {
+	id: string;
 	name: string;
 	active: boolean;
 	expanded: boolean;
@@ -767,6 +811,10 @@ interface ProjectRowProps {
 	onClick: () => void;
 	onAdd: () => void;
 	onSettings: () => void;
+	/** F-7 inline rename：renaming===true 时该行渲染为 Input */
+	renaming?: boolean;
+	onRenameCommit?: (id: string, newName: string) => void;
+	onRenameCancel?: () => void;
 }
 
 /**
@@ -776,6 +824,7 @@ interface ProjectRowProps {
  *   （仅表示"当前所在项目"，不抢 session 选中视觉）
  */
 const ProjectRow: React.FC<ProjectRowProps> = ({
+	id,
 	name,
 	active,
 	expanded,
@@ -787,8 +836,43 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 	onClick,
 	onAdd,
 	onSettings,
+	renaming = false,
+	onRenameCommit,
+	onRenameCancel,
 }) => {
 	const [hovered, setHovered] = useState(false);
+
+	if (renaming) {
+		return (
+			<div
+				className="w-full h-8 pl-3 pr-3 flex items-center gap-2"
+				style={{ color: textColor }}
+			>
+				<span className="w-3 flex items-center justify-center" />
+				<FolderOutlined className="text-[13px]" style={{ color: mutedColor }} />
+				<Input
+					autoFocus
+					size="small"
+					defaultValue={name}
+					onPressEnter={(e) => {
+						const v = (e.target as HTMLInputElement).value.trim();
+						onRenameCommit?.(id, v || name);
+					}}
+					onBlur={(e) => {
+						const v = e.target.value.trim();
+						onRenameCommit?.(id, v || name);
+					}}
+					onKeyDown={(e) => {
+						if (e.key === "Escape") {
+							e.stopPropagation();
+							onRenameCancel?.();
+						}
+					}}
+				/>
+			</div>
+		);
+	}
+
 	return (
 		<div
 			className="group relative w-full h-8 pl-3 pr-3 flex items-center gap-2 rounded-md text-[13px] transition-colors cursor-pointer"
@@ -822,10 +906,7 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 			>
 				<DownOutlined className="text-[9px]" />
 			</span>
-			<FolderOutlined
-				className="text-[13px]"
-				style={{ color: mutedColor }}
-			/>
+			<FolderOutlined className="text-[13px]" style={{ color: mutedColor }} />
 			<span className="flex-1 text-left truncate">{name}</span>
 			{hovered ? (
 				<div className="flex items-center gap-1">
