@@ -66,5 +66,13 @@
 		"uninstall": "Uninstall",
 		"delete": "Delete",
 		"edit": "Edit"
+	},
+	"terminal": {
+		"toggle": "Terminal",
+		"titleLabel": "Terminal",
+		"newTab": "New Terminal",
+		"closePanel": "Close Panel",
+		"closeTab": "Close Terminal",
+		"exited": "Process exited"
 	}
 }

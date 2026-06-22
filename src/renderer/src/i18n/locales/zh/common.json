@@ -66,5 +66,13 @@
 		"uninstall": "卸载",
 		"delete": "删除",
 		"edit": "编辑"
+	},
+	"terminal": {
+		"toggle": "终端",
+		"titleLabel": "终端",
+		"newTab": "新建终端",
+		"closePanel": "关闭面板",
+		"closeTab": "关闭终端",
+		"exited": "进程已退出"
 	}
 }

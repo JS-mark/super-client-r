@@ -85,6 +85,16 @@
 	"networkStatus": "Network Status",
 	"online": "Online",
 	"offline": "Offline",
+	"runtime": {
+		"policyDenied": "Blocked by runtime policy.",
+		"externalAppBlocked": "Opening external apps is blocked for this project.",
+		"externalAppNeedsApproval": "Opening this external app requires approval.",
+		"networkBlocked": "Network access is blocked for this project.",
+		"networkNeedsApproval": "This network request requires approval.",
+		"writeBlockedReadOnly": "File changes are blocked in read-only sandbox mode.",
+		"writeNeedsApproval": "This file change requires approval.",
+		"commandNeedsApproval": "Running this command requires approval."
+	},
 	"lastRefresh": "Last Refresh",
 	"memoryUsage": "Memory Usage",
 	"systemMemory": "System Memory",
@@ -272,8 +282,8 @@
 				"desc": "Built-in HTTP service"
 			},
 			"plugin": {
-				"title": "Plugins",
-				"desc": "Extensions, skins & marketplace"
+				"title": "App Plugins",
+				"desc": "App plugin extensions, skins & marketplace"
 			},
 			"webSearch": {
 				"title": "Web Search",

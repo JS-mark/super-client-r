@@ -86,6 +86,16 @@
 	"networkStatus": "网络状态",
 	"online": "在线",
 	"offline": "离线",
+	"runtime": {
+		"policyDenied": "已被运行时策略阻止。",
+		"externalAppBlocked": "当前项目禁止打开外部应用。",
+		"externalAppNeedsApproval": "打开此外部应用需要审批。",
+		"networkBlocked": "当前项目禁止网络访问。",
+		"networkNeedsApproval": "此次网络请求需要审批。",
+		"writeBlockedReadOnly": "只读沙盒模式下禁止修改文件。",
+		"writeNeedsApproval": "此次文件修改需要审批。",
+		"commandNeedsApproval": "运行此命令需要审批。"
+	},
 	"lastRefresh": "上次刷新",
 	"memoryUsage": "内存使用",
 	"systemMemory": "系统内存",
@@ -273,8 +283,8 @@
 				"desc": "内置 HTTP 服务"
 			},
 			"plugin": {
-				"title": "插件系统",
-				"desc": "插件扩展、主题皮肤、市场安装"
+				"title": "应用插件系统",
+				"desc": "应用插件扩展、主题皮肤、市场安装"
 			},
 			"webSearch": {
 				"title": "联网搜索",
@@ -490,7 +500,7 @@
 		"auth": "认证",
 		"authHint": "代理需要用户名和密码",
 		"username": "用户名",
-		"*": "密码",
+		"password": "密码",
 		"bypassList": "绕过列表",
 		"bypassListHint": "逗号分隔：localhost,127.0.0.1,*.internal.com",
 		"bypassListPlaceholder": "localhost,127.0.0.1",
