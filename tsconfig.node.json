@@ -21,5 +21,10 @@
 			"@super-client/shared-types/*": ["./packages/shared-types/src/*"]
 		}
 	},
-	"include": ["src/main", "src/preload", "electron.vite.config.ts", "packages/shared-types/src"]
+	"include": [
+		"src/main",
+		"src/preload",
+		"electron.vite.config.ts",
+		"packages/shared-types/src"
+	]
 }

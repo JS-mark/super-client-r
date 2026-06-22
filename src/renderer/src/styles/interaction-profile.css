@@ -1,0 +1,73 @@
+/**
+ * Interaction profile differentiation styles.
+ *
+ * Applied via `data-interaction-profile="claude-code|codex|hybrid"` on the
+ * Chat page outer wrapper. Hybrid is the baseline (no overrides).
+ *
+ * This is the minimum-visible-differentiation slice: subtle but real
+ * differences in spacing/density. Full inspector/timeline redesigns are
+ * deferred to dedicated tasks.
+ */
+
+/* --- Defaults / Hybrid baseline ---------------------------------------- */
+[data-interaction-profile] {
+	--profile-message-padding-y: 8px;
+	--profile-composer-padding-y: 16px;
+	--profile-composer-min-height: 96px;
+	--profile-content-max-width: 56rem; /* matches max-w-4xl */
+}
+
+/* --- Claude Code: compact, command-first ------------------------------ */
+[data-interaction-profile="claude-code"] {
+	--profile-message-padding-y: 4px;
+	--profile-composer-padding-y: 10px;
+	--profile-composer-min-height: 72px;
+}
+
+[data-interaction-profile="claude-code"] .user-bubble-content {
+	line-height: 1.45;
+}
+
+[data-interaction-profile="claude-code"] .chat-message-area {
+	padding-top: var(--profile-message-padding-y);
+	padding-bottom: var(--profile-message-padding-y);
+}
+
+[data-interaction-profile="claude-code"] .chat-input-shell {
+	padding-top: var(--profile-composer-padding-y);
+	padding-bottom: var(--profile-composer-padding-y);
+}
+
+[data-interaction-profile="claude-code"] .chat-input-shell textarea {
+	min-height: var(--profile-composer-min-height) !important;
+}
+
+/* --- Codex: task-first, inspectable ----------------------------------- */
+[data-interaction-profile="codex"] {
+	--profile-message-padding-y: 12px;
+	--profile-composer-padding-y: 20px;
+	--profile-composer-min-height: 120px;
+}
+
+[data-interaction-profile="codex"] .user-bubble-content {
+	line-height: 1.7;
+}
+
+[data-interaction-profile="codex"] .chat-message-area {
+	padding-top: var(--profile-message-padding-y);
+	padding-bottom: var(--profile-message-padding-y);
+}
+
+[data-interaction-profile="codex"] .chat-input-shell {
+	padding-top: var(--profile-composer-padding-y);
+	padding-bottom: var(--profile-composer-padding-y);
+}
+
+[data-interaction-profile="codex"] .chat-input-shell textarea {
+	min-height: var(--profile-composer-min-height) !important;
+}
+
+/* Codex emphasises tool-call cards as inspectable artifacts. */
+[data-interaction-profile="codex"] .tool-call-progress-bar {
+	opacity: 1;
+}

@@ -901,7 +901,7 @@ body {
 	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.16);
 }
 
-/* Pill — shared button class for ChatModePill / ApprovalModePill / ModelPill / ChatToolsMenu / search engine icon */
+/* Pill — shared button class for ApprovalModePill / ModelPill / ChatToolsMenu / search engine icon */
 .composer-pill {
 	display: inline-flex;
 	align-items: center;
@@ -1027,7 +1027,9 @@ body {
 	color: var(--color-text-tertiary);
 	font-size: 12px;
 	line-height: 1.6;
-	transition: background 150ms ease, color 150ms ease;
+	transition:
+		background 150ms ease,
+		color 150ms ease;
 	cursor: default;
 }
 

@@ -8,7 +8,10 @@ export default defineConfig({
 	main: {
 		resolve: {
 			alias: {
-				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
+				"@super-client/shared-types": resolve(
+					__dirname,
+					"packages/shared-types/src",
+				),
 			},
 		},
 		build: {
@@ -28,7 +31,10 @@ export default defineConfig({
 	preload: {
 		resolve: {
 			alias: {
-				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
+				"@super-client/shared-types": resolve(
+					__dirname,
+					"packages/shared-types/src",
+				),
 			},
 		},
 		build: {
@@ -49,7 +55,10 @@ export default defineConfig({
 		resolve: {
 			alias: {
 				"@": resolve("src/renderer/src"),
-				"@super-client/shared-types": resolve(__dirname, "packages/shared-types/src"),
+				"@super-client/shared-types": resolve(
+					__dirname,
+					"packages/shared-types/src",
+				),
 			},
 		},
 		plugins: [
