@@ -50,7 +50,6 @@ export interface PresetProviderInfo {
 	defaultBaseUrl: string;
 	requiresApiKey: boolean;
 	helpUrl?: string;
-	supportsClaudeCode?: boolean;
 }
 
 export const PRESET_PROVIDERS: PresetProviderInfo[] = [
@@ -61,7 +60,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 		requiresApiKey: true,
 		helpUrl: "https://help.aliyun.com/zh/model-studio/getting-started/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "deepseek",
@@ -86,7 +84,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://api.anthropic.com/v1",
 		requiresApiKey: true,
 		helpUrl: "https://console.anthropic.com/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "gemini",
@@ -103,7 +100,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://cherry.ai/v1",
 		requiresApiKey: true,
 		helpUrl: "https://cherry.ai/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "siliconflow",
@@ -120,7 +116,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://aihubmix.com/v1",
 		requiresApiKey: true,
 		helpUrl: "https://aihubmix.com/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "ocoolai",
@@ -129,7 +124,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://one.ooo.cool/v1",
 		requiresApiKey: true,
 		helpUrl: "https://one.ooo.cool/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "zhipu-ai",
@@ -138,7 +132,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
 		requiresApiKey: true,
 		helpUrl: "https://open.bigmodel.cn/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "302ai",
@@ -147,7 +140,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://api.302.ai/v1",
 		requiresApiKey: true,
 		helpUrl: "https://302.ai/",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "moonshot",
@@ -220,7 +212,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		defaultBaseUrl: "https://openrouter.ai/api/v1",
 		requiresApiKey: true,
 		helpUrl: "https://openrouter.ai/keys",
-		supportsClaudeCode: true,
 	},
 	{
 		id: "ollama",
@@ -244,7 +235,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		nameZh: "NewAPI",
 		defaultBaseUrl: "https://api.newapi.com/v1",
 		requiresApiKey: true,
-		supportsClaudeCode: true,
 	},
 	{
 		id: "custom",
@@ -252,7 +242,6 @@ export const PRESET_PROVIDERS: PresetProviderInfo[] = [
 		nameZh: "自定义",
 		defaultBaseUrl: "",
 		requiresApiKey: false,
-		supportsClaudeCode: true,
 	},
 ];
 
@@ -260,8 +249,4 @@ export function getPresetProvider(
 	id: ModelProviderPreset,
 ): PresetProviderInfo | undefined {
 	return PRESET_PROVIDERS.find((p) => p.id === id);
-}
-
-export function isClaudeCodeCompatible(preset: ModelProviderPreset): boolean {
-	return getPresetProvider(preset)?.supportsClaudeCode === true;
 }

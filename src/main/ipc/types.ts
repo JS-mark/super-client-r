@@ -322,8 +322,6 @@ export interface ModelProvider {
 	models: ProviderModel[];
 	createdAt: number;
 	updatedAt: number;
-	claudeCodeEnabled?: boolean;
-	claudeCodeModel?: string;
 }
 
 export interface ActiveModelSelection {

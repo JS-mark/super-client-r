@@ -33,7 +33,6 @@ import { GeneralSettings } from "../components/settings/GeneralSettings";
 import { PluginConfigPanel } from "../components/settings/PluginConfigPanel";
 import { SearchSettings } from "../components/settings/SearchSettings";
 import { ShortcutSettings } from "../components/settings/ShortcutSettings";
-import { AgentSettings } from "../components/settings/AgentSettings";
 import { WebhookSettings } from "../components/settings/WebhookSettings";
 import { useTitle } from "../hooks/useTitle";
 import { type AppInfo, appService } from "../services/appService";
@@ -153,12 +152,6 @@ const Settings: React.FC = () => {
 				icon: <CloudOutlined />,
 				label: t("models", "Models", { ns: "settings" }),
 				content: <ModelList />,
-			},
-			{
-				key: "agent",
-				icon: <RobotOutlined />,
-				label: t("agent.title", "Agent", { ns: "settings" }),
-				content: <AgentSettings onTabChange={handleTabClick} />,
 			},
 			{
 				key: "api",

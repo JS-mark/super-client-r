@@ -615,15 +615,6 @@ export class StoreManager {
 	saveModelProvider(provider: ModelProvider): void {
 		const providers = this.getModelProviders();
 
-		// Enforce single-select: only one provider can have claudeCodeEnabled
-		if (provider.claudeCodeEnabled) {
-			for (const p of providers) {
-				if (p.id !== provider.id) {
-					p.claudeCodeEnabled = false;
-				}
-			}
-		}
-
 		const existingIndex = providers.findIndex((p) => p.id === provider.id);
 
 		if (existingIndex >= 0) {

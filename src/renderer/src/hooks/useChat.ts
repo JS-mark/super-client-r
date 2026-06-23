@@ -51,42 +51,16 @@ export interface ChatOptions {
   attachmentIds?: string[];
 }
 
-function isClaudeAgentModel(modelId?: string): boolean {
-  if (!modelId) return false;
-  const id = modelId.toLowerCase();
-  return (
-    id.includes("claude") ||
-    id.includes("anthropic/") ||
-    id.includes("sonnet") ||
-    id.includes("opus") ||
-    id.includes("haiku")
-  );
-}
-
 /**
- * Mirrors the main-process `AgentAutoConfig.pickBestAgentModel`: returns the
- * first Claude-compatible model id from a provider's model list, or undefined.
- */
-function pickBestAgentModelId(
-  models: Array<{ id: string; enabled?: boolean }> | undefined,
-): string | undefined {
-  if (!models?.length) return undefined;
-  const enabled = models.filter((m) => m.enabled !== false);
-  return enabled.find((m) => isClaudeAgentModel(m.id))?.id;
-}
-
-/**
- * Renderer-side preflight that mirrors the main-process
- * `AgentSDKService.resolveAnthropicEnv` logic at the *intent* level (we only
- * care about which Claude Code model would actually be used).
+ * Renderer-side pre-flight for the agent run.
  *
- * Returns `{ ok: true, modelId }` when a Claude-compatible model can be
- * resolved, or `{ ok: false, message }` with an actionable error otherwise.
+ * After the ClaudeCodeAgentRuntime / llm-loop swap (Phase D), agent calls
+ * work with any provider+model the user has configured — the runtime
+ * goes through unified LLMService.chatCompletion and supports OpenAI /
+ * DashScope / DeepSeek / Anthropic / Gemini / etc.
  *
- * The previous implementation incorrectly checked the *chat* model id
- * (`effective.model.id`), which is the model the composer selected. The Agent
- * SDK actually uses `provider.claudeCodeModel` (set in the provider's "Claude
- * Code Provider" config), so the two ids can diverge — and did in practice.
+ * So the only thing the pre-flight needs to verify is "at least one
+ * enabled provider exists and has an API key".
  */
 function resolveAgentSdkIntent(
   providers: Array<{
@@ -95,45 +69,26 @@ function resolveAgentSdkIntent(
     enabled?: boolean;
     apiKey?: string;
     preset?: string;
-    claudeCodeEnabled?: boolean;
-    claudeCodeModel?: string;
     models?: Array<{ id: string; name?: string; enabled?: boolean }>;
   }>,
 ):
   | { ok: true; providerName: string; modelId: string }
   | { ok: false; message: string } {
-  const ccProvider = providers.find(
-    (p) => p.enabled && p.claudeCodeEnabled && p.apiKey,
-  );
-
-  if (ccProvider) {
-    const configured = ccProvider.claudeCodeModel?.trim();
-    const candidate =
-      configured && configured.length > 0
-        ? configured
-        : pickBestAgentModelId(ccProvider.models);
-    if (candidate && isClaudeAgentModel(candidate)) {
-      return { ok: true, providerName: ccProvider.name, modelId: candidate };
-    }
+  const ready = providers.find((p) => p.enabled && p.apiKey);
+  if (ready) {
+    const firstEnabledModel = ready.models?.find(
+      (m) => m.enabled !== false,
+    );
     return {
-      ok: false,
-      message: configured
-        ? `Agent SDK 需要 Claude Code 兼容模型。当前 Claude Code Provider「${ccProvider.name}」配置的是「${configured}」，Claude Code SDK 不支持这个模型，因此不会执行 agent/tool_use。请把该 Provider 的 Claude Code 模型改为 Claude/Sonnet/Opus/Haiku 系列，或配置可用的 Anthropic/OpenRouter Claude Code Provider。`
-        : `Agent SDK 需要 Claude Code 兼容模型。Claude Code Provider「${ccProvider.name}」上没有可用的 Claude 兼容模型，请在该 Provider 设置中选择 Claude/Sonnet/Opus/Haiku 系列模型作为 Claude Code 模型，或改用 Anthropic/OpenRouter。`,
+      ok: true,
+      providerName: ready.name,
+      modelId: firstEnabledModel?.id ?? "default",
     };
   }
-
-  const anthropicPreset = providers.find(
-    (p) => p.enabled && p.preset === "anthropic" && p.apiKey,
-  );
-  if (anthropicPreset) {
-    return { ok: true, providerName: anthropicPreset.name, modelId: "default" };
-  }
-
   return {
     ok: false,
     message:
-      "未配置 Claude Code Provider。请到「设置 → 模型」里挑一个 Provider 勾上 Claude Code 开关并选择 Claude/Sonnet/Opus/Haiku 系列模型，或添加 Anthropic 官方 Provider。",
+      "未配置任何可用 Provider。请到「设置 → 模型」添加 Provider、填入 API Key 并启用至少一个模型。",
   };
 }
 

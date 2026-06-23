@@ -40,7 +40,6 @@ import {
 	type ApiFormat,
 	defaultApiFormatForPreset,
 	getPresetProvider,
-	isClaudeCodeCompatible,
 	PRESET_PROVIDERS,
 	type PresetProviderInfo,
 } from "./ModelProviders";
@@ -82,10 +81,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
 	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
 	const [manageModalOpen, setManageModalOpen] = useState(false);
-	const [claudeCodeEnabled, setClaudeCodeEnabled] = useState(false);
-	const [claudeCodeModel, setClaudeCodeModel] = useState<string | undefined>(
-		undefined,
-	);
 	const watchedPreset = Form.useWatch("preset", form) as
 		| ModelProviderPreset
 		| undefined;
@@ -119,8 +114,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			setSelectedModelIds(
 				selectedProvider.models.filter((m) => m.enabled).map((m) => m.id),
 			);
-			setClaudeCodeEnabled(!!selectedProvider.claudeCodeEnabled);
-			setClaudeCodeModel(selectedProvider.claudeCodeModel);
 			form.setFieldsValue({
 				preset: selectedProvider.preset,
 				name: selectedProvider.name,
@@ -183,8 +176,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 		setTestResult(null);
 		setFetchedModels([]);
 		setSelectedModelIds([]);
-		setClaudeCodeEnabled(false);
-		setClaudeCodeModel(undefined);
 		form.resetFields();
 	}, [form]);
 
@@ -322,8 +313,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				models,
 				createdAt: selectedProvider?.createdAt ?? now,
 				updatedAt: now,
-				claudeCodeEnabled,
-				claudeCodeModel,
 			};
 
 			try {
@@ -346,8 +335,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			message,
 			t,
 			isAdding,
-			claudeCodeEnabled,
-			claudeCodeModel,
 		],
 	);
 
@@ -504,12 +491,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 											{getPresetName(provider.preset)}
 										</div>
 									</div>
-									{provider.claudeCodeEnabled && (
-										<RobotOutlined
-											className="text-[11px]"
-											style={{ color: token.colorPrimary }}
-										/>
-									)}
 									{provider.enabled && (
 										<Tag
 											color="green"
@@ -725,23 +706,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 										)}
 									</div>
 
-									{/* Claude Code / Agent Section */}
-									<ClaudeCodeSection
-										preset={watchedPreset}
-										claudeCodeEnabled={claudeCodeEnabled}
-										onClaudeCodeChange={setClaudeCodeEnabled}
-										claudeCodeModel={claudeCodeModel}
-										onClaudeCodeModelChange={setClaudeCodeModel}
-										models={
-											fetchedModels.length > 0
-												? fetchedModels
-												: (selectedProvider?.models ?? [])
-										}
-										testPassed={testResult?.success === true}
-										currentProviderId={selectedProvider?.id}
-										providers={providers}
-										token={token}
-									/>
 								</Form>
 							</div>
 
@@ -847,133 +811,3 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	);
 };
 
-/* ------------------------------------------------------------------ */
-/*  ClaudeCodeSection                                                   */
-/* ------------------------------------------------------------------ */
-function ClaudeCodeSection({
-	preset,
-	claudeCodeEnabled,
-	onClaudeCodeChange,
-	claudeCodeModel,
-	onClaudeCodeModelChange,
-	models,
-	testPassed,
-	currentProviderId,
-	providers,
-	token,
-}: {
-	preset: ModelProviderPreset | undefined;
-	claudeCodeEnabled: boolean;
-	onClaudeCodeChange: (v: boolean) => void;
-	claudeCodeModel: string | undefined;
-	onClaudeCodeModelChange: (model: string | undefined) => void;
-	models: ProviderModel[];
-	testPassed: boolean;
-	currentProviderId: string | undefined;
-	providers: ModelProvider[];
-	token: ReturnType<typeof useToken>["token"];
-}) {
-	const { t } = useTranslation();
-	const isCompatible = preset ? isClaudeCodeCompatible(preset) : false;
-
-	// Find if another provider already has claudeCodeEnabled
-	const existingCCProvider = useMemo(
-		() =>
-			providers.find((p) => p.claudeCodeEnabled && p.id !== currentProviderId),
-		[providers, currentProviderId],
-	);
-
-	return (
-		<>
-			<Divider className="my-4!" />
-			<div className="mb-3">
-				<Text strong className="text-sm flex items-center gap-1.5">
-					<RobotOutlined />
-					{t("claudeCode.title", { ns: "models" })}
-				</Text>
-			</div>
-
-			{isCompatible ? (
-				<div
-					className="py-2 px-3 rounded-lg"
-					style={{ backgroundColor: token.colorFillQuaternary }}
-				>
-					<div className="flex items-center justify-between">
-						<div>
-							<div className="text-[13px]" style={{ color: token.colorText }}>
-								{t("claudeCode.useForAgent", { ns: "models" })}
-							</div>
-							<div
-								className="text-[11px] mt-0.5"
-								style={{ color: token.colorTextQuaternary }}
-							>
-								{!testPassed
-									? t("claudeCode.testFirst", { ns: "models" })
-									: t("claudeCode.useForAgentHint", { ns: "models" })}
-							</div>
-						</div>
-						<Switch
-							checked={claudeCodeEnabled}
-							onChange={onClaudeCodeChange}
-							size="small"
-							disabled={!testPassed}
-						/>
-					</div>
-					{claudeCodeEnabled && (
-						<div className="mt-2">
-							<div
-								className="text-[11px] mb-1"
-								style={{ color: token.colorTextSecondary }}
-							>
-								{t("claudeCode.agentModel", { ns: "models" })}
-							</div>
-							<Select
-								size="small"
-								variant="borderless"
-								placeholder={t("claudeCode.modelPlaceholder", { ns: "models" })}
-								value={claudeCodeModel}
-								onChange={onClaudeCodeModelChange}
-								allowClear
-								showSearch
-								options={models
-									.filter((m) => m.enabled)
-									.map((m) => ({
-										label: m.name || m.id,
-										value: m.id,
-									}))}
-								className="w-full"
-							/>
-							<div
-								className="text-[11px] mt-0.5"
-								style={{ color: token.colorTextQuaternary }}
-							>
-								{t("claudeCode.modelHint", { ns: "models" })}
-							</div>
-						</div>
-					)}
-					{claudeCodeEnabled && existingCCProvider && (
-						<div
-							className="text-[11px] mt-1.5"
-							style={{ color: token.colorWarning }}
-						>
-							{t("claudeCode.willReplace", {
-								ns: "models",
-								name: existingCCProvider.name,
-							})}
-						</div>
-					)}
-				</div>
-			) : (
-				<div
-					className="text-center py-3 text-[11px] rounded-lg"
-					style={{
-						color: token.colorTextQuaternary,
-						backgroundColor: token.colorFillQuaternary,
-					}}
-				>
-					{t("claudeCode.incompatible", { ns: "models" })}
-				</div>
-			)}
-		</>
-	);
-}
