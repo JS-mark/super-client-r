@@ -1,7 +1,7 @@
-import { App as AntdApp, ConfigProvider, theme } from "antd";
+import { App as AntdApp, ConfigProvider, Spin, theme } from "antd";
 import en_US from "antd/locale/en_US";
 import zhCN from "antd/locale/zh_CN";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { RouterProvider } from "react-router-dom";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -83,7 +83,22 @@ function App() {
 	}, []);
 
 	// 同步 body 背景色到当前主题（确保 Error 等全屏页面背景正确）
+	// 浮窗路由 (#/float) 需要保持透明，否则 body 白底会盖在透明窗口上，
+	// 让胶囊圆角外、capsule 与 panel 间的间隙都泛白。
 	useEffect(() => {
+		// dev 用 loadURL 得到 hash `#/float`；prod 用 loadFile({ hash: "float" })
+		// 得到 hash `#float`。两者都视为浮窗。
+		const hash = window.location.hash;
+		const isFloatWindow = hash === "#/float" || hash === "#float";
+		if (isFloatWindow) {
+			document.documentElement.style.backgroundColor = "transparent";
+			document.body.style.backgroundColor = "transparent";
+			document.body.style.color =
+				actualTheme === "dark"
+					? "rgba(255, 255, 255, 0.88)"
+					: "rgba(0, 0, 0, 0.88)";
+			return;
+		}
 		document.body.style.backgroundColor =
 			actualTheme === "dark" ? "#141414" : "#ffffff";
 		document.body.style.color =
@@ -267,7 +282,21 @@ function App() {
 					<LegacyImportPrompt />
 					<GlobalRequestLogHost />
 					<ErrorBoundary>
-						<RouterProvider router={router} />
+						{/*
+						 * router 内部使用了 React.lazy（例如 /log-viewer、
+						 * /debug/agent-traces 弹出窗口）。一旦命中这些路由就会
+						 * suspend，没有 Suspense 边界 React 19 会直接抛错，
+						 * 让独立窗口在加载时白屏并被 errorElement 兜住。
+						 */}
+						<Suspense
+							fallback={
+								<div className="flex h-full w-full items-center justify-center">
+									<Spin />
+								</div>
+							}
+						>
+							<RouterProvider router={router} />
+						</Suspense>
 					</ErrorBoundary>
 				</AntdApp>
 			</TitleProvider>

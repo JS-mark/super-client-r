@@ -78,9 +78,93 @@ function applyUpdate(
 	return next;
 }
 
+/** Truncation suffix added by RequestLogService when the body exceeds caps. */
+const TRUNCATION_SUFFIX_RE = /…\[(?:preview capped|truncated) at [^\]]+\]\s*$/;
+
+/**
+ * Best-effort structural pretty-printer for JSON-ish text.
+ *
+ * Unlike `JSON.parse + stringify`, this works on truncated / partially streamed
+ * payloads (the common case in the request log — body cap is 32KB and large
+ * model-list responses or SSE tails routinely exceed it). It walks the string
+ * once, tracking string + escape boundaries so structural characters inside
+ * quoted text don't trigger indentation.
+ */
+function prettyPrintJsonish(input: string): string {
+	let result = "";
+	let indent = 0;
+	let inString = false;
+	let escaped = false;
+	const pad = (n: number) => "  ".repeat(Math.max(0, n));
+
+	for (let i = 0; i < input.length; i++) {
+		const ch = input[i];
+
+		if (inString) {
+			result += ch;
+			if (escaped) {
+				escaped = false;
+			} else if (ch === "\\") {
+				escaped = true;
+			} else if (ch === '"') {
+				inString = false;
+			}
+			continue;
+		}
+
+		if (ch === '"') {
+			inString = true;
+			result += ch;
+			continue;
+		}
+
+		if (ch === "{" || ch === "[") {
+			// Keep empty containers on one line: `{}` / `[]`.
+			const close = ch === "{" ? "}" : "]";
+			const rest = input.slice(i + 1);
+			const nextNonWs = rest.match(/^\s*(.)/);
+			if (nextNonWs && nextNonWs[1] === close) {
+				result += ch + close;
+				i += (nextNonWs[0]?.length ?? 1);
+				continue;
+			}
+			indent++;
+			result += `${ch}\n${pad(indent)}`;
+			continue;
+		}
+
+		if (ch === "}" || ch === "]") {
+			indent = Math.max(0, indent - 1);
+			result += `\n${pad(indent)}${ch}`;
+			continue;
+		}
+
+		if (ch === ",") {
+			result += `,\n${pad(indent)}`;
+			continue;
+		}
+
+		if (ch === ":") {
+			result += ": ";
+			continue;
+		}
+
+		// Collapse incidental whitespace between tokens — we lay out our own.
+		if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+			continue;
+		}
+
+		result += ch;
+	}
+
+	return result;
+}
+
 /**
  * Best-effort pretty-printer:
- *  - Whole-text JSON → 2-space indented.
+ *  - Whole-text JSON → 2-space indented via JSON.parse round-trip.
+ *  - Truncated JSON (body preview cap hit) → strip suffix, retry parse;
+ *    on failure fall back to structural printer so output is still multi-line.
  *  - SSE frames (`data: {...}`) → parse each frame separately and stitch back.
  *  - Anything else → return as-is.
  */
@@ -116,7 +200,20 @@ function formatBody(body: string | undefined, contentType?: string): string {
 		try {
 			return JSON.stringify(JSON.parse(trimmed), null, 2);
 		} catch {
-			return body;
+			// Detect & strip the service-side truncation marker so a near-complete
+			// payload can still round-trip through JSON.parse cleanly.
+			const truncationMatch = trimmed.match(TRUNCATION_SUFFIX_RE);
+			if (truncationMatch) {
+				const head = trimmed.slice(0, truncationMatch.index).trim();
+				try {
+					return `${JSON.stringify(JSON.parse(head), null, 2)}\n\n${truncationMatch[0]}`;
+				} catch {
+					// fall through to structural formatter
+				}
+			}
+			// Last resort: lay out structural characters manually. This preserves
+			// the truncation suffix (it's just trailing text) inline.
+			return prettyPrintJsonish(body);
 		}
 	}
 	return body;
