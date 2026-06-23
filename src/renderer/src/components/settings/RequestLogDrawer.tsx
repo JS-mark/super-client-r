@@ -508,8 +508,7 @@ export function RequestLogDrawer({ open, onClose }: RequestLogDrawerProps) {
 	return (
 		<Drawer
 			title={t("network.logDrawerTitle")}
-			size="large"
-			width={920}
+      size={920}
 			open={open}
 			onClose={onClose}
 			styles={{

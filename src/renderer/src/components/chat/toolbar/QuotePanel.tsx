@@ -1,5 +1,6 @@
 import { MessageOutlined } from "@ant-design/icons";
-import { Empty, List, Tag, theme } from "antd";
+import { Empty, Tag, theme } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatMessageStore } from "../../../stores/chatMessageStore";

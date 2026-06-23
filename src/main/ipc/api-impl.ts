@@ -30,8 +30,9 @@ import {
 } from "fs";
 import { promises as fsPromises } from "fs";
 import os from "os";
-import { basename, extname, join } from "path";
+import { basename, dirname, extname, join, relative, sep } from "path";
 import * as path from "path";
+import { glob } from "tinyglobby";
 
 import { registerAPI } from "./register";
 import { broadcastEvent } from "./events";
@@ -1593,6 +1594,125 @@ module.exports = {
 		resolveSessionCwd: (sessionId: string) => resolveConversationCwd(sessionId),
 		resolveProjectRoot: (sessionId: string) =>
 			resolveConversationProjectRoot(sessionId),
+	},
+
+	// ─── workspace file enumeration ─────────────────
+	// 给 composer 的 "@" 文件提及面板用。一次性枚举项目根 + 会话沙箱下的文件，
+	// 渲染端做内存过滤；这里只负责"列出有什么"，不做 fuzzy。
+	workspace: {
+		listFiles: async (req: {
+			sessionId: string;
+			limit?: number;
+		}): Promise<{
+			files: Array<{
+				absolutePath: string;
+				relativePath: string;
+				root: "project" | "session";
+				name: string;
+				dir: string;
+				ext: string;
+				size: number;
+				mtimeMs: number;
+			}>;
+			roots: { projectRoot?: string; sessionCwd?: string };
+		}> => {
+			const limit = Math.max(1, Math.min(req.limit ?? 5000, 20000));
+
+			const projectRoot =
+				resolveConversationProjectRoot(req.sessionId) || undefined;
+			const sessionCwd = resolveConversationCwd(req.sessionId) || undefined;
+
+			// 同名文件 dedupe：project 优先于 session（用户更关心源代码）
+			const seen = new Set<string>();
+			const out: Array<{
+				absolutePath: string;
+				relativePath: string;
+				root: "project" | "session";
+				name: string;
+				dir: string;
+				ext: string;
+				size: number;
+				mtimeMs: number;
+			}> = [];
+
+			const ignore = [
+				"**/node_modules/**",
+				"**/.git/**",
+				"**/.svn/**",
+				"**/.hg/**",
+				"**/dist/**",
+				"**/build/**",
+				"**/out/**",
+				"**/.next/**",
+				"**/.turbo/**",
+				"**/.cache/**",
+				"**/.parcel-cache/**",
+				"**/coverage/**",
+				"**/.nyc_output/**",
+				"**/*.lock",
+				"**/*.map",
+				"**/.DS_Store",
+			];
+
+			async function enumerate(
+				cwd: string | undefined,
+				rootKind: "project" | "session",
+			): Promise<void> {
+				if (!cwd) return;
+				if (!existsSync(cwd)) return;
+				try {
+					const absPaths = await glob(["**/*"], {
+						cwd,
+						onlyFiles: true,
+						dot: false,
+						absolute: true,
+						expandDirectories: false,
+						ignore,
+					});
+					for (const abs of absPaths) {
+						if (out.length >= limit) return;
+						if (seen.has(abs)) continue;
+						seen.add(abs);
+						let size = 0;
+						let mtimeMs = 0;
+						try {
+							const stats = statSync(abs);
+							size = stats.size;
+							mtimeMs = stats.mtimeMs;
+						} catch {
+							/* unreadable — skip */
+							continue;
+						}
+						const rel = relative(cwd, abs).split(sep).join("/");
+						out.push({
+							absolutePath: abs,
+							relativePath: rel,
+							root: rootKind,
+							name: basename(abs),
+							dir: dirname(rel) === "." ? "" : dirname(rel),
+							ext: extname(abs).toLowerCase(),
+							size,
+							mtimeMs,
+						});
+					}
+				} catch {
+					// per-root soft-fail — keep going with whatever we got
+				}
+			}
+
+			await enumerate(projectRoot, "project");
+			if (out.length < limit) {
+				await enumerate(sessionCwd, "session");
+			}
+
+			// mtime 倒序，新文件优先（query 为空时直接展示最近修改的）
+			out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+			return {
+				files: out,
+				roots: { projectRoot, sessionCwd },
+			};
+		},
 	},
 
 	// ─── G-3 老数据导入 ───────────────────────

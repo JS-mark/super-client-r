@@ -20,156 +20,156 @@ const { useToken } = theme;
 
 // Page transition config
 const pageTransition = {
-	duration: 0.2,
-	ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
+  duration: 0.2,
+  ease: [0.4, 0, 0.2, 1] as [number, number, number, number],
 };
 
 // --- Main Layout ---
 
 export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
-	children,
+  children,
 }) => {
-	const location = useLocation();
-	const { token } = useToken();
+  const location = useLocation();
+  const { token } = useToken();
 
-	useAppShortcuts();
+  useAppShortcuts();
 
-	const setPluginItems = useMenuStore((state) => state.setPluginItems);
-	const loadProviders = useModelStore((s) => s.loadProviders);
-	const loadActiveModel = useModelStore((s) => s.loadActiveModel);
+  const setPluginItems = useMenuStore((state) => state.setPluginItems);
+  const loadProviders = useModelStore((s) => s.loadProviders);
+  const loadActiveModel = useModelStore((s) => s.loadActiveModel);
 
-	// Effective interactionProfile drives which sidebar to render shell-wide.
-	const interactionProfile = useEffectiveInteractionProfile();
+  // Effective interactionProfile drives which sidebar to render shell-wide.
+  const interactionProfile = useEffectiveInteractionProfile();
 
-	const [aboutModalOpen, setAboutModalOpen] = useState(false);
-	const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [aboutModalOpen, setAboutModalOpen] = useState(false);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
 
-	// Initialize model store on app mount so all pages can access providers
-	useEffect(() => {
-		loadProviders();
-		loadActiveModel();
-	}, [loadProviders, loadActiveModel]);
+  // Initialize model store on app mount so all pages can access providers
+  useEffect(() => {
+    loadProviders();
+    loadActiveModel();
+  }, [loadProviders, loadActiveModel]);
 
-	useEffect(() => {
-		appService.getInfo().then((info) => {
-			setAppInfo(info);
-		});
-	}, []);
+  useEffect(() => {
+    appService.getInfo().then((info) => {
+      setAppInfo(info);
+    });
+  }, []);
 
-	useEffect(() => {
-		const handleShowAboutModal = () => {
-			setAboutModalOpen(true);
-		};
-		window.electron.ipc.on("show-about-modal", handleShowAboutModal);
-		return () => {
-			window.electron.ipc.off("show-about-modal", handleShowAboutModal);
-		};
-	}, []);
+  useEffect(() => {
+    const handleShowAboutModal = () => {
+      setAboutModalOpen(true);
+    };
+    window.electron.ipc.on("show-about-modal", handleShowAboutModal);
+    return () => {
+      window.electron.ipc.off("show-about-modal", handleShowAboutModal);
+    };
+  }, []);
 
-	// Sync plugin sidebar contributions
-	useEffect(() => {
-		const syncContributions = (contributions: unknown) => {
-			const data = contributions as {
-				sidebars?: Array<{
-					pluginId: string;
-					id: string;
-					label: string;
-					icon: string;
-					iconType: "default" | "emoji";
-					path: string;
-					order?: number;
-				}>;
-			};
-			if (data?.sidebars) {
-				setPluginItems(
-					data.sidebars.map((s) => ({
-						id: `plugin:${s.pluginId}/${s.id}`,
-						label: s.label,
-						path: s.path,
-						iconType: s.iconType,
-						iconContent: s.icon,
-						enabled: true,
-						action: "navigate" as const,
-					})),
-				);
-			}
-		};
+  // Sync plugin sidebar contributions
+  useEffect(() => {
+    const syncContributions = (contributions: unknown) => {
+      const data = contributions as {
+        sidebars?: Array<{
+          pluginId: string;
+          id: string;
+          label: string;
+          icon: string;
+          iconType: "default" | "emoji";
+          path: string;
+          order?: number;
+        }>;
+      };
+      if (data?.sidebars) {
+        setPluginItems(
+          data.sidebars.map((s) => ({
+            id: `plugin:${s.pluginId}/${s.id}`,
+            label: s.label,
+            path: s.path,
+            iconType: s.iconType,
+            iconContent: s.icon,
+            enabled: true,
+            action: "navigate" as const,
+          })),
+        );
+      }
+    };
 
-		// Load initial contributions
-		window.electron.plugin
-			.getUIContributions()
-			.then((result) => {
-				if (result.success && result.data) {
-					syncContributions(result.data);
-				}
-			})
-			.catch(() => {});
+    // Load initial contributions
+    window.electron.plugin
+      .getUIContributions()
+      .then((result) => {
+        if (result.success && result.data) {
+          syncContributions(result.data);
+        }
+      })
+      .catch(() => { });
 
-		// Listen for changes
-		const unsubscribe =
-			window.electron.plugin.onUIContributionsChanged(syncContributions);
-		return unsubscribe;
-	}, [setPluginItems]);
+    // Listen for changes
+    const unsubscribe =
+      window.electron.plugin.onUIContributionsChanged(syncContributions);
+    return unsubscribe;
+  }, [setPluginItems]);
 
-	// §22 rollback flag: 关闭 profileLayouts 时强制走 AppSidebar，忽略 profile。
-	const profileLayouts = useFeatureFlagsStore((s) => s.profileLayouts);
-	const useClaudeSidebar =
-		profileLayouts &&
-		(interactionProfile === "claude-code" || interactionProfile === "hybrid");
+  // §22 rollback flag: 关闭 profileLayouts 时强制走 AppSidebar，忽略 profile。
+  const profileLayouts = useFeatureFlagsStore((s) => s.profileLayouts);
+  const useClaudeSidebar =
+    profileLayouts &&
+    (interactionProfile === "claude-code" || interactionProfile === "hybrid");
 
-	return (
-		<div
-			className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10"
-			data-interaction-profile={interactionProfile}
-		>
-			{/* Sidebar — profile-driven routing */}
-			{useClaudeSidebar ? (
-				<ClaudeSidebar onOpenAbout={() => setAboutModalOpen(true)} />
-			) : (
-				<AppSidebar onOpenAbout={() => setAboutModalOpen(true)} />
-			)}
+  return (
+    <div
+      className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10"
+      data-interaction-profile={interactionProfile}
+    >
+      {/* Sidebar — profile-driven routing */}
+      {useClaudeSidebar ? (
+        <ClaudeSidebar onOpenAbout={() => setAboutModalOpen(true)} />
+      ) : (
+        <AppSidebar onOpenAbout={() => setAboutModalOpen(true)} />
+      )}
 
-			{/* Right column */}
-			<div className="flex-1 h-full flex flex-col overflow-hidden">
-				{/* Title bar */}
-				<TitleBar />
+      {/* Right column */}
+      <div className="flex-1 h-full flex flex-col overflow-hidden">
+        {/* Title bar */}
+        <TitleBar />
 
-				{/* Scrollable content area */}
-				<div
-					className="flex-1 overflow-y-auto"
-					style={{ background: token.colorBgContainer }}
-				>
-					<AnimatePresence mode="wait">
-						<motion.div
-							key={location.pathname}
-							initial={{ opacity: 0, y: 8 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0, y: -4 }}
-							transition={pageTransition}
-							className="h-full"
-						>
-							{children}
-						</motion.div>
-					</AnimatePresence>
-				</div>
+        {/* Scrollable content area */}
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ background: token.colorBgContainer }}
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={pageTransition}
+              className="h-full"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
 
-				{/* Bottom-docked terminal panel; renders nothing when closed.
+        {/* Bottom-docked terminal panel; renders nothing when closed.
 				    Sits in the right column flex flow so the content area
 				    above naturally shrinks to make room. */}
-				<TerminalPanel />
-			</div>
+        <TerminalPanel />
+      </div>
 
-			{/* About modal */}
-			<AboutModal
-				open={aboutModalOpen}
-				onClose={() => setAboutModalOpen(false)}
-				appInfo={appInfo}
-			/>
+      {/* About modal */}
+      <AboutModal
+        open={aboutModalOpen}
+        onClose={() => setAboutModalOpen(false)}
+        appInfo={appInfo}
+      />
 
-			{/* §25.3 advanced "新建对话…" modal — listens for the
+      {/* §25.3 advanced "新建对话…" modal — listens for the
 			    `chat:open-new-conversation` window event dispatched by
 			    TitleBar More menu. */}
-			<NewConversationModal />
-		</div>
-	);
+      <NewConversationModal />
+    </div>
+  );
 };

@@ -113,6 +113,29 @@ describe("computeContextUsage", () => {
 		expect(usage.cacheHitRate).toBeNull();
 	});
 
+	it("Agent SDK with explicit-zero cache fields: hit rate is 0, not null", () => {
+		// Claude 在 prefix 未触及缓存门槛时会返回 cache_read=0、cache_creation=0，
+		// 但字段仍然存在。此时应展示 0.0% 而不是 "—"。
+		const messages: Message[] = [
+			mkUser("u1", "hi"),
+			mkAssistant({
+				id: "a1",
+				inputTokens: 500,
+				cacheReadTokens: 0,
+				cacheCreationTokens: 0,
+			}),
+		];
+		const usage = computeContextUsage({
+			messages,
+			systemPromptText: "",
+			systemToolsText: "",
+			skillText: "",
+			contextWindow: 200_000,
+			estimateFn: estimateByLength,
+		});
+		expect(usage.cacheHitRate).toBe(0);
+	});
+
 	it("Agent SDK single turn: cacheHitRate computed from one assistant", () => {
 		const messages: Message[] = [
 			mkUser("u1", "hi"),

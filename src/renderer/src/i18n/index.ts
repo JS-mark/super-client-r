@@ -109,6 +109,9 @@ i18n
 	.init({
 		resources,
 		fallbackLng: "zh",
+		supportedLngs: ["zh", "en"],
+		load: "languageOnly",
+		nonExplicitSupportedLngs: true,
 		debug: import.meta.env.DEV,
 		interpolation: {
 			escapeValue: false,

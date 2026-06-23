@@ -235,10 +235,7 @@ function App() {
 				headerBg: actualTheme === "dark" ? "#262626" : "#fafafa",
 				borderColor: actualTheme === "dark" ? "#424242" : "#f0f0f0",
 			},
-			List: {
-				colorSplit: actualTheme === "dark" ? "#424242" : "#f0f0f0",
-			},
-			Divider: {
+				Divider: {
 				colorSplit: actualTheme === "dark" ? "#424242" : "#f0f0f0",
 			},
 			Tooltip: {

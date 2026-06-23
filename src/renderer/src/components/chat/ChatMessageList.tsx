@@ -244,7 +244,7 @@ export function ChatMessageList({
 			document.body.removeChild(a);
 			URL.revokeObjectURL(url);
 			messageApi.success(
-				t("chat.messageExported", "消息已导出", { ns: "chat" }),
+				t("messageExported", "消息已导出", { ns: "chat" }),
 			);
 		},
 		[messageApi, t],
@@ -256,7 +256,7 @@ export function ChatMessageList({
 			if (bm) {
 				removeBookmark(bm.id);
 				messageApi.success(
-					t("chat.bookmarkRemoved", "已取消收藏", { ns: "chat" }),
+					t("bookmarkRemoved", "已取消收藏", { ns: "chat" }),
 				);
 			} else if (msg.role === "user" || msg.role === "assistant") {
 				addBookmark({
@@ -267,7 +267,7 @@ export function ChatMessageList({
 					timestamp: msg.timestamp,
 				});
 				messageApi.success(
-					t("chat.bookmarkAdded", "已收藏消息", { ns: "chat" }),
+					t("bookmarkAdded", "已收藏消息", { ns: "chat" }),
 				);
 			}
 		},
@@ -391,7 +391,7 @@ export function ChatMessageList({
 									color: token.colorText,
 								}}
 							>
-								{t("chat.user", "用户", { ns: "chat" })}
+								{t("user", "用户", { ns: "chat" })}
 							</span>
 							<Avatar
 								icon={<UserOutlined />}
@@ -495,7 +495,7 @@ export function ChatMessageList({
 							conversationId={conversationId}
 							onDelete={() => {
 								messageApi.info(
-									t("chat.messageDeleteNotImplemented", "消息删除功能待实现", {
+									t("messageDeleteNotImplemented", "消息删除功能待实现", {
 										ns: "chat",
 									}),
 								);
@@ -678,7 +678,7 @@ export function ChatMessageList({
 						conversationId={conversationId}
 						onDelete={() => {
 							messageApi.info(
-								t("chat.messageDeleteNotImplemented", "消息删除功能待实现", {
+								t("messageDeleteNotImplemented", "消息删除功能待实现", {
 									ns: "chat",
 								}),
 							);
@@ -711,18 +711,18 @@ export function ChatMessageList({
 				const tooltipLines: string[] = [];
 				if (footerMeta?.firstTokenMs != null) {
 					tooltipLines.push(
-						`${t("chat.metrics.firstToken", "首字时延", { ns: "chat" })} ${footerMeta.firstTokenMs} ms`,
+						`${t("metrics.firstToken", "首字时延", { ns: "chat" })} ${footerMeta.firstTokenMs} ms`,
 					);
 				}
 				if (footerMeta?.tokensPerSecond != null) {
 					tooltipLines.push(
-						`${t("chat.metrics.speed", "每秒", { ns: "chat" })} ${footerMeta.tokensPerSecond} tokens`,
+						`${t("metrics.speed", "每秒", { ns: "chat" })} ${footerMeta.tokensPerSecond} tokens`,
 					);
 				}
 				if (footerMeta?.duration != null) {
 					const seconds = (footerMeta.duration / 1000).toFixed(1);
 					tooltipLines.push(
-						`${t("chat.metrics.duration", "回答耗时", { ns: "chat" })} ${seconds} s`,
+						`${t("metrics.duration", "回答耗时", { ns: "chat" })} ${seconds} s`,
 					);
 				}
 				if (footerMeta?.tokens != null) {
@@ -781,7 +781,7 @@ export function ChatMessageList({
 							<StarOutlined />
 						),
 						label: isBookmarked(representativeMsg.id)
-							? t("chat.removeBookmark", "取消收藏", { ns: "chat" })
+							? t("removeBookmark", "取消收藏", { ns: "chat" })
 							: t("actions.bookmark", "收藏", { ns: "chat" }),
 						onClick: () => handleToggleBookmark(representativeMsg),
 					},

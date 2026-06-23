@@ -12,7 +12,8 @@
  *    —— 简化实现：当前版本只提供"导入"和"暂时不导"两个按钮
  */
 
-import { Alert, Button, List, Modal, Typography, message } from "antd";
+import { Alert, Button, Modal, Typography, message } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useEffect, useState } from "react";
 import { useChatStore } from "../../stores/chatStore";
 

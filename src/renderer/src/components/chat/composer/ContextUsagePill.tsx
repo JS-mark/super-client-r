@@ -248,8 +248,8 @@ export function ContextUsagePill() {
 			trigger="click"
 			open={open}
 			onOpenChange={setOpen}
-			placement="topRight"
-			overlayInnerStyle={{ padding: 12 }}
+			placement="top"
+      styles={{ container: { padding: 12 } }}
 		>
 			<Tooltip
 				title={

@@ -1,5 +1,6 @@
 import { ToolOutlined } from "@ant-design/icons";
-import { Empty, List, Spin, Tag, theme } from "antd";
+import { Empty, Spin, Tag, theme } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { mcpClient } from "../../../services/mcp/mcpService";

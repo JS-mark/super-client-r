@@ -5,7 +5,8 @@
  * 「恢复」会把 archived 翻回 false，sidebar 立即看到。
  */
 
-import { Button, Empty, List, Tag, Typography, message } from "antd";
+import { Button, Empty, Tag, Typography, message } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useMemo } from "react";
 import { useProjectStore } from "../../stores/projectStore";
 

@@ -63,7 +63,12 @@ const CodeBlock: FC<ComponentProps> = ({
 	return <code {...props}>{children}</code>;
 };
 
-const BlockquoteBlock: FC<ComponentProps> = ({ children, ...props }) => {
+const BlockquoteBlock: FC<ComponentProps> = ({
+	children,
+	streamStatus: _streamStatus,
+	domNode: _domNode,
+	...props
+}) => {
 	const quoteRef = useRef<HTMLQuoteElement>(null);
 
 	const getText = useCallback(() => quoteRef.current?.textContent ?? "", []);
@@ -80,7 +85,12 @@ const BlockquoteBlock: FC<ComponentProps> = ({ children, ...props }) => {
 	);
 };
 
-const TableBlock: FC<ComponentProps> = ({ children, ...props }) => {
+const TableBlock: FC<ComponentProps> = ({
+	children,
+	streamStatus: _streamStatus,
+	domNode: _domNode,
+	...props
+}) => {
 	const tableRef = useRef<HTMLTableElement>(null);
 
 	const getText = useCallback(() => {

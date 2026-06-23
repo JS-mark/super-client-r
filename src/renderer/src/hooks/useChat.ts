@@ -1455,8 +1455,10 @@ export function useChat() {
           ? sessionSettings.systemPrompt
           : model.systemPrompt;
         // Build system prompt
-        debugger
-        const systemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo);
+        const systemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo, {
+          name: model.name,
+          id: model.id,
+        });
         history.unshift({
           role: "system",
           content: systemPrompt,
@@ -1755,9 +1757,11 @@ export function useChat() {
           ? sessionSettings.systemPrompt
           : effective?.model.systemPrompt;
 
-        debugger
         // 构建系统提示词，注入环境信息（如工作目录、已连接的 MCP 服务器等）
-        const customSystemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo);
+        const customSystemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo, {
+          name: effective?.model.name,
+          id: effective?.model.id,
+        });
 
         // Build agents map from selected team (Multi-Agent)
         let agents:
@@ -1939,9 +1943,11 @@ export function useChat() {
         const baseSkillPrompt = sessionSettings.systemPrompt
           ? sessionSettings.systemPrompt
           : model.systemPrompt;
-        debugger
         // 构建系统提示词，注入环境信息（如工作目录、已连接的 MCP 服务器等）
-        const basePrompt = buildSystemPrompt(baseSkillPrompt, envInfo);
+        const basePrompt = buildSystemPrompt(baseSkillPrompt, envInfo, {
+          name: model.name,
+          id: model.id,
+        });
         const systemPrompt = skillSystemPrompt
           ? `${basePrompt}\n\n--- Skill Context ---\n${skillSystemPrompt}`
           : basePrompt;
@@ -2173,6 +2179,31 @@ export function useChat() {
       };
       addMessage(assistantMessage);
 
+      // Slash command / skill overlay: if a skill (and optional command) is
+      // selected — either via the slash panel state or explicitly in options —
+      // route through sendSkillMessage so the skill / command systemPrompt is
+      // injected. Otherwise fall through to the default agent path.
+      //
+      // 历史回归：0cb21a9 重构把 ChatMode 收敛为 "agent" 时，把 sendSkillMessage
+      // 这一支顺手删了，但 slash 面板这一侧仍在更新 selectedSkillId /
+      // selectedCommandName。结果就是"选了 /xxx 但发出去等于什么都没发"。
+      const effectiveSkillId =
+        options?.skillId || selectedSkillId || undefined;
+      const effectiveCommandName =
+        options?.commandName || selectedCommandName || undefined;
+
+      if (effectiveSkillId) {
+        await sendSkillMessage(
+          content,
+          effectiveSkillId,
+          effectiveCommandName,
+        );
+        // One-shot semantics: clear after dispatch so the next message goes
+        // back to the default agent path unless the user picks again.
+        setSelectedCommandName(null);
+        return;
+      }
+
       await sendAgentMessage(
         content,
         options?.agentId || selectedAgentId || undefined,
@@ -2183,7 +2214,17 @@ export function useChat() {
         },
       );
     },
-    [input, selectedAgentId, addMessage, deleteMessagesFrom, sendAgentMessage],
+    [
+      input,
+      selectedAgentId,
+      selectedSkillId,
+      selectedCommandName,
+      addMessage,
+      deleteMessagesFrom,
+      sendAgentMessage,
+      sendSkillMessage,
+      setSelectedCommandName,
+    ],
   );
 
   const stopCurrentStream = useCallback(() => {

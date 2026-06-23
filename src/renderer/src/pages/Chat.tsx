@@ -19,6 +19,7 @@ import { useChatPageState } from "../hooks/useChatPageState";
 import { useEffectiveInteractionProfile } from "../hooks/useEffectiveInteractionProfile";
 import { useRemoteChat } from "../hooks/useRemoteChat";
 import { useSlashCommands } from "../hooks/useSlashCommands";
+import { useAtMentions } from "../hooks/useAtMentions";
 
 import { useModelStore } from "../stores/modelStore";
 import { useChatStore } from "../stores/chatStore";
@@ -164,6 +165,14 @@ const Chat: React.FC = () => {
 		setSelectedSkillId,
 		setSelectedCommandName,
 		setInput,
+	});
+
+	// "@" file-mention panel. Selection is handled inside the host composer
+	// (ChatInputArea / ClaudeEmptyChatHome) where the textarea caret is
+	// reachable, so the hook just exposes panel state + keydown plumbing.
+	const mention = useAtMentions({
+		sessionId: pageState.currentConversationId,
+		isSlashOpen: slash.slashPanelOpen,
 	});
 
 	// ── Send handler (AI chat) ──
@@ -365,6 +374,27 @@ const Chat: React.FC = () => {
 													void handleSend(text, attachmentIds);
 												}}
 												isStreaming={isStreaming}
+												slashPanelOpen={slash.slashPanelOpen}
+												slashFilteredItems={slash.slashFilteredItems}
+												slashHighlight={slash.slashHighlight}
+												onSlashHighlightChange={slash.setSlashHighlight}
+												onSlashSelect={slash.handleSlashSelect}
+												onSlashPanelClose={() => {
+													slash.setSlashPanelOpen(false);
+													slash.setSlashQuery("");
+												}}
+												onSlashInputChange={slash.handleSlashInputChange}
+												registerKeydownHandler={slash.registerKeydownHandler}
+												mentionPanelOpen={mention.mentionPanelOpen}
+												mentionFilteredItems={mention.mentionFilteredItems}
+												mentionHighlight={mention.mentionHighlight}
+												onMentionHighlightChange={mention.setMentionHighlight}
+												onMentionPanelClose={mention.closeMentionPanel}
+												onMentionInputChange={mention.handleMentionInputChange}
+												registerMentionKeydownHandler={
+													mention.registerKeydownHandler
+												}
+												setMentionSelectHandler={mention.setSelectHandler}
 											/>
 										) : (
 											<ChatWelcomeScreen
@@ -420,6 +450,16 @@ const Chat: React.FC = () => {
 											}}
 											onSlashInputChange={slash.handleSlashInputChange}
 											registerKeydownHandler={slash.registerKeydownHandler}
+											mentionPanelOpen={mention.mentionPanelOpen}
+											mentionFilteredItems={mention.mentionFilteredItems}
+											mentionHighlight={mention.mentionHighlight}
+											onMentionHighlightChange={mention.setMentionHighlight}
+											onMentionPanelClose={mention.closeMentionPanel}
+											onMentionInputChange={mention.handleMentionInputChange}
+											registerMentionKeydownHandler={
+												mention.registerKeydownHandler
+											}
+											setMentionSelectHandler={mention.setSelectHandler}
 											respondToApproval={respondToApproval}
 										/>
 									)}

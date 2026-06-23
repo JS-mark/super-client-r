@@ -353,7 +353,7 @@ export function SearchSettings() {
 											})}
 											onConfirm={() => handleDeleteConfig(config.id)}
 											okText={t("confirm", "确定", { ns: "common" })}
-											cancelText={t("common.cancel", "取消")}
+											cancelText={t("cancel", "取消", { ns: "common" })}
 										>
 											<Tooltip title={t("delete", { ns: "settings" })}>
 												<Button

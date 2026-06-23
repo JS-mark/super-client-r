@@ -180,7 +180,7 @@ export function ChatModelPicker({
 
 	return (
 		<Modal
-			title={t("chat.modelPicker.title", "选择模型")}
+			title={t("modelPicker.title", "选择模型", { ns: "chat" })}
 			open={open}
 			onCancel={onClose}
 			footer={null}
@@ -194,8 +194,9 @@ export function ChatModelPicker({
 				<Input
 					prefix={<SearchOutlined className="text-gray-400" />}
 					placeholder={t(
-						"chat.modelPicker.searchPlaceholder",
+						"modelPicker.searchPlaceholder",
 						"搜索模型 ID 或名称…",
+						{ ns: "chat" },
 					)}
 					value={searchText}
 					onChange={(e) => setSearchText(e.target.value)}
@@ -220,7 +221,7 @@ export function ChatModelPicker({
 							borderRadius: token.borderRadius,
 						}}
 					>
-						{t("chat.modelPicker.clear", "清除选择")}
+						{t("modelPicker.clear", "清除选择", { ns: "chat" })}
 					</button>
 				)}
 			</div>
@@ -247,8 +248,9 @@ export function ChatModelPicker({
 					<Empty
 						image={Empty.PRESENTED_IMAGE_SIMPLE}
 						description={t(
-							"chat.modelPicker.empty",
+							"modelPicker.empty",
 							"没有匹配的模型；请在 设置 → 模型 中启用所需模型。",
+							{ ns: "chat" },
 						)}
 					/>
 				) : (

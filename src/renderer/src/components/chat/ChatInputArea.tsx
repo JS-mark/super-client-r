@@ -6,7 +6,7 @@ import {
 } from "@ant-design/icons";
 import { App, Button, Flex, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
 	type Attachment,
@@ -40,6 +40,9 @@ import {
 import { SearchEnginePanel } from "./SearchEnginePanel";
 import type { SlashItem } from "./SlashCommandPanel";
 import { SlashCommandPanel } from "./SlashCommandPanel";
+import { MentionPanel } from "./MentionPanel";
+import { applyMentionToValue } from "../../hooks/useAtMentions";
+import type { WorkspaceFileEntry } from "../../services/workspaceService";
 import { PromptTemplatePanel } from "./toolbar/PromptTemplatePanel";
 import type { PromptTemplate } from "./toolbar/PromptTemplatePanel";
 import { QuotePanel } from "./toolbar/QuotePanel";
@@ -72,6 +75,26 @@ interface ChatInputAreaProps {
 	onSlashPanelClose: () => void;
 	onSlashInputChange: (val: string) => void;
 	registerKeydownHandler: (el: HTMLElement | null) => () => void;
+	// "@" file-mention panel (from useAtMentions) — all optional so the
+	// remote-IM ChatInputArea (which has no mention support) doesn't need to
+	// pass them.
+	mentionPanelOpen?: boolean;
+	mentionFilteredItems?: WorkspaceFileEntry[];
+	mentionHighlight?: number;
+	onMentionHighlightChange?: (index: number) => void;
+	onMentionSelect?: (item: WorkspaceFileEntry) => void;
+	onMentionPanelClose?: () => void;
+	onMentionInputChange?: (val: string, caret: number) => void;
+	registerMentionKeydownHandler?: (el: HTMLElement | null) => () => void;
+	/**
+	 * Register the splice callback the hook's capture-phase Enter handler
+	 * should invoke. Supplied by `useAtMentions.setSelectHandler`. We forward
+	 * our local `handleMentionItemSelect` (which knows the live `input` value
+	 * and textarea caret) so Enter behaves identically to a mouse click.
+	 */
+	setMentionSelectHandler?: (
+		fn: ((item: WorkspaceFileEntry) => void) | null,
+	) => void;
 	hideToolbar?: boolean;
 	placeholder?: string;
 	respondToApproval?: (
@@ -103,6 +126,15 @@ export function ChatInputArea({
 	onSlashPanelClose,
 	onSlashInputChange,
 	registerKeydownHandler,
+	mentionPanelOpen = false,
+	mentionFilteredItems,
+	mentionHighlight = 0,
+	onMentionHighlightChange,
+	onMentionSelect,
+	onMentionPanelClose,
+	onMentionInputChange,
+	registerMentionKeydownHandler,
+	setMentionSelectHandler,
 	hideToolbar,
 	placeholder: placeholderProp,
 	respondToApproval,
@@ -116,6 +148,9 @@ export function ChatInputArea({
 	const [quotePanelOpen, setQuotePanelOpen] = useState(false);
 	const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	// Captured from registerKeydownHandler so we can read the textarea caret
+	// during onChange and reposition it after a mention splice.
+	const composerWrapperRef = useRef<HTMLElement | null>(null);
 	const chatMessages = useChatMessageStore((s) => s.messages);
 	const pendingToolMessage = useMemo(() => {
 		for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
@@ -209,20 +244,83 @@ export function ChatInputArea({
 		(val: string) => {
 			onInputChange(val);
 			onSlashInputChange(val);
+			if (onMentionInputChange) {
+				const ta = composerWrapperRef.current?.querySelector(
+					"textarea",
+				) as HTMLTextAreaElement | null;
+				const caret = ta?.selectionStart ?? val.length;
+				onMentionInputChange(val, caret);
+			}
 		},
-		[onInputChange, onSlashInputChange],
+		[onInputChange, onSlashInputChange, onMentionInputChange],
 	);
+
+	const handleMentionItemSelect = useCallback(
+		(item: WorkspaceFileEntry) => {
+			const ta = composerWrapperRef.current?.querySelector(
+				"textarea",
+			) as HTMLTextAreaElement | null;
+			const caret = ta?.selectionStart ?? input.length;
+			const next = applyMentionToValue(input, caret, item.relativePath);
+			onInputChange(next.value);
+			// Restore caret position after React commits the new value.
+			requestAnimationFrame(() => {
+				const ta2 = composerWrapperRef.current?.querySelector(
+					"textarea",
+				) as HTMLTextAreaElement | null;
+				if (ta2) {
+					ta2.setSelectionRange(next.caret, next.caret);
+					ta2.focus();
+				}
+			});
+			onMentionSelect?.(item);
+		},
+		[input, onInputChange, onMentionSelect],
+	);
+
+	// Wire the same splice handler into the hook's capture-phase Enter path.
+	// The hook stores it through a ref so this fires once per render (cheap)
+	// — it just keeps `onSelectRef.current` pointing at the freshest closure
+	// of `handleMentionItemSelect` (which closes over the live `input`).
+	useEffect(() => {
+		if (!setMentionSelectHandler) return;
+		setMentionSelectHandler(handleMentionItemSelect);
+		return () => {
+			setMentionSelectHandler(null);
+		};
+	}, [setMentionSelectHandler, handleMentionItemSelect]);
 
 	const handleSend = useCallback(
 		(value: string) => {
+			// Slash / mention panels swallow Enter at the capture phase; this is
+			// a defensive guard for synthetic-submit paths (e.g. click on send
+			// button) so a literal `/cmd` or `@token` query doesn't get fired.
+			if (slashPanelOpen || mentionPanelOpen) return;
 			if ((value.trim() || attachedFiles.length > 0) && !isStreaming) {
 				const attachmentIds = attachedFiles.map((f) => f.id);
 				onSend(value, attachmentIds);
 				setAttachedFiles([]);
 			}
 		},
-		[attachedFiles, isStreaming, onSend],
+		[attachedFiles, isStreaming, onSend, slashPanelOpen, mentionPanelOpen],
 	);
+
+	// Compose slash + mention capture-phase listeners into one registration so
+	// ChatComposer's single `registerKeydownHandler` slot can host both.
+	const composedRegisterKeydown = useCallback(
+		(el: HTMLElement | null) => {
+			composerWrapperRef.current = el;
+			const off1 = registerKeydownHandler(el);
+			const off2 = registerMentionKeydownHandler?.(el);
+			return () => {
+				off1?.();
+				off2?.();
+				composerWrapperRef.current = null;
+			};
+		},
+		[registerKeydownHandler, registerMentionKeydownHandler],
+	);
+
 
 	const handlePromptSelect = useCallback(
 		(template: PromptTemplate) => {
@@ -270,6 +368,20 @@ export function ChatInputArea({
 					/>
 				</div>
 			)}
+			{!hideToolbar &&
+				mentionPanelOpen &&
+				!slashPanelOpen &&
+				mentionFilteredItems && (
+					<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+						<MentionPanel
+							items={mentionFilteredItems}
+							highlightIndex={mentionHighlight}
+							onSelect={handleMentionItemSelect}
+							onHighlightChange={onMentionHighlightChange ?? (() => {})}
+							onClose={onMentionPanelClose ?? (() => {})}
+						/>
+					</div>
+				)}
 			{!hideToolbar && searchPopoverOpen && (
 				<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
 					<SearchEnginePanel
@@ -416,7 +528,7 @@ export function ChatInputArea({
 							<Tooltip
 								title={
 									currentEngine?.name ??
-									t("chat.toolbar.search", "搜索", { ns: "chat" })
+									t("toolbar.search", "搜索", { ns: "chat" })
 								}
 							>
 								<button
@@ -429,7 +541,7 @@ export function ChatInputArea({
 												? " is-accent-blue"
 												: ""
 									}`}
-									aria-label={t("chat.toolbar.search", "搜索", { ns: "chat" })}
+									aria-label={t("toolbar.search", "搜索", { ns: "chat" })}
 								>
 									{currentEngine?.icon ?? <SearchOutlined />}
 								</button>
@@ -519,7 +631,7 @@ export function ChatInputArea({
 					onStopStream={onStopStream}
 					placeholder={
 						placeholderProp ??
-						t("chat.placeholder", "在这里输入消息，按 Enter 发送")
+						t("placeholder", "在这里输入消息，按 Enter 发送", { ns: "chat" })
 					}
 					hideToolbar={hideToolbar}
 					infoBar={
@@ -532,7 +644,7 @@ export function ChatInputArea({
 						)
 					}
 					topOverlay={topOverlay}
-					registerKeydownHandler={registerKeydownHandler}
+					registerKeydownHandler={composedRegisterKeydown}
 					onKeyDown={(e) => {
 						if (e.nativeEvent.isComposing) return;
 						const { getShortcut } = useShortcutStore.getState();

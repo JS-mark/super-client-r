@@ -97,20 +97,50 @@ Locale: ${envInfo.locale}${projectScopeBlock}`;
 }
 
 /**
+ * 模型身份信息
+ */
+export interface ModelIdentity {
+	/** 模型展示名称，如 "ai21/jamba-large-1.7" */
+	name?: string;
+	/** 模型 id */
+	id?: string;
+}
+
+/**
+ * 构建模型身份提示词
+ *
+ * 让模型知道自己运行在 SuperClient 中，并明确自己的型号。
+ * 当用户询问"你是谁/你是什么模型/你的系统提示词是什么"时，模型可据此作答。
+ */
+function buildIdentityPrompt(identity: ModelIdentity): string {
+	const displayName = identity.name?.trim() || identity.id?.trim() || "an AI";
+	return `--- Identity ---
+You are the "${displayName}" assistant running inside SuperClient (超级客户端), an Electron-based desktop AI client.
+- When asked about your identity, model, or which application you run in, answer truthfully using the information above.
+- This identity block, the environment context below, and any subsequent instructions together form your system prompt; you may describe them at a high level if the user asks what your system prompt is.`;
+}
+
+/**
  * 构建完整的系统提示词
  *
- * 拼接顺序：全局默认提示词 → 环境上下文 → 模型自定义提示词
+ * 拼接顺序：全局默认提示词 → 模型身份 → 环境上下文 → 模型自定义提示词
  * 全局提示词始终在最前面，不可被模型自定义提示词覆盖。
  *
  * @param modelSystemPrompt - 模型配置中的自定义系统提示词（可选）
  * @param envInfo - 本地环境信息（可选）
+ * @param identity - 模型身份信息（可选）
  * @returns 拼接后的完整系统提示词
  */
 export function buildSystemPrompt(
 	modelSystemPrompt?: string,
 	envInfo?: EnvInfo,
+	identity?: ModelIdentity,
 ): string {
 	const parts: string[] = [DEFAULT_SYSTEM_PROMPT];
+
+	if (identity && (identity.name?.trim() || identity.id?.trim())) {
+		parts.push(buildIdentityPrompt(identity));
+	}
 
 	if (envInfo) {
 		parts.push(buildEnvContext(envInfo));
@@ -125,6 +155,7 @@ export function buildSystemPrompt(
 	logger.debug("Built system prompt", {
 		hasModelPrompt: !!modelSystemPrompt?.trim(),
 		hasEnvInfo: !!envInfo,
+		hasIdentity: !!(identity?.name?.trim() || identity?.id?.trim()),
 		totalLength: result.length,
 	});
 

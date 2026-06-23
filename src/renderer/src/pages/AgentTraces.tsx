@@ -23,7 +23,6 @@ import {
 	Empty,
 	Input,
 	Layout,
-	List,
 	message,
 	Select,
 	Space,
@@ -34,6 +33,7 @@ import {
 	Tooltip,
 	Typography,
 } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import type {
 	AgentTraceEntry,
 	AgentTraceFilter,

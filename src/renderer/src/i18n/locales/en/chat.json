@@ -71,6 +71,7 @@
 	"deleteMessage": "Delete Message",
 	"searchMessages": "Search Messages",
 	"searchPlaceholder": "Search chat history...",
+	"searchHistory": "Search History",
 	"newChat": "New Chat",
 	"chatHistory": "Chat History",
 	"searching": "Searching...",
@@ -83,6 +84,7 @@
 	"exportFilename": "Filename (Optional)",
 	"exportFilenamePlaceholder": "Leave empty for default filename",
 	"exportStats": "Will export {{count}} messages",
+	"exportFormatLabel": "Export Format",
 	"noMessagesToExport": "No messages to export",
 	"exportSuccess": "Export successful: {{filename}}",
 	"exportError": "Export failed: {{error}}",
@@ -93,6 +95,20 @@
 		"jsonDesc": "Structured format with complete data",
 		"txt": "Plain Text (.txt)",
 		"txtDesc": "Simple plain text format"
+	},
+	"modelPicker": {
+		"title": "Select Model",
+		"searchPlaceholder": "Search model ID or name…",
+		"clear": "Clear Selection",
+		"empty": "No matching models. Enable the desired models in Settings → Models."
+	},
+	"rename": {
+		"title": "Rename Conversation",
+		"confirm": "Confirm",
+		"cancel": "Cancel",
+		"placeholder": "Enter new name",
+		"empty": "Name cannot be empty",
+		"failed": "Rename failed"
 	},
 	"user": "User",
 	"assistant": "Assistant",
@@ -183,6 +199,12 @@
 		"hint": "Type / to quickly select a skill or command",
 		"commandFrom": "From {{skill}}"
 	},
+	"atMention": {
+		"title": "Files",
+		"noResults": "No matching files",
+		"hint": "Type to search files",
+		"sessionTag": "session"
+	},
 	"chatMode": {
 		"direct": "Direct",
 		"agent": "Agent",
@@ -219,6 +241,7 @@
 		"toolCallMode": "Tool Call Mode",
 		"toolCallModeDesc": "How to invoke MCP tools: Function Call uses native function calling API; Prompt injects tool descriptions into the system prompt; Disabled turns off tools.",
 		"toolCallFunction": "Function Call",
+		"toolCallPrompt": "Prompt (Compat Mode)",
 		"toolCallStreaming": "Streaming",
 		"temperature": "Temperature",
 		"temperatureDesc": "Controls randomness. Higher values produce more creative responses, lower values are more deterministic.",

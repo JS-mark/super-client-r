@@ -1,5 +1,5 @@
 import { Alert, App, Flex, theme } from "antd";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useEffectiveModel } from "../../hooks/useEffectiveModel";
 import {
@@ -25,12 +25,51 @@ import type { PromptTemplate } from "./toolbar/PromptTemplatePanel";
 import { QuotePanel } from "./toolbar/QuotePanel";
 import { ToolsPanel } from "./toolbar/ToolsPanel";
 import type { ToolItem } from "./toolbar/ToolsPanel";
+import type { SlashItem } from "./SlashCommandPanel";
+import { SlashCommandPanel } from "./SlashCommandPanel";
+import { MentionPanel } from "./MentionPanel";
+import { applyMentionToValue } from "../../hooks/useAtMentions";
+import type { WorkspaceFileEntry } from "../../services/workspaceService";
 
 const { useToken } = theme;
 
 export interface ClaudeEmptyChatHomeProps {
 	onSend: (text: string, attachmentIds?: string[]) => void;
 	isStreaming?: boolean;
+	/**
+	 * Slash command bindings — when supplied, the welcome composer wires up
+	 * the same `/` panel that ChatInputArea uses (panel render + ↑↓/Enter/ESC
+	 * keyboard nav + input-prefix detection). All optional so legacy callers
+	 * keep working.
+	 */
+	slashPanelOpen?: boolean;
+	slashFilteredItems?: SlashItem[];
+	slashHighlight?: number;
+	onSlashHighlightChange?: (index: number) => void;
+	onSlashSelect?: (item: SlashItem) => void;
+	onSlashPanelClose?: () => void;
+	onSlashInputChange?: (val: string) => void;
+	registerKeydownHandler?: (el: HTMLElement | null) => () => void;
+	/**
+	 * "@" file-mention bindings — twin of the slash group above. Optional so
+	 * standalone usage of this component (e.g. tests / fixtures) keeps working.
+	 */
+	mentionPanelOpen?: boolean;
+	mentionFilteredItems?: WorkspaceFileEntry[];
+	mentionHighlight?: number;
+	onMentionHighlightChange?: (index: number) => void;
+	onMentionSelect?: (item: WorkspaceFileEntry) => void;
+	onMentionPanelClose?: () => void;
+	onMentionInputChange?: (val: string, caret: number) => void;
+	registerMentionKeydownHandler?: (el: HTMLElement | null) => () => void;
+	/**
+	 * Hook's splice-callback setter — see `ChatInputArea` for the rationale.
+	 * The welcome page maintains its own local `text` state, so it forwards
+	 * its private splice closure so Enter and click behave identically.
+	 */
+	setMentionSelectHandler?: (
+		fn: ((item: WorkspaceFileEntry) => void) | null,
+	) => void;
 }
 
 /**
@@ -50,6 +89,23 @@ export interface ClaudeEmptyChatHomeProps {
 export function ClaudeEmptyChatHome({
 	onSend,
 	isStreaming = false,
+	slashPanelOpen = false,
+	slashFilteredItems,
+	slashHighlight = 0,
+	onSlashHighlightChange,
+	onSlashSelect,
+	onSlashPanelClose,
+	onSlashInputChange,
+	registerKeydownHandler,
+	mentionPanelOpen = false,
+	mentionFilteredItems,
+	mentionHighlight = 0,
+	onMentionHighlightChange,
+	onMentionSelect,
+	onMentionPanelClose,
+	onMentionInputChange,
+	registerMentionKeydownHandler,
+	setMentionSelectHandler,
 }: ClaudeEmptyChatHomeProps) {
 	const { token } = useToken();
 	const { t } = useTranslation();
@@ -60,6 +116,46 @@ export function ClaudeEmptyChatHome({
 	const [quotePanelOpen, setQuotePanelOpen] = useState(false);
 	const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	// Captured from registerKeydownHandler (composer wrapper div) so onChange
+	// can read the textarea caret and mention selection can restore it.
+	const composerWrapperRef = useRef<HTMLElement | null>(null);
+
+	// Shared splice closure used by BOTH the mouse-click path (panel onSelect)
+	// and the keyboard-Enter path (useAtMentions's capture-phase handler).
+	// Operates on the welcome page's local `text` state, restores caret/focus
+	// after React commits the new value.
+	const handleMentionItemSelect = useCallback(
+		(item: WorkspaceFileEntry) => {
+			const ta = composerWrapperRef.current?.querySelector(
+				"textarea",
+			) as HTMLTextAreaElement | null;
+			const caret = ta?.selectionStart ?? text.length;
+			const next = applyMentionToValue(text, caret, item.relativePath);
+			setText(next.value);
+			requestAnimationFrame(() => {
+				const ta2 = composerWrapperRef.current?.querySelector(
+					"textarea",
+				) as HTMLTextAreaElement | null;
+				if (ta2) {
+					ta2.setSelectionRange(next.caret, next.caret);
+					ta2.focus();
+				}
+			});
+			onMentionSelect?.(item);
+		},
+		[text, onMentionSelect],
+	);
+
+	// Register the splice handler with the hook so Enter behaves the same as
+	// a click. Re-runs on every render (closure depends on live `text`); the
+	// hook stores it in a ref so this is just one assignment per render.
+	useEffect(() => {
+		if (!setMentionSelectHandler) return;
+		setMentionSelectHandler(handleMentionItemSelect);
+		return () => {
+			setMentionSelectHandler(null);
+		};
+	}, [setMentionSelectHandler, handleMentionItemSelect]);
 
 	const currentConvId = useChatStore((s) => s.currentConversationId);
 	const conversation = useChatStore((s) =>
@@ -244,8 +340,21 @@ export function ClaudeEmptyChatHome({
 			<div className="mx-auto w-full px-6" style={{ maxWidth: 760 }}>
 				<ChatComposer
 					value={text}
-					onChange={setText}
+					onChange={(val) => {
+						setText(val);
+						onSlashInputChange?.(val);
+						if (onMentionInputChange) {
+							const ta = composerWrapperRef.current?.querySelector(
+								"textarea",
+							) as HTMLTextAreaElement | null;
+							const caret = ta?.selectionStart ?? val.length;
+							onMentionInputChange(val, caret);
+						}
+					}}
 					onSubmit={(value) => {
+						// Slash / mention panels swallow Enter at capture phase; guard
+						// the synthetic-submit (click on send button) path here.
+						if (slashPanelOpen || mentionPanelOpen) return;
 						if ((!value.trim() && attachedFiles.length === 0) || isStreaming)
 							return;
 						const attachmentIds = attachedFiles.map((f) => f.id);
@@ -262,8 +371,47 @@ export function ClaudeEmptyChatHome({
 					}}
 					isStreaming={isStreaming}
 					placeholder="想做什么？"
+					registerKeydownHandler={(el) => {
+						composerWrapperRef.current = el;
+						const off1 = registerKeydownHandler?.(el);
+						const off2 = registerMentionKeydownHandler?.(el);
+						return () => {
+							off1?.();
+							off2?.();
+							composerWrapperRef.current = null;
+						};
+					}}
 					topOverlay={
 						<>
+							{slashPanelOpen && slashFilteredItems && onSlashSelect && (
+								<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+									<SlashCommandPanel
+										items={slashFilteredItems}
+										highlightIndex={slashHighlight}
+										onSelect={(item) => {
+											// Hook's handleSlashSelect clears the *shared* input via
+											// useChat.setInput, but our local `text` state is separate
+											// — clear it here so the "/" prefix doesn't linger after
+											// the user picks an item.
+											setText("");
+											onSlashSelect(item);
+										}}
+										onHighlightChange={onSlashHighlightChange ?? (() => {})}
+										onClose={onSlashPanelClose ?? (() => {})}
+									/>
+								</div>
+							)}
+							{mentionPanelOpen && !slashPanelOpen && mentionFilteredItems && (
+								<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
+									<MentionPanel
+										items={mentionFilteredItems}
+										highlightIndex={mentionHighlight}
+										onSelect={handleMentionItemSelect}
+										onHighlightChange={onMentionHighlightChange ?? (() => {})}
+										onClose={onMentionPanelClose ?? (() => {})}
+									/>
+								</div>
+							)}
 							{promptPanelOpen && (
 								<div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
 									<PromptTemplatePanel

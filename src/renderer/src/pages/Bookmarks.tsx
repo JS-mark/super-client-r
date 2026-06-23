@@ -10,12 +10,12 @@ import {
 	Card,
 	Empty,
 	Input,
-	List,
 	Modal,
 	message,
 	Tag,
 	theme,
 } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { MainLayout } from "../components/layout/MainLayout";
@@ -199,7 +199,7 @@ export default function Bookmarks() {
 													color={bookmark.role === "user" ? "blue" : "green"}
 												>
 													{bookmark.role === "user"
-														? t("chat.user", "用户")
+														? t("user", "用户", { ns: "chat" })
 														: t("assistant", "助手", { ns: "chat" })}
 												</Tag>
 												<span className="text-xs text-slate-400">

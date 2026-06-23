@@ -1,5 +1,6 @@
 import { ClockCircleOutlined, SearchOutlined } from "@ant-design/icons";
-import { Empty, Input, List, Modal, theme } from "antd";
+import { Empty, Input, Modal, theme } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useChatStore } from "../../stores/chatStore";

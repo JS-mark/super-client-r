@@ -201,7 +201,7 @@ export function NewConversationModal() {
 			cancelText="取消"
 			okButtonProps={{ disabled: submitDisabled, loading: submitting }}
 			width={520}
-			destroyOnClose
+      destroyOnHidden
 		>
 			<Form layout="vertical" className="pt-2">
 				<Form.Item

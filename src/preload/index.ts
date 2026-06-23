@@ -1766,6 +1766,9 @@ const electronAPI: ElectronAPI = {
 		"resolveSessionCwd",
 		"resolveProjectRoot",
 	]),
+	workspace: createBridge<ElectronAPI["workspace"]>("workspace", [
+		"listFiles",
+	]),
 	legacyData: createBridge<ElectronAPI["legacyData"]>("legacyData", [
 		"detect",
 		"importAll",

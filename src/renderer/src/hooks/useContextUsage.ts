@@ -160,7 +160,16 @@ export function computeContextUsage(
 		const inputT = m.metadata.inputTokens ?? 0;
 		const cr = m.metadata.cacheReadTokens ?? 0;
 		const cc = m.metadata.cacheCreationTokens ?? 0;
-		if (cr || cc) anyCacheSeen = true;
+		// 只要 provider 显式回了 cache 字段（哪怕值为 0），就认为该路径支持
+		// prompt cache，应当展示命中率（0.0% 也是有效信息）。
+		// 仅当两个字段都是 undefined 时——典型是 OpenAI/Gemini 等不返回该字段
+		// 的 provider——才视为"无 cache 数据"。
+		if (
+			m.metadata.cacheReadTokens !== undefined ||
+			m.metadata.cacheCreationTokens !== undefined
+		) {
+			anyCacheSeen = true;
+		}
 		sumCacheRead += cr;
 		sumCacheBase += inputT + cr + cc;
 		const totalThisTurn = inputT + cr + cc;

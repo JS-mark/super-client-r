@@ -1102,7 +1102,7 @@ function ProfileEditModal({
 			onCancel={onCancel}
 			okButtonProps={{ disabled: !form.name.trim() || !form.prompt.trim() }}
 			width={520}
-			destroyOnClose
+      destroyOnHidden
 		>
 			<div className="space-y-3 mt-4">
 				<div>
@@ -1439,7 +1439,7 @@ function TeamEditModal({
 				disabled: !form.name.trim() || form.agents.length === 0,
 			}}
 			width={480}
-			destroyOnClose
+      destroyOnHidden
 		>
 			<div className="space-y-3 mt-4">
 				<div>

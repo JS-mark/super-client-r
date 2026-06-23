@@ -34,7 +34,7 @@ export function ChatExportDialog({
 	const handleExport = async () => {
 		if (messages.length === 0) {
 			message.warning(
-				t("chat.noMessagesToExport", "没有可导出的消息", { ns: "chat" }),
+				t("noMessagesToExport", "没有可导出的消息", { ns: "chat" }),
 			);
 			return;
 		}
@@ -43,14 +43,18 @@ export function ChatExportDialog({
 		try {
 			const exportedFilename = await exportMessages(messages, format, filename);
 			message.success(
-				t("chat.exportSuccess", "导出成功: {{filename}}", {
+				t("exportSuccess", "导出成功: {{filename}}", {
+					ns: "chat",
 					filename: exportedFilename,
 				}),
 			);
 			onClose();
 		} catch (error) {
 			message.error(
-				t("chat.exportError", "导出失败: {{error}}", { error: String(error) }),
+				t("exportError", "导出失败: {{error}}", {
+					ns: "chat",
+					error: String(error),
+				}),
 			);
 		} finally {
 			setIsExporting(false);
@@ -60,24 +64,24 @@ export function ChatExportDialog({
 	const formatOptions = [
 		{
 			value: "markdown" as ExportFormat,
-			label: t("chat.exportFormat.markdown", "Markdown (.md)"),
-			description: t("chat.exportFormat.markdownDesc", "适合阅读和编辑的格式", {
+			label: t("exportFormat.markdown", "Markdown (.md)", { ns: "chat" }),
+			description: t("exportFormat.markdownDesc", "适合阅读和编辑的格式", {
 				ns: "chat",
 			}),
 			icon: <FileMarkdownOutlined className="text-2xl text-blue-500" />,
 		},
 		{
 			value: "json" as ExportFormat,
-			label: t("chat.exportFormat.json", "JSON (.json)"),
-			description: t("chat.exportFormat.jsonDesc", "包含完整数据的结构化格式", {
+			label: t("exportFormat.json", "JSON (.json)", { ns: "chat" }),
+			description: t("exportFormat.jsonDesc", "包含完整数据的结构化格式", {
 				ns: "chat",
 			}),
 			icon: <CodeOutlined className="text-2xl text-green-500" />,
 		},
 		{
 			value: "txt" as ExportFormat,
-			label: t("chat.exportFormat.txt", "纯文本 (.txt)"),
-			description: t("chat.exportFormat.txtDesc", "简洁的纯文本格式", {
+			label: t("exportFormat.txt", "纯文本 (.txt)", { ns: "chat" }),
+			description: t("exportFormat.txtDesc", "简洁的纯文本格式", {
 				ns: "chat",
 			}),
 			icon: <FileTextOutlined className="text-2xl text-slate-500" />,
@@ -86,7 +90,7 @@ export function ChatExportDialog({
 
 	return (
 		<Modal
-			title={t("chat.exportChat", "导出聊天记录", { ns: "chat" })}
+			title={t("exportChat", "导出聊天记录", { ns: "chat" })}
 			open={isOpen}
 			onCancel={onClose}
 			footer={[
@@ -100,7 +104,7 @@ export function ChatExportDialog({
 					loading={isExporting}
 					disabled={messages.length === 0}
 				>
-					{t("chat.export", "导出", { ns: "chat" })}
+					{t("export", "导出", { ns: "chat" })}
 				</Button>,
 			]}
 			width={500}
@@ -112,7 +116,7 @@ export function ChatExportDialog({
 						className="block text-sm font-medium mb-3"
 						style={{ color: token.colorText }}
 					>
-						{t("chat.exportFormat", "导出格式", { ns: "chat" })}
+						{t("exportFormatLabel", "导出格式", { ns: "chat" })}
 					</span>
 					<Radio.Group
 						value={format}
@@ -173,13 +177,13 @@ export function ChatExportDialog({
 						className="block text-sm font-medium mb-2"
 						style={{ color: token.colorText }}
 					>
-						{t("chat.exportFilename", "文件名 (可选)", { ns: "chat" })}
+						{t("exportFilename", "文件名 (可选)", { ns: "chat" })}
 					</span>
 					<Input
 						value={filename}
 						onChange={(e) => setFilename(e.target.value)}
 						placeholder={t(
-							"chat.exportFilenamePlaceholder",
+							"exportFilenamePlaceholder",
 							"留空使用默认文件名",
 							{ ns: "chat" },
 						)}
@@ -189,7 +193,8 @@ export function ChatExportDialog({
 
 				{/* 消息统计 */}
 				<div className="text-sm text-slate-500">
-					{t("chat.exportStats", "将导出 {{count}} 条消息", {
+					{t("exportStats", "将导出 {{count}} 条消息", {
+						ns: "chat",
 						count: messages.length,
 					})}
 				</div>

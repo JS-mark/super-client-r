@@ -1,5 +1,6 @@
 import { ClockCircleOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Empty, Input, List, Modal, Tag, theme } from "antd";
+import { Button, Empty, Input, Modal, Tag, theme } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Message } from "../../stores/chatStore";
@@ -95,7 +96,7 @@ export function MessageSearch({
 
 	return (
 		<Modal
-			title={t("chat.searchMessages", "搜索消息", { ns: "chat" })}
+			title={t("searchMessages", "搜索消息", { ns: "chat" })}
 			open={isOpen}
 			onCancel={onClose}
 			footer={null}
@@ -108,7 +109,7 @@ export function MessageSearch({
 					prefix={
 						<SearchOutlined style={{ color: token.colorTextQuaternary }} />
 					}
-					placeholder={t("chat.searchPlaceholder", "搜索聊天记录...", {
+					placeholder={t("searchPlaceholder", "搜索聊天记录...", {
 						ns: "chat",
 					})}
 					value={query}
@@ -126,7 +127,7 @@ export function MessageSearch({
 								className="text-sm"
 								style={{ color: token.colorTextTertiary }}
 							>
-								{t("chat.searchHistory", "搜索历史", { ns: "chat" })}
+								{t("searchHistory", "搜索历史", { ns: "chat" })}
 							</span>
 							<Button type="link" size="small" onClick={clearSearchHistory}>
 								{t("clear", "清空", { ns: "common" })}
@@ -155,15 +156,16 @@ export function MessageSearch({
 							style={{ color: token.colorTextTertiary }}
 						>
 							{isSearching
-								? t("chat.searching", "搜索中...", { ns: "chat" })
-								: t("chat.searchResults", "找到 {{count}} 条结果", {
+								? t("searching", "搜索中...", { ns: "chat" })
+								: t("searchResults", "找到 {{count}} 条结果", {
+										ns: "chat",
 										count: results.length,
 									})}
 						</div>
 
 						{results.length === 0 && !isSearching ? (
 							<Empty
-								description={t("chat.noSearchResults", "未找到相关消息", {
+								description={t("noSearchResults", "未找到相关消息", {
 									ns: "chat",
 								})}
 								image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -189,8 +191,8 @@ export function MessageSearch({
 											<div className="flex items-center gap-2 mb-1">
 												<Tag color={msg.role === "user" ? "blue" : "green"}>
 													{msg.role === "user"
-														? t("chat.user", "用户")
-														: t("chat.assistant", "助手", { ns: "chat" })}
+												? t("user", "用户", { ns: "chat" })
+													: t("assistant", "助手", { ns: "chat" })}
 												</Tag>
 												<span
 													className="text-xs"

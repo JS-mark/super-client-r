@@ -668,7 +668,7 @@ export default function Plugins({ embedded = false }: PluginsProps) {
 								<Popconfirm
 									title={t("plugins.confirmUninstall", "确定要卸载此插件吗？")}
 									onConfirm={() => handleUninstallPlugin(plugin.id)}
-									okText={t("common.yes", "是")}
+									okText={t("yes", "是", { ns: "common" })}
 									cancelText={t("no", "否", { ns: "common" })}
 								>
 									<Tooltip title={t("plugins.uninstall", { ns: "plugins" })}>

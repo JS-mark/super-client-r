@@ -77,7 +77,7 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 		description: "打开快速搜索面板",
 		descriptionKey: "quickSearchDesc",
 		scope: "global",
-		defaultKey: "mod+k",
+		defaultKey: "mod+f",
 		enabled: true,
 	},
 	{
@@ -87,7 +87,7 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 		description: "跨所有会话按 title 和 preview 搜索",
 		descriptionKey: "globalSearchDesc",
 		scope: "global",
-		defaultKey: "mod+p",
+		defaultKey: "mod+k",
 		enabled: true,
 	},
 	{
@@ -416,15 +416,33 @@ export const useShortcutStore = create<ShortcutState & ShortcutActions>()(
 					// Build a map of defaults keyed by id for quick lookup
 					const defaultsById = new Map(DEFAULT_SHORTCUTS.map((d) => [d.id, d]));
 
+					// One-shot default-key migrations: if a user is still on the
+					// previous default key for one of these shortcuts (i.e. never
+					// customized it), advance them to the new default. Custom keys
+					// are preserved.
+					const REKEY_IF_DEFAULT: Record<string, string> = {
+						// quick-search: mod+k → mod+f (mod+k now belongs to global-search)
+						"quick-search": "mod+k",
+						// global-search: mod+p → mod+k
+						"global-search": "mod+p",
+					};
+
 					// Migrate persisted shortcuts: sync nameKey/descriptionKey
-					// from defaults and strip legacy "shortcuts." prefix
+					// from defaults, strip legacy "shortcuts." prefix, and apply
+					// the default-key rekey when appropriate.
 					const migrated = state.shortcuts.map((s) => {
 						const def = defaultsById.get(s.id);
 						if (def) {
+							const previousDefault = REKEY_IF_DEFAULT[s.id];
+							const shouldRekey =
+								previousDefault !== undefined &&
+								normalizeShortcut(s.currentKey) ===
+									normalizeShortcut(previousDefault);
 							return {
 								...s,
 								nameKey: def.nameKey,
 								descriptionKey: def.descriptionKey,
+								currentKey: shouldRekey ? def.defaultKey : s.currentKey,
 							};
 						}
 						// Legacy shortcut with "shortcuts." prefix

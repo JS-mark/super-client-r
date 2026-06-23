@@ -10,13 +10,13 @@ import {
 	Badge,
 	Button,
 	Empty,
-	List,
 	Modal,
 	Tag,
 	Tooltip,
 	message,
 	theme,
 } from "antd";
+import { LiteList as List } from "@/components/ui/LiteList";
 import type * as React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

@@ -339,7 +339,7 @@ export const GitGraphDrawer: React.FC<GitGraphDrawerProps> = ({
 			open={open}
 			onClose={onClose}
 			placement="right"
-			width={720}
+			size={720}
 			closeIcon={null}
 			styles={{
 				body: { padding: 0 },

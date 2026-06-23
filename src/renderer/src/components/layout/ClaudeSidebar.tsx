@@ -35,6 +35,11 @@ import { SessionContextMenu } from "./SessionContextMenu";
 import { GlobalSessionSearchModal } from "../chat/GlobalSessionSearchModal";
 import { useFeatureFlagsStore } from "../../stores/featureFlagsStore";
 import { useMenuStore } from "../../stores/menuStore";
+import {
+	DEFAULT_SHORTCUTS,
+	formatShortcut,
+	useShortcutStore,
+} from "../../stores/shortcutStore";
 import { useSidebarLayoutStore } from "../../stores/sidebarLayoutStore";
 import {
 	getAvatarColor,
@@ -77,10 +82,6 @@ const MENU_ICON_BY_ID: Record<string, string> = {
 function isMac(): boolean {
 	if (typeof navigator === "undefined") return false;
 	return navigator.platform.toLowerCase().includes("mac");
-}
-
-function modKey(): string {
-	return isMac() ? "⌘" : "Ctrl";
 }
 
 function renderMenuIcon(item: MenuItemConfig): React.ReactNode {
@@ -183,7 +184,7 @@ const QuickActionRow: React.FC<QuickActionRowProps> = ({
 		<span className="flex-1 text-left truncate">{label}</span>
 		{shortcut && (
 			<span
-				className="text-[10.5px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+				className="text-[10.5px] font-mono px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
 				style={{ color: mutedColor, background: chipBg }}
 			>
 				{shortcut}
@@ -287,6 +288,29 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	);
 
 	const mac = useMemo(() => isMac(), []);
+
+	// Quick-action shortcuts: read user-configurable keys from shortcutStore.
+	// `shortcuts` may be `[]` on first render before zustand persist rehydrates,
+	// so fall back to DEFAULT_SHORTCUTS.defaultKey to keep the hover chip stable.
+	// Rendering goes through formatShortcut → "⌘ + N" / "Ctrl + N".
+	const newChatShortcutKey = useShortcutStore(
+		(s) => s.shortcuts.find((sh) => sh.id === "new-chat")?.currentKey,
+	);
+	const globalSearchShortcutKey = useShortcutStore(
+		(s) => s.shortcuts.find((sh) => sh.id === "global-search")?.currentKey,
+	);
+	const newChatShortcut = useMemo(() => {
+		const key =
+			newChatShortcutKey ||
+			DEFAULT_SHORTCUTS.find((s) => s.id === "new-chat")?.defaultKey;
+		return key ? formatShortcut(key, mac) : undefined;
+	}, [newChatShortcutKey, mac]);
+	const globalSearchShortcut = useMemo(() => {
+		const key =
+			globalSearchShortcutKey ||
+			DEFAULT_SHORTCUTS.find((s) => s.id === "global-search")?.defaultKey;
+		return key ? formatShortcut(key, mac) : undefined;
+	}, [globalSearchShortcutKey, mac]);
 
 	const [recentsOpen, setRecentsOpen] = useState(true);
 	const [projectsOpen, setProjectsOpen] = useState(true);
@@ -425,6 +449,14 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		await openOrCreateConversation();
 	}, [openOrCreateConversation]);
 
+	// Recents 表头/空态 "+"——显式 target=null，强制创建 casual 会话。
+	// 修复：在项目会话中点顶部"+ 新建对话"会派生为"项目内新建"，导致
+	// Recents 永远填不进东西。这个入口绕过派生逻辑，直接落到 casual 桶。
+	const handleNewCasualConversation = useCallback(async () => {
+		useProjectStore.getState().setCurrent(null);
+		await openOrCreateConversation(null);
+	}, [openOrCreateConversation]);
+
 	// 项目行 hover "+"——目标 = 该项目
 	const handleNewConversationInProject = useCallback(
 		async (projectId: string) => {
@@ -493,9 +525,13 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const mutedColor = token.colorTextSecondary;
 	const hoverBg = token.colorFillTertiary;
 	const chipBg = token.colorFillQuaternary;
-	// Session 选中态：用更柔和的 fill tertiary（比 secondary 轻一档）+ 左侧主色竖条 +
-	// 轻微加粗。比单纯整段灰底更精致。
-	const activeBg = token.colorFillTertiary;
+	// Session 选中态 —— 参考 Claude.ai / ChatGPT / Linear：
+	// 不做染色，仅在 hover 灰阶上再"沉降一档"（secondary 比 tertiary 略深），
+	// 文字保持原色 + 字重 500，去掉左侧主色竖条。这样：
+	//   - 不与项目行的主色竖条争视觉
+	//   - 列表整体保持单一中性色，更像专业 IDE / Notion 风格
+	//   - hover→active 是顺滑的灰阶加深，而不是颜色跳变
+	const activeBg = token.colorFillSecondary;
 	const activeText = token.colorText;
 	const primaryBg = token.colorPrimary;
 
@@ -519,24 +555,6 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 			>
 				<TrafficLightSpacer mac={mac} />
 
-				{/* Brand row — collapse button removed; 通过侧边拖拽手柄调整宽度 */}
-				<div className="h-12 px-3 flex items-center flex-none">
-					<div className="flex items-center gap-2.5 min-w-0">
-						<div
-							className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[13px] font-semibold flex-none shadow-sm"
-							style={{ background: primaryBg }}
-						>
-							C
-						</div>
-						<span
-							className="text-[15px] font-semibold truncate"
-							style={{ color: textColor, letterSpacing: "-0.01em" }}
-						>
-							Claude
-						</span>
-					</div>
-				</div>
-
 				{/* Quick actions */}
 				<div
 					className="px-2 pb-2 flex flex-col gap-0.5 flex-none"
@@ -549,7 +567,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 							label={
 								item.id === "chat" ? "新建对话" : t(item.label, { ns: "menu" })
 							}
-							shortcut={item.id === "chat" ? `${modKey()}N` : undefined}
+							shortcut={item.id === "chat" ? newChatShortcut : undefined}
 							onClick={() => {
 								void handleMenuItemClick(item);
 							}}
@@ -562,7 +580,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					<QuickActionRow
 						icon={<SearchOutlined />}
 						label="会话搜索"
-						shortcut={`${modKey()}P`}
+						shortcut={globalSearchShortcut}
 						onClick={handleSessionSearch}
 						hoverBg={hoverBg}
 						textColor={textColor}
@@ -597,16 +615,30 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 								onToggle={() => setRecentsOpen((v) => !v)}
 								mutedColor={mutedColor}
 								hoverBg={hoverBg}
+								action={{
+									icon: <PlusOutlined className="text-[10px]" />,
+									onClick: handleNewCasualConversation,
+									tooltip: "新建普通对话",
+								}}
 							/>
 							{recentsOpen && (
-								<div className="mt-1 flex flex-col">
+								<div className="mt-1 flex flex-col gap-0.5">
 									{recentConversations.length === 0 ? (
-										<div
-											className="px-3 py-2 text-xs"
+										<button
+											type="button"
+											onClick={handleNewCasualConversation}
+											className="mx-1 px-2 py-2 flex items-center gap-2 rounded-md text-xs transition-colors"
 											style={{ color: mutedColor }}
+											onMouseEnter={(e) => {
+												e.currentTarget.style.background = hoverBg;
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.background = "transparent";
+											}}
 										>
-											暂无对话
-										</div>
+											<PlusOutlined />
+											<span>新建普通对话</span>
+										</button>
 									) : (
 										recentConversations.map((conv) => (
 											<RecentConversationRow
@@ -698,7 +730,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 														/>
 													</ProjectContextMenu>
 													{expanded && (
-														<div className="ml-5 mt-px mb-1 flex flex-col">
+														<div className="ml-5 mt-px mb-1 flex flex-col gap-0.5">
 															{projectConvs.length === 0 ? (
 																<div
 																	className="px-3 py-1.5 text-xs italic"
@@ -1039,13 +1071,6 @@ const RecentConversationRow: React.FC<RecentConversationRowProps> = ({
 					if (!active) e.currentTarget.style.background = "transparent";
 				}}
 			>
-				{active && (
-					<span
-						aria-hidden
-						className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r"
-						style={{ background: primaryBg }}
-					/>
-				)}
 				{pinned && (
 					<span
 						aria-label="pinned"

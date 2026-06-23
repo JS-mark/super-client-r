@@ -280,6 +280,35 @@ export interface ElectronAPIMigrated {
 	};
 
 	/**
+	 * Workspace file enumeration — backs the composer's "@" file-mention panel.
+	 *
+	 * Lists files under the conversation's project root AND its per-session
+	 * sandbox (deduped, project wins). Hidden dirs and common build/output
+	 * directories are filtered server-side; fuzzy filtering happens in the
+	 * renderer.
+	 */
+	workspace: {
+		listFiles: (req: {
+			sessionId: string;
+			limit?: number;
+		}) => Promise<
+			IPCResponse<{
+				files: Array<{
+					absolutePath: string;
+					relativePath: string;
+					root: "project" | "session";
+					name: string;
+					dir: string;
+					ext: string;
+					size: number;
+					mtimeMs: number;
+				}>;
+				roots: { projectRoot?: string; sessionCwd?: string };
+			}>
+		>;
+	};
+
+	/**
 	 * G-3 老数据导入。renderer 启动时调 detect 看是否有老数据，
 	 * 用户确认后调 importAll 一次性把老 chats/ 目录下的 conversations 转成
 	 * 新 SessionStorage 的 casual sessions（保留 id 与时间戳）。
