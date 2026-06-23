@@ -55,8 +55,6 @@
 		"@ant-design/icons": "^6.1.0",
 		"@ant-design/x": "^2.4.0",
 		"@ant-design/x-markdown": "^2.4.0",
-		"@anthropic-ai/claude-agent-sdk": "^0.2.81",
-		"@anthropic-ai/sdk": "^0.78.0",
 		"@codemirror/language": "^6.12.2",
 		"@codemirror/state": "^6.6.0",
 		"@codemirror/view": "^6.40.0",
