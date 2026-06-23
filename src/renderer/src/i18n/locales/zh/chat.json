@@ -12,6 +12,16 @@
 		"debug": "帮我调试代码中的这个错误",
 		"marketing": "为新产品创建营销计划"
 	},
+	"composer": {
+		"menu": {
+			"title": "添加",
+			"attach": "附件",
+			"promptTemplate": "Prompt 模板",
+			"quote": "引用消息",
+			"tools": "Tools",
+			"triggerAriaLabel": "添加"
+		}
+	},
 	"toolbar": {
 		"quote": "引用",
 		"attach": "附件",

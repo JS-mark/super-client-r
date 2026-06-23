@@ -12,6 +12,16 @@
 		"debug": "Help me debug this error in my code",
 		"marketing": "Create a marketing plan for a new product"
 	},
+	"composer": {
+		"menu": {
+			"title": "Add",
+			"attach": "Attach",
+			"promptTemplate": "Prompt Template",
+			"quote": "Quote Message",
+			"tools": "Tools",
+			"triggerAriaLabel": "Add"
+		}
+	},
 	"toolbar": {
 		"quote": "Quote",
 		"attach": "Attach",

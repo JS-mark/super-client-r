@@ -4,20 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionSettings } from "../components/chat/ChatSettingsModal";
 import { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 import {
-  BROWSER_INSTRUCTIONS,
   buildSystemPrompt,
-  CLEAR_INSTRUCTIONS,
   type EnvInfo,
-  KNOWLEDGE_INSTRUCTIONS,
-  TOOLS_INSTRUCTIONS,
-  USER_CONFIG_INSTRUCTIONS,
 } from "../prompt";
 import { agentSDKClient } from "../services/agent/agentSDKService";
-import { attachmentResolverService } from "../services/attachmentResolverService";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
 import { runtimeService } from "../services/runtimeService";
-import { searchService } from "../services/search/searchService";
 import { skillClient } from "../services/skill/skillService";
 import { sanitizeAssistantContent } from "../lib/assistantContent";
 import { createLogger } from "../services/logService";
@@ -32,6 +25,7 @@ import { useModelStore } from "../stores/modelStore";
 import { useProjectStore } from "../stores/projectStore";
 import type { ActiveModelSelection } from "../types/models";
 import type { SearchConfig } from "../types/search";
+import { buildAgentPromptWithContext } from "./agentPromptContext";
 import { captureFileArtifactsFromToolResult } from "./useChatFileCapture";
 
 export type {
@@ -70,9 +64,79 @@ function isClaudeAgentModel(modelId?: string): boolean {
 }
 
 /**
- * Fetch MCP tools from all connected servers and build tool awareness prompt.
- * Returns tools array, toolMapping, and a tool hint string for the system prompt.
+ * Mirrors the main-process `AgentAutoConfig.pickBestAgentModel`: returns the
+ * first Claude-compatible model id from a provider's model list, or undefined.
  */
+function pickBestAgentModelId(
+  models: Array<{ id: string; enabled?: boolean }> | undefined,
+): string | undefined {
+  if (!models?.length) return undefined;
+  const enabled = models.filter((m) => m.enabled !== false);
+  return enabled.find((m) => isClaudeAgentModel(m.id))?.id;
+}
+
+/**
+ * Renderer-side preflight that mirrors the main-process
+ * `AgentSDKService.resolveAnthropicEnv` logic at the *intent* level (we only
+ * care about which Claude Code model would actually be used).
+ *
+ * Returns `{ ok: true, modelId }` when a Claude-compatible model can be
+ * resolved, or `{ ok: false, message }` with an actionable error otherwise.
+ *
+ * The previous implementation incorrectly checked the *chat* model id
+ * (`effective.model.id`), which is the model the composer selected. The Agent
+ * SDK actually uses `provider.claudeCodeModel` (set in the provider's "Claude
+ * Code Provider" config), so the two ids can diverge — and did in practice.
+ */
+function resolveAgentSdkIntent(
+  providers: Array<{
+    id: string;
+    name: string;
+    enabled?: boolean;
+    apiKey?: string;
+    preset?: string;
+    claudeCodeEnabled?: boolean;
+    claudeCodeModel?: string;
+    models?: Array<{ id: string; name?: string; enabled?: boolean }>;
+  }>,
+):
+  | { ok: true; providerName: string; modelId: string }
+  | { ok: false; message: string } {
+  const ccProvider = providers.find(
+    (p) => p.enabled && p.claudeCodeEnabled && p.apiKey,
+  );
+
+  if (ccProvider) {
+    const configured = ccProvider.claudeCodeModel?.trim();
+    const candidate =
+      configured && configured.length > 0
+        ? configured
+        : pickBestAgentModelId(ccProvider.models);
+    if (candidate && isClaudeAgentModel(candidate)) {
+      return { ok: true, providerName: ccProvider.name, modelId: candidate };
+    }
+    return {
+      ok: false,
+      message: configured
+        ? `Agent SDK 需要 Claude Code 兼容模型。当前 Claude Code Provider「${ccProvider.name}」配置的是「${configured}」，Claude Code SDK 不支持这个模型，因此不会执行 agent/tool_use。请把该 Provider 的 Claude Code 模型改为 Claude/Sonnet/Opus/Haiku 系列，或配置可用的 Anthropic/OpenRouter Claude Code Provider。`
+        : `Agent SDK 需要 Claude Code 兼容模型。Claude Code Provider「${ccProvider.name}」上没有可用的 Claude 兼容模型，请在该 Provider 设置中选择 Claude/Sonnet/Opus/Haiku 系列模型作为 Claude Code 模型，或改用 Anthropic/OpenRouter。`,
+    };
+  }
+
+  const anthropicPreset = providers.find(
+    (p) => p.enabled && p.preset === "anthropic" && p.apiKey,
+  );
+  if (anthropicPreset) {
+    return { ok: true, providerName: anthropicPreset.name, modelId: "default" };
+  }
+
+  return {
+    ok: false,
+    message:
+      "未配置 Claude Code Provider。请到「设置 → 模型」里挑一个 Provider 勾上 Claude Code 开关并选择 Claude/Sonnet/Opus/Haiku 系列模型，或添加 Anthropic 官方 Provider。",
+  };
+}
+
 /**
  * 将 serverId 转换为合法的 OpenAI 函数名前缀
  * OpenAI 要求: ^[a-zA-Z0-9_-]+$
@@ -80,207 +144,6 @@ function isClaudeAgentModel(modelId?: string): boolean {
  */
 function sanitizeServerId(serverId: string): string {
   return serverId.replace(/^@/, "").replace(/[^a-zA-Z0-9_-]/g, "-");
-}
-
-async function fetchMcpTools(): Promise<{
-  tools?: Array<{
-    type: "function";
-    function: {
-      name: string;
-      description: string;
-      parameters: Record<string, unknown>;
-    };
-  }>;
-  toolMapping?: Record<string, { serverId: string; toolName: string }>;
-  toolHint: string;
-}> {
-  try {
-    const mcpTools = await mcpClient.getAllTools();
-    if (mcpTools.length > 0) {
-      const tools: Array<{
-        type: "function";
-        function: {
-          name: string;
-          description: string;
-          parameters: Record<string, unknown>;
-        };
-      }> = [];
-      const toolMapping: Record<
-        string,
-        { serverId: string; toolName: string }
-      > = {};
-      for (const { serverId, tool } of mcpTools) {
-        const safePrefix = sanitizeServerId(serverId);
-        const prefixedName = `${safePrefix}__${tool.name}`;
-        tools.push({
-          type: "function",
-          function: {
-            name: prefixedName,
-            description: tool.description || "",
-            parameters: tool.inputSchema || { type: "object", properties: {} },
-          },
-        });
-        toolMapping[prefixedName] = { serverId, toolName: tool.name };
-      }
-      const toolNames = tools
-        .map((t) => t.function.name.split("__").pop())
-        .join(", ");
-
-      // Build context-aware tool instructions based on available servers/tools
-      const serverIds = new Set(mcpTools.map((t) => t.serverId));
-      const allToolNames = new Set(mcpTools.map((t) => t.tool.name));
-      const hints: string[] = [
-        `\n\nYou have access to the following tools and SHOULD actively use them when the user's request can benefit from them: ${toolNames}. Do not say you cannot access files, databases, or the web if a relevant tool is available — use the tool instead.`,
-        CLEAR_INSTRUCTIONS,
-        TOOLS_INSTRUCTIONS,
-      ];
-      if (serverIds.has("@scp/browser")) {
-        hints.push(BROWSER_INSTRUCTIONS);
-      }
-      if (allToolNames.has("knowledge_base_search")) {
-        hints.push(KNOWLEDGE_INSTRUCTIONS);
-      }
-      if (allToolNames.has("request_user_config")) {
-        hints.push(USER_CONFIG_INSTRUCTIONS);
-      }
-      const toolHint = hints.join("\n");
-      return { tools, toolMapping, toolHint };
-    }
-  } catch (err) {
-    console.warn("[useChat] Failed to fetch MCP tools:", err);
-  }
-  return { toolHint: "" };
-}
-
-/**
- * Fetch tools defined by a specific skill and build function calling format.
- * Uses `skill:{skillId}` as serverId convention to distinguish from MCP tools.
- */
-async function fetchSkillTools(skillId: string): Promise<{
-  tools: Array<{
-    type: "function";
-    function: {
-      name: string;
-      description: string;
-      parameters: Record<string, unknown>;
-    };
-  }>;
-  toolMapping: Record<string, { serverId: string; toolName: string }>;
-}> {
-  try {
-    const allSkillTools = await skillClient.getAllTools();
-    const skillTools = allSkillTools.filter((t) => t.skillId === skillId);
-    const tools: Array<{
-      type: "function";
-      function: {
-        name: string;
-        description: string;
-        parameters: Record<string, unknown>;
-      };
-    }> = [];
-    const toolMapping: Record<string, { serverId: string; toolName: string }> =
-      {};
-    for (const { skillId: sid, tool } of skillTools) {
-      const prefixedName = `skill-${sid}__${tool.name}`;
-      tools.push({
-        type: "function",
-        function: {
-          name: prefixedName,
-          description: tool.description || "",
-          parameters: tool.inputSchema || { type: "object", properties: {} },
-        },
-      });
-      toolMapping[prefixedName] = {
-        serverId: `skill:${sid}`,
-        toolName: tool.name,
-      };
-    }
-    return { tools, toolMapping };
-  } catch (err) {
-    console.warn("[useChat] Failed to fetch skill tools:", err);
-    return { tools: [], toolMapping: {} };
-  }
-}
-
-/**
- * Fetch tools from ALL enabled skills (not filtered by skillId).
- * Used by direct/agent modes so Claude can access skill tools globally.
- */
-async function fetchAllSkillTools(): Promise<{
-  tools: Array<{
-    type: "function";
-    function: {
-      name: string;
-      description: string;
-      parameters: Record<string, unknown>;
-    };
-  }>;
-  toolMapping: Record<string, { serverId: string; toolName: string }>;
-}> {
-  try {
-    const allSkillTools = await skillClient.getAllTools();
-    const tools: Array<{
-      type: "function";
-      function: {
-        name: string;
-        description: string;
-        parameters: Record<string, unknown>;
-      };
-    }> = [];
-    const toolMapping: Record<string, { serverId: string; toolName: string }> =
-      {};
-    for (const { skillId, tool } of allSkillTools) {
-      const prefixedName = `skill-${skillId}__${tool.name}`;
-      tools.push({
-        type: "function",
-        function: {
-          name: prefixedName,
-          description: tool.description || "",
-          parameters: tool.inputSchema || { type: "object", properties: {} },
-        },
-      });
-      toolMapping[prefixedName] = {
-        serverId: `skill:${skillId}`,
-        toolName: tool.name,
-      };
-    }
-    return { tools, toolMapping };
-  } catch (err) {
-    console.warn("[useChat] Failed to fetch all skill tools:", err);
-    return { tools: [], toolMapping: {} };
-  }
-}
-
-/**
- * Parse custom params from SessionSettings into a Record.
- */
-function parseCustomParams(
-  params: Array<{ name: string; type: string; value: string }>,
-): Record<string, unknown> | undefined {
-  const valid = params.filter((p) => p.name.trim());
-  if (valid.length === 0) return undefined;
-  const result: Record<string, unknown> = {};
-  for (const p of valid) {
-    const key = p.name.trim();
-    switch (p.type) {
-      case "number":
-        result[key] = Number(p.value) || 0;
-        break;
-      case "boolean":
-        result[key] = p.value.toLowerCase() === "true";
-        break;
-      case "json":
-        try {
-          result[key] = JSON.parse(p.value);
-        } catch {
-          result[key] = p.value;
-        }
-        break;
-      default:
-        result[key] = p.value;
-    }
-  }
-  return result;
 }
 
 // 缓存环境信息（静态数据，应用生命周期内不变）
@@ -352,6 +215,9 @@ export function useChat() {
   const updateMessageMetadata = useChatMessageStore(
     (s) => s.updateMessageMetadata,
   );
+  const applyAssistantPartEvent = useChatMessageStore(
+    (s) => s.applyAssistantPartEvent,
+  );
   const updateMessageContent = useChatMessageStore(
     (s) => s.updateMessageContent,
   );
@@ -370,13 +236,6 @@ export function useChat() {
   const [selectedCommandName, setSelectedCommandName] = useState<string | null>(
     null,
   );
-
-  // Pending tool approval state
-  const [pendingApproval, setPendingApproval] = useState<{
-    toolCallId: string;
-    name: string;
-    arguments: string;
-  } | null>(null);
 
   // Session-scoped model override (does not affect global setting).
   // Derived directly from conversation metadata `session.modelOverride`;
@@ -436,7 +295,6 @@ export function useChat() {
       } catch (err) {
         console.error("[useChat] toolApprovalResponse failed:", err);
       }
-      setPendingApproval(null);
     },
     [updateMessageToolCall],
   );
@@ -1061,6 +919,18 @@ export function useChat() {
           break;
         }
 
+        case "assistant_part": {
+          if (!event.assistantPart) break;
+          const msgs = useChatMessageStore.getState().messages;
+          const lastAssistant = [...msgs]
+            .reverse()
+            .find((msg) => msg.role === "assistant");
+          if (lastAssistant) {
+            applyAssistantPartEvent(lastAssistant.id, event.assistantPart);
+          }
+          break;
+        }
+
         case "assistant": {
           // Full assistant message — update the last message with complete content
           if (event.content) {
@@ -1364,6 +1234,7 @@ export function useChat() {
   }, [
     addMessage,
     appendAssistantStreamChunk,
+    applyAssistantPartEvent,
     clearAssistantStreamContent,
     finalizeAssistantStreamContent,
     setSessionStatus,
@@ -1379,273 +1250,6 @@ export function useChat() {
   ]);
 
   /**
-   * Send message in direct chat mode (via IPC to main process)
-   * Automatically includes MCP tools when servers are connected.
-   */
-  const sendDirectMessage = useCallback(
-    async (
-      content: string,
-      options?: {
-        searchEngine?: string;
-        searchConfigs?: SearchConfig[];
-        attachmentIds?: string[];
-      },
-    ) => {
-      // R-2: pull model from main-process resolver (authoritative); fall
-      // back to renderer-local resolution on transient IPC failure.
-      const active = await resolveActiveProviderModel();
-      if (!active) {
-        message.error(
-          "No active model selected. Please configure a model in Settings → Models.",
-        );
-        return;
-      }
-
-      const { provider, model } = active;
-      currentModelInfoRef.current = {
-        model: model.id,
-        providerPreset: provider.preset,
-        providerName: provider.name,
-      };
-
-      setSessionStatus("preparing");
-      clearAssistantStreamContent();
-      armWatchdog();
-
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      currentRequestIdRef.current = requestId;
-      agentFirstChunkLoggedRef.current = false;
-      agentLog.info("Agent send requested", {
-        requestId,
-        contentLength: content.length,
-        hasResumeSession: Boolean(agentSDKSessionIdRef.current),
-      });
-
-      try {
-        // Read latest messages from store (not closure) to handle retry correctly
-        const currentMessages = useChatMessageStore.getState().messages;
-        let chatHistory = currentMessages
-          .filter(
-            (m) =>
-              (m.role === "user" || m.role === "assistant") &&
-              m.content.length > 0,
-          )
-          .map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          }));
-
-        // Apply context count limit
-        if (
-          sessionSettings.contextCount !== -1 &&
-          chatHistory.length > sessionSettings.contextCount
-        ) {
-          chatHistory = chatHistory.slice(-sessionSettings.contextCount);
-        }
-
-        const history: Array<{
-          role: "user" | "assistant" | "system";
-          content: string;
-        }> = chatHistory;
-
-        // Inject system prompt: session override > model custom > global default
-        const envInfo = await getEnvInfoForPrompt();
-        console.debug("[useChat] System prompt cwd:", envInfo?.cwd);
-        const baseSystemPrompt = sessionSettings.systemPrompt
-          ? sessionSettings.systemPrompt
-          : model.systemPrompt;
-        // Build system prompt
-        const systemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo, {
-          name: model.name,
-          id: model.id,
-        });
-        history.unshift({
-          role: "system",
-          content: systemPrompt,
-        });
-
-        // Search augmentation: if a search engine is selected, execute search and prepend results
-        console.log("[useChat] Search trigger check:", {
-          searchEngine: options?.searchEngine,
-          hasConfigs: !!options?.searchConfigs?.length,
-        });
-        if (options?.searchEngine && options.searchConfigs) {
-          const searchConfig = options.searchConfigs.find(
-            (c) => c.provider === options.searchEngine && c.enabled,
-          );
-          if (searchConfig) {
-            try {
-              const searchResult = await searchService.execute({
-                provider: searchConfig.provider,
-                query: content,
-                apiKey: searchConfig.apiKey,
-                apiUrl: searchConfig.apiUrl,
-                maxResults: 5,
-                config: searchConfig.config,
-              });
-              if (
-                searchResult.success &&
-                searchResult.data &&
-                searchResult.data.results.length > 0
-              ) {
-                const searchContext = searchResult.data.results
-                  .map(
-                    (r, i) => `[${i + 1}] ${r.title}\n${r.url}\n${r.snippet}`,
-                  )
-                  .join("\n\n");
-                // Insert after system prompt (index 0) so global prompt stays first
-                history.splice(1, 0, {
-                  role: "system",
-                  content: `The following are web search results for the user's query "${content}" (searched via ${searchResult.data.provider} in ${searchResult.data.searchTimeMs}ms). Use these results to provide an informed, up-to-date response. Cite sources when relevant.\n\n${searchContext}`,
-                });
-              }
-            } catch (searchError) {
-              console.warn(
-                "[useChat] Search failed, continuing without search results:",
-                searchError,
-              );
-              message.warning(
-                t("searchEngine.searchFailed", {
-                  ns: "chat",
-                  error:
-                    searchError instanceof Error
-                      ? searchError.message
-                      : t("searchEngine.unknownError", { ns: "chat" }),
-                }),
-              );
-            }
-          }
-        }
-
-        // Fetch MCP tools for function calling (skip if permission mode is "none")
-        const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
-        const mcpResult = isToolsDisabled
-          ? { toolHint: "" }
-          : await fetchMcpTools();
-
-        // Fetch all enabled skill tools and merge with MCP tools
-        const skillResult = isToolsDisabled
-          ? { tools: [], toolMapping: {} }
-          : await fetchAllSkillTools();
-
-        const tools = isToolsDisabled
-          ? undefined
-          : [...(mcpResult.tools || []), ...skillResult.tools];
-        const toolMapping = isToolsDisabled
-          ? undefined
-          : { ...(mcpResult.toolMapping || {}), ...skillResult.toolMapping };
-        if (mcpResult.toolHint) {
-          history[0].content += mcpResult.toolHint;
-        }
-
-        const toolPermission = isToolsDisabled
-          ? undefined
-          : {
-            mode: sessionSettings.toolPermissionMode,
-            authorizedTools: sessionSettings.authorizedTools,
-          };
-
-        // §14: resolve attachments and prefix their content into the
-        // last user message ONLY for the model — leave the message
-        // stored in chatStore untouched so the UI stays clean.
-        const convForAttach = useChatStore.getState().currentConversationId;
-        if (
-          options?.attachmentIds &&
-          options.attachmentIds.length > 0 &&
-          convForAttach
-        ) {
-          try {
-            const resolveRes = await attachmentResolverService.resolveContext({
-              conversationId: convForAttach,
-              attachmentIds: options.attachmentIds,
-            });
-            if (resolveRes.success && resolveRes.data?.length) {
-              const fragments: string[] = [];
-              for (const block of resolveRes.data) {
-                if (block.resolution === "text") {
-                  const truncAttr = block.truncated ? ' truncated="true"' : "";
-                  fragments.push(
-                    `<attachment file="${block.fileName}"${truncAttr}>\n${block.text ?? ""}\n</attachment>`,
-                  );
-                } else {
-                  fragments.push(
-                    `<attachment-ref file="${block.fileName}" size="${block.size}" mimeType="${block.mimeType ?? "?"}" />`,
-                  );
-                }
-              }
-              if (fragments.length > 0) {
-                const prefix = `--- 附件内容 ---\n${fragments.join("\n\n")}\n`;
-                // Find last user turn in history (which currently
-                // ends with the user message we just added) and
-                // prepend the prefix to its content.
-                for (let i = history.length - 1; i >= 0; i--) {
-                  if (history[i].role === "user") {
-                    history[i] = {
-                      role: "user",
-                      content: `${prefix}${history[i].content}`,
-                    };
-                    break;
-                  }
-                }
-              }
-            }
-          } catch (resolveErr) {
-            console.warn(
-              "[useChat] attachment resolveContext failed, sending without prefix:",
-              resolveErr,
-            );
-          }
-        }
-
-        await modelService.chatCompletion({
-          requestId,
-          baseUrl: provider.baseUrl,
-          apiKey: provider.apiKey,
-          model: model.id,
-          messages: history,
-          tools: tools && tools.length > 0 ? tools : undefined,
-          toolMapping:
-            toolMapping && Object.keys(toolMapping).length > 0
-              ? toolMapping
-              : undefined,
-          toolPermission,
-          toolCallMode:
-            sessionSettings.toolCallMode === "prompt" ||
-              !model.capabilities?.includes("tool_use")
-              ? "prompt"
-              : "function",
-          temperature: sessionSettings.temperatureEnabled
-            ? sessionSettings.temperature
-            : undefined,
-          maxTokens: sessionSettings.maxTokens,
-          topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
-          stream: sessionSettings.streamingEnabled,
-          providerPreset: provider.preset,
-          extraParams: parseCustomParams(sessionSettings.customParams),
-          conversationId:
-            useChatStore.getState().currentConversationId ?? undefined,
-          toolTimeout: sessionSettings.toolTimeout,
-        });
-      } catch (error: unknown) {
-        console.error("[useChat] Failed to send direct message:", error);
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        message.error(`Error: ${errorMsg}`);
-        setSessionStatus("idle");
-        clearAssistantStreamContent();
-        currentRequestIdRef.current = null;
-      }
-    },
-    [
-      message,
-      setSessionStatus,
-      clearAssistantStreamContent,
-      resolveActiveProviderModel,
-      sessionSettings,
-      armWatchdog,
-    ],
-  );
-
-  /**
    * Send message using Agent mode (via Agent SDK)
    * Delegates to AgentSDKService which handles multi-turn tool execution,
    * session management, and streaming internally.
@@ -1658,6 +1262,7 @@ export function useChat() {
         searchEngine?: string;
         searchConfigs?: SearchConfig[];
         attachmentIds?: string[];
+        skillContext?: string;
       },
     ) => {
       isAgentSDKRequestRef.current = false;
@@ -1739,15 +1344,24 @@ export function useChat() {
           providerName: effective?.provider.name ?? "Agent SDK",
         };
 
-        if (effective && !isClaudeAgentModel(effective.model.id)) {
-          agentLog.info("Agent routed to local LLM loop", {
+        // Pre-flight: check the *Claude Code* model the provider will use,
+        // not the chat-side model in the composer. See `resolveAgentSdkIntent`
+        // for rationale.
+        const intent = resolveAgentSdkIntent(
+          useModelStore.getState().providers,
+        );
+        if (!intent.ok) {
+          agentLog.info("Agent blocked: claude code intent unresolved", {
             requestId,
-            model: effective.model.id,
-            providerId: effective.provider.id,
-            providerPreset: effective.provider.preset,
-            modelToolUse: effective.model.capabilities?.includes("tool_use"),
+            chatModel: effective?.model.id,
+            chatProviderId: effective?.provider.id,
+            chatProviderPreset: effective?.provider.preset,
           });
-          await sendDirectMessage(content, options);
+          message.error(intent.message);
+          updateLastAssistantContent(intent.message);
+          setSessionStatus("idle");
+          clearAssistantStreamContent();
+          currentRequestIdRef.current = null;
           return;
         }
 
@@ -1758,10 +1372,14 @@ export function useChat() {
           : effective?.model.systemPrompt;
 
         // 构建系统提示词，注入环境信息（如工作目录、已连接的 MCP 服务器等）
-        const customSystemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo, {
+        const baseAgentSystemPrompt = buildSystemPrompt(baseSystemPrompt, envInfo, {
           name: effective?.model.name,
           id: effective?.model.id,
         });
+        const skillContext = options?.skillContext?.trim();
+        const customSystemPrompt = skillContext
+          ? `${baseAgentSystemPrompt}\n\n--- Skill Context ---\n${skillContext}`
+          : baseAgentSystemPrompt;
 
         // Build agents map from selected team (Multi-Agent)
         let agents:
@@ -1807,6 +1425,20 @@ export function useChat() {
           }
         }
 
+        const promptContext = await buildAgentPromptWithContext({
+          conversationId: convId,
+          content,
+          attachmentIds: options?.attachmentIds,
+          searchEngine: options?.searchEngine,
+          searchConfigs: options?.searchConfigs,
+        });
+        if (promptContext.warnings.length > 0) {
+          agentLog.warn("Agent prompt context warnings", {
+            requestId,
+            warnings: promptContext.warnings,
+          });
+        }
+
         agentLog.info("Agent createQuery IPC start", {
           requestId,
           conversationId: convId,
@@ -1815,9 +1447,11 @@ export function useChat() {
           hasSystemPrompt: Boolean(customSystemPrompt.trim()),
           resumeSessionId: agentSDKSessionIdRef.current ?? undefined,
           mcpServerCount: mcpServerNames.length,
+          attachmentCount: promptContext.attachmentCount,
+          searchResultCount: promptContext.searchResultCount,
         });
         await agentSDKClient.createQuery(requestId, {
-          prompt: content,
+          prompt: promptContext.prompt,
           sessionId: convId ?? undefined,
           cwd,
           model: overrideModelId,
@@ -1857,9 +1491,9 @@ export function useChat() {
       currentConversation,
       sessionModelOverride,
       resolveActiveProviderModel,
-      sendDirectMessage,
       updateLastAssistantContent,
       armWatchdog,
+      t,
     ],
   );
 
@@ -1867,27 +1501,20 @@ export function useChat() {
    * Send message in skill mode (LLM streaming with skill systemPrompt injection)
    */
   const sendSkillMessage = useCallback(
-    async (content: string, skillId?: string, commandName?: string) => {
+    async (
+      content: string,
+      skillId?: string,
+      commandName?: string,
+      options?: {
+        searchEngine?: string;
+        searchConfigs?: SearchConfig[];
+        attachmentIds?: string[];
+      },
+    ) => {
       if (!skillId) {
         message.error(t("noSkillSelected", { ns: "chat" }));
         return;
       }
-
-      // R-2: pull model from main-process resolver (authoritative).
-      const active = await resolveActiveProviderModel();
-      if (!active) {
-        message.error(
-          "No active model selected. Please configure a model in Settings → Models.",
-        );
-        return;
-      }
-
-      const { provider, model } = active;
-      currentModelInfoRef.current = {
-        model: model.id,
-        providerPreset: provider.preset,
-        providerName: provider.name,
-      };
 
       // 获取提示词: command prompt > skill system prompt
       let skillSystemPrompt: string | null = null;
@@ -1904,137 +1531,17 @@ export function useChat() {
       } catch {
         console.warn("[useChat] Failed to load skill/command prompt");
       }
-
-      setSessionStatus("preparing");
-      clearAssistantStreamContent();
-      armWatchdog();
-
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      currentRequestIdRef.current = requestId;
-
-      try {
-        const currentMessages = useChatMessageStore.getState().messages;
-        let chatHistory = currentMessages
-          .filter(
-            (m) =>
-              (m.role === "user" || m.role === "assistant") &&
-              m.content.length > 0,
-          )
-          .map((m) => ({
-            role: m.role as "user" | "assistant",
-            content: m.content,
-          }));
-
-        // Apply context count limit
-        if (
-          sessionSettings.contextCount !== -1 &&
-          chatHistory.length > sessionSettings.contextCount
-        ) {
-          chatHistory = chatHistory.slice(-sessionSettings.contextCount);
-        }
-
-        const history: {
-          role: "user" | "assistant" | "system";
-          content: string;
-        }[] = chatHistory;
-
-        // 构建系统提示词: 会话自定义 > 模型自定义 > 全局默认 + 环境上下文 + Skill 上下文
-        const envInfo = await getEnvInfoForPrompt();
-        const baseSkillPrompt = sessionSettings.systemPrompt
-          ? sessionSettings.systemPrompt
-          : model.systemPrompt;
-        // 构建系统提示词，注入环境信息（如工作目录、已连接的 MCP 服务器等）
-        const basePrompt = buildSystemPrompt(baseSkillPrompt, envInfo, {
-          name: model.name,
-          id: model.id,
-        });
-        const systemPrompt = skillSystemPrompt
-          ? `${basePrompt}\n\n--- Skill Context ---\n${skillSystemPrompt}`
-          : basePrompt;
-
-        history.unshift({
-          role: "system",
-          content: systemPrompt,
-        });
-
-        // Fetch MCP tools for function calling (skip if permission mode is "none")
-        const isToolsDisabled = sessionSettings.toolPermissionMode === "none";
-        const mcpResult = isToolsDisabled
-          ? { toolHint: "" }
-          : await fetchMcpTools();
-
-        // Fetch skill tools and merge with MCP tools
-        const skillToolsResult =
-          skillId && !isToolsDisabled
-            ? await fetchSkillTools(skillId)
-            : { tools: [], toolMapping: {} };
-
-        const tools = isToolsDisabled
-          ? undefined
-          : [...(mcpResult.tools || []), ...skillToolsResult.tools];
-        const toolMapping = isToolsDisabled
-          ? undefined
-          : {
-            ...(mcpResult.toolMapping || {}),
-            ...skillToolsResult.toolMapping,
-          };
-
-        if (mcpResult.toolHint) {
-          history[0].content += mcpResult.toolHint;
-        }
-
-        const toolPermission = isToolsDisabled
-          ? undefined
-          : {
-            mode: sessionSettings.toolPermissionMode,
-            authorizedTools: sessionSettings.authorizedTools,
-          };
-
-        await modelService.chatCompletion({
-          requestId,
-          baseUrl: provider.baseUrl,
-          apiKey: provider.apiKey,
-          model: model.id,
-          messages: history,
-          tools: tools && tools.length > 0 ? tools : undefined,
-          toolMapping:
-            toolMapping && Object.keys(toolMapping).length > 0
-              ? toolMapping
-              : undefined,
-          toolPermission,
-          toolCallMode:
-            sessionSettings.toolCallMode === "prompt" ||
-              !model.capabilities?.includes("tool_use")
-              ? "prompt"
-              : "function",
-          temperature: sessionSettings.temperatureEnabled
-            ? sessionSettings.temperature
-            : undefined,
-          maxTokens: sessionSettings.maxTokens,
-          topP: sessionSettings.topPEnabled ? sessionSettings.topP : undefined,
-          stream: sessionSettings.streamingEnabled,
-          providerPreset: provider.preset,
-          extraParams: parseCustomParams(sessionSettings.customParams),
-          conversationId:
-            useChatStore.getState().currentConversationId ?? undefined,
-          toolTimeout: sessionSettings.toolTimeout,
-        });
-      } catch (error: unknown) {
-        console.error("[useChat] Failed to send skill message:", error);
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        message.error(`Error: ${errorMsg}`);
-        setSessionStatus("idle");
-        clearAssistantStreamContent();
-        currentRequestIdRef.current = null;
-      }
+      await sendAgentMessage(content, undefined, {
+        skillContext: skillSystemPrompt ?? undefined,
+        searchEngine: options?.searchEngine,
+        searchConfigs: options?.searchConfigs,
+        attachmentIds: options?.attachmentIds,
+      });
     },
     [
       message,
-      setSessionStatus,
-      clearAssistantStreamContent,
-      resolveActiveProviderModel,
-      sessionSettings,
-      armWatchdog,
+      sendAgentMessage,
+      t,
     ],
   );
 
@@ -2197,6 +1704,11 @@ export function useChat() {
           content,
           effectiveSkillId,
           effectiveCommandName,
+          {
+            searchEngine: options?.searchEngine,
+            searchConfigs: options?.searchConfigs,
+            attachmentIds: options?.attachmentIds,
+          },
         );
         // One-shot semantics: clear after dispatch so the next message goes
         // back to the default agent path unless the user picks again.

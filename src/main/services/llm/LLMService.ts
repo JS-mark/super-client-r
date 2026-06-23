@@ -306,6 +306,39 @@ export class LLMService {
 	private chatHookRegistry:
 		| import("../plugin/hooks/ChatHooks").ChatHookRegistry
 		| null = null;
+	// Per-request stream event subscribers. Used by HTTP entry points
+	// (`src/main/server/routes/llm.ts`) to deliver SSE to a single client
+	// without involving BrowserWindow broadcasts.
+	private streamSubscribers = new Map<
+		string,
+		Set<(event: ChatStreamEvent) => void>
+	>();
+
+	/**
+	 * Subscribe to stream events for a single `requestId`. Returns an
+	 * unsubscribe function. Multiple subscribers per requestId are supported.
+	 *
+	 * Events are still broadcast to every BrowserWindow via `broadcast` so the
+	 * renderer IPC consumers continue to work; this is an *additional* fan-out
+	 * for the local HTTP server.
+	 */
+	subscribeRequestEvents(
+		requestId: string,
+		listener: (event: ChatStreamEvent) => void,
+	): () => void {
+		let set = this.streamSubscribers.get(requestId);
+		if (!set) {
+			set = new Set();
+			this.streamSubscribers.set(requestId, set);
+		}
+		set.add(listener);
+		return () => {
+			const s = this.streamSubscribers.get(requestId);
+			if (!s) return;
+			s.delete(listener);
+			if (s.size === 0) this.streamSubscribers.delete(requestId);
+		};
+	}
 
 	/**
 	 * Set the chat hook registry for plugin integration
@@ -334,8 +367,9 @@ export class LLMService {
 			permission.mode === "approve_except_authorized" &&
 			permission.authorizedTools?.includes(toolName)
 		) {
-			return true;
-		}
+		return true;
+	}
+
 		// Consult existing approval grants before prompting the user.
 		const operationType = `tool:${toolName}`;
 		if (conversationId) {
@@ -366,6 +400,72 @@ export class LLMService {
 			);
 		}
 		return approved;
+	}
+
+	private evaluateToolRuntimePolicy(
+		conversationId: string | undefined,
+		toolName: string,
+		args: Record<string, unknown>,
+	): { allowed: true } | { allowed: false; code: string; message: string } {
+		const kind = classifyToolKind(toolName);
+		const target = extractTarget(toolName, args);
+		const fallbackCtx = {
+			workspaceId: "",
+			sessionId: conversationId,
+			source: "llm" as const,
+			operation: toolName,
+			kind,
+			target,
+			input: args,
+		};
+
+		if (!conversationId) {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"no-session",
+			);
+			return { allowed: true };
+		}
+
+		try {
+			const runtime = getSessionRuntimeResolver().resolve({
+				sessionId: conversationId,
+			});
+			const ctx = {
+				...fallbackCtx,
+				workspaceId: runtime.workspaceId,
+				sessionId: conversationId,
+			};
+			const evaluation = getRuntimePolicyService().evaluate(
+				ctx,
+				runtime.runtimePolicy,
+			);
+			if (
+				evaluation.decision === "deny" ||
+				evaluation.decision === "needs-approval"
+			) {
+				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				return {
+					allowed: false,
+					code: evaluation.code ?? "runtime.policyDenied",
+					message: evaluation.reason ?? "runtime-policy-denied",
+				};
+			}
+			getRuntimePolicyService().record(
+				ctx,
+				evaluation.reason?.startsWith("audit-only") ? "audit-only" : "allowed",
+				evaluation.reason,
+			);
+			return { allowed: true };
+		} catch {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"runtime-resolver-failed",
+			);
+			return { allowed: true };
+		}
 	}
 
 	/**
@@ -840,26 +940,25 @@ export class LLMService {
 								}));
 							} else {
 							const parsedArgs = safeParseArgs(tc.function.arguments);
-							getRuntimePolicyService().record(
-								{
-									workspaceId: "",
-									sessionId: request.conversationId,
-									source: "llm",
-									operation: tc.function.name,
-									kind: classifyToolKind(tc.function.name),
-									target: extractTarget(tc.function.name, parsedArgs),
-									input: parsedArgs,
-								},
-								"audit-only",
+							const policyResult = this.evaluateToolRuntimePolicy(
+								request.conversationId,
+								tc.function.name,
+								parsedArgs,
 							);
-							const toolStart = Date.now();
-							try {
-								toolResult = await toolExecutor(tc.function.name, parsedArgs);
-							} catch (err) {
+							let toolDuration: number | undefined;
+							if (!policyResult.allowed) {
 								isError = true;
-								toolResult = err instanceof Error ? err.message : String(err);
+								toolResult = policyResult.message;
+							} else {
+								const toolStart = Date.now();
+								try {
+									toolResult = await toolExecutor(tc.function.name, parsedArgs);
+								} catch (err) {
+									isError = true;
+									toolResult = err instanceof Error ? err.message : String(err);
+								}
+								toolDuration = Date.now() - toolStart;
 							}
-							const toolDuration = Date.now() - toolStart;
 
 								this.broadcast(createToolOutcomeEvent({
 									requestId: request.requestId,
@@ -868,6 +967,8 @@ export class LLMService {
 									result: toolResult,
 									isError,
 									duration: toolDuration,
+									code:
+										!policyResult.allowed ? policyResult.code : undefined,
 								}));
 							}
 
@@ -939,26 +1040,26 @@ export class LLMService {
 										code: "TOOL_REJECTED",
 									}));
 								} else {
-								getRuntimePolicyService().record(
-									{
-										workspaceId: "",
-										sessionId: request.conversationId,
-										source: "llm",
-										operation: tc.name,
-										kind: classifyToolKind(tc.name),
-										target: extractTarget(tc.name, tc.arguments),
-										input: tc.arguments,
-									},
-									"audit-only",
+								const policyResult = this.evaluateToolRuntimePolicy(
+									request.conversationId,
+									tc.name,
+									tc.arguments,
 								);
-								const toolStart = Date.now();
-								try {
-									toolResult = await toolExecutor(tc.name, tc.arguments);
-								} catch (err) {
+								let toolDuration: number | undefined;
+								if (!policyResult.allowed) {
 									isError = true;
-									toolResult = err instanceof Error ? err.message : String(err);
+									toolResult = policyResult.message;
+								} else {
+									const toolStart = Date.now();
+									try {
+										toolResult = await toolExecutor(tc.name, tc.arguments);
+									} catch (err) {
+										isError = true;
+										toolResult =
+											err instanceof Error ? err.message : String(err);
+									}
+									toolDuration = Date.now() - toolStart;
 								}
-								const toolDuration = Date.now() - toolStart;
 
 									this.broadcast(createToolOutcomeEvent({
 										requestId: request.requestId,
@@ -967,6 +1068,8 @@ export class LLMService {
 										result: toolResult,
 										isError,
 										duration: toolDuration,
+										code:
+											!policyResult.allowed ? policyResult.code : undefined,
 									}));
 								}
 
@@ -1320,26 +1423,25 @@ export class LLMService {
 								tb.input && typeof tb.input === "object"
 									? (tb.input as Record<string, unknown>)
 									: {};
-							getRuntimePolicyService().record(
-								{
-									workspaceId: "",
-									sessionId: request.conversationId,
-									source: "llm",
-									operation: tb.name,
-									kind: classifyToolKind(tb.name),
-									target: extractTarget(tb.name, tbInputObj),
-									input: tbInputObj,
-								},
-								"audit-only",
+							const policyResult = this.evaluateToolRuntimePolicy(
+								request.conversationId,
+								tb.name,
+								tbInputObj,
 							);
-							const toolStart = Date.now();
-							try {
-								toolResult = await toolExecutor(tb.name, tb.input);
-							} catch (err) {
+							let toolDuration: number | undefined;
+							if (!policyResult.allowed) {
 								isError = true;
-								toolResult = err instanceof Error ? err.message : String(err);
+								toolResult = policyResult.message;
+							} else {
+								const toolStart = Date.now();
+								try {
+									toolResult = await toolExecutor(tb.name, tb.input);
+								} catch (err) {
+									isError = true;
+									toolResult = err instanceof Error ? err.message : String(err);
+								}
+								toolDuration = Date.now() - toolStart;
 							}
-							const toolDuration = Date.now() - toolStart;
 
 								this.broadcast(createToolOutcomeEvent({
 									requestId: request.requestId,
@@ -1348,6 +1450,8 @@ export class LLMService {
 									result: toolResult,
 									isError,
 									duration: toolDuration,
+									code:
+										!policyResult.allowed ? policyResult.code : undefined,
 								}));
 							}
 
@@ -1414,11 +1518,23 @@ export class LLMService {
 	}
 
 	private broadcast(event: ChatStreamEvent): void {
+		// Renderer windows (IPC consumers).
 		BrowserWindow.getAllWindows().forEach((win) => {
 			if (!win.isDestroyed()) {
 				win.webContents.send(LLM_CHANNELS.STREAM_EVENT, event);
 			}
 		});
+		// Per-request HTTP subscribers (SSE).
+		const subs = this.streamSubscribers.get(event.requestId);
+		if (subs && subs.size > 0) {
+			for (const listener of subs) {
+				try {
+					listener(event);
+				} catch {
+					// Subscriber errors must not poison the broadcast loop.
+				}
+			}
+		}
 	}
 }
 

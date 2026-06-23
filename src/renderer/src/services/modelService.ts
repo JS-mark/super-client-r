@@ -7,6 +7,7 @@ import type {
   ProviderModel,
   TestConnectionResponse,
 } from "../types/models";
+import { httpJson } from "./localApiClient";
 
 export const modelService = {
   listProviders: (): Promise<{
@@ -22,16 +23,39 @@ export const modelService = {
 
   deleteProvider: (id: string) => window.electron.model.deleteProvider(id),
 
-  testConnection: (
+  /**
+   * Test provider connectivity. Routed through the local HTTP API
+   * (`POST /v1/llm/test-connection`) so requests are logged and the same
+   * code path is exercised as external clients use.
+   */
+  testConnection: async (
     baseUrl: string,
     apiKey: string,
   ): Promise<{
     success: boolean;
     data?: TestConnectionResponse;
     error?: string;
-  }> => window.electron.model.testConnection(baseUrl, apiKey),
+  }> => {
+    try {
+      const data = await httpJson<TestConnectionResponse>(
+        "/v1/llm/test-connection",
+        { method: "POST", body: { baseUrl, apiKey } },
+      );
+      return { success: true, data };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to test connection",
+      };
+    }
+  },
 
-  fetchModels: (
+  /**
+   * Fetch the provider's `/v1/models` list. Routed through the local HTTP API
+   * (`POST /v1/llm/models`) so logs appear in the API request log and external
+   * clients can invoke the same endpoint.
+   */
+  fetchModels: async (
     baseUrl: string,
     apiKey: string,
     preset?: ModelProviderPreset,
@@ -39,7 +63,20 @@ export const modelService = {
     success: boolean;
     data?: FetchModelsResponse;
     error?: string;
-  }> => window.electron.model.fetchModels(baseUrl, apiKey, preset),
+  }> => {
+    try {
+      const data = await httpJson<FetchModelsResponse>("/v1/llm/models", {
+        method: "POST",
+        body: { baseUrl, apiKey, preset },
+      });
+      return { success: true, data };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to fetch models",
+      };
+    }
+  },
 
   updateModelConfig: (
     providerId: string,
