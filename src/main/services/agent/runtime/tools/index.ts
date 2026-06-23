@@ -1,3 +1,4 @@
+import { createBashTool } from "./bash";
 import { createEditTool } from "./edit";
 import { createReadTool } from "./read";
 import { createWriteTool } from "./write";
@@ -69,7 +70,7 @@ export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
 		createReadTool(ctx),
 		createWriteTool(ctx),
 		createEditTool(ctx),
-		placeholder("Bash"),
+		createBashTool(ctx),
 		placeholder("Grep"),
 		placeholder("Glob"),
 		placeholder("WebFetch"),
