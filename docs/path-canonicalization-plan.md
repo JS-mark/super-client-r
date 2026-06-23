@@ -86,25 +86,25 @@ UI 文案需要遵循 [data-privacy-export-plan](./data-privacy-export-plan.md) 
 
 | Area | Minimum evidence |
 | --- | --- |
-| Normalize | relative path、trailing slash、root、spaces、中文、emoji。 |
+| Normalize | relative path、trailing slash、root 已由 `cwd.test.ts` 覆盖；spaces / 中文已由 `ProjectStorageService.test.ts` 覆盖；emoji 仍待补。 |
 | Platform cases | Windows drive/UNC path 单元测试；macOS case 规则以当前平台或 mock 覆盖。 |
-| Symlink | symlink 与 realpath 是否生成两个 project 的测试。 |
+| Symlink | 已覆盖 symlink 与 realpath 生成两个 project，不自动 realpath 合并。 |
 | Missing path | path 不存在时 project record 可 load，状态为 missing。 |
-| Collision | 人工制造 hash/id 冲突时不覆盖旧 project。 |
+| Collision | 已覆盖人工制造 hash/id 冲突时使用更长 hash fallback，不覆盖旧 project。 |
 | Migration | duplicate legacy cwd、invalid cwd、missing cwd 的 import report。 |
 | Privacy | display/log/export 中路径按 privacy plan 脱敏。 |
 
 ## 8. Open Decisions
 
-1. symlink 是否长期保持独立 project，还是未来提供 “按 realpath 合并” 设置。
+1. symlink 当前保持独立 project；未来如要 realpath 合并，必须做显式 relink 设置。
 2. macOS 是否需要 NFC/NFD normalize，尤其是中文目录名。
-3. hash fallback 采用加长 hash、suffix，还是保存 explicit random id。
+3. hash fallback 当前采用加长 hash；suffix / random id 暂不采用。
 4. legacy workspace cwd 缺失时默认 orphan project 还是 casual session。
 
 ## 9. Readiness Checklist
 
 - [ ] `normalizeCwd` 的规则和本文一致，或者本文被更新为实现真实规则。
-- [ ] collision handling 不会覆盖旧 project。
+- [x] collision handling 不会覆盖旧 project。
 - [ ] missing/orphan/relink UI 已在 [project-management-settings-ia](./project-management-settings-ia.md) 里有入口。
 - [ ] migration matrix 明确 legacy cwd 到 project/casual 的选择。
-- [ ] 测试覆盖 symlink、中文路径、missing path、hash collision。
+- [ ] 测试覆盖 symlink、中文路径、missing path、hash collision。（symlink / 中文路径 / hash collision 已覆盖；missing path 仍需 relink/import UI 证据。）

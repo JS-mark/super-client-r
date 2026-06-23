@@ -30,6 +30,7 @@ interface ApprovalDecisionCardProps {
 	onReject?: () => void;
 	tone?: "default" | "warning" | "success";
 	maxWidth?: number;
+	density?: "default" | "compact";
 }
 
 export function ApprovalDecisionCard({
@@ -51,9 +52,12 @@ export function ApprovalDecisionCard({
 	rejectDisabled,
 	onReject,
 	tone = "default",
-	maxWidth = 560,
+	maxWidth,
+	density = "default",
 }: ApprovalDecisionCardProps) {
 	const { token } = useToken();
+	const compact = density === "compact";
+	const resolvedMaxWidth = maxWidth ?? (compact ? 520 : 560);
 	const toneColor =
 		tone === "warning"
 			? token.colorWarning
@@ -79,14 +83,15 @@ export function ApprovalDecisionCard({
 			style={{
 				border: `1px solid ${token.colorBorderSecondary}`,
 				backgroundColor: token.colorBgContainer,
-				maxWidth,
-				borderRadius: 10,
-				boxShadow: token.boxShadowSecondary,
+				maxWidth: resolvedMaxWidth,
+				borderRadius: compact ? 12 : 10,
+				boxShadow: compact ? token.boxShadowTertiary : token.boxShadowSecondary,
 			}}
 		>
 			<div
-				className="flex items-center gap-2.5 px-4 py-3"
+				className="flex items-center gap-2.5"
 				style={{
+					padding: compact ? "10px 14px" : "12px 16px",
 					borderBottom: `1px solid ${token.colorBorderSecondary}`,
 					background: `linear-gradient(180deg, ${token.colorFillQuaternary}, ${token.colorBgContainer})`,
 				}}
@@ -120,15 +125,22 @@ export function ApprovalDecisionCard({
 				</span>
 			</div>
 
-			<div className="px-4 py-3.5 flex flex-col gap-3">
+			<div
+				className="flex flex-col"
+				style={{
+					padding: compact ? "12px 14px" : "14px 16px",
+					gap: compact ? 10 : 12,
+				}}
+			>
 				{description && (
 					<div
-						className="rounded-md px-3 py-2.5"
+						className="rounded-md"
 						style={{
+							padding: compact ? "8px 10px" : "10px 12px",
 							backgroundColor: toneBg,
 							border: `1px solid ${toneBorder}`,
 							color: token.colorTextSecondary,
-							fontSize: 13,
+							fontSize: compact ? 12 : 13,
 							lineHeight: 1.55,
 						}}
 					>
@@ -162,7 +174,7 @@ export function ApprovalDecisionCard({
 										className="group flex items-center gap-3 min-w-0"
 										style={{
 											width: "100%",
-											padding: "10px 12px",
+											padding: compact ? "8px 10px" : "10px 12px",
 											borderRadius: 8,
 											border: `1px solid ${
 												selected ? toneBorder : token.colorBorderSecondary
@@ -244,6 +256,7 @@ export function ApprovalDecisionCard({
 				<div
 					className="flex items-center justify-center gap-3 px-4 py-3"
 					style={{
+						padding: compact ? "10px 14px" : "12px 16px",
 						borderTop: `1px solid ${token.colorBorderSecondary}`,
 						backgroundColor: token.colorFillQuaternary,
 					}}
@@ -256,7 +269,11 @@ export function ApprovalDecisionCard({
 							icon={rejectIcon}
 							disabled={rejectDisabled}
 							onClick={onReject}
-							style={{ minWidth: 112, height: 36, fontWeight: 600 }}
+							style={{
+								minWidth: compact ? 128 : 112,
+								height: compact ? 34 : 36,
+								fontWeight: 600,
+							}}
 						>
 							{rejectLabel}
 						</Button>
@@ -269,7 +286,11 @@ export function ApprovalDecisionCard({
 							icon={confirmIcon}
 							disabled={confirmDisabled}
 							onClick={onConfirm}
-							style={{ minWidth: 112, height: 36, fontWeight: 600 }}
+							style={{
+								minWidth: compact ? 128 : 112,
+								height: compact ? 34 : 36,
+								fontWeight: 600,
+							}}
 						>
 							{confirmLabel}
 						</Button>

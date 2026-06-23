@@ -23,11 +23,11 @@
 - `ProjectStorageService.archive()` 只切 `archived` flag。
 - `ProjectStorageService.remove(id, { keepFiles: true })` 会移除 registry，但保留 app-managed project dir，供 orphan restore。
 - `ProjectStorageService.remove(id)` 默认删除 app-managed project dir。
-- `SessionStorageService.delete()` 直接删除 session meta、JSONL、per-session subdir。
+- `SessionStorageService.delete()` soft-deletes session meta with `deletedAt` + `tombstone`; JSONL、attachments、tool outputs stay in place for recovery.
+- `SessionStorageService.restoreDeleted()` clears the tombstone and makes the session visible again.
 
 缺口：
 
-- session delete 还没有 trash/tombstone 语义。
 - remote-bound session、运行中的 Agent callback、late webhook replay 没有统一 tombstone 策略。
 - UI copy 和 destructive confirmation 还没有按下表绑定到具体 action。
 
@@ -36,7 +36,7 @@
 | Action | Registry | JSONL/meta | attachments/tool outputs | User cwd | Recoverable? |
 | --- | --- | --- | --- | --- | --- |
 | Archive session | keep | keep | keep | unchanged | yes |
-| Delete session | remove from lists | move to trash or tombstone | move with session | unchanged | yes if trash enabled |
+| Delete session | hidden from active lists via `deletedAt` | keep in place with tombstone meta | keep in place | unchanged | yes via `restoreDeleted` |
 | Archive project | keep with `archived=true` | keep | keep | unchanged | yes |
 | Remove project, keep files | remove registry row | keep under app data | keep | unchanged | yes via orphan restore |
 | Physical delete project | remove registry row | delete app-managed project data | delete app-managed copies | unchanged | no |
@@ -46,7 +46,7 @@
 
 - Never delete the user's actual project cwd from this app.
 - “Physical delete project” only deletes app-managed metadata, sessions, attachments, and tool outputs.
-- Remote bindings must be unbound or tombstoned before session physical delete.
+- Remote bindings must be unbound or tombstoned before any future session physical cleanup.
 - Active session fallback must skip archived sessions and archived projects.
 - Any destructive modal must name exactly what will be deleted and what will remain.
 
@@ -87,8 +87,10 @@ interface Tombstone {
 ## 7. Tests To Add
 
 - [ ] Delete active session picks next non-archived session outside archived projects.
-- [ ] Delete remote-bound session creates tombstone or unbinds before data removal.
+- [x] Session delete creates tombstone, hides from normal lists, preserves JSONL, and blocks new appends.
+- [x] Restore deleted session clears tombstone and makes it visible again.
+- [ ] Delete remote-bound session creates tombstone or unbinds before future physical cleanup.
 - [ ] Archive current project routes away from its active session.
-- [ ] Remove project keepFiles allows restore.
-- [ ] Physical delete does not touch user cwd.
+- [x] Remove project keepFiles preserves app-managed project/session bucket for orphan restore.
+- [x] Physical delete does not touch user cwd.
 - [ ] Missing cwd project shows orphan recovery path.

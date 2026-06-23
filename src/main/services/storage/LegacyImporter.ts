@@ -125,8 +125,8 @@ export class LegacyImporter {
 	/**
 	 * 真正执行导入。可重复调（幂等）；返回每条记录的处理结果。
 	 *
-	 * 不论成败，全部完成后置 `migrationV2Done = true`，避免下次启动反复弹窗。
-	 * 失败的条目用户可凭 `<legacyDir>` 手动救援。
+	 * 只有全部成功/跳过时才置 `migrationV2Done = true`；出现 failures 时保留 retry
+	 * 入口，避免失败数据被静默关闭。失败条目用户可凭 `<legacyDir>` 手动救援。
 	 */
 	importAll(): ImportResult {
 		const result: ImportResult = {

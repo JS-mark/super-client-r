@@ -13,6 +13,7 @@
 
 import type {
 	EnabledCapability,
+	AssistantPartEvent,
 	InteractionProfile,
 	Message,
 	ModelSelection,
@@ -203,6 +204,7 @@ export type SessionEvent =
 	| ToolCallEvent
 	| ToolResultEvent
 	| ToolErrorEvent
+	| SessionAssistantPartEvent
 	| ApprovalEvent
 	| FileArtifactEvent
 	| SessionMarkerEvent;
@@ -233,6 +235,9 @@ export interface AssistantMessageEvent extends BaseEvent {
 	content: string;
 	metadata?: Message["metadata"];
 }
+
+/** Structured assistant output part event. New JSONL writes can stream rich parts. */
+export type SessionAssistantPartEvent = AssistantPartEvent & BaseEvent;
 
 /** 模型发起的工具调用请求。`parentId` 指向触发该 tool_call 的 assistant_message id。 */
 export interface ToolCallEvent extends BaseEvent {

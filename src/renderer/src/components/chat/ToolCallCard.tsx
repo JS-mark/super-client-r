@@ -212,13 +212,14 @@ const STATUS_COLOR: Record<string, (token: Record<string, string>) => string> =
 
 export const ToolCallCard: React.FC<{
 	toolCall: NonNullable<Message["toolCall"]>;
+	compact?: boolean;
 	onApproval?: (
 		toolCallId: string,
 		approved: boolean,
 		updatedInput?: Record<string, unknown>,
 		updatedPermissions?: Array<Record<string, unknown>>,
 	) => void;
-}> = ({ toolCall, onApproval }) => {
+}> = ({ toolCall, compact = false, onApproval }) => {
 	const { token } = useToken();
 	const { t } = useTranslation("chat");
 	const { message } = App.useApp();
@@ -340,6 +341,8 @@ export const ToolCallCard: React.FC<{
 					}
 					onConfirm={handleApprovalConfirm}
 					tone="warning"
+					density={compact ? "compact" : "default"}
+					maxWidth={compact ? 520 : undefined}
 			>
 				<div className="flex items-center gap-2">
 					{server && (
@@ -374,6 +377,7 @@ export const ToolCallCard: React.FC<{
 					label={t("toolCall.input")}
 					value={toolCall.input}
 					defaultExpanded={false}
+					maxHeight={compact ? 160 : undefined}
 					dark={isDark}
 				/>
 			</ApprovalDecisionCard>

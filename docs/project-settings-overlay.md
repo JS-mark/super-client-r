@@ -21,14 +21,15 @@ Later layers win only for fields they explicitly set.
 
 ## 2. Current Implementation Snapshot
 
-当前实现已有 `SessionRuntimeResolver`，会从 `SessionMeta` + `ProjectSettings` + global defaults 解析有效 runtime；但 settings 持久化仍是 MVP：
+当前实现已有 `SessionRuntimeResolver`，会从 `SessionMeta` + `ProjectSettings` + global defaults 解析有效 runtime；settings 持久化也已完成核心 patch 语义：
 
-- `ProjectStorageService.saveSettings(id, patch)` 当前使用 shallow merge：`{ ...current, ...patch }`。
-- `runtimePolicy` / `contextPolicy` 这类 nested policy 如果直接 patch，可能覆盖掉 sibling fields。
-- `null` clear 语义尚未在 storage 层规范化；若直接持久化 `null`，会和“稀疏覆盖”模型冲突。
-- UI reset 需要等 patch API 明确 set/clear/no-op 后再承诺。
+- `ProjectStorageService.saveSettings(id, patch)` 对 nested plain object 使用 deep merge。
+- `undefined` 表示 no-op。
+- `null` 表示 clear override；nested `null` 会删除 sibling field，top-level `null` 会删除整个 override。
+- 已有测试覆盖 nested deep merge、nested null clear、top-level null clear、undefined no-op。
+- 尚未完成：UI reset/source tooltip 还需 renderer 层测试。
 
-因此本文后续规则是目标契约，进入实现前需要补 storage + renderer store + UI tests。
+因此本文剩余规则主要约束 renderer store + UI reset/source display。
 
 ## 3. Empty Value Semantics
 
@@ -86,11 +87,11 @@ Rules:
 
 ## 7. Tests To Add
 
-- [ ] Undefined inherits lower layer.
-- [ ] Null clears override.
-- [ ] Project approval overrides global.
-- [ ] Session model overrides project model.
+- [x] Undefined inherits lower layer / no-op in patch.
+- [x] Null clears override.
+- [x] Project approval overrides global.
+- [x] Session model overrides project model.
 - [ ] Message model override does not persist.
-- [ ] Deep merge runtimePolicy does not erase sibling keys.
+- [x] Deep merge runtimePolicy does not erase sibling keys.
 - [ ] Reset project setting reveals app default in UI.
-- [ ] saveSettings does not persist `null`, `undefined`, or empty policy objects.
+- [x] saveSettings does not persist `null`, `undefined`, or empty policy objects.

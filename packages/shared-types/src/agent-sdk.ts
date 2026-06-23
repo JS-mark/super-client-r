@@ -2,6 +2,8 @@
  * Claude Agent SDK 相关共享类型定义
  */
 
+import type { AssistantPartEvent } from "./chat";
+
 /** Agent SDK 查询请求配置 */
 export interface AgentSDKQueryRequest {
 	/** 用户消息 */
@@ -94,6 +96,8 @@ export interface AgentSDKStreamEvent {
 	result?: AgentSDKResultData;
 	/** 权限请求 */
 	permissionRequest?: AgentSDKPermissionRequest;
+	/** 结构化 assistant part 事件 */
+	assistantPart?: AssistantPartEvent;
 	/** 状态信息 */
 	status?: string;
 	/** 用量 */
@@ -104,6 +108,7 @@ export type AgentSDKStreamEventType =
 	| "init" // session 初始化完成
 	| "chunk" // 流式文本块
 	| "assistant" // 完整 assistant 消息
+	| "assistant_part" // 结构化 assistant part 事件
 	| "tool_call" // 工具调用
 	| "tool_error" // 工具失败
 	| "tool_use_summary" // 工具使用摘要

@@ -114,13 +114,13 @@ interface LegacyImportReport {
 
 ## 8. Tests To Add
 
-- [ ] default workspace + no path → casual.
+- [x] default workspace + no path → casual.
 - [ ] project path → project session.
 - [ ] missing workspace config → casual with `needsCwdReview`.
-- [ ] invalid messages JSON → failure report, no done flag.
-- [ ] interrupted import → rerun completes without duplicates.
+- [x] invalid messages JSON → failure report, no done flag.
+- [x] interrupted import → rerun completes without duplicates.
 - [ ] attachment missing → imported with warning.
-- [ ] duplicate legacy id → skipped on rerun.
+- [x] duplicate legacy id → skipped on rerun.
 - [ ] all failed sessions → no `migrationV2Done`.
-- [ ] partial failures keep retry or explicit dismissed state discoverable.
-- [ ] Option A imports legacy project sessions as casual but preserves old source metadata for relink.
+- [x] partial failures keep retry or explicit dismissed state discoverable.
+- [x] Option A imports legacy sessions as casual and preserves old source metadata for relink.

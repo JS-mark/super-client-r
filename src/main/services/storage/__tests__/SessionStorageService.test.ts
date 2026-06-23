@@ -167,6 +167,99 @@ describe("appendEvent + readMessages", () => {
 		expect(msgs[0].metadata).toMatchObject({ model: "claude", tokens: 10 });
 	});
 
+	it("appendEvent counts assistant.part_start once per assistant message", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.appendEvent(s.id, {
+			type: "assistant.part_start",
+			messageId: "a-parts",
+			ts: 1,
+			part: {
+				id: "p1",
+				type: "text",
+				state: "streaming",
+				createdAt: 1,
+				updatedAt: 1,
+				content: "hello",
+			},
+		});
+		expect(sessions.getMeta(s.id).messageCount).toBe(1);
+
+		sessions.appendEvent(s.id, {
+			type: "assistant.part_start",
+			messageId: "a-parts",
+			ts: 2,
+			part: {
+				id: "p2",
+				type: "code_block",
+				state: "streaming",
+				createdAt: 2,
+				updatedAt: 2,
+				language: "ts",
+				content: "const value = 1;",
+			},
+		});
+		expect(sessions.getMeta(s.id).messageCount).toBe(1);
+	});
+
+	it("repairs messageCount from unique user/assistant/assistant.part_start events", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.appendEvent(s.id, {
+			type: "user_message",
+			id: "u1",
+			ts: 1,
+			content: "first",
+		});
+		sessions.appendEvent(s.id, {
+			type: "assistant_message",
+			id: "a1",
+			ts: 2,
+			content: "",
+		});
+		sessions.appendEvent(s.id, {
+			type: "assistant_message",
+			id: "a1",
+			ts: 3,
+			content: "final",
+		});
+		sessions.appendEvent(s.id, {
+			type: "assistant.part_start",
+			messageId: "a2",
+			ts: 4,
+			part: {
+				id: "p1",
+				type: "text",
+				state: "complete",
+				createdAt: 4,
+				updatedAt: 4,
+				content: "structured",
+			},
+		});
+		sessions.appendEvent(s.id, {
+			type: "assistant.part_start",
+			messageId: "a2",
+			ts: 5,
+			part: {
+				id: "p2",
+				type: "text",
+				state: "complete",
+				createdAt: 5,
+				updatedAt: 5,
+				content: "more",
+			},
+		});
+
+		const meta = JSON.parse(readFileSync(casualPath(s.id, ".meta.json"), "utf-8"));
+		writeFileSync(
+			casualPath(s.id, ".meta.json"),
+			JSON.stringify({ ...meta, messageCount: 0, metaNeedsRepair: true }),
+		);
+
+		const repaired = sessions.getMeta(s.id);
+		expect(repaired.messageCount).toBe(3);
+		expect(repaired.preview).toBe("first");
+		expect(repaired.metaNeedsRepair).toBeUndefined();
+	});
+
 	it("sealInflightToolCalls writes synthetic tool_error for orphan tool_call", () => {
 		const s = sessions.create({ projectId: null });
 		sessions.appendEvent(s.id, {
@@ -333,6 +426,32 @@ describe("appendEvent + readMessages", () => {
 		expect(sessions.getMeta(s.id).messageCount).toBe(1);
 	});
 
+	it("keeps 120 append events as complete JSONL lines with monotonic seq and consistent meta", () => {
+		const s = sessions.create({ projectId: null });
+
+		for (let i = 0; i < 120; i++) {
+			sessions.appendEvent(s.id, {
+				type: "user_message",
+				id: `u-${i}`,
+				ts: i + 1,
+				content: `message ${i}`,
+			});
+		}
+
+		const rows = readFileSync(casualPath(s.id, ".jsonl"), "utf-8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		expect(rows).toHaveLength(120);
+		expect(rows.map((row) => row.seq)).toEqual(
+			Array.from({ length: 120 }, (_, index) => index + 1),
+		);
+		expect(rows.every((row) => typeof row.eventId === "string")).toBe(true);
+		expect(rows.every((row) => typeof row.writtenAt === "number")).toBe(true);
+		expect(sessions.getMeta(s.id).messageCount).toBe(120);
+		expect(sessions.readMessages(s.id)).toHaveLength(120);
+	});
+
 	it("marks meta corrupted when JSONL contains malformed middle line", () => {
 		const s = sessions.create({ projectId: null });
 		writeFileSync(
@@ -472,6 +591,19 @@ describe("rename / updateMeta / delete", () => {
 		expect(sessions.list(null).map((m) => m.id)).toContain(s.id);
 	});
 
+	it("does not allow appending to a soft-deleted session", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.delete(s.id);
+		expect(() =>
+			sessions.appendEvent(s.id, {
+				type: "user_message",
+				id: "u-after-delete",
+				ts: 1,
+				content: "should not write",
+			}),
+		).toThrow("cannot append to deleted session");
+	});
+
 	it("getMeta throws for unknown session", () => {
 		expect(() => sessions.getMeta("nope")).toThrow("session not found");
 	});
@@ -608,28 +740,26 @@ describe("G-2 dir helpers", () => {
 	});
 });
 
-// ─── G-5 chatMode lock ───────────────────────────────────
-describe("G-5 chatMode lock (§10 C1)", () => {
-	it("allows chatMode change before first message", () => {
+// ─── G-5 Agent-only chatMode normalization ─────────────────────────────
+describe("G-5 Agent-only chatMode normalization", () => {
+	it("normalizes create chatMode to agent", () => {
 		const s = sessions.create({ projectId: null, chatMode: "chat" });
-		const updated = sessions.updateMeta(s.id, { chatMode: "agent" });
-		expect(updated.chatMode).toBe("agent");
+		expect(s.chatMode).toBe("agent");
 	});
 
-	it("rejects chatMode change after first message persisted (jsonl exists)", () => {
-		const s = sessions.create({ projectId: null, chatMode: "chat" });
+	it("normalizes chatMode patches to agent even after first message", () => {
+		const s = sessions.create({ projectId: null });
 		sessions.appendEvent(s.id, {
 			type: "user_message",
 			id: "u1",
 			ts: 1,
 			content: "hi",
 		});
-		expect(() => sessions.updateMeta(s.id, { chatMode: "agent" })).toThrow(
-			/lock acquired/,
-		);
+		const updated = sessions.updateMeta(s.id, { chatMode: "chat" });
+		expect(updated.chatMode).toBe("agent");
 	});
 
-	it("allows non-chatMode patches even after lock", () => {
+	it("allows non-chatMode patches after messages exist", () => {
 		const s = sessions.create({ projectId: null });
 		sessions.appendEvent(s.id, {
 			type: "user_message",

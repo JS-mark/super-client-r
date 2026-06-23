@@ -23,13 +23,16 @@ import { useChatMessageStore } from "../../stores/chatMessageStore";
 import type { Message } from "../../stores/chatMessageStore";
 import { useMessageStore } from "../../stores/messageStore";
 import type { ModelProviderPreset } from "../../types/models";
-import { Markdown, StreamingMarkdown } from "../Markdown";
+import { Markdown } from "../Markdown";
 import { MessageContextMenu } from "./MessageContextMenu";
 import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ToolCallCard } from "./ToolCallCard";
 import { shouldVirtualizeMessageList } from "./chatMessageListVirtualization";
+import { isAskUserQuestionToolCall, messageToParts } from "./messagePartsAdapter";
+import { buildMessageTurns } from "./messageTurns";
+import { StreamPartRenderer } from "./parts/StreamPartRenderer";
 
 const { useToken } = theme;
 
@@ -343,32 +346,8 @@ export function ChatMessageList({
 
 	// ── Build bubble items ──
 	const bubbleItems = useMemo(() => {
-		// Step 1: Group messages into turns
-		type Turn =
-			| { type: "user"; msg: Message }
-			| { type: "ai"; messages: Message[] };
-		const turns: Turn[] = [];
-		let currentAiMessages: Message[] | null = null;
+		const turns = buildMessageTurns(messages);
 
-		for (const msg of messages) {
-			if (msg.role === "system") continue;
-
-			if (msg.role === "user") {
-				if (currentAiMessages) {
-					turns.push({ type: "ai", messages: currentAiMessages });
-					currentAiMessages = null;
-				}
-				turns.push({ type: "user", msg });
-			} else {
-				if (!currentAiMessages) currentAiMessages = [];
-				currentAiMessages.push(msg);
-			}
-		}
-		if (currentAiMessages) {
-			turns.push({ type: "ai", messages: currentAiMessages });
-		}
-
-		// Step 2: Build bubble items from turns
 		const result: BubbleItemType[] = [];
 		for (let turnIdx = 0; turnIdx < turns.length; turnIdx++) {
 			const turn = turns[turnIdx];
@@ -378,7 +357,7 @@ export function ChatMessageList({
 			//  User turn
 			// ════════════════════════════════════════
 			if (turn.type === "user") {
-				const msg = turn.msg;
+				const msg = turn.message;
 				const timeText = formatHeaderTime(msg.timestamp);
 				const meta = msg.metadata;
 				const userHeader = (
@@ -628,23 +607,41 @@ export function ChatMessageList({
 					const m = aiMessages[i];
 					if (m.role === "assistant") {
 						const isLastInTurn = i === aiMessages.length - 1;
+						const assistantParts = messageToParts(m).filter(
+							(part) => part.type !== "tool",
+						);
+						const textPart = assistantParts.find(
+							(part) => part.type === "text",
+						);
 						if (isStreamingTurn && isLastInTurn) {
 							// StreamingMarkdown reads streamingContent from Zustand store directly,
 							// so this component re-renders in isolation without rebuilding all bubbleItems.
 							parts.push(
-								<StreamingMarkdown
-									key={m.id}
-									fallbackContent={m.content || ""}
+								<StreamPartRenderer
+									key={textPart?.id ?? `${m.id}:streaming-text`}
+									part={
+										textPart ?? {
+											id: `${m.id}:streaming-text`,
+											type: "text",
+											state: "streaming",
+											createdAt: m.timestamp || Date.now(),
+											updatedAt: m.timestamp || Date.now(),
+											content: m.content || "",
+										}
+									}
+									streaming
 								/>,
 							);
-						} else if (m.content?.trim()) {
-							parts.push(<Markdown key={m.id} content={m.content} />);
+						} else {
+							for (const part of assistantParts) {
+								parts.push(<StreamPartRenderer key={part.id} part={part} />);
+							}
 						}
 					} else if (m.role === "tool" && m.toolCall) {
 						if (m.toolCall.status === "awaiting_approval") {
 							continue;
 						}
-						if (m.toolCall.name === "AskUserQuestion") {
+						if (isAskUserQuestionToolCall(m.toolCall)) {
 							parts.push(
 								<AskUserQuestionCard
 									key={m.id}
@@ -856,7 +853,7 @@ export function ChatMessageList({
 				role: "ai" as const,
 				content: "",
 				extraInfo: {
-					hasPendingInteraction: false,
+					hasPendingInteraction: turn.hasPendingInteraction,
 				},
 				loading:
 					isStreamingTurn &&

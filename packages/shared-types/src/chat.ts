@@ -511,6 +511,176 @@ export interface ToolCallApproval {
 	agentId?: string;
 }
 
+export type MessagePartState =
+	| "streaming"
+	| "complete"
+	| "error"
+	| "requires-approval"
+	| "executing"
+	| "denied";
+
+export type MessagePartType =
+	| "text"
+	| "code_block"
+	| "diff"
+	| "tool"
+	| "data"
+	| "table"
+	| "tree"
+	| "sources"
+	| "artifact"
+	| "status";
+
+export interface BaseMessagePart {
+	id: string;
+	type: MessagePartType;
+	state: MessagePartState;
+	transient?: boolean;
+	createdAt: number;
+	updatedAt: number;
+}
+
+export interface TextMessagePart extends BaseMessagePart {
+	type: "text";
+	content: string;
+}
+
+export interface CodeBlockMessagePart extends BaseMessagePart {
+	type: "code_block";
+	language?: string;
+	path?: string;
+	title?: string;
+	content: string;
+	completeFence?: boolean;
+	lineCount?: number;
+}
+
+export interface DiffMessagePart extends BaseMessagePart {
+	type: "diff";
+	files: Array<{
+		path: string;
+		status: "added" | "modified" | "deleted" | "renamed" | "unknown";
+		hunks?: Array<{
+			header?: string;
+			lines: Array<{ type: "add" | "remove" | "context"; content: string }>;
+		}>;
+	}>;
+	valid?: boolean;
+}
+
+export interface ToolMessagePart extends BaseMessagePart {
+	type: "tool";
+	toolUseId: string;
+	name: string;
+	input?: Record<string, unknown>;
+	output?: unknown;
+	error?: { code?: string; messageKey?: string; details?: unknown };
+	duration?: number;
+	approval?: ToolCallApproval;
+}
+
+export interface DataMessagePart extends BaseMessagePart {
+	type: "data";
+	format?: "json" | "yaml" | "text" | "unknown";
+	value: unknown;
+	title?: string;
+}
+
+export interface TableMessagePart extends BaseMessagePart {
+	type: "table";
+	columns: string[];
+	rows: unknown[][];
+	title?: string;
+}
+
+export interface TreeMessagePart extends BaseMessagePart {
+	type: "tree";
+	nodes: Array<{
+		id: string;
+		label: string;
+		parentId?: string;
+		kind?: "file" | "folder" | "task" | "item";
+		meta?: Record<string, unknown>;
+	}>;
+	title?: string;
+}
+
+export interface SourcesMessagePart extends BaseMessagePart {
+	type: "sources";
+	sources: Array<{
+		id: string;
+		title?: string;
+		url?: string;
+		path?: string;
+		snippet?: string;
+		sourceType?: "web" | "file" | "mcp" | "memory" | "unknown";
+	}>;
+}
+
+export interface ArtifactMessagePart extends BaseMessagePart {
+	type: "artifact";
+	artifactId: string;
+	artifactType: "markdown" | "html" | "image" | "file" | "unknown";
+	title?: string;
+	preview?: string;
+	ref?: string;
+}
+
+export interface StatusMessagePart extends BaseMessagePart {
+	type: "status";
+	label: string;
+	detail?: string;
+	progress?: number;
+}
+
+export type MessagePart =
+	| TextMessagePart
+	| CodeBlockMessagePart
+	| DiffMessagePart
+	| ToolMessagePart
+	| DataMessagePart
+	| TableMessagePart
+	| TreeMessagePart
+	| SourcesMessagePart
+	| ArtifactMessagePart
+	| StatusMessagePart;
+
+export type AssistantPartEvent =
+	| {
+			type: "assistant.part_start";
+			messageId: string;
+			part: MessagePart;
+			ts: number;
+	  }
+	| {
+			type: "assistant.part_delta";
+			messageId: string;
+			partId: string;
+			delta: unknown;
+			ts: number;
+	  }
+	| {
+			type: "assistant.part_update";
+			messageId: string;
+			partId: string;
+			patch: Partial<MessagePart>;
+			ts: number;
+	  }
+	| {
+			type: "assistant.part_done";
+			messageId: string;
+			partId: string;
+			patch?: Partial<MessagePart>;
+			ts: number;
+	  }
+	| {
+			type: "assistant.part_error";
+			messageId: string;
+			partId: string;
+			error: { code?: string; messageKey?: string; details?: unknown };
+			ts: number;
+	  };
+
 export interface Message {
 	id: string;
 	role: MessageRole;
@@ -518,6 +688,8 @@ export interface Message {
 	timestamp: number;
 	type?: MessageType;
 	toolCall?: ToolCall;
+	/** Structured assistant/user render parts. Old messages may only have content. */
+	parts?: MessagePart[];
 	metadata?: {
 		model?: string;
 		providerPreset?: string;

@@ -470,8 +470,16 @@ export function ClaudeEmptyChatHome({
 					renderFooter={(_footerNode, opts) => {
 						const { SendButton } = opts.components;
 						return (
-							<Flex justify="space-between" align="center">
-								<Flex align="center" gap={8}>
+							<Flex
+								justify="space-between"
+								align="center"
+								style={{ width: "100%", minWidth: 0 }}
+							>
+								<Flex
+									align="center"
+									gap={8}
+									style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}
+								>
 									<ChatToolsMenu
 										onAttachment={handleAttachmentClick}
 										onPromptTemplate={() => {
@@ -493,7 +501,7 @@ export function ClaudeEmptyChatHome({
 									/>
 									<AgentTeamSelector />
 								</Flex>
-								<Flex align="center" gap={8}>
+								<Flex align="center" gap={8} style={{ flexShrink: 0 }}>
 									<ModelPill
 										label={modelLabel}
 										onClick={handleOpenModelSwitcher}

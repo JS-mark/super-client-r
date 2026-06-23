@@ -4,7 +4,8 @@
 > 相关计划：[runtime-enforcement-matrix](./runtime-enforcement-matrix.md) ·
 > [deletion-retention-matrix](./deletion-retention-matrix.md) ·
 > [git-worktree-preflight](./git-worktree-preflight.md) ·
-> [sidebar-parity-plan](./sidebar-parity-plan.md)
+> [sidebar-parity-plan](./sidebar-parity-plan.md) ·
+> [streaming-structured-output-plan](./streaming-structured-output-plan.md)
 
 ## 1. 当前 Agent 运行链路
 
@@ -40,7 +41,7 @@
 
 - 所有审批必须进入同一类 Approval interaction，不再散落成按钮、Modal、toast 或 raw exception。
 - AskUserQuestion 是“模型询问用户”，不是普通工具；它仍使用问答卡片，但视觉和阻塞状态应与 approval family 保持一致。
-- Composer 在 pending approval/ask 时保持可见，但发送入口禁用，提示先处理当前请求。
+- 最新交互：当 pending tool_call / approval / ask 出现时，Composer 输入区切换为阻塞交互面板；普通输入框隐藏或降级为不可编辑 pending surface，用户先处理当前请求，再恢复输入。
 
 ## 3. 用户反馈汇总
 
@@ -194,12 +195,14 @@
   - 始终允许本项目/本会话
   - 拒绝
 - 保留 transcript-first，不使用系统级 Modal。
+- ToolCall/Ask 的阻塞交互应优先落在 composer 区域，避免普通聊天流里出现 raw `tool_call>` 文本或过大的工具审批卡片；聊天流中保留执行历史摘要。
 
 本轮实现：
 
 - `ToolCallCard` awaiting approval 状态改为选择式 Approval panel，确认后提交。
 - `Allow for session` 仍写 session grant，并把 SDK suggestions 作为 updatedPermissions 传回。
 - 抽出 `ApprovalDecisionCard`，ToolCall 和 AskUserQuestion 共享同一外框、状态和操作区。
+- 按最新要求，下一步 UI 应把 active approval/ask 挂到 composer pending surface；transcript 内 tool message 只显示状态、输入/结果摘要和错误。
 
 后续 P1：
 
@@ -225,7 +228,7 @@
 - 保持聊天体验：
   - 当用户在底部附近时自动跟随最新消息。
   - 用户向上滚动查看历史时，不强制跳到底部。
-  - pending approval / ask 自动滚动到可见区域。
+  - pending approval / ask 出现时 composer pending surface 自动可见；transcript 只保留对应 tool/ask 历史摘要。
   - 支持 `msg-<id>` 定位和搜索跳转。
 
 设计方案：
@@ -251,8 +254,30 @@
 
 - 保留 `Bubble.List` 作为小会话路径，`turns/items > 80` 时启用 `react-window` v2 `List + useDynamicRowHeight`。
 - 虚拟列表按现有 turn/bubble item 渲染，不重写 markdown、tool card、approval、AskUserQuestion、context menu、bookmark action。
-- pending approval / AskUserQuestion 所在 turn 带 `hasPendingInteraction` 标记，出现时滚动到可见区域。
+- pending approval / AskUserQuestion 触发 composer pending surface；对应 turn 保留 `hasPendingInteraction` 标记用于历史定位，但不再把主审批交互塞进大消息卡片。
 - 新增阈值单测；大列表视觉和滚动继续通过 `pnpm dev` 做人工回归。
+
+### 问题 7：代码 / diff / tool / 结构化结果缺少流式结构化展示
+
+现状：
+
+- assistant streaming 仍主要依赖 markdown 文本拼接。
+- 代码块、diff、JSON、表格、文件树、引用等结构化内容没有 stable part id，无法独立更新、折叠、复制、虚拟化或最终校验。
+- `tool_call` / `tool_use` / `tool_error` 已开始收口到 tool message，但还缺少统一的 typed part state machine。
+- raw protocol 文本一旦漏过 normalization，就会出现在用户可见正文里。
+
+目标：
+
+- 引入 typed message parts，把 text、code block、diff、tool、data、table、tree、sources、status、artifact 分开渲染。
+- 同一个 part id 的更新必须 reconcile，不能重复插入卡片。
+- tool 状态统一为 `input-streaming -> input-available -> approval-requested -> executing -> output-available/output-error/denied`。
+- transient status 只用于 UI 进度，不写入 JSONL 历史。
+- 代码块和大结构化结果按 part 层级节流渲染，避免每个 token 重建整条消息。
+
+执行依据：
+
+- 详细协议、renderer 拆分、性能要求和验收测试见 [streaming-structured-output-plan](./streaming-structured-output-plan.md)。
+- 实现顺序应排在虚拟列表基础能力之后，至少先保证 part 高度变化能触发当前 row remeasure。
 
 ## 4. 本轮验证
 

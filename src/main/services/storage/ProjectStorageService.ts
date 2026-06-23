@@ -470,7 +470,7 @@ function deepMergeSettings(
 			(merged as Record<string, unknown>)[key] = value;
 		}
 	}
-	return merged;
+	return removeEmptyObjects(merged) as ProjectSettings;
 }
 
 function removeUndefinedAndNullClears(
@@ -488,6 +488,20 @@ function removeUndefinedAndNullClears(
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function removeEmptyObjects(value: unknown): unknown {
+	if (!isPlainObject(value)) return value;
+	const next: Record<string, unknown> = {};
+	for (const [key, child] of Object.entries(value)) {
+		if (child === undefined || child === null) continue;
+		const cleaned = removeEmptyObjects(child);
+		if (isPlainObject(cleaned) && Object.keys(cleaned).length === 0) {
+			continue;
+		}
+		next[key] = cleaned;
+	}
+	return next;
 }
 
 // ─────────────────────────────────────────────────────────────────────

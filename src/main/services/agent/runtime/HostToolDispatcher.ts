@@ -39,6 +39,7 @@ export interface McpToolCallService {
 		serverId: string,
 		toolName: string,
 		args: Record<string, unknown>,
+		options?: { conversationId?: string },
 	): Promise<{ success: boolean; data?: unknown; error?: string }>;
 }
 
@@ -185,6 +186,7 @@ export class HostToolDispatcher implements ToolDispatcher {
 				call.origin.serverId,
 				call.origin.realName,
 				args,
+				{ conversationId: call.conversationId },
 			);
 			if (!r.success) {
 				return errorResult(r.error ?? "Tool call failed", startedAt);

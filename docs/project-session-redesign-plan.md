@@ -7,6 +7,8 @@
 > **本文 supersedes**：`workspace-session-ui-plan.md` 中所有"Workspace 作为独立配置实体"的章节（§2 product model 中的 Workspace 层、§4 workspace source-of-truth、§15 workspace settings、§16 `WorkspaceConfig`、§26.4 R-1）。R-1 phase 1 + phase 2 在本计划下变成**过渡兼容层**，最终被删除。
 >
 > 状态说明：本文中的 `✅` 是历史实施记录或当时的切片状态。进入新一轮实现、合并或声称完成前，必须按 [refactor-execution-gates](./refactor-execution-gates.md) 重新验证当前代码、测试和手测证据。
+>
+> 最新决策覆盖：当前产品只保留 Agent 模式；本文旧章节中关于 `chatMode = chat/direct/agent` 的切换、锁死和 UI 选择只作为历史/兼容迁移参考。JSONL 正式升级为 structured part events；旧的“只落最终 assistant_message、不持久化流式 part”的决策已被 [streaming-structured-output-plan](./streaming-structured-output-plan.md) supersede。
 
 ## 1. 出发点（用户给出的需求）
 
@@ -907,14 +909,14 @@ UI 层强化：
 |---|---|---|---|
 | GUI 创建项目 | 通过 `cd` + 启动 CLI | 显式按钮 / 拖拽 / picker | desktop GUI 不依赖 shell cwd |
 | 普通对话（无 project） | 不存在 | 一等公民 | 用户原话："新建会话有 2 种" |
-| chat / agent mode | 不区分 | 区分 | 我们的产品保留两种执行后端 |
+| chat / agent mode | 不区分 | 不区分 | 当前产品只保留 Agent 模式；旧 direct/chat 后端仅作为兼容迁移上下文 |
 | session 分桶 | 时间分桶 | 项目分桶（+ casual 分桶） | §2.3 论证 |
 | 项目绑定可变 | N/A | 锁死 | 简化存储路由；fork 提供"换绑"路径 |
 
 ## 10. 决策点（已 sign-off 标 ✅，待拍板标 ⚠）
 
 ✅ 1. **projectId 用 hash + path.txt 备份**。`hash(cwd)` 取前 16 字符 hex 作为 projectId；同时在 `projects/<id>/path.txt` 写入 cwd 字面量。**path.txt 写入时机**：每次 `projects.add` / `projects.restoreOrphan` 成功后立即写；若 cwd rename 通过迁移流程，重写 path.txt。
-✅ 2. **JSONL 不持久化流式 chunk**，只落最终 `assistant_message`（与 Claude Code 一致）。
+✅ 2. **JSONL 正式升级为 structured part events**。assistant text/code/diff/tool/data 等输出以 typed part start/delta/update/done/error 事件持久化；transient status 仅走 IPC 不进历史。旧的“只落最终 `assistant_message`”策略已废弃。
 ✅ 3. **search 索引先不上 SQLite**。等用户报告"找不到历史"再加，索引可 derive 自 JSONL。
 ⚠ 4. **多窗口策略**：当前单窗口。若开第二窗口，主进程加 `chokidar` watch jsonl → 广播事件给所有 renderer。本计划范围**不实施**，仅在 §11 列为 out-of-scope。
 ✅ 5. **会话编辑历史 = fork**。原会话不可变 append-only；编辑某条历史 → 在该位置 fork 新 session（lineage.forkOriginId + forkAtMessageId）。
@@ -922,7 +924,7 @@ UI 层强化：
 ✅ 7. **§9.5 picker sticky**：普通对话 / 项目对话各自独立 sticky；项目对话内记 lastUsed projectId。落地到 `appConfig.getNewConversationDefaults` IPC（§5）。
 ✅ 8. **"派生为项目对话…"进 casual session 右键菜单**。点击 → 强制选项目的 §9.5 picker 变体（不显示"普通对话"radio）。
 ✅ 9. **孤儿恢复入口**：Settings → Advanced → "已删除项目 (N)"。实施细节见 §9.11 (S6)。
-✅ 10. **(C1) projectId / chatMode 的锁死时机统一为"首条消息发送后"**。锁死前可改，锁死后必须 fork。详见 §9.10。`kind` 字段在 (B7) 已被合入 chatMode，不再单独锁。
+✅ 10. **(C1) projectId 的锁死时机为"首条消息发送后"**。锁死前可改，锁死后必须 fork。`chatMode` 不再作为用户可选产品模式；历史字段只保留兼容读取，写入路径应统一为 Agent。
 ✅ 11. **(C2) §9.5 picker 默认勾选"普通对话"**（zero-friction 兜底；新手不用懂"项目"概念也能用）。
 
 ## 11. 不在本计划范围
@@ -1093,7 +1095,7 @@ ipc.invoke("app:show-in-folder", absolutePath: string): Promise<IPCResponse<bool
 | **B2** | P0 | `ApprovalGrantStore` / `RemoteChatBridge` / `AttachmentContextResolver` 走老 storage → 新 session approval / remote / attachments 全失效 | G-2 |
 | **B3** | P0 | E-7 删 migration → 老用户升级后所有历史对话凭空消失 | G-3 |
 | **B8** | P1 | `ProjectSettings` main 端 runtime / RuntimePolicyService 不读 → 用户配置形同虚设 | G-4 |
-| **B6** | P1 | `chatMode` 在 SessionStorage 没强制锁（plan §10 C1 要求首条消息后锁死） | G-5 |
+| **B6** | P1 | 历史 `chatMode` / direct 对话路径需要清理，写入路径应统一 Agent-only | G-5 |
 | **B5** | P2 | `workspaceId === "default"` 魔法字符串散落 14+ 处 | G-6 |
 | **B7** | P2 | `Project.firstRunSeen` 字段定义但无消费者；§A-1 项目首页未实现 | G-7 |
 
@@ -1105,7 +1107,7 @@ ipc.invoke("app:show-in-folder", absolutePath: string): Promise<IPCResponse<bool
 | **G-2** 3 个 dir/grant 消费者切到新 storage ✅ | 0.5d | ✅ 完成：(a) SessionStorage 新增 `getSessionDir/getAttachmentsDir/getToolOutputsDir`；(b) `AttachmentContextResolver` / `RemoteChatBridge` (4 sites) / `ApprovalGrantStore` 全切。`SessionRuntimeResolver` 因深度耦合 WorkspaceConfig 推到 G-4 |
 | **G-3** 升级 import wizard ✅ | 0.5d | ✅ 完成：(a) `LegacyImporter` 服务（detect / importAll，原 id 保留、cp attachments、`migrationV2Done` 防重入）；(b) `legacyData` IPC namespace；(c) `<LegacyImportPrompt>` Modal 在 App 启动时检测并询问；(d) SessionStorage 加 `injectLegacy` 内部 API。MVP 全部老对话导入为 casual，用户手动重新分组到项目 |
 | **G-4** SessionRuntimeResolver 重构 + ProjectSettings overlay ✅ | 1d | ✅ 完成：resolver 全面重写 → 数据源 = `SessionMeta` + `ProjectSettings` + `GLOBAL_RUNTIME_DEFAULTS`；overlay 顺序 global ← project ← session ← message。SessionMeta 加 `planMode` / `interactionProfileOverride` 字段；chatStore 写 / 读路径同步。`EffectiveSessionRuntime` 形态不变，LLMService / IPC consumer 透明 |
-| **G-5** chatMode 锁强制 ✅ | 0.2d | ✅ 完成：`SessionStorage.updateMeta` 见 chatMode 改且 jsonl 已存在 → 抛 lock 错（与 reassignProject 同款机制） |
+| **G-5** legacy chatMode cleanup / Agent-only enforcement | 0.2d | 历史记录：曾实现 chatMode 锁；最新决策改为不保留对话模式，后续应改为兼容读取旧字段、创建/发送路径统一写 Agent |
 | **G-6** "default" 魔法值收口 ✅ | 0.3d | ✅ 完成：chatStore export `getProjectIdFromConversation(conv): string \| null`；8 处 callsite（ClaudeSidebar / AppSidebar / useChat / useNewConversation / useEffectiveInteractionProfile / ComposerStatusBar / ChatInputArea / ClaudeEmptyChatHome）全部收敛 |
 | **G-7** 项目首页 + firstRunSeen ✅ | 0.5d | ✅ 完成（精简版）：`ProjectStorage.markFirstRunSeen` + IPC + store action；ClaudeEmptyChatHome 在 `project && !firstRunSeen` 时显示 first-run Alert（项目名 + cwd + 提示）；首次发消息自动标记 |
 
@@ -1117,4 +1119,4 @@ ipc.invoke("app:show-in-folder", absolutePath: string): Promise<IPCResponse<bool
 - G-2：新建 session 后跑一次 approve flow / remote bind / 附件 resolve，全部命中新 storage
 - G-3：手工塞一份老 chats 数据 → 启动看到 import dialog → 完成后 sidebar 出现导入会话
 - G-4：在 ProjectSettings 设 sandbox=read-only → 跑工具 → audit log 见 enforcement 拒绝写入
-- G-5：开发者控制台直接调 `sessions.updateMeta(id, { chatMode: "agent" })` 在已发消息的 session 上 → 报错
+- G-5：✅ 新建/欢迎页/项目会话/普通会话发送路径均进入 Agent runtime；`useChat` 已删除 direct fallback，Skill prompt / 附件解析结果 / 可选搜索结果作为 Agent context 注入，`SessionStorageService.create/updateMeta` 强制写 `chatMode: "agent"`；旧 `direct/chat` meta 仅作为兼容读取上下文，不再暴露对话模式切换

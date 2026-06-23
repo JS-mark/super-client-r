@@ -25,7 +25,7 @@
 | Project list | yes | yes | 数据源一致，active state 一致。 |
 | Global search | yes | yes or shortcut-only | `mod+p` 在两个 shell 下都可用。 |
 | Remote/IM entry | maybe | yes | 如果 ClaudeSidebar 不展示，必须提供明确 AppSidebar 跳转。 |
-| Extensions/Skills | maybe | yes | 不要求视觉一致，但入口不能消失。 |
+| MCP / Skills / App Plugins | maybe | yes | 三个独立入口不能消失；不再提供用户可见的 Extensions 聚合入口。 |
 | Settings / Project Management | yes or delegated | yes | archive/orphan/import/deleted recovery 必须可发现。 |
 | Archived projects | hidden by default | managed in settings | 两者不能展示互相矛盾的数量或 active state。 |
 | Runtime status | compact indicators | page/detail indicators | 不要求相同 UI，但 project/session context 必须一致。 |
@@ -35,7 +35,7 @@
 这些差异是允许的：
 
 - ClaudeSidebar 可以更像会话工作台，优先 Recent、Projects、Search。
-- AppSidebar 可以更像应用导航，优先 Chat、Settings、Extensions、IM。
+- AppSidebar 可以更像应用导航，优先 Chat、Settings、MCP / Skills / App Plugins、IM。
 - Quick action 视觉样式可以不同。
 - 非核心入口可以通过 command palette/global search 访问，而不是两个 sidebar 都放按钮。
 
@@ -46,6 +46,7 @@
 - active project/session 在两个 sidebar 显示不一致。
 - 一个 sidebar 隐藏 archived/missing 状态，另一个仍允许进入已归档 active session。
 - 快捷键在不同 shell 下绑定不同动作。
+- 把 MCP / Skills / App Plugins 重新合并成用户可见的 Extensions 聚合页。
 
 ## 4. Navigation Rules
 

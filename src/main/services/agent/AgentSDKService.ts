@@ -47,6 +47,7 @@ import type {
 	EffectiveSessionRuntime,
 	PlanMode,
 	ApprovalMode,
+	RuntimeOperationKind,
 } from "@super-client/shared-types/chat";
 import { logger } from "../../utils/logger";
 
@@ -135,6 +136,40 @@ function buildSdkMessageDebugTag(message: SDKMessage): string {
 		return `type=system subtype=${String(msg.subtype ?? "?")}`;
 	}
 	return `type=${type}`;
+}
+
+function getSdkStreamMessageId(requestId: string, message: SDKMessage): string {
+	const raw = message as unknown as Record<string, unknown>;
+	return typeof raw.uuid === "string" ? raw.uuid : `sdk_assistant_${requestId}`;
+}
+
+function getSdkPartId(event: unknown): string {
+	const raw = event as Record<string, unknown>;
+	const index =
+		typeof raw.index === "number" || typeof raw.index === "string"
+			? raw.index
+			: "0";
+	return `sdk_part_${index}`;
+}
+
+function classifyAgentToolKind(toolName: string): RuntimeOperationKind {
+	const bare = toolName.toLowerCase();
+	if (bare.includes("write") || bare.includes("edit")) return "file-write";
+	if (bare.includes("delete") || bare.includes("remove")) return "file-delete";
+	if (bare.includes("read") || bare.includes("list") || bare.includes("glob"))
+		return "file-read";
+	if (bare.includes("bash") || bare.includes("exec") || bare.includes("command"))
+		return "command-exec";
+	if (bare.includes("fetch") || bare.includes("web") || bare.includes("http"))
+		return "network-request";
+	return "tool-execute";
+}
+
+function extractAgentToolTarget(input: Record<string, unknown>): string | undefined {
+	for (const key of ["path", "file", "filePath", "filename", "url", "command"]) {
+		if (typeof input[key] === "string") return input[key] as string;
+	}
+	return undefined;
 }
 
 function derivePermissionModeFromRuntime(
@@ -1087,17 +1122,75 @@ export class AgentSDKService extends EventEmitter {
 			case "stream_event": {
 				// 流式部分消息
 				const event = message.event;
+				if (event.type === "content_block_start" && "content_block" in event) {
+					const contentBlock = event.content_block as unknown as Record<
+						string,
+						unknown
+					>;
+					if (contentBlock.type === "text") {
+						const now = Date.now();
+						return {
+							requestId,
+							type: "assistant_part",
+							sessionId,
+							assistantPart: {
+								type: "assistant.part_start",
+								messageId: getSdkStreamMessageId(requestId, message),
+								ts: now,
+								part: {
+									id: getSdkPartId(event),
+									type: "text",
+									state: "streaming",
+									createdAt: now,
+									updatedAt: now,
+									content:
+										typeof contentBlock.text === "string"
+											? contentBlock.text
+											: "",
+								},
+							},
+						} satisfies AgentSDKStreamEvent;
+					}
+				}
 				if (
 					event.type === "content_block_delta" &&
 					"delta" in event &&
 					event.delta.type === "text_delta"
 				) {
+					const delta = (event.delta as { text: string }).text;
+					return [
+						{
+							requestId,
+							type: "assistant_part",
+							sessionId,
+							assistantPart: {
+								type: "assistant.part_delta",
+								messageId: getSdkStreamMessageId(requestId, message),
+								partId: getSdkPartId(event),
+								delta,
+								ts: Date.now(),
+							},
+						} satisfies AgentSDKStreamEvent,
+						{
+							requestId,
+							type: "chunk",
+							sessionId,
+							content: delta,
+						} satisfies AgentSDKStreamEvent,
+					];
+				}
+				if (event.type === "content_block_stop") {
 					return {
 						requestId,
-						type: "chunk",
+						type: "assistant_part",
 						sessionId,
-						content: (event.delta as { text: string }).text,
-					};
+						assistantPart: {
+							type: "assistant.part_done",
+							messageId: getSdkStreamMessageId(requestId, message),
+							partId: getSdkPartId(event),
+							ts: Date.now(),
+						},
+					} satisfies AgentSDKStreamEvent;
 				}
 				return null;
 			}
@@ -1206,6 +1299,17 @@ export class AgentSDKService extends EventEmitter {
 		conversationId?: string,
 	): Promise<PermissionResult> {
 		const operationType = `tool:${toolName}`;
+		const runtimeGate = this.evaluateAgentToolRuntimePolicy(
+			conversationId,
+			toolName,
+			input,
+		);
+		if (!runtimeGate.allowed) {
+			return Promise.resolve({
+				behavior: "deny",
+				message: runtimeGate.message,
+			});
+		}
 
 		// 在向用户发起请求前先查找已有授权
 		if (conversationId) {
@@ -1280,6 +1384,64 @@ export class AgentSDKService extends EventEmitter {
 				}
 			});
 		});
+	}
+
+	private evaluateAgentToolRuntimePolicy(
+		conversationId: string | undefined,
+		toolName: string,
+		input: Record<string, unknown>,
+	): { allowed: true } | { allowed: false; message: string } {
+		const fallbackCtx = {
+			workspaceId: "",
+			sessionId: conversationId,
+			source: "agent-sdk" as const,
+			operation: toolName,
+			kind: classifyAgentToolKind(toolName),
+			target: extractAgentToolTarget(input),
+			input,
+		};
+		if (!conversationId) {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"no-session",
+			);
+			return { allowed: true };
+		}
+		try {
+			const runtime = getSessionRuntimeResolver().resolve({
+				sessionId: conversationId,
+			});
+			const ctx = {
+				...fallbackCtx,
+				workspaceId: runtime.workspaceId,
+				sessionId: conversationId,
+			};
+			const evaluation = getRuntimePolicyService().evaluate(
+				ctx,
+				runtime.runtimePolicy,
+			);
+			if (evaluation.decision === "deny") {
+				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				return {
+					allowed: false,
+					message: evaluation.reason ?? evaluation.code ?? "runtime-policy-denied",
+				};
+			}
+			getRuntimePolicyService().record(
+				ctx,
+				evaluation.reason?.startsWith("audit-only") ? "audit-only" : "allowed",
+				evaluation.reason,
+			);
+			return { allowed: true };
+		} catch {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"runtime-resolver-failed",
+			);
+			return { allowed: true };
+		}
 	}
 
 	/**

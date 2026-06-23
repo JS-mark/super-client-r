@@ -31,6 +31,8 @@ MCP 和 Skill 需要重新设计，但不是删除市场，也不是合并进 Ex
 
 不提供用户可见的 `/extensions` 聚合页。Agent-facing capability overview 后续如有需要，应作为调试/详情视图或 runtime 子视图，而不是替代三个市场入口。
 
+应用插件开发说明按现有实现处理：本地 API 服务已提供 `/plugin-dev` 静态说明页，作为“如何开发/使用应用插件”的 Web 入口。后续只需要在 Settings → API 服务或应用插件中心补稳定入口和文案，不再另起 Extensions 页面承载这部分内容。
+
 ### MCP Domain
 
 MCP 拆为四层：
@@ -114,6 +116,13 @@ Skill 与 MCP 的差异：
 - Agent capability resolver 只读取 runtime capability + activation + policy，不直接读市场 store。
 - MCP tool execution、Skill injection、plugin capability contribution 统一进入 runtime policy / approval pipeline。
 - Runtime capability 视图独立于市场 store，不通过 Extensions 聚合页拼接各 store。
+
+### P4.5: App Plugin Developer Guide Entry
+
+- 沿用当前 API server 静态页面 `/plugin-dev`。
+- Settings → API 服务和 `/plugins` 页面提供打开入口。
+- 页面内容只介绍应用插件开发、安装、UI contribution、权限和调试方式。
+- Agent-facing capability contribution 只链接到 runtime/policy 文档，不在该页面伪装成 MCP/Skill 市场。
 
 ## Validation
 

@@ -190,9 +190,12 @@ describe("HostToolDispatcher.execute", () => {
 		const d = new HostToolDispatcher(makeDeps({ callTool }));
 		const r = await d.execute(ctx());
 		expect(r.isError).toBe(false);
-		expect(callTool).toHaveBeenCalledWith("@scp/file-system", "read_file", {
-			path: "/work/src/foo.ts",
-		});
+		expect(callTool).toHaveBeenCalledWith(
+			"@scp/file-system",
+			"read_file",
+			{ path: "/work/src/foo.ts" },
+			{ conversationId: "conv-1" },
+		);
 		expect(r.content.kind).toBe("text");
 	});
 

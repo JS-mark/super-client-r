@@ -21,7 +21,22 @@ export interface MessageLike {
 	timestamp: number;
 	type?: "text" | "tool_use" | "tool_result" | "error";
 	toolCall?: ToolCall;
+	parts?: Message["parts"];
 	metadata?: Message["metadata"];
+}
+
+function isTextPart(
+	part: NonNullable<Message["parts"]>[number],
+): part is Extract<NonNullable<Message["parts"]>[number], { type: "text" }> {
+	return part.type === "text";
+}
+
+function textFromPersistentParts(parts: NonNullable<Message["parts"]>): string {
+	return parts
+		.filter((part) => !part.transient)
+		.filter(isTextPart)
+		.map((part) => part.content)
+		.join("");
 }
 
 /** 单条 → 0..N 个 event。 */
@@ -120,15 +135,38 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 	}
 
 	if (msg.role === "assistant") {
-		return [
+		const persistentParts = (msg.parts ?? []).filter((part) => !part.transient);
+		const content =
+			persistentParts.length > 0
+				? textFromPersistentParts(persistentParts) || msg.content
+				: msg.content;
+		const events: SessionEvent[] = [
 			{
 				type: "assistant_message",
 				id: msg.id,
 				ts,
-				content: msg.content,
+				content,
 				...(msg.metadata ? { metadata: msg.metadata } : {}),
 			},
 		];
+		for (const part of persistentParts) {
+			events.push({
+				type: "assistant.part_start",
+				messageId: msg.id,
+				part,
+				ts: part.createdAt || ts,
+			});
+			if (part.state !== "streaming") {
+				events.push({
+					type: "assistant.part_done",
+					messageId: msg.id,
+					partId: part.id,
+					patch: { state: part.state, updatedAt: part.updatedAt || ts },
+					ts: part.updatedAt || ts,
+				});
+			}
+		}
+		return events;
 	}
 
 	console.warn(

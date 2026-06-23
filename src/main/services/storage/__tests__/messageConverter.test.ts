@@ -8,6 +8,7 @@ import {
 	convertChatMessageToEvents,
 	convertChatMessagesToEvents,
 } from "../messageConverter";
+import { messageToEvents } from "@super-client/shared-types/messageConverter";
 
 describe("user / assistant text messages", () => {
 	it("user text → single user_message event", () => {
@@ -56,6 +57,52 @@ describe("user / assistant text messages", () => {
 			type: "user_message",
 			attachmentIds: ["att-1", "att-2"],
 		});
+	});
+
+	it("assistant structured parts skip transient parts", () => {
+		const events = messageToEvents({
+			id: "a-parts",
+			role: "assistant",
+			content: "transient persistent",
+			timestamp: 2100,
+			parts: [
+				{
+					id: "p-transient",
+					type: "text",
+					state: "streaming",
+					transient: true,
+					createdAt: 2100,
+					updatedAt: 2100,
+					content: "transient",
+				},
+				{
+					id: "p-persistent",
+					type: "text",
+					state: "complete",
+					createdAt: 2101,
+					updatedAt: 2102,
+					content: "persistent",
+				},
+			],
+		});
+
+		expect(events.map((event) => event.type)).toEqual([
+			"assistant_message",
+			"assistant.part_start",
+			"assistant.part_done",
+		]);
+		expect(events[0]).toMatchObject({
+			type: "assistant_message",
+			content: "persistent",
+		});
+		expect(events).not.toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ partId: "p-transient" }),
+				expect.objectContaining({
+					part: expect.objectContaining({ id: "p-transient" }),
+				}),
+			]),
+		);
 	});
 });
 

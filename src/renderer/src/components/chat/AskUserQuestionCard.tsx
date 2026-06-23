@@ -25,6 +25,7 @@ export interface QuestionAnswer {
 
 interface AskUserQuestionCardProps {
 	toolCall: NonNullable<Message["toolCall"]>;
+	compact?: boolean;
 	onSubmit: (
 		toolCallId: string,
 		approved: boolean,
@@ -121,6 +122,7 @@ const SelectionDot: React.FC<{
  */
 export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 	toolCall,
+	compact = false,
 	onSubmit,
 }) => {
 	const { token } = useToken();
@@ -268,6 +270,8 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 			icon={<QuestionCircleOutlined style={{ fontSize: 13 }} />}
 			title={t("askUserQuestion.title")}
 			tone="success"
+			density={compact ? "compact" : "default"}
+			maxWidth={compact ? 520 : undefined}
 			footer={
 				isInteractive ? (
 					<>

@@ -20,14 +20,28 @@ Approval can reduce prompts, but it must not bypass hard sandbox limits.
 
 ## 2. Current Implementation Snapshot
 
-Current `RuntimePolicyService` is an MVP gate:
+Current `RuntimePolicyService.evaluate()` covers the core policy decisions:
 
-- `external-app` with `externalAppAccess === "blocked"` is denied.
-- `external-app` with `approval-required` currently returns allow with reason `approval-required-not-yet-prompted`.
-- `network-request`, `file-write`, `file-delete`, `file-read`, `command-exec`, and `tool-execute` return allow with reason `kind-not-yet-enforced`.
-- Audit buffering exists, but the matrix below is not fully wired to every caller path.
+- `external-app`: `blocked` denies, `approval-required` returns `needs-approval`.
+- `network-request`: `blocked` denies, `approval-required` returns `needs-approval`.
+- `file-write` / `file-delete`: `read-only` denies; `approvalMode=request` returns `needs-approval`.
+- `command-exec`: anything below `system-access` returns `needs-approval`.
+- `file-read` and unknown `tool-execute` remain explicit audit-only.
 
-Implication: any UI or plan text must treat full runtime enforcement as pending until each row below has an entrypoint test.
+Wiring status:
+
+- File open/open-with and attachment resolver call `evaluate()`.
+- Git worktree creation calls `evaluate()` and denies when approval would be required but no prompt path exists.
+- Legacy LLM tool executor now calls `evaluate()` before executing classified tools; `needs-approval` without a prompt path is denied as a structured tool error.
+- Agent SDK `canUseTool` now classifies tool requests and calls `evaluate()` before
+  showing the SDK permission prompt; hard `deny` decisions are returned to the SDK,
+  while `allow` / `needs-approval` continue through the existing approval card.
+- MCP `McpService.callTool()` now accepts optional `conversationId`, classifies
+  internal/builtin/market/third-party tool calls, and calls `evaluate()` before
+  dispatch. Callers without a prompt path deny `needs-approval`; no-session
+  callers are explicit audit-only. Tests cover no-session audit and read-only
+  file-write deny, command-exec approval-required denial, and network-blocked
+  denial; browser/third-party proxy approval tests still need to be expanded.
 
 ## 3. Operation Matrix
 
@@ -64,14 +78,15 @@ Grant matching must include operation class and target pattern. A grant for `fil
 
 ## 6. Enforcement Gaps To Close
 
-- [ ] Direct LLM tool executor uses `RuntimePolicyService.evaluate` before calling MCP.
-- [ ] Agent SDK `canUseTool` uses the same classifier as MCP.
-- [ ] Attachment reads are classified before reading file content.
-- [ ] File artifact open/open-with-app respects external-app policy.
-- [ ] Git worktree creation goes through command-exec policy, even though it is app-initiated.
+- [x] Direct LLM tool executor uses `RuntimePolicyService.evaluate` before calling MCP / tool executor.
+- [x] Agent SDK `canUseTool` uses the same classifier family as MCP/tool calls and records audit evidence.
+- [x] Attachment reads are classified before reading file content.
+- [x] File artifact open/open-with-app respects external-app policy.
+- [x] Git worktree creation goes through command-exec policy, even though it is app-initiated.
 - [ ] All deny paths return structured errors that renderer can show without string parsing.
-- [ ] `approval-required` returns `needs-approval` only when caller has a prompt path; otherwise UI must label the policy as audit-only/MVP.
+- [ ] `approval-required` returns `needs-approval` only when caller has a prompt path; Agent SDK has one, legacy LLM direct tools currently deny `needs-approval` as structured tool errors.
 - [ ] Tests assert every operation kind is either enforced or explicitly documented as not yet enforced.
+- [ ] MCP per-server regression tests cover file-system, bash, fetch/browser, and third-party proxy paths with real session runtime policies. File-system, bash command, and fetch/network classification are covered; browser/third-party remain.
 
 ## 7. Audit Event Shape
 

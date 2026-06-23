@@ -26,7 +26,7 @@
 | Migration mode | 已选定保守 casual 导入；workspace path → project 映射仅作为后续 relink/import wizard。 | [project-session-migration-matrix](./project-session-migration-matrix.md) 记录 Option A 为当前实现；failure report / no silent done flag 测试继续补齐。 |
 | Project session storage | 已选定 app-managed userData 分桶；不写 `project.cwd/.scr-data`。 | `SessionStorageService` 测试覆盖 writable cwd 仍落 userData、删除项目不触碰用户 cwd；相关 plan 不再要求 `.scr-data` 迁移。 |
 | Runtime enforcement | 哪些 operation kind 在本轮真正 enforce，哪些仅 audit-only。 | [runtime-enforcement-matrix](./runtime-enforcement-matrix.md) 的每个 operation 有 owner、entrypoint、test。 |
-| JSONL concurrency | 同一 session 的 append owner / queue / atomic meta write 规则。 | [jsonl-concurrency-plan](./jsonl-concurrency-plan.md) 明确 per-session writer；并发 append 测试存在。 |
+| JSONL concurrency / structured parts | 同一 session 的 append owner / queue / atomic meta write 规则；assistant text/code/diff/tool/data part event replay/rebuild 规则。 | [jsonl-concurrency-plan](./jsonl-concurrency-plan.md) 明确 per-session writer；[streaming-structured-output-plan](./streaming-structured-output-plan.md) 明确 part event 协议；并发 append 和 part replay 测试存在。 |
 | Project path canonicalization | cwd normalize、symlink、missing path、hash collision、legacy cwd import/relink 规则。 | [path-canonicalization-plan](./path-canonicalization-plan.md) 的 MVP policy 被选定；collision/missing path 测试存在。 |
 | Delete retention | session delete、project remove、archive、physical delete、tombstone 的最终语义。 | [deletion-retention-matrix](./deletion-retention-matrix.md) 的 action 都有 UI copy 和 tests。 |
 | Remote lifecycle | remote binding、bot offline、webhook replay、tombstone 的状态机。 | [remote-session-lifecycle](./remote-session-lifecycle.md) 的 state matrix 有 tests。 |
@@ -35,12 +35,13 @@
 | Privacy/export | 是否暴露 cwd/path/audit/log/export 内容的规则。 | [data-privacy-export-plan](./data-privacy-export-plan.md) 定义 redaction 和 export modes。 |
 | Sidebar parity | ClaudeSidebar/AppSidebar 能力边界和 delegated entry 是否明确。 | [sidebar-parity-plan](./sidebar-parity-plan.md) 覆盖 global search、Settings recovery、active fallback。 |
 | i18n discipline | 新 UI plan 是否列出文案范围、key、硬编码 debt。 | [i18n-plan-discipline](./i18n-plan-discipline.md) 被对应功能 plan 引用。 |
+| Agent-only mode | direct/chat 对话模式不再作为产品模式出现；旧 `chatMode` 仅兼容读取。 | 新建、欢迎页、项目/普通会话发送路径都走 Agent runtime；UI 不再暴露对话模式切换。 |
 
 ## 3. Phase Gates
 
 | Phase | Entry gate | Exit evidence |
 | --- | --- | --- |
-| A: storage foundation | `Project/Session` schema、path/hash policy、JSONL event protocol 已冻结。 | `pnpm check`；storage tests 覆盖 cwd/hash、ProjectStorage、SessionStorage、jsonl parse/serialize、半行恢复。 |
+| A: storage foundation | `Project/Session` schema、path/hash policy、JSONL structured part event protocol 已冻结。 | `pnpm check`；storage tests 覆盖 cwd/hash、ProjectStorage、SessionStorage、jsonl parse/serialize、part replay、半行恢复。 |
 | B: legacy migration | Migration mode 已选；failure matrix 已转测试。 | Legacy import tests 覆盖 invalid JSON、partial failure、rerun idempotency、attachment copy failure、no silent done flag。 |
 | C: renderer stores | IPC contract 稳定；stores 不切消费者。 | store tests 覆盖 load/create/delete/rename/updateMeta、project cache、error path。 |
 | D: UI switch | B/C 已 verified；旧/新会话读写路径不能混用。 | 新建 casual/project session、发送、重启恢复、remote/attachment 基础路径手测通过。 |
@@ -55,6 +56,7 @@
 | Migration | `LegacyImporter` failure matrix；`migrationV2Done` 不因失败静默关闭 retry；old data untouched。 |
 | Runtime | Every operation kind has either enforce test or explicit audit-only test; `approval-required` cannot silently allow without UI label. |
 | JSONL | Concurrent appends preserve line integrity and meta consistency; malformed trailing line recovery tested. |
+| Structured streaming output | `part_start/delta/update/done/error` 可 replay；raw `tool_call>` / `<|eom|>` 不进正文；tool error/approval/result 恢复后状态一致。 |
 | Project path | symlink policy, path missing, hash collision fallback, macOS Unicode/path casing decision documented and tested where supported. |
 | Sidebar parity | global search shortcut works in both shells; active project/session fallback is consistent after archive/delete/remote incoming. |
 | i18n | New or changed user-visible copy has keys, fallback behavior, long text checks, and no raw exception text in UI. |

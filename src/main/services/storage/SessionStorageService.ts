@@ -160,7 +160,7 @@ export class SessionStorageService {
 			id,
 			projectId: input.projectId,
 			name: input.name,
-			chatMode: input.chatMode ?? "agent",
+			chatMode: "agent",
 			createdAt: now,
 			updatedAt: now,
 			messageCount: 0,
@@ -183,19 +183,8 @@ export class SessionStorageService {
 		const current = this.getMeta(sessionId);
 		// 不允许通过 updateMeta 改 projectId / id —— 走 reassignProject
 		const { id: _id, projectId: _pid, ...safePatch } = patch as SessionMeta;
-
-		// G-5 §10 (C1) chatMode 锁：首条消息发出后（jsonl 存在）禁改 chatMode；
-		// 用户要换模式必须 fork。projectId 已在 reassignProject 走同款锁。
-		if (
-			safePatch.chatMode !== undefined &&
-			safePatch.chatMode !== current.chatMode
-		) {
-			const jsonlPath = this.sessionFile(current, ".jsonl");
-			if (existsSync(jsonlPath)) {
-				throw new Error(
-					`cannot change chatMode of session ${sessionId}: messages already persisted (lock acquired)`,
-				);
-			}
+		if (safePatch.chatMode !== undefined) {
+			safePatch.chatMode = "agent";
 		}
 
 		const merged: SessionMeta = {
@@ -305,25 +294,18 @@ export class SessionStorageService {
 
 		// 写入前先判定是不是同 id 的"消息更新"（assistant placeholder 落空 content，
 		// 流式结束后再以最终 content + metadata 重发同 id 事件做覆盖）。
+		const countedMessageKey = this.getCountedMessageKey(normalized);
 		const isMessageUpdate =
-			(normalized.type === "user_message" ||
-				normalized.type === "assistant_message") &&
+			countedMessageKey !== null &&
 			existsSync(jsonlPath) &&
-			this.hasMessageEventWithId(
-				jsonlPath,
-				normalized.type,
-				(normalized as { id: string }).id,
-			);
+			this.hasCountedMessageWithKey(jsonlPath, countedMessageKey);
 
 		appendFileSync(jsonlPath, serializeEvent(normalized), "utf-8");
 
-		// 维护 messageCount —— 仅"新增"的 user_message + assistant_message 计数
-		// （tool / approval / file_artifact / session_marker 不算"消息"；同 id update 也不算）
-		if (
-			(normalized.type === "user_message" ||
-				normalized.type === "assistant_message") &&
-			!isMessageUpdate
-		) {
+		// 维护 messageCount —— 仅"新增"的 user_message / assistant_message /
+		// assistant.part_start(messageId) 计数；tool / approval / file_artifact /
+		// session_marker 不算"消息"；同 id update / 同 messageId 多 part 不算。
+		if (countedMessageKey !== null && !isMessageUpdate) {
 			const next: SessionMeta = {
 				...meta,
 				messageCount: meta.messageCount + 1,
@@ -699,24 +681,10 @@ export class SessionStorageService {
 		return events.some((event) => event.eventId === eventId);
 	}
 
-	/**
-	 * Check whether a prior `user_message` / `assistant_message` event with the
-	 * given message `id` already exists in the jsonl. Used by `appendEvent` to
-	 * distinguish a brand-new message from an in-place content/metadata update.
-	 */
-	private hasMessageEventWithId(
-		jsonlPath: string,
-		type: "user_message" | "assistant_message",
-		messageId: string,
-	): boolean {
+	private hasCountedMessageWithKey(jsonlPath: string, key: string): boolean {
 		if (!existsSync(jsonlPath)) return false;
 		const events = parseEvents(readFileSync(jsonlPath, "utf-8"));
-		return events.some(
-			(event) =>
-				event.type === type &&
-				"id" in event &&
-				(event as { id: string }).id === messageId,
-		);
+		return events.some((event) => this.getCountedMessageKey(event) === key);
 	}
 
 	private repairMetaFromJsonl(meta: SessionMeta): SessionMeta {
@@ -728,10 +696,6 @@ export class SessionStorageService {
 			return repaired;
 		}
 		const report = parseEventsWithReport(readFileSync(jsonlPath, "utf-8"));
-		const messageEvents = report.events.filter(
-			(event) =>
-				event.type === "user_message" || event.type === "assistant_message",
-		);
 		const firstUser = report.events.find(
 			(event) => event.type === "user_message",
 		);
@@ -741,7 +705,7 @@ export class SessionStorageService {
 		);
 		const repaired: SessionMeta = {
 			...meta,
-			messageCount: messageEvents.length,
+			messageCount: this.countRenderedMessages(report.events),
 			updatedAt: lastTs,
 			...(firstUser?.type === "user_message"
 				? { preview: firstUser.content.slice(0, 100) }
@@ -751,6 +715,28 @@ export class SessionStorageService {
 		delete repaired.metaNeedsRepair;
 		this.writeMeta(repaired);
 		return repaired;
+	}
+
+	private countRenderedMessages(events: SessionEvent[]): number {
+		const keys = new Set<string>();
+		for (const event of events) {
+			const key = this.getCountedMessageKey(event);
+			if (key) keys.add(key);
+		}
+		return keys.size;
+	}
+
+	private getCountedMessageKey(event: SessionEvent): string | null {
+		switch (event.type) {
+			case "user_message":
+				return `user:${event.id}`;
+			case "assistant_message":
+				return `assistant:${event.id}`;
+			case "assistant.part_start":
+				return `assistant:${event.messageId}`;
+			default:
+				return null;
+		}
 	}
 
 	private allProjectBuckets(): Array<string | null> {

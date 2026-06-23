@@ -2,7 +2,7 @@
 //
 // A-3 ProjectStorageService 测试。所有用例用 tmp dir，避免污染真实 userData。
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -45,6 +45,38 @@ describe("add", () => {
 		expect(b.id).toBe(a.id);
 		expect(b.name).toBe("Renamed"); // existing record updates name on idempotent add
 		expect(svc.list()).toHaveLength(1);
+	});
+
+	it("preserves paths with spaces and Chinese characters", () => {
+		const cwd = "/Users/mark/项目 空格/app";
+		const p = svc.add(cwd);
+		expect(p.cwd).toBe(cwd);
+		expect(readFileSync(join(projectDir(p.id), "path.txt"), "utf-8")).toBe(
+			cwd,
+		);
+		expect(svc.list()[0].cwd).toBe(cwd);
+	});
+
+	it("treats symlink path and real path as separate projects", () => {
+		if (process.platform === "win32") return;
+
+		const realDir = mkdtempSync(join(tmpdir(), "super-client-real-"));
+		const linkDir = join(
+			tmpdir(),
+			`super-client-link-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		);
+		symlinkSync(realDir, linkDir, "dir");
+		try {
+			const realProject = svc.add(realDir);
+			const linkProject = svc.add(linkDir);
+			expect(linkProject.id).not.toBe(realProject.id);
+			expect(svc.list().map((project) => project.cwd).sort()).toEqual(
+				[linkDir, realDir].sort(),
+			);
+		} finally {
+			rmSync(linkDir, { force: true });
+			rmSync(realDir, { recursive: true, force: true });
+		}
 	});
 
 	it("rolls back registry + directory when ensureProjectFiles fails", () => {
@@ -159,6 +191,32 @@ describe("settings", () => {
 			sandboxMode: "read-only",
 		});
 	});
+
+	it("treats undefined as no-op and top-level null as clear", () => {
+		const p = svc.add("/a/b");
+		svc.saveSettings(p.id, {
+			interactionProfile: "codex",
+			defaultModel: { providerId: "anthropic", modelId: "claude" },
+		});
+		svc.saveSettings(p.id, {
+			interactionProfile: undefined,
+			defaultModel: null,
+		} as never);
+		expect(svc.getSettings(p.id)).toEqual({
+			interactionProfile: "codex",
+		});
+	});
+
+	it("does not persist empty policy objects after clearing nested fields", () => {
+		const p = svc.add("/a/b");
+		svc.saveSettings(p.id, {
+			runtimePolicy: { networkAccess: "blocked" },
+		});
+		svc.saveSettings(p.id, {
+			runtimePolicy: { networkAccess: null } as never,
+		});
+		expect(svc.getSettings(p.id)).toEqual({});
+	});
 });
 
 describe("hash collision guard", () => {
@@ -171,6 +229,7 @@ describe("hash collision guard", () => {
 		);
 		const next = svc.add("/a/b");
 		expect(next.id).not.toBe(p.id);
+		expect(next.id.length).toBeGreaterThan(p.id.length);
 		expect(svc.list()).toHaveLength(2);
 		expect(readFileSync(join(projectDir(p.id), "path.txt"), "utf-8")).toBe(
 			"/different/path",

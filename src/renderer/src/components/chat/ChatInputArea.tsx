@@ -50,6 +50,7 @@ import { ToolsPanel } from "./toolbar/ToolsPanel";
 import type { ToolItem } from "./toolbar/ToolsPanel";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ToolCallCard } from "./ToolCallCard";
+import { isAskUserQuestionToolCall } from "./messagePartsAdapter";
 
 const { useToken } = theme;
 
@@ -486,8 +487,19 @@ export function ChatInputArea({
 				);
 			}
 			return (
-				<Flex justify="space-between" align="center">
-					<Flex align="center" gap={8}>
+				<Flex
+					justify="space-between"
+					align="center"
+					style={{ width: "100%", minWidth: 0 }}
+				>
+					{/* Left group can shrink (and clip overflowing pills) so the
+					    right group — which carries the Send / Stop button — never
+					    overflows past the composer card's right border. */}
+					<Flex
+						align="center"
+						gap={8}
+						style={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}
+					>
 						<ApprovalModePill
 							projectId={projectId}
 							approvalMode={approvalMode}
@@ -549,8 +561,10 @@ export function ChatInputArea({
 						)}
 					</Flex>
 
-					{/* Send or Stop button */}
-					<Flex align="center" gap={8}>
+					{/* Send or Stop button — pinned to the right edge. flexShrink:0
+					    keeps it inside the card; ModelPill already self-truncates via
+					    its own max-width. */}
+					<Flex align="center" gap={8} style={{ flexShrink: 0 }}>
 						<ContextUsagePill />
 						<ModelPill label={modelLabel} onClick={handleOpenModelSwitcher} />
 						{isStreaming ? (
@@ -609,15 +623,17 @@ export function ChatInputArea({
 				}}
 			/>
 			{pendingToolMessage?.toolCall && respondToApproval ? (
-				<div className="chat-composer relative w-full mx-auto max-w-4xl">
-					{pendingToolMessage.toolCall.name === "AskUserQuestion" ? (
+				<div className="chat-composer relative w-full mx-auto max-w-2xl">
+					{isAskUserQuestionToolCall(pendingToolMessage.toolCall) ? (
 						<AskUserQuestionCard
 							toolCall={pendingToolMessage.toolCall}
+							compact
 							onSubmit={respondToApproval}
 						/>
 					) : (
 						<ToolCallCard
 							toolCall={pendingToolMessage.toolCall}
+							compact
 							onApproval={respondToApproval}
 						/>
 					)}

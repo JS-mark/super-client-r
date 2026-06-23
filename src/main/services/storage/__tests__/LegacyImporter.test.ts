@@ -214,6 +214,35 @@ describe("LegacyImporter.importAll", () => {
 		expect(sm._getDone()).toBe(false);
 	});
 
+	it("rerun after fixing a failed item skips imported sessions and then marks done", () => {
+		writeLegacyConv("good", { name: "G" }, []);
+		const badDir = join(userDataDir, "chats", userId, "bad");
+		mkdirSync(badDir, { recursive: true });
+		writeFileSync(join(badDir, "messages.json"), "not json", "utf-8");
+
+		const sm = makeStoreManager();
+		const importer = new LegacyImporter(sessions, sm as never, userId);
+		const first = importer.importAll();
+		expect(first.imported).toBe(1);
+		expect(first.failed).toBe(1);
+		expect(sm._getDone()).toBe(false);
+
+		writeFileSync(
+			join(badDir, "messages.json"),
+			JSON.stringify([
+				{ id: "m-bad", role: "user", content: "fixed", timestamp: 1 },
+			]),
+			"utf-8",
+		);
+		const second = importer.importAll();
+		expect(second.imported).toBe(1);
+		expect(second.skipped).toBe(1);
+		expect(second.failed).toBe(0);
+		expect(second.failures).toEqual([]);
+		expect(sm._getDone()).toBe(true);
+		expect(sessions.getMeta("bad").importSource?.id).toBe("bad");
+	});
+
 	it("no legacy dir → marks done immediately, no error", () => {
 		const sm = makeStoreManager();
 		const importer = new LegacyImporter(sessions, sm as never, userId);

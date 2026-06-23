@@ -13,7 +13,12 @@
  *    `Message{type:'tool_use', toolCall:{...result, status}}` 形态
  */
 
-import type { Message, ToolCall } from "@super-client/shared-types/chat";
+import type {
+	Message,
+	MessagePart,
+	TextMessagePart,
+	ToolCall,
+} from "@super-client/shared-types/chat";
 import type {
 	SessionEvent,
 	ToolCallEvent,
@@ -111,6 +116,11 @@ function isSessionEvent(v: unknown): v is SessionEvent {
 		case "tool_call":
 		case "tool_result":
 		case "tool_error":
+		case "assistant.part_start":
+		case "assistant.part_delta":
+		case "assistant.part_update":
+		case "assistant.part_done":
+		case "assistant.part_error":
 		case "approval":
 		case "file_artifact":
 		case "session_marker":
@@ -150,6 +160,7 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 	const toolCallIndex = new Map<string, number>();
 	// id-keyed index for user_message / assistant_message upserts.
 	const messageIndex = new Map<string, number>();
+	const assistantPartIndex = new Map<string, number>();
 
 	for (const e of events) {
 		switch (e.type) {
@@ -185,11 +196,105 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 				};
 				const existing = messageIndex.get(e.id);
 				if (existing !== undefined) {
-					messages[existing] = next;
+					messages[existing] = {
+						...next,
+						...(messages[existing]?.parts
+							? { parts: messages[existing].parts }
+							: {}),
+					};
 				} else {
 					messageIndex.set(e.id, messages.length);
 					messages.push(next);
 				}
+				break;
+			}
+
+			case "assistant.part_start": {
+				const idx = ensureAssistantPartMessage(
+					messages,
+					messageIndex,
+					assistantPartIndex,
+					e.messageId,
+					e.ts,
+				);
+				const target = messages[idx];
+				const existingParts = target.parts ?? [];
+				const partIdx = existingParts.findIndex((part) => part.id === e.part.id);
+				const parts =
+					partIdx >= 0
+						? existingParts.map((part, i) =>
+								i === partIdx ? { ...part, ...e.part } : part,
+							)
+						: [...existingParts, e.part];
+				messages[idx] = withAssistantParts(target, parts);
+				break;
+			}
+
+			case "assistant.part_delta": {
+				const idx = assistantPartIndex.get(e.messageId);
+				if (idx === undefined) {
+					console.warn(
+						"[jsonl] assistant.part_delta without preceding part_start:",
+						e.messageId,
+						e.partId,
+					);
+					break;
+				}
+				const target = messages[idx];
+				const parts = (target.parts ?? []).map((part) =>
+					part.id === e.partId ? applyPartDelta(part, e.delta, e.ts) : part,
+				);
+				messages[idx] = withAssistantParts(target, parts);
+				break;
+			}
+
+			case "assistant.part_update":
+			case "assistant.part_done": {
+				const idx = assistantPartIndex.get(e.messageId);
+				if (idx === undefined) {
+					console.warn(
+						"[jsonl] assistant part patch without preceding part_start:",
+						e.messageId,
+						e.partId,
+					);
+					break;
+				}
+				const patch =
+					e.type === "assistant.part_done"
+						? ({ state: "complete", ...e.patch } as Partial<MessagePart>)
+						: e.patch;
+				const target = messages[idx];
+				const parts = (target.parts ?? []).map((part) =>
+					part.id === e.partId
+						? ({ ...part, ...patch, updatedAt: e.ts } as MessagePart)
+						: part,
+				);
+				messages[idx] = withAssistantParts(target, parts);
+				break;
+			}
+
+			case "assistant.part_error": {
+				const idx = assistantPartIndex.get(e.messageId);
+				if (idx === undefined) {
+					console.warn(
+						"[jsonl] assistant.part_error without preceding part_start:",
+						e.messageId,
+						e.partId,
+					);
+					break;
+				}
+				const target = messages[idx];
+				const parts = (target.parts ?? []).map((part) =>
+					part.id === e.partId
+						? ({
+								...part,
+								state: "error",
+								error: e.error,
+								updatedAt: e.ts,
+							} as MessagePart)
+						: part,
+				);
+				messages[idx] = withAssistantParts(target, parts);
 				break;
 			}
 
@@ -270,6 +375,83 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 	}
 
 	return messages;
+}
+
+function ensureAssistantPartMessage(
+	messages: Message[],
+	messageIndex: Map<string, number>,
+	assistantPartIndex: Map<string, number>,
+	messageId: string,
+	ts: number,
+): number {
+	const existing = messageIndex.get(messageId);
+	if (existing !== undefined) {
+		assistantPartIndex.set(messageId, existing);
+		return existing;
+	}
+	const idx = messages.length;
+	messageIndex.set(messageId, idx);
+	assistantPartIndex.set(messageId, idx);
+	messages.push({
+		id: messageId,
+		role: "assistant",
+		content: "",
+		timestamp: ts,
+		type: "text",
+		parts: [],
+	});
+	return idx;
+}
+
+function withAssistantParts(message: Message, parts: MessagePart[]): Message {
+	return {
+		...message,
+		parts,
+		content: partsToTextContent(parts) || message.content,
+	};
+}
+
+function partsToTextContent(parts: MessagePart[]): string {
+	return parts
+		.filter((part): part is TextMessagePart => part.type === "text")
+		.map((part) => part.content)
+		.join("");
+}
+
+function applyPartDelta(
+	part: MessagePart,
+	delta: unknown,
+	ts: number,
+): MessagePart {
+	const textDelta = extractTextDelta(delta);
+	if (
+		textDelta !== null &&
+		(part.type === "text" || part.type === "code_block")
+	) {
+		return {
+			...part,
+			content: `${part.content}${textDelta}`,
+			state: "streaming",
+			updatedAt: ts,
+		} as MessagePart;
+	}
+	if (delta && typeof delta === "object") {
+		return {
+			...part,
+			...(delta as Partial<MessagePart>),
+			updatedAt: ts,
+		} as MessagePart;
+	}
+	return { ...part, updatedAt: ts };
+}
+
+function extractTextDelta(delta: unknown): string | null {
+	if (typeof delta === "string") return delta;
+	if (!delta || typeof delta !== "object") return null;
+	const record = delta as Record<string, unknown>;
+	if (typeof record.text === "string") return record.text;
+	if (typeof record.content === "string") return record.content;
+	return null;
 }
 
 /**

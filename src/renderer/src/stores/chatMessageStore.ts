@@ -45,8 +45,10 @@ export type {
 } from "@super-client/shared-types/chat";
 
 import type {
+	AssistantPartEvent,
 	ChatSessionStatus,
 	Message,
+	MessagePart,
 	ToolCall,
 } from "@super-client/shared-types/chat";
 
@@ -61,6 +63,107 @@ function emitSessionEvent(event: SessionEvent): void {
 	const conversationId = useChatStore.getState().currentConversationId;
 	if (!conversationId) return;
 	window.electron.sessions.appendEvent(conversationId, event).catch(() => {});
+}
+
+function applyPartDelta(
+	part: MessagePart,
+	delta: unknown,
+	updatedAt: number,
+): MessagePart {
+	if (part.type === "text" && typeof delta === "string") {
+		return { ...part, content: part.content + delta, updatedAt };
+	}
+	if (part.type === "code_block" && typeof delta === "string") {
+		return { ...part, content: part.content + delta, updatedAt };
+	}
+	if (delta && typeof delta === "object") {
+		return { ...part, ...(delta as Partial<MessagePart>), updatedAt } as MessagePart;
+	}
+	return { ...part, updatedAt };
+}
+
+function contentFromParts(parts: MessagePart[], fallback: string): string {
+	const text = parts
+		.filter((part) => part.type === "text")
+		.map((part) => part.content)
+		.join("");
+	return text || fallback;
+}
+
+function applyAssistantPartToMessage(
+	message: Message,
+	event: AssistantPartEvent,
+): Message {
+	const currentParts = message.parts ?? [];
+	let nextParts = currentParts;
+
+	switch (event.type) {
+		case "assistant.part_start": {
+			const existing = currentParts.findIndex(
+				(part) => part.id === event.part.id,
+			);
+			nextParts =
+				existing >= 0
+					? currentParts.map((part, index) =>
+							index === existing ? event.part : part,
+						)
+					: [...currentParts, event.part];
+			break;
+		}
+		case "assistant.part_delta":
+			nextParts = currentParts.map((part) =>
+				part.id === event.partId
+					? applyPartDelta(part, event.delta, event.ts)
+					: part,
+			);
+			break;
+		case "assistant.part_update":
+			nextParts = currentParts.map((part) =>
+				part.id === event.partId
+					? ({ ...part, ...event.patch, updatedAt: event.ts } as MessagePart)
+					: part,
+			);
+			break;
+		case "assistant.part_done":
+			nextParts = currentParts.map((part) =>
+				part.id === event.partId
+					? ({
+							...part,
+							...event.patch,
+							state: "complete",
+							updatedAt: event.ts,
+						} as MessagePart)
+					: part,
+			);
+			break;
+		case "assistant.part_error":
+			nextParts = currentParts.map((part) =>
+				part.id === event.partId
+					? ({
+							...part,
+							state: "error",
+							error: event.error,
+							updatedAt: event.ts,
+						} as MessagePart)
+					: part,
+			);
+			break;
+	}
+
+	return {
+		...message,
+		parts: nextParts,
+		content: contentFromParts(nextParts, message.content),
+	};
+}
+
+function shouldPersistAssistantPartEvent(
+	message: Message,
+	event: AssistantPartEvent,
+): boolean {
+	if (event.type === "assistant.part_start") return !event.part.transient;
+	const part = message.parts?.find((item) => item.id === event.partId);
+	return !part?.transient;
 }
 
 interface ChatMessageState {
@@ -82,6 +185,10 @@ interface ChatMessageState {
 	updateMessageMetadata: (
 		messageId: string,
 		metadata: Partial<NonNullable<Message["metadata"]>>,
+	) => void;
+	applyAssistantPartEvent: (
+		messageId: string,
+		event: AssistantPartEvent,
 	) => void;
 	clearMessages: () => void;
 	deleteMessage: (messageId: string) => void;
@@ -237,6 +344,26 @@ export const useChatMessageStore = create<ChatMessageState>()((set) => ({
 						? { attachmentIds: nextMetadata.attachmentIds }
 						: {}),
 				});
+			}
+			return { messages: newMessages };
+		});
+	},
+
+	applyAssistantPartEvent: (messageId, event) => {
+		set((state) => {
+			const messageIndex = state.messages.findIndex((m) => m.id === messageId);
+			if (messageIndex === -1) return state;
+			const message = state.messages[messageIndex];
+			if (message.role !== "assistant") return state;
+
+			const eventForMessage = { ...event, messageId };
+			const newMessages = [...state.messages];
+			newMessages[messageIndex] = applyAssistantPartToMessage(
+				message,
+				eventForMessage,
+			);
+			if (shouldPersistAssistantPartEvent(message, eventForMessage)) {
+				emitSessionEvent(eventForMessage);
 			}
 			return { messages: newMessages };
 		});

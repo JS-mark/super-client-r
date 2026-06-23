@@ -130,4 +130,53 @@ describe("Chat Message Store", () => {
 			expect(fresh().streamingContent).toBe("Hello World");
 		});
 	});
+
+	describe("Assistant Parts", () => {
+		it("should apply assistant part start, delta, and done events", () => {
+			fresh().addMessage({
+				id: "assistant_1",
+				role: "assistant",
+				content: "",
+				timestamp: 1,
+			});
+
+			fresh().applyAssistantPartEvent("assistant_1", {
+				type: "assistant.part_start",
+				messageId: "sdk-message",
+				ts: 2,
+				part: {
+					id: "part_1",
+					type: "text",
+					state: "streaming",
+					createdAt: 2,
+					updatedAt: 2,
+					content: "Hel",
+				},
+			});
+			fresh().applyAssistantPartEvent("assistant_1", {
+				type: "assistant.part_delta",
+				messageId: "sdk-message",
+				partId: "part_1",
+				ts: 3,
+				delta: "lo",
+			});
+			fresh().applyAssistantPartEvent("assistant_1", {
+				type: "assistant.part_done",
+				messageId: "sdk-message",
+				partId: "part_1",
+				ts: 4,
+			});
+
+			const msg = fresh().messages[0];
+			expect(msg.content).toBe("Hello");
+			expect(msg.parts).toEqual([
+				expect.objectContaining({
+					id: "part_1",
+					type: "text",
+					state: "complete",
+					content: "Hello",
+				}),
+			]);
+		});
+	});
 });

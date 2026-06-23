@@ -138,6 +138,55 @@ describe("eventsToMessages", () => {
 		});
 	});
 
+	it("reduces assistant part events into structured Message.parts and text fallback", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant.part_start",
+				messageId: "a-parts",
+				ts: 10,
+				part: {
+					id: "p1",
+					type: "text",
+					state: "streaming",
+					createdAt: 10,
+					updatedAt: 10,
+					content: "Hello",
+				},
+			},
+			{
+				type: "assistant.part_delta",
+				messageId: "a-parts",
+				partId: "p1",
+				ts: 11,
+				delta: " world",
+			},
+			{
+				type: "assistant.part_done",
+				messageId: "a-parts",
+				partId: "p1",
+				ts: 12,
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0]).toMatchObject({
+			id: "a-parts",
+			role: "assistant",
+			type: "text",
+			content: "Hello world",
+		});
+		expect(msgs[0].parts).toEqual([
+			expect.objectContaining({
+				id: "p1",
+				type: "text",
+				state: "complete",
+				content: "Hello world",
+			}),
+		]);
+	});
+
 	it("pairs tool_call + tool_result into one tool_use Message", () => {
 		const events: SessionEvent[] = [
 			{

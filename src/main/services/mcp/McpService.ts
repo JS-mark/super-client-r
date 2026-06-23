@@ -14,6 +14,9 @@ import type {
 } from "../../ipc/types";
 import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
+import type { RuntimeOperationKind } from "@super-client/shared-types/chat";
+import { getRuntimePolicyService } from "../runtime/RuntimePolicyService";
+import { getSessionRuntimeResolver } from "../runtime/SessionRuntimeResolver";
 import { builtinMcpService } from "./BuiltinMcpService";
 import { thirdPartyMcpService } from "./ThirdPartyMcpService";
 import { mcpMarketService } from "./McpMarketService";
@@ -32,9 +35,14 @@ export interface UnifiedToolCallResult {
 	success: boolean;
 	data?: unknown;
 	error?: string;
+	errorCode?: string;
 	serverType: McpServerType;
 	timestamp: number;
 	duration: number;
+}
+
+export interface McpToolCallOptions {
+	conversationId?: string;
 }
 
 export class McpService extends EventEmitter {
@@ -357,6 +365,7 @@ export class McpService extends EventEmitter {
 		serverId: string,
 		toolName: string,
 		args: Record<string, unknown>,
+		options: McpToolCallOptions = {},
 	): Promise<UnifiedToolCallResult> {
 		const startTime = Date.now();
 		const config = this.servers.get(serverId);
@@ -373,6 +382,30 @@ export class McpService extends EventEmitter {
 		}
 
 		log.debug("Calling tool", { serverId, serverName: config.name, toolName });
+
+		const runtimeGate = this.evaluateRuntimePolicy(
+			options.conversationId,
+			serverId,
+			toolName,
+			args,
+		);
+		if (!runtimeGate.allowed) {
+			const duration = Date.now() - startTime;
+			this.emit("tool-error", {
+				serverId,
+				toolName,
+				error: runtimeGate.message,
+				duration,
+			});
+			return {
+				success: false,
+				error: runtimeGate.message,
+				errorCode: runtimeGate.code,
+				serverType: config.type,
+				timestamp: startTime,
+				duration,
+			};
+		}
 
 		try {
 			let result: unknown;
@@ -462,6 +495,77 @@ export class McpService extends EventEmitter {
 				timestamp: startTime,
 				duration,
 			};
+		}
+	}
+
+	private evaluateRuntimePolicy(
+		conversationId: string | undefined,
+		serverId: string,
+		toolName: string,
+		args: Record<string, unknown>,
+	): { allowed: true } | { allowed: false; code: string; message: string } {
+		const fallbackCtx = {
+			workspaceId: "",
+			sessionId: conversationId,
+			source: "mcp" as const,
+			operation: `${serverId}:${toolName}`,
+			kind: classifyMcpToolKind(serverId, toolName),
+			target: extractMcpToolTarget(args),
+			input: args,
+		};
+		if (!conversationId) {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"no-session",
+			);
+			return { allowed: true };
+		}
+		try {
+			const runtime = getSessionRuntimeResolver().resolve({
+				sessionId: conversationId,
+			});
+			const ctx = {
+				...fallbackCtx,
+				workspaceId: runtime.workspaceId,
+				sessionId: conversationId,
+			};
+			const evaluation = getRuntimePolicyService().evaluate(
+				ctx,
+				runtime.runtimePolicy,
+			);
+			if (evaluation.decision === "deny") {
+				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				return {
+					allowed: false,
+					code: evaluation.code ?? "runtime.policyDenied",
+					message: evaluation.reason ?? evaluation.code ?? "runtime-policy-denied",
+				};
+			}
+			if (evaluation.decision === "needs-approval") {
+				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				return {
+					allowed: false,
+					code: evaluation.code ?? "runtime.needsApproval",
+					message:
+						evaluation.reason ??
+						evaluation.code ??
+						"runtime-policy-needs-approval",
+				};
+			}
+			getRuntimePolicyService().record(
+				ctx,
+				evaluation.reason?.startsWith("audit-only") ? "audit-only" : "allowed",
+				evaluation.reason,
+			);
+			return { allowed: true };
+		} catch {
+			getRuntimePolicyService().record(
+				fallbackCtx,
+				"audit-only",
+				"runtime-resolver-failed",
+			);
+			return { allowed: true };
 		}
 	}
 
@@ -702,6 +806,70 @@ export class McpService extends EventEmitter {
 
 		return result;
 	}
+}
+
+function classifyMcpToolKind(
+	serverId: string,
+	toolName: string,
+): RuntimeOperationKind {
+	const id = `${serverId}:${toolName}`.toLowerCase();
+	if (
+		id.includes("write") ||
+		id.includes("edit") ||
+		id.includes("create_directory") ||
+		id.includes("move_file")
+	) {
+		return "file-write";
+	}
+	if (id.includes("delete") || id.includes("remove")) return "file-delete";
+	if (
+		id.includes("read") ||
+		id.includes("list") ||
+		id.includes("search") ||
+		id.includes("grep") ||
+		id.includes("file_info")
+	) {
+		return "file-read";
+	}
+	if (
+		id.includes("execute") ||
+		id.includes("script") ||
+		id.includes("command") ||
+		id.includes("bash") ||
+		id.includes("python") ||
+		id.includes("nodejs") ||
+		id.includes("kill_process")
+	) {
+		return "command-exec";
+	}
+	if (
+		id.includes("fetch") ||
+		id.includes("http") ||
+		id.includes("url") ||
+		id.includes("web") ||
+		id.includes("browser")
+	) {
+		return "network-request";
+	}
+	return "tool-execute";
+}
+
+function extractMcpToolTarget(
+	args: Record<string, unknown>,
+): string | undefined {
+	for (const key of [
+		"path",
+		"source",
+		"destination",
+		"url",
+		"command",
+		"script",
+		"workingDir",
+	]) {
+		const value = args[key];
+		if (typeof value === "string" && value) return value;
+	}
+	return undefined;
 }
 
 // 单例实例
