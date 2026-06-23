@@ -3,6 +3,7 @@ import { createEditTool } from "./edit";
 import { createGlobTool } from "./glob";
 import { createGrepTool } from "./grep";
 import { createReadTool } from "./read";
+import { createTaskTool } from "./task";
 import { createWebFetchTool } from "./webfetch";
 import { createWriteTool } from "./write";
 
@@ -57,17 +58,6 @@ export const BUILTIN_TOOL_NAMES = [
 
 export type BuiltinToolName = (typeof BUILTIN_TOOL_NAMES)[number];
 
-function placeholder(name: BuiltinToolName): BuiltinToolDef {
-	return {
-		name,
-		description: `${name} (not yet implemented)`,
-		inputSchema: { type: "object" },
-		execute: async () => {
-			throw new Error(`${name}: not implemented`);
-		},
-	};
-}
-
 export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
 	return [
 		createReadTool(ctx),
@@ -77,6 +67,6 @@ export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
 		createGrepTool(ctx),
 		createGlobTool(ctx),
 		createWebFetchTool(ctx),
-		placeholder("Task"),
+		createTaskTool(ctx),
 	];
 }

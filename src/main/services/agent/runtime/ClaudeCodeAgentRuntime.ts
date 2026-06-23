@@ -95,10 +95,36 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 
 		const cwd = req.cwd ?? process.cwd();
 		const taskDepth = this.taskDepthByRequest.get(req.requestId) ?? 0;
+
+		// Closure so the Task tool can recurse back into this same runtime
+		// with a fresh requestId + tracked depth.
+		const dispatchSubagent = async (
+			subPrompt: string,
+			opts: { signal: AbortSignal; depth: number },
+		): Promise<string> => {
+			const subRequestId = `${req.requestId}_sub_${opts.depth}_${Date.now()}`;
+			this.taskDepthByRequest.set(subRequestId, opts.depth);
+			const subReq: AgentQueryRequest = {
+				...req,
+				requestId: subRequestId,
+				prompt: { kind: "text", text: subPrompt },
+				signal: opts.signal,
+				history: [],
+			};
+			let collected = "";
+			for await (const ev of this.createQuery(subReq)) {
+				if ((ev as { type?: string }).type === "text.delta") {
+					collected += (ev as { delta: string }).delta;
+				}
+			}
+			return collected || "(subagent returned no text)";
+		};
+
 		const builtinTools = getBuiltinTools({
 			cwd,
 			signal: req.signal,
 			taskDepth,
+			dispatchSubagent,
 		});
 		const builtinByName = new Map<string, BuiltinToolDef>(
 			builtinTools.map((t) => [t.name, t]),
