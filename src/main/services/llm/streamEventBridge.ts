@@ -59,8 +59,16 @@ export async function drainFullStream(
 					"";
 				if (delta) broadcast({ requestId, type: "chunk", content: delta });
 			} else if (part.type === "finish") {
-				const u = (part as { usage?: typeof usage }).usage;
+				// AI SDK 6 emits `totalUsage` on the overall finish part (the
+				// per-step finish-step parts use `usage`). Read both names so
+				// the bridge survives shape drift across minor versions.
+				const u =
+					(part as { totalUsage?: typeof usage }).totalUsage ??
+					(part as { usage?: typeof usage }).usage;
 				if (u) usage = u;
+			} else if (part.type === "abort") {
+				aborted = true;
+				break;
 			} else if (part.type === "error") {
 				if (abortSignal?.aborted) {
 					aborted = true;

@@ -14,6 +14,25 @@ async function* textStream() {
 }
 
 describe("drainFullStream", () => {
+	it("captures totalUsage (AI SDK 6 shape) on the finish part", async () => {
+		const events: ChatStreamEvent[] = [];
+		async function* withTotalUsage() {
+			yield { type: "text-delta", text: "hi" } as const;
+			yield {
+				type: "finish",
+				finishReason: "stop",
+				totalUsage: { inputTokens: 4, outputTokens: 2, totalTokens: 6 },
+			} as const;
+		}
+		await drainFullStream(withTotalUsage() as never, {
+			requestId: "rTU",
+			broadcast: (e) => events.push(e),
+			startTime: Date.now() - 50,
+		});
+		expect(events.find((e) => e.type === "chunk")?.content).toBe("hi");
+		expect(events.find((e) => e.type === "done")?.usage?.totalTokens).toBe(6);
+	});
+
 	it("emits chunk events for text-delta and a final done with usage and timing", async () => {
 		const events: ChatStreamEvent[] = [];
 		await drainFullStream(textStream() as never, {
