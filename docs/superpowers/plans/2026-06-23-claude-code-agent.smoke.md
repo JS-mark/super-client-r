@@ -82,4 +82,28 @@ default + legacy compat) ready to ship. HTTP smoke confirms the model
 layer is healthy; renderer-side agent UI smoke is left to the user with
 the expectation that the region-block 403 is resolved.
 
-Phase D (delete legacy AgentSDK + drop deps) is safe to run.
+Phase D (delete legacy AgentSDK + drop deps) executed:
+
+- **D1**: deleted AgentSDKService.ts (1476 lines) + AgentService.ts (274) +
+  ClaudeSdkRuntime.ts (382) + AgentSdkTraceSniffer.ts (167) + their tests.
+  bootstrap.ts simplified to register only ClaudeCodeAgentRuntime.
+  streamingHandlers `agent-sdk:create-query` rerouted to llm-loop.
+  api-impl `agentSDK.*` namespace becomes thin forwarders (interrupt /
+  resolvePermission go to runtime; native-session methods are no-ops).
+  `agent.*` namespace entirely removed.
+- **D2**: deleted renderer dead code (useAgent / agentStore /
+  agentService client) + their re-exports.
+- **D3**: deleted `claudeCodeEnabled` / `claudeCodeModel` fields +
+  StoreManager single-select enforcement + ModelList Claude Code form
+  section + ModelProviders `isClaudeCodeCompatible` helper +
+  AgentSettings settings panel (1567 lines) + Settings tab.
+  useChat `resolveAgentSdkIntent` pre-flight simplified to a generic
+  "at least one enabled provider with API key" check (which is what
+  llm-loop needs).
+- **D4**: `pnpm remove @anthropic-ai/claude-agent-sdk @anthropic-ai/sdk`.
+
+Post-cleanup smoke: HTTP plain chat against dashscope qwen-flash → 8
+chunk events, stream healthy. TS clean. **25 test files / 138 tests**
+all green.
+
+Branch is ready to merge.
