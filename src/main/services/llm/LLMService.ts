@@ -16,10 +16,8 @@ import { getApprovalGrantStore } from "../runtime/ApprovalGrantStore";
 import { getRuntimePolicyService } from "../runtime/RuntimePolicyService";
 import { getSessionRuntimeResolver } from "../runtime/SessionRuntimeResolver";
 import { normalizeModels } from "./modelNormalizer";
-import type {
-	PlanMode,
-	RuntimeOperationKind,
-} from "@super-client/shared-types/chat";
+import { applyPlanModeGate } from "./planModeGate";
+import type { RuntimeOperationKind } from "@super-client/shared-types/chat";
 
 const MAX_TOOL_ROUNDS = 10;
 
@@ -528,20 +526,10 @@ export class LLMService {
 	}
 
 	/**
-	 * R-5 — Plan-mode gate.
+	 * R-5 — Plan-mode gate (delegates to ./planModeGate).
 	 *
-	 * Runs before the provider-specific chat-completion path. When the session's
-	 * `planMode` is `plan-only`, we:
-	 *   - drop the tool list and toolExecutor so the model cannot call tools
-	 *   - prepend a one-line instruction to the system message so the model
-	 *     understands it should describe a plan without invoking anything
-	 *   - record a single audit deny so the gate is observable in the runtime
-	 *     inspector
-	 *
-	 * Other plan modes (`chat`, `plan-then-ask`, `auto-execute-safe`,
-	 * `full-agent`) are informational at this stage; the chip writes them to
-	 * conversation metadata and the resolver exposes them, but nothing is gated
-	 * here. Their enforcement is a separate task.
+	 * Kept as a private method (rather than calling the imported function
+	 * directly) so future overrides / instrumentation have one seam.
 	 */
 	private applyPlanModeGate(
 		request: ChatCompletionRequest,
@@ -550,72 +538,7 @@ export class LLMService {
 		request: ChatCompletionRequest;
 		toolExecutor: ToolExecutor | undefined;
 	} {
-		const sessionId = request.conversationId;
-		if (!sessionId) {
-			return { request, toolExecutor };
-		}
-		let planMode: PlanMode = "chat";
-		try {
-			const runtime = getSessionRuntimeResolver().resolve({ sessionId });
-			planMode = runtime.planMode;
-		} catch {
-			// Resolver failure is non-fatal — treat as "chat" so legacy paths
-			// keep working. The audit log will still see no deny here.
-			return { request, toolExecutor };
-		}
-
-		if (planMode !== "plan-only") {
-			return { request, toolExecutor };
-		}
-
-		// Audit-record the gate firing once per request.
-		try {
-			getRuntimePolicyService().record(
-				{
-					workspaceId: "",
-					sessionId,
-					source: "llm",
-					operation: "plan-mode:strip-tools",
-					kind: "tool-execute",
-				},
-				"denied",
-				"plan-only-mode",
-			);
-		} catch {
-			/* never let audit failure block the user */
-		}
-
-		// Prepend a system note so the model knows to plan, not act.
-		const PLAN_NOTE =
-			"You are in PLAN ONLY mode. Describe the plan you would carry out, but do NOT call any tools. If tool input is needed for planning, list the calls and arguments you would make in prose.";
-		const messages = request.messages.slice();
-		const first = messages[0];
-		if (
-			first &&
-			(first as { role?: string }).role === "system" &&
-			typeof (first as { content?: unknown }).content === "string"
-		) {
-			messages[0] = {
-				...(first as object),
-				content: `${PLAN_NOTE}\n\n${(first as { content: string }).content}`,
-			} as ChatCompletionRequest["messages"][number];
-		} else {
-			messages.unshift({
-				role: "system",
-				content: PLAN_NOTE,
-			} as ChatCompletionRequest["messages"][number]);
-		}
-
-		return {
-			request: {
-				...request,
-				messages,
-				tools: undefined,
-				toolMapping: undefined,
-				toolPermission: undefined,
-			},
-			toolExecutor: undefined,
-		};
+		return applyPlanModeGate(request, toolExecutor);
 	}
 
 	async chatCompletion(
