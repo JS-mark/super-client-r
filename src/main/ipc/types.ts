@@ -361,6 +361,16 @@ export interface ChatCompletionRequest {
 	toolPermission?: ToolPermissionConfig;
 	/** "function" = native function calling API; "prompt" = inject tools into system prompt and parse from text */
 	toolCallMode?: "function" | "prompt";
+	/**
+	 * Wire-format of the provider's HTTP API. Drives which AI SDK provider
+	 * factory we instantiate in providers.ts:
+	 *   - "anthropic-messages"  → POST /v1/messages           (Anthropic, Bedrock Claude, Vertex Claude)
+	 *   - "chat-completions"    → POST /chat/completions      (OpenAI, DeepSeek, Qwen, Grok, OpenRouter, Ollama, …)
+	 *   - "responses"           → POST /responses             (OpenAI new API)
+	 * If omitted, providers.ts falls back to inferring from `providerPreset`
+	 * for backwards compatibility with existing renderer/HTTP callers.
+	 */
+	apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
 	providerPreset?: ModelProviderPreset;
 	extraParams?: Record<string, unknown>;
 	/** Conversation ID for resolving workspace directory in tool calls */

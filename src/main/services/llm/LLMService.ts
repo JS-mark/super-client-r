@@ -405,6 +405,7 @@ export class LLMService {
 
 		const model = resolveProvider({
 			preset: request.providerPreset,
+			apiFormat: request.apiFormat,
 			baseUrl: request.baseUrl,
 			apiKey: request.apiKey,
 			model: request.model,
@@ -431,7 +432,11 @@ export class LLMService {
 				),
 		});
 
-		const mapped = mapExtraParams(request.providerPreset, request.extraParams);
+		const mapped = mapExtraParams(
+			request.providerPreset,
+			request.extraParams,
+			request.apiFormat,
+		);
 
 		// Tee chunk events into an accumulator so the postResponse hook can
 		// compute a delta. Otherwise plugins that mutate the response would

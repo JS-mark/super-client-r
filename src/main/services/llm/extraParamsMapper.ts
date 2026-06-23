@@ -10,7 +10,7 @@
  * keyed by the preset's provider name (see `providerOptionsKey`).
  */
 
-import { providerOptionsKey } from "./providers";
+import { providerOptionsKey, type ApiFormat } from "./providers";
 import type { ModelProviderPreset } from "../../ipc/types";
 
 export interface MappedTopLevel {
@@ -46,11 +46,12 @@ const TOP_LEVEL_ALIASES: Record<string, keyof MappedTopLevel> = {
 export function mapExtraParams(
 	preset: ModelProviderPreset | undefined,
 	extraParams: Record<string, unknown> | undefined,
+	apiFormat?: ApiFormat,
 ): MappedExtraParams {
 	const result: MappedExtraParams = { top: {}, providerOptions: {} };
 	if (!extraParams) return result;
 
-	const provider = providerOptionsKey(preset);
+	const provider = providerOptionsKey(preset, apiFormat);
 	for (const [k, v] of Object.entries(extraParams)) {
 		if (v === undefined) continue;
 		const aliased = TOP_LEVEL_ALIASES[k];
