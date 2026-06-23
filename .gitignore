@@ -31,3 +31,6 @@ tsconfig.*.tsbuildinfo
 
 # Claude Code
 .claude/settings.local.json
+
+# Git worktrees (superpowers)
+.worktrees/
