@@ -29,6 +29,8 @@ install only had openrouter + dashscope configured. Coverage is therefore:
 | 2 | Plain chat: streaming + done + usage + timing | openrouter · deepseek/deepseek-chat-v3.1 | ✅ done included `inputTokens:9, outputTokens:18, totalTokens:27` after the fix |
 | 3 | Stop mid-stream: silent halt | dashscope · qwen-plus | ✅ 13 chunks broadcast before stop, then **0 done + 0 error** events. `POST /v1/llm/stop` returned `stopped: true` |
 | 4 | `extraParams.response_format: { type: "json_object" }` | dashscope · qwen-plus | ✅ Model output reassembled to exactly `{"hello": "world"}` — no markdown / prose, JSON.parse succeeds. Confirms `extraParamsMapper` correctly routes `response_format` to AI SDK top-level `responseFormat` |
+| 5 | Prompt-mode dispatch: `toolCallMode:"prompt"` must route to legacy | dashscope · qwen-plus | ✅ Stream completes cleanly with chunks + done + usage (13/55/68). `LLMService.unifiedPath.test.ts` already pins the dispatcher contract (flag-on + prompt-mode → legacy, not streamText) with a `vi.spyOn` on `chatCompletionLegacy`. The live smoke confirms the path is functional end-to-end |
+| 6 | Tool call round-trip: model picks tool → adapter executes → second-round response | dashscope · qwen-plus + `@scp/file-system.read_file` | ✅ Event sequence: `tool_call` (model picked `read_file({"path":"/tmp/smoke-fc.txt"})`) → `tool_result` (MCP returned file contents, `duration:3ms`, `isError:false`) → 9× `chunk` (model's second-round answer) → `done` (`usage:{424,59,483}`). Validates: tool adapter broadcast wrapping, toolMapping → MCP dispatch, AI SDK `stopWhen` multi-step loop, approval gate auto-pass, and full IPC event contract preserved |
 
 ## Bug found and fixed during smoke
 
@@ -56,11 +58,17 @@ Re-running scenarios 1 + 2 after the fix produced full `done.usage` payloads.
 ## Carry-forwards (not blocking)
 
 - **createAnthropic branch unexercised.** When a tester with an Anthropic
-  key runs scenarios 1-3 against `providerPreset: "anthropic"`, that will
-  close the only remaining coverage gap before Task 10 cutover.
-- **DeepSeek-R1 prompt-mode dispatch** was not exercised by HTTP smoke
-  because the prompt-mode path stays on legacy by design. Worth one click
-  in the renderer's chat UI to confirm visually before cutover.
+  API key runs scenarios 1, 3, and 6 against `providerPreset: "anthropic"`,
+  that closes the only remaining coverage gap before Task 10 cutover.
+  Concretely: `messageMapper.toModelMessages` handles `tool_calls` and
+  `tool` role messages identically across providers, but the Anthropic
+  branch's wire format conversion is what AI SDK does internally — verify
+  once before deleting the legacy `chatCompletionAnthropic`.
+- **48h soak** with the flag on (`LLM_UNIFIED_PATH=1`) is the standard
+  gate per the plan's Task 10. Anything dashscope / openrouter related
+  surfaces during day-to-day use will land on the legacy path with the
+  flag off and on the unified path with it on; if no regression reports
+  arrive, that's a strong signal.
 
 ## Conclusion
 
@@ -70,6 +78,11 @@ Unified path is **safe to keep as the default for the rolling window**:
 LLM_UNIFIED_PATH=1 pnpm dev
 ```
 
-All four smoke scenarios pass; the one bug found during smoke was caught
-by direct event inspection, fixed in 10 lines, and pinned with a new unit
-test case so regressions are surfaced offline next time.
+All six smoke scenarios pass; the one bug found during smoke was caught
+by direct event inspection, fixed in ~10 lines, and pinned with a new
+unit test case so regressions are surfaced offline next time. The
+remaining work before Task 10 cutover is:
+
+1. Run scenarios 1, 3, 6 against an Anthropic-preset provider.
+2. Let the flag bake for 48h on real day-to-day chat traffic.
+3. Then delete legacy + drop `openai` and `@anthropic-ai/sdk` deps.
