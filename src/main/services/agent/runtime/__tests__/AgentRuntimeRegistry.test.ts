@@ -53,16 +53,16 @@ const openaiModel: ModelSelection = {
 // ─────────────────────────── pickDefaultRuntimeId ───────────────────────────
 
 describe("pickDefaultRuntimeId", () => {
-	it("claude-code → claude-sdk regardless of model", () => {
+	it("claude-code profile → llm-loop (ClaudeCodeAgentRuntime is the new default)", () => {
 		expect(
 			pickDefaultRuntimeId({ profile: "claude-code", model: openaiModel }),
-		).toBe("claude-sdk");
+		).toBe("llm-loop");
 	});
 
-	it("hybrid + anthropic → claude-sdk", () => {
+	it("hybrid + anthropic → llm-loop (no longer routes to claude-sdk by default)", () => {
 		expect(
 			pickDefaultRuntimeId({ profile: "hybrid", model: anthropicModel }),
-		).toBe("claude-sdk");
+		).toBe("llm-loop");
 	});
 
 	it("hybrid + non-anthropic → llm-loop", () => {
@@ -93,13 +93,13 @@ describe("pickDefaultRuntimeId", () => {
 		expect(warn).toHaveBeenCalledOnce();
 	});
 
-	it("treats anthropic provider id case-insensitively", () => {
+	it("treats anthropic provider id case-insensitively (still → llm-loop)", () => {
 		expect(
 			pickDefaultRuntimeId({
 				profile: "hybrid",
 				model: { providerId: "Anthropic", modelId: "x" },
 			}),
-		).toBe("claude-sdk");
+		).toBe("llm-loop");
 	});
 });
 
@@ -155,16 +155,16 @@ describe("AgentRuntimeRegistry", () => {
 		).toThrow(RuntimeNotRegisteredError);
 	});
 
-	it("resolveForSession derives default when sessionMeta.runtimeId missing", () => {
+	it("resolveForSession derives default (llm-loop) when sessionMeta.runtimeId missing", () => {
 		const r = new AgentRuntimeRegistry();
-		const claude = fakeRuntime("claude-sdk");
-		r.register(claude);
+		const llmLoop = fakeRuntime("llm-loop");
+		r.register(llmLoop);
 		const got = r.resolveForSession({
 			sessionMeta: {},
 			profile: "claude-code",
 			model: anthropicModel,
 		});
-		expect(got).toBe(claude);
+		expect(got).toBe(llmLoop);
 	});
 
 	it("resolveForSession reports codex fallback through logger", () => {

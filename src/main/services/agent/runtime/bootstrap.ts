@@ -26,6 +26,7 @@ import {
 	setAgentRuntimeRegistry,
 } from "./AgentRuntimeRegistry";
 import { AgentSdkTraceSniffer } from "./AgentSdkTraceSniffer";
+import { ClaudeCodeAgentRuntime } from "./ClaudeCodeAgentRuntime";
 import { ClaudeSdkRuntime } from "./ClaudeSdkRuntime";
 
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -64,7 +65,13 @@ export function bootstrapAgentRuntime(): AgentRuntimeBootstrapResult {
 	const registry = new AgentRuntimeRegistry();
 	registry.setLogger((msg) => console.warn("[AgentRuntimeRegistry]", msg));
 
-	// 3) ClaudeSdkRuntime —— Phase 1.5a 不传 dispatcher
+	// 3a) ClaudeCodeAgentRuntime ("llm-loop") — new default. Built on
+	//     unified LLMService.chatCompletion + Vercel AI SDK; supports any
+	//     model with native function calling.
+	registry.register(new ClaudeCodeAgentRuntime());
+
+	// 3b) ClaudeSdkRuntime — legacy, kept until renderer is fully migrated
+	//     and the @anthropic-ai/claude-agent-sdk dep is dropped (Phase D).
 	registry.register(
 		new ClaudeSdkRuntime({
 			inner: agentSDKService,

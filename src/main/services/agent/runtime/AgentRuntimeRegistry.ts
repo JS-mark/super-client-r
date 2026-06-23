@@ -30,11 +30,18 @@ import type { SessionMeta } from "@super-client/shared-types/project";
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * Anthropic 原生 provider id。其它 OpenAI 兼容（DeepSeek、OpenRouter、Bedrock 等）
- * 都走 llm-loop 直到 1.5b 之后能够透传给 Claude SDK 的 third-party 网关模式。
+ * Default runtime selection.
+ *
+ * Since ClaudeCodeAgentRuntime ("llm-loop") was introduced, it's the
+ * preferred runtime for every profile / provider — it delivers the same
+ * Claude-Code-style agent experience on top of the unified LLMService,
+ * works with any model that supports native function calling, and isn't
+ * tied to the Anthropic wire format.
+ *
+ * The legacy `claude-sdk` runtime stays registered for now but is no
+ * longer the default for any profile; callers can still opt in by
+ * persisting `SessionMeta.runtimeId = "claude-sdk"`.
  */
-const ANTHROPIC_NATIVE_PROVIDERS = new Set(["anthropic", "claude"]);
-
 export interface PickDefaultRuntimeContext {
 	profile: InteractionProfile;
 	model: ModelSelection;
@@ -48,9 +55,6 @@ export function pickDefaultRuntimeId(
 	ctx: PickDefaultRuntimeContext,
 ): AgentRuntimeId {
 	switch (ctx.profile) {
-		case "claude-code":
-			return "claude-sdk";
-
 		case "codex": {
 			if (ctx.codexRegistered) return "codex";
 			ctx.onCodexFallback?.(
@@ -59,11 +63,10 @@ export function pickDefaultRuntimeId(
 			return "llm-loop";
 		}
 
+		case "claude-code":
 		case "hybrid":
 		default:
-			return ANTHROPIC_NATIVE_PROVIDERS.has(ctx.model.providerId.toLowerCase())
-				? "claude-sdk"
-				: "llm-loop";
+			return "llm-loop";
 	}
 }
 
