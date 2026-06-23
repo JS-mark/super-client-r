@@ -3,6 +3,7 @@ import { createEditTool } from "./edit";
 import { createGlobTool } from "./glob";
 import { createGrepTool } from "./grep";
 import { createReadTool } from "./read";
+import { createWebFetchTool } from "./webfetch";
 import { createWriteTool } from "./write";
 
 /**
@@ -75,7 +76,7 @@ export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
 		createBashTool(ctx),
 		createGrepTool(ctx),
 		createGlobTool(ctx),
-		placeholder("WebFetch"),
+		createWebFetchTool(ctx),
 		placeholder("Task"),
 	];
 }
