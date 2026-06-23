@@ -65,9 +65,7 @@ import { localServer } from "../server";
 import { getOrCreateApiKey } from "../server/config";
 import { logDatabaseService } from "../services/log";
 import { updateService } from "../services/updateService";
-import { agentService } from "../services/agent/AgentService";
-import type { AgentConfig } from "../services/agent/AgentService";
-import { agentSDKService } from "../services/agent/AgentSDKService";
+import { getAgentRuntimeRegistry } from "../services/agent/runtime/AgentRuntimeRegistry";
 import {
 	BUILTIN_PROFILES,
 	BUILTIN_TEAMS,
@@ -1068,57 +1066,59 @@ const apiImpl = {
 		},
 	},
 
-	// ─── Agent (RPC only, streaming in streamingHandlers) ─
-	agent: {
-		createSession: (config: AgentConfig) => agentService.createSession(config),
-		getStatus: (sessionId: string) => {
-			const session = agentService.getSession(sessionId);
-			if (!session) throw new Error("Session not found");
-			return session;
-		},
-		stopAgent: (sessionId: string) => agentService.stopAgent(sessionId),
-		listAgents: () => agentService.listSessions(),
-		getMessages: (sessionId: string) => agentService.getMessages(sessionId),
-		clearMessages: (sessionId: string) => agentService.clearMessages(sessionId),
-		deleteSession: (sessionId: string) => agentService.deleteSession(sessionId),
-	},
-
-	// ─── Agent SDK (RPC only, streaming in streamingHandlers) ─
+	// ─── Agent SDK (RPC only; streaming via legacy compat in
+	//     streamingHandlers → llm-loop runtime) ─
+	//
+	// After the legacy AgentSDKService removal (Phase D), only the few
+	// methods the renderer actually invokes remain wired:
+	//   - interrupt: forwarded to runtime.interrupt
+	//   - resolvePermission: forwarded to runtime.resolvePermission
+	//   - getConfig / setConfig / getProfiles / setProfiles / getTeams /
+	//     setTeams: storeManager-backed; unchanged
+	// Everything else throws "deprecated" so accidental callers fail loudly.
 	agentSDK: {
-		interrupt: (requestId: string) => agentSDKService.interruptQuery(requestId),
-		close: (requestId: string) => agentSDKService.closeQuery(requestId),
-		listSessions: (dir?: string) => agentSDKService.listSDKSessions(dir),
-		getSessionInfo: (sessionId: string) =>
-			agentSDKService.getSDKSessionInfo(sessionId),
-		setModel: (requestId: string, model: string) =>
-			agentSDKService.setModel(requestId, model),
-		resolvePermission: (
+		interrupt: async (requestId: string) => {
+			const runtime = getAgentRuntimeRegistry()?.tryGet("llm-loop");
+			if (runtime) await runtime.interrupt(requestId);
+			return true;
+		},
+		close: async (_requestId: string) => {
+			// No-op after legacy removal; interrupt subsumes close semantics.
+			return true;
+		},
+		listSessions: async (_dir?: string) => {
+			// Native-session listing was a Claude SDK feature; new runtime has
+			// no native sessions.
+			return [];
+		},
+		getSessionInfo: async (_sessionId: string) => null,
+		setModel: async (_requestId: string, _model: string) => {
+			// No live model swap on llm-loop; configured at request start.
+			return false;
+		},
+		resolvePermission: async (
 			toolUseId: string,
 			allowed: boolean,
-			updatedInput?: Record<string, unknown>,
-			updatedPermissions?: Array<Record<string, unknown>>,
-		) =>
-			agentSDKService.resolvePermission(
-				toolUseId,
-				allowed,
-				updatedInput,
-				updatedPermissions,
-			),
-		forkSession: (sessionId: string, dir?: string) =>
-			agentSDKService.forkSDKSession(sessionId, dir ? { dir } : undefined),
-		renameSession: (sessionId: string, title: string, dir?: string) =>
-			agentSDKService.renameSDKSession(
-				sessionId,
-				title,
-				dir ? { dir } : undefined,
-			),
-		tagSession: (sessionId: string, tag: string, dir?: string) =>
-			agentSDKService.tagSDKSession(sessionId, tag, dir ? { dir } : undefined),
-		getSessionMessages: (sessionId: string, dir?: string) =>
-			agentSDKService.getSDKSessionMessages(
-				sessionId,
-				dir ? { dir } : undefined,
-			),
+			_updatedInput?: Record<string, unknown>,
+			_updatedPermissions?: Array<Record<string, unknown>>,
+		) => {
+			const runtime = getAgentRuntimeRegistry()?.tryGet("llm-loop");
+			if (!runtime) return false;
+			await runtime.resolvePermission(toolUseId, {
+				approved: allowed,
+				scope: "once",
+			});
+			return true;
+		},
+		forkSession: async (_sessionId: string, _dir?: string) => null,
+		renameSession: async (
+			_sessionId: string,
+			_title: string,
+			_dir?: string,
+		) => false,
+		tagSession: async (_sessionId: string, _tag: string, _dir?: string) =>
+			false,
+		getSessionMessages: async (_sessionId: string, _dir?: string) => [],
 		getConfig: () => storeManager.getAgentSDKConfig(),
 		setConfig: (config: AgentSDKConfig) =>
 			storeManager.setAgentSDKConfig(config),

@@ -4,59 +4,28 @@
  * 需要 event.sender.send() 转发流式事件的 handlers。
  * 这些 handler 不能使用 Typed IPC Proxy（registerAPI），因为需要访问 event 对象。
  *
- * 包含：
- *   - Agent sendMessage（流式转发 agent stream events）
- *   - AgentSDK createQuery（流式转发 agent-sdk stream events）
+ * 当前仅保留 legacy `agent-sdk:create-query` 兼容入口,内部转调
+ * `llm-loop` runtime。Phase D 之后用户应直接使用 `agent-runtime:*` 通道。
  */
 
 import type { IpcMainInvokeEvent } from "electron";
 import { ipcMain } from "electron";
-import { agentService } from "../../services/agent/AgentService";
-import { agentSDKService } from "../../services/agent/AgentSDKService";
 import {
 	adaptRuntimeEventToSdk,
 	adaptSdkRequestToRuntime,
 } from "../../services/agent/runtime/agentSdkLegacyAdapter";
 import { getAgentRuntimeRegistry } from "../../services/agent/runtime/AgentRuntimeRegistry";
 import { logger } from "../../utils/logger";
-import type { AgentStreamEvent, AgentSDKQueryRequest } from "../types";
+import type { AgentSDKQueryRequest } from "../types";
 
 const log = logger.withContext("AgentSDKIPC");
 
 export function registerStreamingHandlers(): void {
-	// ─── Agent: sendMessage ──────────────────
-	// 流式转发 agent events 到发起请求的 renderer
-	ipcMain.handle(
-		"agent:send-message",
-		async (_event: IpcMainInvokeEvent, sessionId: string, content: string) => {
-			try {
-				const events: AgentStreamEvent[] = [];
-
-				const eventListener = (event: AgentStreamEvent) => {
-					if (event.sessionId === sessionId) {
-						events.push(event);
-						_event.sender.send("agent:stream-event", event);
-					}
-				};
-
-				agentService.on("stream-event", eventListener);
-				await agentService.sendMessage(sessionId, content);
-				agentService.off("stream-event", eventListener);
-
-				return { success: true, data: { sessionId, events } };
-			} catch (error: any) {
-				return { success: false, error: error.message };
-			}
-		},
-	);
-
-	// ─── AgentSDK: createQuery (compat layer) ───────────────
-	// Legacy agent-sdk:create-query is now backed by the new llm-loop
-	// runtime (ClaudeCodeAgentRuntime). The renderer (`useChat.ts`) still
-	// uses the legacy IPC namespace and event shape via agentSDKClient,
-	// so this handler translates both directions until Phase D switches
-	// the renderer to agent-runtime:* channels.
-	const activeQueries = new Map<string, AbortController>();
+	// ─── Legacy agent-sdk:create-query (compat layer) ──────────────────
+	// Renderer still uses window.electron.agentSDK.* via this legacy IPC
+	// namespace. We translate the request → AgentQueryRequest, run it on
+	// the llm-loop runtime, and translate emitted events back to the
+	// AgentSDKStreamEvent shape the renderer's useChat.ts expects.
 	ipcMain.handle(
 		"agent-sdk:create-query",
 		async (
@@ -82,26 +51,23 @@ export function registerStreamingHandlers(): void {
 						error: "AgentRuntimeRegistry not initialized",
 					};
 				}
-				const runtime =
-					registry.tryGet("llm-loop") ?? registry.tryGet("claude-sdk");
+				const runtime = registry.tryGet("llm-loop");
 				if (!runtime) {
 					return {
 						success: false,
-						error: "No agent runtime registered",
+						error: "llm-loop runtime not registered",
 					};
 				}
 
 				const controller = new AbortController();
-				activeQueries.set(requestId, controller);
 				const runtimeReq = adaptSdkRequestToRuntime(
 					requestId,
 					request,
 					controller.signal,
 				);
 
-				// Pump in the background; per legacy contract this handler
-				// returns the synthetic ack immediately and events flow via
-				// agent-sdk:stream-event.
+				// Pump in the background; ack returns immediately and events
+				// flow via agent-sdk:stream-event.
 				(async () => {
 					try {
 						for await (const ev of runtime.createQuery(runtimeReq)) {
@@ -125,7 +91,6 @@ export function registerStreamingHandlers(): void {
 							error: message,
 						});
 					} finally {
-						activeQueries.delete(requestId);
 						log.info("agent-sdk:create-query finished", { requestId });
 					}
 				})();
@@ -143,8 +108,4 @@ export function registerStreamingHandlers(): void {
 			}
 		},
 	);
-
-	// Reference `agentSDKService` so its singleton stays imported (Phase D
-	// will delete this and the import along with the whole legacy path).
-	void agentSDKService;
 }
