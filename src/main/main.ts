@@ -546,15 +546,6 @@ app.whenReady().then(async () => {
 	bootstrapAgentRuntime();
 	logger.info("AgentRuntime registry + trace collector booted");
 
-	// Vercel AI SDK unified chat completion path opt-in (Task 8 / Task 9
-	// rollout). Off by default; flip per install/session with
-	// `LLM_UNIFIED_PATH=1`. Renderer/HTTP contract is unchanged either way.
-	if (process.env.LLM_UNIFIED_PATH === "1") {
-		const { llmService } = await import("./services/llm");
-		llmService.setUnifiedPath(true);
-		logger.info("LLMService: unified path enabled (LLM_UNIFIED_PATH=1)");
-	}
-
 	// 注册 IPC 处理器
 	registerIpcHandlers();
 	registerWindowHandlers();
