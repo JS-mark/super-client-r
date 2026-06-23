@@ -1,4 +1,5 @@
 import { createReadTool } from "./read";
+import { createWriteTool } from "./write";
 
 /**
  * Built-in tool registry for ClaudeCodeAgentRuntime.
@@ -65,7 +66,7 @@ function placeholder(name: BuiltinToolName): BuiltinToolDef {
 export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
 	return [
 		createReadTool(ctx),
-		placeholder("Write"),
+		createWriteTool(ctx),
 		placeholder("Edit"),
 		placeholder("Bash"),
 		placeholder("Grep"),
