@@ -347,6 +347,7 @@ export function useChat() {
     model: string;
     providerPreset: string;
     providerName: string;
+    apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
   } | null>(null);
 
   /**

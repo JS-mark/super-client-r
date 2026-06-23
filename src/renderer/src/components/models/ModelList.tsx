@@ -36,6 +36,9 @@ import type {
 } from "../../types/models";
 import { ModelManageModal } from "./ModelManageModal";
 import {
+	API_FORMAT_OPTIONS,
+	type ApiFormat,
+	defaultApiFormatForPreset,
 	getPresetProvider,
 	isClaudeCodeCompatible,
 	PRESET_PROVIDERS,
@@ -123,6 +126,9 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				name: selectedProvider.name,
 				baseUrl: selectedProvider.baseUrl,
 				apiKey: selectedProvider.apiKey,
+				apiFormat:
+					selectedProvider.apiFormat ??
+					defaultApiFormatForPreset(selectedProvider.preset),
 			});
 		}
 	}, [selectedProvider, isAdding, form]);
@@ -207,6 +213,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				form.setFieldsValue({
 					name: isZh ? info.nameZh : info.name,
 					baseUrl: info.defaultBaseUrl,
+					apiFormat: defaultApiFormatForPreset(preset),
 				});
 				setTestResult(null);
 				setFetchedModels([]);
@@ -288,6 +295,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			name: string;
 			baseUrl: string;
 			apiKey: string;
+			apiFormat?: ApiFormat;
 		}) => {
 			const now = Date.now();
 			const models: ProviderModel[] =
@@ -307,6 +315,8 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				preset: values.preset,
 				baseUrl: values.baseUrl,
 				apiKey: values.apiKey || "",
+				apiFormat:
+					values.apiFormat ?? defaultApiFormatForPreset(values.preset),
 				enabled: selectedProvider?.enabled ?? testResult?.success === true,
 				tested: testResult?.success === true,
 				models,
@@ -596,7 +606,12 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 								</div>
 
 								{/* Form */}
-								<Form form={form} layout="vertical" onFinish={handleSave}>
+								<Form
+									form={form}
+									layout="vertical"
+									onFinish={handleSave}
+									initialValues={{ apiFormat: "chat-completions" }}
+								>
 									<Form.Item
 										name="preset"
 										label={t("form.preset", { ns: "models" })}
@@ -658,6 +673,19 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 										]}
 									>
 										<Input placeholder="https://api.example.com/v1" />
+									</Form.Item>
+
+									<Form.Item
+										name="apiFormat"
+										label={t("form.apiFormat", { ns: "models" })}
+										help={t("form.apiFormatHelp", { ns: "models" })}
+									>
+										<Select
+											options={API_FORMAT_OPTIONS.map((o) => ({
+												value: o.value,
+												label: `${isZh ? o.labelZh : o.labelEn} (${o.endpoint})`,
+											}))}
+										/>
 									</Form.Item>
 
 									{/* Test Connection */}

@@ -130,6 +130,8 @@ export const modelService = {
       authorizedTools?: string[];
     };
     toolCallMode?: "function" | "prompt";
+    /** Wire format ('/v1/messages' | '/chat/completions' | '/responses'). */
+    apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
     providerPreset?: string;
     extraParams?: Record<string, unknown>;
     conversationId?: string;

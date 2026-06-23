@@ -47,7 +47,9 @@
 		"baseUrl": "Base URL",
 		"baseUrlHelp": "API endpoint URL",
 		"baseUrlPlaceholder": "https://api.example.com/v1",
-		"baseUrlRequired": "Base URL is required"
+		"baseUrlRequired": "Base URL is required",
+		"apiFormat": "API Format",
+		"apiFormatHelp": "Wire format used to talk to this provider. Defaults are inferred from provider type."
 	},
 	"messages": {
 		"saveSuccess": "Provider saved successfully",

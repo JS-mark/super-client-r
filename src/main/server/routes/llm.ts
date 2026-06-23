@@ -239,6 +239,7 @@ export class LLMController {
 			toolMapping: raw.toolMapping,
 			toolPermission: raw.toolPermission,
 			toolCallMode: raw.toolCallMode,
+			apiFormat: raw.apiFormat,
 			providerPreset: raw.providerPreset,
 			extraParams: raw.extraParams,
 			conversationId: raw.conversationId,

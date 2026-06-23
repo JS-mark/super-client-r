@@ -1,5 +1,48 @@
 import type { ModelProviderPreset } from "../../types/models";
 
+/**
+ * The three HTTP wire-formats any LLM provider can speak. Drives backend
+ * routing in `providers.resolveProvider`.
+ */
+export type ApiFormat =
+	| "anthropic-messages"
+	| "chat-completions"
+	| "responses";
+
+export const API_FORMAT_OPTIONS: ReadonlyArray<{
+	value: ApiFormat;
+	labelEn: string;
+	labelZh: string;
+	endpoint: string;
+}> = [
+	{
+		value: "anthropic-messages",
+		labelEn: "Anthropic Messages",
+		labelZh: "Anthropic Messages",
+		endpoint: "/v1/messages",
+	},
+	{
+		value: "chat-completions",
+		labelEn: "Chat Completions",
+		labelZh: "Chat Completions",
+		endpoint: "/chat/completions",
+	},
+	{
+		value: "responses",
+		labelEn: "Responses",
+		labelZh: "Responses",
+		endpoint: "/responses",
+	},
+];
+
+/** Default API format for a given preset. Mirrors backend `presetToApiFormat`. */
+export function defaultApiFormatForPreset(
+	preset: ModelProviderPreset | undefined,
+): ApiFormat {
+	if (preset === "anthropic") return "anthropic-messages";
+	return "chat-completions";
+}
+
 export interface PresetProviderInfo {
 	id: ModelProviderPreset;
 	name: string;

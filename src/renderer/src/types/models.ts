@@ -70,6 +70,8 @@ export interface ModelProvider {
 	preset: ModelProviderPreset;
 	baseUrl: string;
 	apiKey: string;
+	/** HTTP wire-format the provider speaks; backend infers from preset if absent. */
+	apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
 	enabled: boolean;
 	tested: boolean;
 	models: ProviderModel[];

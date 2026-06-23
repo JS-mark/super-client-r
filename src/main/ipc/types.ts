@@ -311,6 +311,12 @@ export interface ModelProvider {
 	preset: ModelProviderPreset;
 	baseUrl: string;
 	apiKey: string;
+	/**
+	 * Wire-format of the provider's HTTP API. Drives backend routing in
+	 * `providers.resolveProvider`. Optional for backwards compatibility —
+	 * when absent, backend infers from `preset` via `presetToApiFormat`.
+	 */
+	apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
 	enabled: boolean;
 	tested: boolean;
 	models: ProviderModel[];

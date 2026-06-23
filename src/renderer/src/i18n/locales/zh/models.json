@@ -47,7 +47,9 @@
 		"baseUrl": "Base URL",
 		"baseUrlHelp": "API 端点 URL",
 		"baseUrlPlaceholder": "https://api.example.com/v1",
-		"baseUrlRequired": "请输入 Base URL"
+		"baseUrlRequired": "请输入 Base URL",
+		"apiFormat": "API 格式",
+		"apiFormatHelp": "决定后端用哪种 HTTP 协议与该服务商通信(默认按服务商类型推断)"
 	},
 	"messages": {
 		"saveSuccess": "服务商保存成功",
