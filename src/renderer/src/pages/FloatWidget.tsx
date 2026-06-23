@@ -256,7 +256,7 @@ const FloatWidget: React.FC = () => {
 			<div className="flex flex-col items-end">
 				{/* Morphing circle → capsule */}
 				<div
-					className="bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg overflow-hidden relative flex items-center transition-all ease-out"
+					className="bg-gradient-to-br from-blue-500 to-purple-600 overflow-hidden relative flex items-center transition-all ease-out"
 					style={{
 						width: isExpanded ? 280 : 48,
 						height: isExpanded ? 44 : 48,
@@ -321,7 +321,7 @@ const FloatWidget: React.FC = () => {
 
 				{/* Active: Expanded input panel */}
 				<div
-					className="w-[280px] rounded-2xl shadow-xl mt-2 overflow-hidden transition-all ease-out"
+					className="w-[280px] rounded-2xl mt-2 overflow-hidden transition-all ease-out"
 					style={{
 						maxHeight: mode === "active" ? 280 : 0,
 						opacity: mode === "active" ? 1 : 0,
