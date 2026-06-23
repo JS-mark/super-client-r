@@ -22,6 +22,12 @@ import {
 	hasToolBlocks,
 	parseToolCallsFromText,
 } from "./promptModeFallback";
+import { stepCountIs, streamText } from "ai";
+import { drainFullStream } from "./streamEventBridge";
+import { mapExtraParams } from "./extraParamsMapper";
+import { toModelMessages } from "./messageMapper";
+import { resolveProvider } from "./providers";
+import { buildToolSet } from "./toolAdapter";
 import type { RuntimeOperationKind } from "@super-client/shared-types/chat";
 
 const MAX_TOOL_ROUNDS = 10;
@@ -120,6 +126,11 @@ export class LLMService {
 	private activeStreams = new Map<string, AbortController>();
 	// Track providers that don't support stream_options
 	private noStreamOptionsProviders = new Set<string>();
+	// Toggle for the Vercel AI SDK unified path. Off by default; flipped by
+	// `setUnifiedPath(true)` (or via the main.ts env-var bridge during the
+	// rollout window). Prompt-mode requests stay on the legacy path even when
+	// this is on — see `chatCompletion()` dispatcher.
+	private useUnifiedPath = false;
 	// Pending tool approval requests awaiting user response
 	private pendingApprovals = new Map<
 		string,
@@ -366,7 +377,39 @@ export class LLMService {
 		return applyPlanModeGate(request, toolExecutor);
 	}
 
+	/**
+	 * Toggle the Vercel AI SDK unified path. Default off.
+	 * Production toggle is wired via env in `main.ts` during the rollout
+	 * window; tests can flip per-instance.
+	 */
+	setUnifiedPath(enabled: boolean): void {
+		this.useUnifiedPath = enabled;
+	}
+
+	/**
+	 * Public chat completion entry. Routes:
+	 *   - `toolCallMode === "prompt"` always → legacy (the AI SDK has no
+	 *     awareness of `<tool_call>` XML sentinels, so DeepSeek-R1-style
+	 *     prompt-mode flows would single-step and silently drop tool calls
+	 *     if pushed through the unified path).
+	 *   - Otherwise, if `useUnifiedPath` is on → `chatCompletionUnified`.
+	 *   - Otherwise → `chatCompletionLegacy`.
+	 *
+	 * Fire-and-forget contract preserved: stream events are broadcast via
+	 * `broadcast()` to BrowserWindows + per-request subscribers. The promise
+	 * returned here just lets callers `await` the completion if they want to.
+	 */
 	async chatCompletion(
+		rawRequest: ChatCompletionRequest,
+		rawToolExecutor?: ToolExecutor,
+	): Promise<void> {
+		if (this.useUnifiedPath && rawRequest.toolCallMode !== "prompt") {
+			return this.chatCompletionUnified(rawRequest, rawToolExecutor);
+		}
+		return this.chatCompletionLegacy(rawRequest, rawToolExecutor);
+	}
+
+	private async chatCompletionLegacy(
 		rawRequest: ChatCompletionRequest,
 		rawToolExecutor?: ToolExecutor,
 	): Promise<void> {
@@ -885,6 +928,169 @@ export class LLMService {
 				requestId: request.requestId,
 				type: "error",
 				error: message,
+			});
+		} finally {
+			this.activeStreams.delete(request.requestId);
+		}
+	}
+
+	/**
+	 * Unified chat completion via the Vercel AI SDK. Same public contract
+	 * as `chatCompletion`: fire-and-forget, side effects via `broadcast`.
+	 *
+	 * Preserves every legacy side effect:
+	 *   - plan-mode gate
+	 *   - preSend / systemPrompt / postResponse hooks
+	 *   - approval gate (per-tool, via tool adapter)
+	 *   - runtime policy gate (per-tool, via tool adapter)
+	 *   - per-request stream subscribers (via broadcast)
+	 *   - stopStream + abort signal silently halts
+	 *   - postResponse hook delta broadcast as a tail `chunk` event
+	 */
+	private async chatCompletionUnified(
+		rawRequest: ChatCompletionRequest,
+		rawToolExecutor?: ToolExecutor,
+	): Promise<void> {
+		const gated = this.applyPlanModeGate(rawRequest, rawToolExecutor);
+		const request = gated.request;
+		const toolExecutor = gated.toolExecutor;
+
+		const controller = new AbortController();
+		this.activeStreams.set(request.requestId, controller);
+
+		const messages = toModelMessages(request.messages).slice();
+
+		// preSend hook parity
+		if (this.chatHookRegistry?.hasHooks("preSend")) {
+			const ctx: import("../plugin/types").PreSendHookContext = {
+				messages: messages.map((m) => ({
+					role: String((m as { role: string }).role),
+					content:
+						typeof (m as { content?: unknown }).content === "string"
+							? (m as { content: string }).content
+							: JSON.stringify((m as { content?: unknown }).content ?? ""),
+				})),
+			};
+			await this.chatHookRegistry.runPreSendHooks(ctx);
+			if (ctx.cancelled) {
+				this.broadcast({ requestId: request.requestId, type: "done" });
+				this.activeStreams.delete(request.requestId);
+				return;
+			}
+		}
+
+		// systemPrompt hook parity
+		if (this.chatHookRegistry?.hasHooks("systemPrompt")) {
+			const first = messages[0];
+			if (
+				first &&
+				first.role === "system" &&
+				typeof first.content === "string"
+			) {
+				const ctx = { systemPrompt: first.content };
+				await this.chatHookRegistry.runSystemPromptHooks(ctx);
+				(first as { content: string }).content = ctx.systemPrompt;
+			}
+		}
+
+		const model = resolveProvider({
+			preset: request.providerPreset,
+			baseUrl: request.baseUrl,
+			apiKey: request.apiKey,
+			model: request.model,
+		});
+
+		const toolSet = buildToolSet({
+			request,
+			toolExecutor,
+			broadcast: (e) => this.broadcast(e),
+			checkPermission: ({ toolCallId, toolName, toolArgs }) =>
+				this.checkToolPermission(
+					request.requestId,
+					request.toolPermission,
+					toolCallId,
+					toolName,
+					toolArgs,
+					request.conversationId,
+				),
+			evaluateRuntimePolicy: (toolName, args) =>
+				this.evaluateToolRuntimePolicy(
+					request.conversationId,
+					toolName,
+					args,
+				),
+		});
+
+		const mapped = mapExtraParams(request.providerPreset, request.extraParams);
+
+		// Tee chunk events into an accumulator so the postResponse hook can
+		// compute a delta. Otherwise plugins that mutate the response would
+		// see no visible effect (legacy broadcast the tail diff as a chunk).
+		const startTime = Date.now();
+		let accumulatedText = "";
+		const taggingBroadcast = (e: ChatStreamEvent) => {
+			if (e.type === "chunk" && typeof e.content === "string") {
+				accumulatedText += e.content;
+			}
+			this.broadcast(e);
+		};
+
+		try {
+			const result = streamText({
+				model,
+				messages,
+				tools: toolSet,
+				stopWhen: stepCountIs(10),
+				abortSignal: controller.signal,
+				temperature: request.temperature ?? 0.7,
+				topP: request.topP,
+				maxOutputTokens: request.maxTokens ?? 4096,
+				...mapped.top,
+				// extraParams flow in from IPC / HTTP and are guaranteed to be
+				// JSON-serialisable, so the AI SDK's stricter JSONObject typing
+				// is satisfied at runtime even though it doesn't follow from
+				// the looser `Record<string, unknown>` we use upstream.
+				providerOptions:
+					Object.keys(mapped.providerOptions).length > 0
+						? (mapped.providerOptions as Parameters<
+								typeof streamText
+							>[0]["providerOptions"])
+						: undefined,
+			});
+
+			await drainFullStream(result.fullStream, {
+				requestId: request.requestId,
+				broadcast: taggingBroadcast,
+				startTime,
+				abortSignal: controller.signal,
+			});
+
+			// postResponse hook: broadcast tail delta if hook mutated the
+			// response, matching legacy behaviour.
+			if (
+				!controller.signal.aborted &&
+				accumulatedText &&
+				this.chatHookRegistry?.hasHooks("postResponse")
+			) {
+				const ctx = { response: accumulatedText };
+				await this.chatHookRegistry.runPostResponseHooks(ctx);
+				if (ctx.response !== accumulatedText) {
+					const tail = ctx.response.slice(accumulatedText.length);
+					if (tail) {
+						this.broadcast({
+							requestId: request.requestId,
+							type: "chunk",
+							content: tail,
+						});
+					}
+				}
+			}
+		} catch (error: unknown) {
+			if (controller.signal.aborted) return;
+			this.broadcast({
+				requestId: request.requestId,
+				type: "error",
+				error: error instanceof Error ? error.message : "Stream failed",
 			});
 		} finally {
 			this.activeStreams.delete(request.requestId);
