@@ -1,3 +1,5 @@
+import { createReadTool } from "./read";
+
 /**
  * Built-in tool registry for ClaudeCodeAgentRuntime.
  *
@@ -60,6 +62,15 @@ function placeholder(name: BuiltinToolName): BuiltinToolDef {
 	};
 }
 
-export function getBuiltinTools(_ctx: BuiltinToolContext): BuiltinToolDef[] {
-	return BUILTIN_TOOL_NAMES.map(placeholder);
+export function getBuiltinTools(ctx: BuiltinToolContext): BuiltinToolDef[] {
+	return [
+		createReadTool(ctx),
+		placeholder("Write"),
+		placeholder("Edit"),
+		placeholder("Bash"),
+		placeholder("Grep"),
+		placeholder("Glob"),
+		placeholder("WebFetch"),
+		placeholder("Task"),
+	];
 }
