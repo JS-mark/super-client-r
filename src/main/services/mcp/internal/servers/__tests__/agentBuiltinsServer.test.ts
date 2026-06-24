@@ -19,8 +19,13 @@ import {
 const TMP = mkdtempSync(join(tmpdir(), "agent-builtins-test-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
 
-function textOf(result: { content: Array<{ text?: string }> }): string {
-	return result.content.map((c) => c.text ?? "").join("");
+type AnyResult = {
+	content: Array<{ text?: string } | { data: string; mimeType: string }>;
+};
+function textOf(result: AnyResult): string {
+	return result.content
+		.map((c) => ("text" in c ? c.text ?? "" : ""))
+		.join("");
 }
 
 describe("agentBuiltinsServer skeleton", () => {
@@ -57,11 +62,6 @@ describe("agentBuiltinsServer skeleton", () => {
 		}
 	});
 
-	it("Task is still placeholder until E2.9", async () => {
-		const server = createAgentBuiltinsServer();
-		const result = await server.handlers.get("Task")!({});
-		expect(result.isError).toBe(true);
-	});
 });
 
 describe("Bash handler (delegates @scp/bash)", () => {
@@ -316,4 +316,57 @@ describe("Edit handler", () => {
 		expect(result.isError).toBe(true);
 		expect(textOf(result)).toMatch(/identical|no-op/i);
 	});
+});
+
+describe("Task handler (HTTP recursion)", () => {
+	it("errors at depth >= 3", async () => {
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Task")!({
+			description: "x",
+			prompt: "y",
+			_taskDepth: 3,
+			_provider: { baseUrl: "x", apiKey: "y", model: "z" },
+		});
+		expect(result.isError).toBe(true);
+		expect(textOf(result)).toMatch(/depth|nest/i);
+	});
+
+	it("errors when _provider missing", async () => {
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Task")!({
+			description: "x",
+			prompt: "y",
+		});
+		expect(result.isError).toBe(true);
+		expect(textOf(result)).toMatch(/_provider|provider/i);
+	});
+
+	it("errors when _scpPort/_scpApiKey missing", async () => {
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Task")!({
+			description: "x",
+			prompt: "y",
+			_provider: { baseUrl: "x", apiKey: "y", model: "z" },
+		});
+		expect(result.isError).toBe(true);
+		expect(textOf(result)).toMatch(/_scpPort|_scpApiKey|HTTP recursion/i);
+	});
+
+	it("errors on empty description/prompt", async () => {
+		const server = createAgentBuiltinsServer();
+		const r1 = await server.handlers.get("Task")!({
+			description: "",
+			prompt: "y",
+		});
+		expect(r1.isError).toBe(true);
+		const r2 = await server.handlers.get("Task")!({
+			description: "x",
+			prompt: "  ",
+		});
+		expect(r2.isError).toBe(true);
+	});
+
+	// Note: a full HTTP-recursion happy-path test lives in the e2e suite
+	// (Phase E5.2). The unit tests above cover error paths because they
+	// don't require a live LocalServer.
 });

@@ -20,6 +20,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { parseSSEStream } from "../../../llm/sseClient";
 import { mcpService } from "../../McpService";
 import type {
 	InternalMcpServer,
@@ -27,6 +28,8 @@ import type {
 	InternalToolHandler,
 	InternalToolResult,
 } from "../types";
+
+const MAX_TASK_DEPTH = 3;
 
 const toolDefs: InternalToolDefinition[] = [
 	{
@@ -143,13 +146,6 @@ const toolDefs: InternalToolDefinition[] = [
 ];
 
 export const AGENT_BUILTIN_TOOL_NAMES = toolDefs.map((t) => t.name);
-
-function placeholder(name: string): InternalToolHandler {
-	return async () => ({
-		content: [{ type: "text" as const, text: `${name}: not implemented yet` }],
-		isError: true,
-	});
-}
 
 function textOk(text: string): InternalToolResult {
 	return { content: [{ type: "text", text }], isError: false };
@@ -335,6 +331,116 @@ const webfetchHandler: InternalToolHandler = async (args) => {
 	}
 };
 
+// ── Task handler (HTTP recursion) ─────────────────────────────────────
+// Reads the parent's provider/scp/port config from injected args and
+// POSTs a fresh chat completion request back to the local HTTP server.
+// The subagent has the same tool set (including Task itself, depth-bounded).
+// Returns the accumulated assistant text as a single tool result.
+
+const taskHandler: InternalToolHandler = async (args) => {
+	try {
+		const description = String(args.description ?? "").trim();
+		const prompt = String(args.prompt ?? "").trim();
+		if (!description) throw new Error("description is required");
+		if (!prompt) throw new Error("prompt is required");
+
+		const depth = Number(args._taskDepth ?? 0);
+		if (depth >= MAX_TASK_DEPTH) {
+			throw new Error(
+				`max nesting depth (${MAX_TASK_DEPTH}) reached; inline this work instead`,
+			);
+		}
+
+		const provider = args._provider as
+			| {
+					baseUrl?: string;
+					apiKey?: string;
+					model?: string;
+					providerPreset?: string;
+					apiFormat?: string;
+			  }
+			| undefined;
+		if (!provider || !provider.baseUrl || !provider.model) {
+			throw new Error("_provider is required (host injection failed)");
+		}
+
+		const scpPort = Number(args._scpPort ?? 0);
+		const scpApiKey = String(args._scpApiKey ?? "");
+		if (!scpPort || !scpApiKey) {
+			throw new Error("_scpPort/_scpApiKey required for HTTP recursion");
+		}
+
+		const parentRequestId = String(args._parentRequestId ?? "");
+		const subRequestId = `${parentRequestId || "task"}_d${
+			depth + 1
+		}_${Date.now()}`;
+
+		const subRequest = {
+			requestId: subRequestId,
+			conversationId: subRequestId,
+			baseUrl: provider.baseUrl,
+			apiKey: provider.apiKey,
+			model: provider.model,
+			providerPreset: provider.providerPreset,
+			apiFormat: provider.apiFormat,
+			messages: [
+				{
+					role: "system" as const,
+					content:
+						`You are a focused subagent. Task: ${description}\n` +
+						`Return a concise summary of your findings. ` +
+						`You have access to the same built-in tools as the parent agent.`,
+				},
+				{ role: "user" as const, content: prompt },
+			],
+			tools: toolDefs.map((t) => ({
+				type: "function" as const,
+				function: {
+					name: `scp-agent-builtins__${t.name}`,
+					description: t.description,
+					parameters: t.inputSchema,
+				},
+			})),
+			toolMapping: Object.fromEntries(
+				toolDefs.map((t) => [
+					`scp-agent-builtins__${t.name}`,
+					{ serverId: "@scp/agent-builtins", toolName: t.name },
+				]),
+			),
+		};
+
+		const res = await fetch(
+			`http://127.0.0.1:${scpPort}/v1/llm/chat/completions`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${scpApiKey}`,
+				},
+				body: JSON.stringify(subRequest),
+			},
+		);
+		if (!res.ok || !res.body) {
+			throw new Error(`subagent HTTP ${res.status}`);
+		}
+
+		let accumulated = "";
+		for await (const frame of parseSSEStream(res.body)) {
+			if (frame.event === "chunk") {
+				const c = (frame.data as { content?: string }).content;
+				if (c) accumulated += c;
+			} else if (frame.event === "error") {
+				const e = (frame.data as { error?: string }).error ?? "unknown";
+				throw new Error(`subagent error: ${e}`);
+			}
+		}
+
+		return textOk(accumulated || "(subagent returned no text)");
+	} catch (err) {
+		return textErr(`Task: ${(err as Error).message}`);
+	}
+};
+
 export function createAgentBuiltinsServer(): InternalMcpServer {
 	const handlers = new Map<string, InternalToolHandler>();
 	handlers.set("Read", readHandler);
@@ -344,7 +450,7 @@ export function createAgentBuiltinsServer(): InternalMcpServer {
 	handlers.set("Grep", grepHandler);
 	handlers.set("Glob", globHandler);
 	handlers.set("WebFetch", webfetchHandler);
-	handlers.set("Task", placeholder("Task"));
+	handlers.set("Task", taskHandler);
 	return {
 		id: "@scp/agent-builtins",
 		name: "Agent Built-ins",
