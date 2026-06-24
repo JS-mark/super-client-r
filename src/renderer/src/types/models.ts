@@ -1,3 +1,5 @@
+import type { LLMErrorContext } from "@super-client/shared-types/chat";
+
 export type ModelProviderPreset =
 	| "dashscope"
 	| "deepseek"
@@ -107,6 +109,8 @@ export interface ChatStreamEvent {
 		| "tool_rejected";
 	content?: string;
 	error?: string;
+	/** Structured request/response context for `type:'error'` events. */
+	errorContext?: LLMErrorContext;
 	toolCall?: {
 		id: string;
 		name: string;

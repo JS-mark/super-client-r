@@ -148,6 +148,23 @@
 	"stream": {
 		"watchdogTimeout": "Connection timed out, state reset"
 	},
+	"errorCard": {
+		"title": "Request failed",
+		"query": "Triggering request",
+		"responseBody": "Raw response",
+		"stack": "Error stack",
+		"retry": "Retry",
+		"copyDetails": "Copy details",
+		"copied": "Copied to clipboard",
+		"copyFailed": "Copy failed",
+		"fields": {
+			"model": "Model",
+			"provider": "Provider",
+			"apiFormat": "API format",
+			"endpoint": "Endpoint",
+			"code": "Error code"
+		}
+	},
 	"inspector": {
 		"toggle": "Environment Inspector"
 	},
@@ -299,7 +316,10 @@
 			"authorizedToolsDesc": "Tools that can execute without confirmation",
 			"noTools": "No tools available",
 			"selected": "Selected",
-			"searchTools": "Search tools..."
+			"searchTools": "Search tools...",
+			"sourceBuiltin": "Built-in (Claude Code)",
+			"sourceMcp": "MCP",
+			"sourceSkill": "Skill"
 		}
 	},
 	"toolCall": {

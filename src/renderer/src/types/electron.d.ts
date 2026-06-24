@@ -98,7 +98,12 @@ export type {
   FileOpenTarget,
   ChatFileArtifact,
   ChatFileChangeSet,
+  LLMErrorContext,
 } from "@super-client/shared-types/chat";
+
+// Local import so the type can be referenced as an annotation inside this
+// same module — `export type { … } from "…"` does not create a local binding.
+import type { LLMErrorContext as _LLMErrorContext } from "@super-client/shared-types/chat";
 
 export type {
   // IPC
@@ -364,6 +369,8 @@ export interface ChatStreamEvent {
   | "tool_rejected";
   content?: string;
   error?: string;
+  /** Structured request/response context for `type:'error'` events. */
+  errorContext?: _LLMErrorContext;
   toolCall?: {
     id: string;
     name: string;

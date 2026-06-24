@@ -84,6 +84,11 @@ export interface AgentSDKStreamEvent {
 	content?: string;
 	/** 错误信息 */
 	error?: string;
+	/**
+	 * 结构化错误上下文（LLM provider 失败时携带）。Renderer 据此渲染 ErrorCard：
+	 * preset / apiFormat / baseUrl / model / HTTP status / 业务错误码 + 原始响应。
+	 */
+	errorContext?: import("./chat").LLMErrorContext;
 	/** 工具使用摘要 */
 	toolSummary?: string;
 	/** 工具使用摘要对应的 tool_use ids */

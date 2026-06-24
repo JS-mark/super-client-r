@@ -8,6 +8,7 @@ import {
   type EnvInfo,
 } from "../prompt";
 import { agentSDKClient } from "../services/agent/agentSDKService";
+import { agentRuntimeClient } from "../services/agent/agentRuntimeClient";
 import { mcpClient } from "../services/mcp/mcpService";
 import { modelService } from "../services/modelService";
 import { runtimeService } from "../services/runtimeService";
@@ -170,6 +171,9 @@ export function useChat() {
   const updateMessageMetadata = useChatMessageStore(
     (s) => s.updateMessageMetadata,
   );
+  const markMessageAsError = useChatMessageStore(
+    (s) => s.markMessageAsError,
+  );
   const applyAssistantPartEvent = useChatMessageStore(
     (s) => s.applyAssistantPartEvent,
   );
@@ -211,9 +215,14 @@ export function useChat() {
     DEFAULT_SESSION_SETTINGS,
   );
 
-  // Available MCP tools for permission settings UI
+  // Available tools (builtin facade + MCP + active skill) for permission
+  // settings UI. `source` lets the settings panel render section headers.
   const [availableTools, setAvailableTools] = useState<
-    Array<{ prefixedName: string; displayName: string }>
+    Array<{
+      prefixedName: string;
+      displayName: string;
+      source: "builtin" | "mcp" | "skill";
+    }>
   >([]);
 
   const respondToApproval = useCallback(
@@ -257,37 +266,64 @@ export function useChat() {
   // Fetch available tools list for settings UI
   useEffect(() => {
     const loadTools = async () => {
+      const tools: Array<{
+        prefixedName: string;
+        displayName: string;
+        source: "builtin" | "mcp" | "skill";
+      }> = [];
+
+      // 1) Builtin facade tools (Read/Write/Edit/Bash/Grep/Glob/WebFetch/Task)
+      // injected by ClaudeCodeAgentRuntime. The LLM calls these by their bare
+      // facade name (e.g. "Read"), so authorizedTools[] also stores the bare
+      // name — no `serverId__tool` prefix.
+      try {
+        const builtinTools = await agentRuntimeClient.listBuiltinTools();
+        for (const t of builtinTools) {
+          tools.push({
+            prefixedName: t.name,
+            displayName: t.name,
+            source: "builtin",
+          });
+        }
+      } catch {
+        // Builtin tools loading failure is non-fatal; user can still pre-auth MCP.
+      }
+
+      // 2) MCP tools (prefixed by sanitized serverId).
       try {
         const mcpTools = await mcpClient.getAllTools();
-        const tools = mcpTools.map(({ serverId, tool }) => {
+        for (const { serverId, tool } of mcpTools) {
           const safePrefix = sanitizeServerId(serverId);
-          const prefixedName = `${safePrefix}__${tool.name}`;
-          return { prefixedName, displayName: tool.name };
-        });
-
-        // Also load skill tools when a skill is selected
-        if (selectedSkillId) {
-          try {
-            const skillTools = await skillClient.getAllTools();
-            const filtered = skillTools.filter(
-              (t) => t.skillId === selectedSkillId,
-            );
-            for (const { skillId, tool } of filtered) {
-              const prefixedName = `skill-${skillId}__${tool.name}`;
-              tools.push({
-                prefixedName,
-                displayName: `${skillId}/${tool.name}`,
-              });
-            }
-          } catch {
-            // Skill tools loading failure is non-fatal
-          }
+          tools.push({
+            prefixedName: `${safePrefix}__${tool.name}`,
+            displayName: tool.name,
+            source: "mcp",
+          });
         }
-
-        setAvailableTools(tools);
       } catch {
-        setAvailableTools([]);
+        // MCP tool loading failure is non-fatal.
       }
+
+      // 3) Active skill's tools (prefixed by `skill-{skillId}__`).
+      if (selectedSkillId) {
+        try {
+          const skillTools = await skillClient.getAllTools();
+          const filtered = skillTools.filter(
+            (t) => t.skillId === selectedSkillId,
+          );
+          for (const { skillId, tool } of filtered) {
+            tools.push({
+              prefixedName: `skill-${skillId}__${tool.name}`,
+              displayName: `${skillId}/${tool.name}`,
+              source: "skill",
+            });
+          }
+        } catch {
+          // Skill tools loading failure is non-fatal
+        }
+      }
+
+      setAvailableTools(tools);
     };
     loadTools();
   }, [selectedSkillId]);
@@ -322,6 +358,92 @@ export function useChat() {
       streamWatchdogRef.current = null;
     }
   }, []);
+
+  /**
+   * Convert the in-flight assistant placeholder into a `type:'error'`
+   * Message so the ErrorCard renders in the chat list. Replaces the prior
+   * toast + inline-text pattern. Used by:
+   *   - LLM / Agent SDK stream `error` events (carry errorContext)
+   *   - Watchdog timeout (no errorContext)
+   *   - Pre-flight blockers (intent unresolved, IPC createQuery failure)
+   * The triggering user prompt is located via positional walk-back — same
+   * pattern used by the `done` branch's usage attribution.
+   */
+  const materializeStreamError = useCallback(
+    (
+      summary: string,
+      errorContext?: import("@super-client/shared-types/chat").LLMErrorContext,
+    ) => {
+      const allMessages = useChatMessageStore.getState().messages;
+      const lastAssistant = [...allMessages]
+        .reverse()
+        .find((m) => m.role === "assistant");
+      if (!lastAssistant) {
+        // No bubble to attach to (pre-stream validation) — fall back to
+        // a toast so the user still sees something.
+        message.error(summary);
+        return;
+      }
+      // Defensive: if the bubble was already converted into an error
+      // message (via an earlier, richer event from the same request),
+      // don't let a follow-up event with weaker context overwrite it —
+      // e.g. a broker fallback `Bad Request` arriving after the
+      // translator already shipped statusCode + responseBody + stack.
+      const incomingRichness =
+        Number(Boolean(errorContext?.statusCode !== undefined)) +
+        Number(Boolean(errorContext?.responseBodySnippet)) +
+        Number(Boolean(errorContext?.stack));
+      const existingRichness =
+        Number(
+          Boolean(lastAssistant.metadata?.errorContext?.statusCode !== undefined),
+        ) +
+        Number(
+          Boolean(lastAssistant.metadata?.errorContext?.responseBodySnippet),
+        ) +
+        Number(Boolean(lastAssistant.metadata?.errorContext?.stack));
+      if (
+        lastAssistant.type === "error" &&
+        existingRichness >= incomingRichness
+      ) {
+        return;
+      }
+      const triggeringUser = [...allMessages]
+        .slice(
+          0,
+          allMessages.findIndex((m) => m.id === lastAssistant.id),
+        )
+        .reverse()
+        .find((m) => m.role === "user");
+      // Merge what we know locally (active model resolved just before the
+      // request fired) into the errorContext so the card always shows
+      // model / preset / apiFormat — even when the failure came from a
+      // path that doesn't produce a fully populated errorContext (broker
+      // exceptions, pre-flight blockers, etc.).
+      const modelInfo = currentModelInfoRef.current;
+      const mergedContext: import("@super-client/shared-types/chat").LLMErrorContext =
+        {
+          preset: errorContext?.preset ?? modelInfo?.providerPreset,
+          apiFormat: errorContext?.apiFormat ?? modelInfo?.apiFormat,
+          baseUrl: errorContext?.baseUrl,
+          model: errorContext?.model ?? modelInfo?.model,
+          statusCode: errorContext?.statusCode,
+          endpointUrl: errorContext?.endpointUrl,
+          responseBodySnippet: errorContext?.responseBodySnippet,
+          providerErrorCode: errorContext?.providerErrorCode,
+          providerErrorMessage: errorContext?.providerErrorMessage,
+          ...(errorContext?.stack ? { stack: errorContext.stack } : {}),
+        };
+      markMessageAsError(lastAssistant.id, {
+        summary,
+        errorContext: mergedContext,
+        ...(triggeringUser?.content
+          ? { query: triggeringUser.content }
+          : {}),
+      });
+    },
+    [markMessageAsError, message],
+  );
+
   const kickWatchdog = useCallback(() => {
     if (streamWatchdogRef.current) {
       clearTimeout(streamWatchdogRef.current);
@@ -335,13 +457,10 @@ export function useChat() {
         "[useChat] stream watchdog timeout, force-resetting sessionStatus",
         { requestId: currentRequestIdRef.current },
       );
-      message.warning(t("stream.watchdogTimeout", { ns: "chat" }));
-      // 保住已经累计的内容，再清流式状态
-      if (streamContentRef.current) {
-        const sanitized = sanitizeAssistantContent(streamContentRef.current);
-        setStreamingContent(sanitized);
-        updateLastMessage(sanitized);
-      }
+      // Surface the timeout as a proper ErrorCard on the in-flight assistant
+      // bubble — this is a stream failure, not a transient warning.
+      materializeStreamError(t("stream.watchdogTimeout", { ns: "chat" }));
+      // 清流式状态（已被 markMessageAsError 替换的消息会自带 summary 文案）
       setSessionStatus("idle");
       if (streamFlushRafRef.current !== null) {
         cancelAnimationFrame(streamFlushRafRef.current);
@@ -352,7 +471,7 @@ export function useChat() {
       currentRequestIdRef.current = null;
       isAgentSDKRequestRef.current = false;
     }, STREAM_WATCHDOG_MS);
-  }, [message, setSessionStatus, setStreamingContent, updateLastMessage]);
+  }, [setSessionStatus, setStreamingContent, materializeStreamError, t]);
   const armWatchdog = kickWatchdog;
 
   useEffect(() => {
@@ -609,6 +728,15 @@ export function useChat() {
   useEffect(() => {
     const unsubscribe = modelService.onStreamEvent((event) => {
       if (event.requestId !== currentRequestIdRef.current) return;
+      // Agent SDK 路径下，同一份 ChatStreamEvent 会被 LLMService.broadcast 同时
+      // 发到这条 `model:stream-event` 通道 + per-request 订阅者；后者会被
+      // ClaudeCodeAgentRuntime 翻译成 text.delta 再经 agentSdkLegacyAdapter
+      // 转回 `{ type: "chunk" }` 通过 `agent-sdk:stream-event` 走 agentSDK
+      // 分支。两条都跑就会把每个 chunk append 两次，导致正文出现
+      // "文件文件内容内容" 这种叠字、并且 ``` fence 被叠加成错误序列而无法
+      // 被 messagePartsAdapter 解析成 code_block。这里反向门控：agent SDK
+      // 请求时只听 agentSDK 通道。
+      if (isAgentSDKRequestRef.current) return;
 
       // 收到任意事件都给 watchdog 续命；终态事件下方各自再 clearWatchdog
       kickWatchdog();
@@ -794,7 +922,11 @@ export function useChat() {
         currentRequestIdRef.current = null;
         clearWatchdog();
       } else if (event.type === "error") {
-        message.error(`Stream error: ${event.error}`);
+        // Materialize an ErrorCard on the in-flight assistant message.
+        materializeStreamError(
+          event.error ?? "Stream failed",
+          event.errorContext,
+        );
         setSessionStatus("idle");
         clearAssistantStreamContent();
         currentRequestIdRef.current = null;
@@ -811,6 +943,7 @@ export function useChat() {
     updateLastMessage,
     updateMessageToolCall,
     updateMessageMetadata,
+    materializeStreamError,
     message,
     kickWatchdog,
     clearWatchdog,
@@ -1095,6 +1228,19 @@ export function useChat() {
           const lastAssistant = [...msgs]
             .reverse()
             .find((m) => m.role === "assistant");
+          // If the placeholder was already converted into an error message
+          // by `materializeStreamError`, short-circuit so a stray runtime
+          // `result` event arriving after `error` can't reset the bubble
+          // (e.g. by clobbering content / metadata through the finalize +
+          // updateMessageMetadata path below).
+          if (lastAssistant?.type === "error") {
+            setSessionStatus("idle");
+            clearAssistantStreamContent();
+            currentRequestIdRef.current = null;
+            isAgentSDKRequestRef.current = false;
+            clearWatchdog();
+            break;
+          }
           if (streamContentRef.current) {
             finalizeAssistantStreamContent();
           } else if (
@@ -1140,18 +1286,13 @@ export function useChat() {
 
         case "error": {
           const errorText = event.error || "Agent execution failed";
+          const errorContext = event.errorContext;
           agentLog.error("Agent SDK error event", undefined, {
             requestId: event.requestId,
             error: errorText,
+            ...(errorContext ? { errorContext } : {}),
           });
-          message.error(`Agent error: ${errorText}`);
-          // Finalize any partial content
-          const partial = sanitizeAssistantContent(streamContentRef.current);
-          updateLastAssistantContent(
-            partial
-              ? `${partial}\n\nAgent error: ${errorText}`
-              : `Agent error: ${errorText}`,
-          );
+          materializeStreamError(errorText, errorContext);
           setSessionStatus("idle");
           clearAssistantStreamContent();
           currentRequestIdRef.current = null;
@@ -1200,6 +1341,7 @@ export function useChat() {
     updateLastAssistantContent,
     updateMessageToolCall,
     updateMessageMetadata,
+    materializeStreamError,
     message,
     kickWatchdog,
     clearWatchdog,
@@ -1313,8 +1455,19 @@ export function useChat() {
             chatProviderId: effective?.provider.id,
             chatProviderPreset: effective?.provider.preset,
           });
-          message.error(intent.message);
-          updateLastAssistantContent(intent.message);
+          // Surface as an ErrorCard with minimal context so the user sees
+          // which chat-side model was attempted and why it was blocked.
+          materializeStreamError(intent.message, {
+            preset: effective?.provider.preset,
+            apiFormat: undefined,
+            baseUrl: effective?.provider.baseUrl,
+            model: effective?.model.id,
+            statusCode: undefined,
+            endpointUrl: undefined,
+            responseBodySnippet: undefined,
+            providerErrorCode: "claude_code_intent_unresolved",
+            providerErrorMessage: intent.message,
+          });
           setSessionStatus("idle");
           clearAssistantStreamContent();
           currentRequestIdRef.current = null;
@@ -1431,8 +1584,22 @@ export function useChat() {
           error instanceof Error ? error : undefined,
           { requestId, error: errorMsg },
         );
-        message.error(`Error: ${errorMsg}`);
-        updateLastAssistantContent(`Agent error: ${errorMsg}`);
+        // Surface IPC-create failures (main process throwing before any
+        // stream event lands) through the same ErrorCard path. Pull the
+        // attempted model from currentModelInfoRef (set just before the
+        // createQuery call) — `effective` itself is local to the try block.
+        const modelInfo = currentModelInfoRef.current;
+        materializeStreamError(errorMsg, {
+          preset: modelInfo?.providerPreset,
+          apiFormat: modelInfo?.apiFormat,
+          baseUrl: undefined,
+          model: modelInfo?.model,
+          statusCode: undefined,
+          endpointUrl: undefined,
+          responseBodySnippet: undefined,
+          providerErrorCode: "agent_create_query_ipc_failed",
+          providerErrorMessage: errorMsg,
+        });
         setSessionStatus("idle");
         clearAssistantStreamContent();
         currentRequestIdRef.current = null;
@@ -1448,6 +1615,7 @@ export function useChat() {
       sessionModelOverride,
       resolveActiveProviderModel,
       updateLastAssistantContent,
+      materializeStreamError,
       armWatchdog,
       t,
     ],

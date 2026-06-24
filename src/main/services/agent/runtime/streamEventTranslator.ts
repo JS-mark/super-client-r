@@ -176,6 +176,9 @@ export class ChatToRuntimeTranslator {
 					fatal: true,
 					code: "model_error",
 					message: ev.error ?? "unknown error",
+					// Forward the structured LLMErrorContext so it survives
+					// the runtime → AgentSDK → renderer translation chain.
+					...(ev.errorContext ? { errorContext: ev.errorContext } : {}),
 				});
 				break;
 			}

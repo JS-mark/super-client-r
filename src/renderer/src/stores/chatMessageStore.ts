@@ -47,6 +47,7 @@ export type {
 import type {
 	AssistantPartEvent,
 	ChatSessionStatus,
+	LLMErrorContext,
 	Message,
 	MessagePart,
 	ToolCall,
@@ -185,6 +186,20 @@ interface ChatMessageState {
 	updateMessageMetadata: (
 		messageId: string,
 		metadata: Partial<NonNullable<Message["metadata"]>>,
+	) => void;
+	/**
+	 * Convert the message into an error message (sets `type:'error'`, fills
+	 * `metadata.errorContext / errorQuery / errorSummary`, and replaces
+	 * `content` with the summary). Used by the LLM stream error branch in
+	 * `useChat.ts` to materialize an ErrorCard.
+	 */
+	markMessageAsError: (
+		messageId: string,
+		payload: {
+			summary: string;
+			errorContext?: LLMErrorContext;
+			query?: string;
+		},
 	) => void;
 	applyAssistantPartEvent: (
 		messageId: string,
@@ -343,6 +358,50 @@ export const useChatMessageStore = create<ChatMessageState>()((set) => ({
 					nextMetadata.attachmentIds.length > 0
 						? { attachmentIds: nextMetadata.attachmentIds }
 						: {}),
+				});
+			}
+			return { messages: newMessages };
+		});
+	},
+
+	markMessageAsError: (messageId, payload) => {
+		set((state) => {
+			const idx = state.messages.findIndex((m) => m.id === messageId);
+			if (idx === -1) return state;
+			const message = state.messages[idx];
+			const nextMetadata = {
+				...message.metadata,
+				errorSummary: payload.summary,
+				...(payload.errorContext
+					? { errorContext: payload.errorContext }
+					: {}),
+				...(payload.query !== undefined ? { errorQuery: payload.query } : {}),
+			};
+			const newMessages = [...state.messages];
+			newMessages[idx] = {
+				...message,
+				type: "error",
+				// Keep the summary in `content` so non-card consumers (plain
+				// text export, search index) can still read the failure reason.
+				content: payload.summary,
+				metadata: nextMetadata,
+				// Drop any in-flight streaming parts — the card replaces them.
+				parts: undefined,
+			};
+
+			// Persist as an `assistant_message` event with the same id so a
+			// conversation reload re-materializes the ErrorCard rather than
+			// showing an empty bubble. `messageType: 'error'` is the field
+			// jsonl.ts replays into `Message.type` so the renderer routes
+			// the rebuilt message back through ErrorCard.
+			if (message.role === "assistant") {
+				emitSessionEvent({
+					type: "assistant_message",
+					id: message.id,
+					ts: message.timestamp || Date.now(),
+					content: payload.summary,
+					metadata: nextMetadata,
+					messageType: "error",
 				});
 			}
 			return { messages: newMessages };

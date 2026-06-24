@@ -4,6 +4,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+import type { LLMErrorContext } from "@super-client/shared-types/chat";
 import type { ElectronAPIMigrated } from "@super-client/shared-types/electron-api";
 import { createBridge } from "./bridge";
 
@@ -1179,6 +1180,8 @@ export interface ChatStreamEvent {
 		| "tool_rejected";
 	content?: string;
 	error?: string;
+	/** Structured request/response context for `type:'error'` events. */
+	errorContext?: LLMErrorContext;
 	toolCall?: {
 		id: string;
 		name: string;
@@ -1860,6 +1863,7 @@ const electronAPI: ElectronAPI = {
 		"resolvePermission",
 		"interrupt",
 		"listRuntimes",
+		"listBuiltinTools",
 		"listNativeSessions",
 		"forkNativeSession",
 		"onStreamEvent",

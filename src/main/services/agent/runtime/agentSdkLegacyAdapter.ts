@@ -47,15 +47,44 @@ export function adaptSdkRequestToRuntime(
 }
 
 /**
+ * Per-request accumulator threaded through `adaptRuntimeEventToSdk` so that
+ * the terminal `result` legacy event can carry real usage + duration. The
+ * runtime emits `usage` and `result` as separate events (translator's `done`
+ * case pushes message.final → usage → result), and the legacy `agent-sdk`
+ * SDK shape collapses them all into `result.usage` / `result.durationMs`.
+ *
+ * Without this, the renderer reads zeros for both and shows "0 tokens, 0.0s".
+ */
+export interface SdkAdapterState {
+	/** Pump start time (ms epoch). Used to fill in `result.durationMs`. */
+	startedAt: number;
+	/** Latest seen `usage` event payload, folded into the next `result`. */
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	};
+}
+
+export function createSdkAdapterState(): SdkAdapterState {
+	return { startedAt: Date.now() };
+}
+
+/**
  * Convert one new-protocol event into 0..N legacy `agent-sdk:stream-event`
  * shaped events (with `requestId` + `type` + variant fields).
  *
  * The legacy event shape is loose (a discriminated union via `type`);
  * we return them as `Record<string, unknown>` to avoid importing the
  * full union here.
+ *
+ * `state` is optional for backward compatibility with existing unit tests;
+ * production callers MUST pass one (see `createSdkAdapterState()`), otherwise
+ * the resulting `result` event carries zero usage + zero duration.
  */
 export function adaptRuntimeEventToSdk(
 	ev: AgentRuntimeStreamEvent,
+	state?: SdkAdapterState,
 ): Record<string, unknown> | null {
 	const base = {
 		requestId: ev.requestId,
@@ -133,6 +162,15 @@ export function adaptRuntimeEventToSdk(
 
 		case "usage":
 			// Folded into `result.usage` below; no direct legacy event.
+			// The `result` case reads from `state.usage` to populate the
+			// terminal SDK `result.usage` field that the renderer consumes
+			// to render token counts in the message footer.
+			if (state) {
+				state.usage = {
+					inputTokens: ev.inputTokens,
+					outputTokens: ev.outputTokens,
+				};
+			}
 			return null;
 
 		case "status":
@@ -141,23 +179,33 @@ export function adaptRuntimeEventToSdk(
 		case "rate_limit":
 			return { ...base, type: "rate_limit", error: ev.message };
 
-		case "result":
+		case "result": {
+			const usage = state?.usage ?? { inputTokens: 0, outputTokens: 0 };
+			const durationMs = state ? Date.now() - state.startedAt : 0;
 			return {
 				...base,
 				type: "result",
 				result: {
 					success: ev.reason === "completed",
 					text: "",
-					durationMs: 0,
+					durationMs,
 					numTurns: 1,
 					totalCostUsd: 0,
 					stopReason: ev.reason,
-					usage: { inputTokens: 0, outputTokens: 0 },
+					usage,
 				},
 			};
+		}
 
 		case "error":
-			return { ...base, type: "error", error: ev.message };
+			return {
+				...base,
+				type: "error",
+				error: ev.message,
+				// Forward structured error context to the renderer so the
+				// ErrorCard can render model/preset/endpoint/HTTP/etc.
+				...(ev.errorContext ? { errorContext: ev.errorContext } : {}),
+			};
 
 		default:
 			return null;

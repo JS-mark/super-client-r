@@ -16,7 +16,11 @@
  * @packageDocumentation
  */
 
-import type { EffectiveSessionRuntime, SessionApprovalGrant } from "./chat";
+import type {
+	EffectiveSessionRuntime,
+	LLMErrorContext,
+	SessionApprovalGrant,
+} from "./chat";
 
 // ─────────────────────────────────────────────────────────────────────
 // Runtime 标识 / Capabilities
@@ -328,6 +332,13 @@ export interface AgentErrorEvent extends AgentEventBase {
 	fatal: boolean;
 	code: string;
 	message: string;
+	/**
+	 * Structured request/response context built by `buildLLMErrorContext`
+	 * in LLMService. Carried through the runtime adapter chain so the
+	 * renderer can surface a rich ErrorCard (model / preset / endpoint /
+	 * HTTP status / provider business-error / response body).
+	 */
+	errorContext?: LLMErrorContext;
 }
 
 // ─────────────────────────────────────────────────────────────────────

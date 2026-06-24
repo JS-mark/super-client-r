@@ -477,6 +477,39 @@ export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageType = "text" | "tool_use" | "tool_result" | "error";
 
 /**
+ * Structured context attached to a failed LLM stream request. Carries enough
+ * information to diagnose config mismatches (preset/apiFormat/baseUrl/model)
+ * and surface the provider's business-error code/message + raw response body.
+ *
+ * Built in the main process by `buildLLMErrorContext` and broadcast to the
+ * renderer on the `type:'error'` stream event so the chat UI can render a
+ * rich error card instead of a plain toast.
+ *
+ * Canonical home is shared-types so all four ChatStreamEvent declaration
+ * sites (main/ipc, preload, renderer ambient .d.ts, renderer types/models)
+ * import the same type.
+ */
+export interface LLMErrorContext {
+	preset: string | undefined;
+	apiFormat: string | undefined;
+	baseUrl: string | undefined;
+	model: string | undefined;
+	statusCode: number | undefined;
+	endpointUrl: string | undefined;
+	responseBodySnippet: string | undefined;
+	/** Parsed business-error code from the provider, when available. */
+	providerErrorCode: string | undefined;
+	/** Parsed business-error message from the provider, when available. */
+	providerErrorMessage: string | undefined;
+	/**
+	 * JS error stack (truncated) for the underlying exception. Useful for
+	 * diagnosing transport / SDK issues distinct from provider business
+	 * errors. Optional — not all error sources have a stack.
+	 */
+	stack?: string;
+}
+
+/**
  * Chat session lifecycle states (live request state, NOT historical):
  * - idle: 空闲 — waiting for user input (also the state after completion/stop/error)
  * - preparing: 创建中 — building request (fetching MCP tools, constructing system prompt)
@@ -711,5 +744,23 @@ export interface Message {
 		agentSDKSessionId?: string;
 		totalCostUsd?: number;
 		numTurns?: number;
+		/**
+		 * Structured LLM error context for messages with `type === "error"`.
+		 * Populated by the renderer when a stream `type:'error'` event arrives
+		 * carrying `errorContext`. Drives the ErrorCard rendering.
+		 */
+		errorContext?: LLMErrorContext;
+		/**
+		 * The user prompt that triggered the failed request, captured so the
+		 * ErrorCard can surface "the query that caused this" without relying on
+		 * positional walk-back at render time.
+		 */
+		errorQuery?: string;
+		/**
+		 * Single-line, human-readable error headline (the same enriched string
+		 * shown in toasts pre-card). Kept for accessibility / non-card
+		 * consumers (export, plain text view).
+		 */
+		errorSummary?: string;
 	};
 }

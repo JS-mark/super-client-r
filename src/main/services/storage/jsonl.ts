@@ -186,12 +186,25 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 			}
 
 			case "assistant_message": {
+				// Restore Message.type from the persisted `messageType` field
+				// when present (currently only `"error"` is meaningful).
+				// Fallback inference for jsonl records written before
+				// messageType existed: a metadata.errorContext or
+				// metadata.errorSummary implies the bubble was an error
+				// bubble, so reading it back as `type:'error'` keeps the
+				// ErrorCard rendering across upgrades.
+				const restoredType: Message["type"] =
+					e.messageType === "error" ||
+					e.metadata?.errorContext ||
+					e.metadata?.errorSummary
+						? "error"
+						: "text";
 				const next: Message = {
 					id: e.id,
 					role: "assistant",
 					content: e.content,
 					timestamp: e.ts,
-					type: "text",
+					type: restoredType,
 					...(e.metadata ? { metadata: e.metadata } : {}),
 				};
 				const existing = messageIndex.get(e.id);

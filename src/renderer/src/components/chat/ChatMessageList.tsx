@@ -19,6 +19,10 @@ import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { List, useDynamicRowHeight, useListRef } from "react-window";
+import {
+	formatTokenCount,
+	formatTokenCountExact,
+} from "../../lib/formatTokens";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import type { Message } from "../../stores/chatMessageStore";
 import { useMessageStore } from "../../stores/messageStore";
@@ -28,6 +32,7 @@ import { MessageContextMenu } from "./MessageContextMenu";
 import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
+import { ErrorCard } from "./ErrorCard";
 import { ToolCallCard } from "./ToolCallCard";
 import { shouldVirtualizeMessageList } from "./chatMessageListVirtualization";
 import { isAskUserQuestionToolCall, messageToParts } from "./messagePartsAdapter";
@@ -392,10 +397,10 @@ export function ChatMessageList({
 					</div>
 				);
 
-				// Token info
+				// Token info (chip = compact, tooltip = exact below)
 				const tokenText =
 					meta?.inputTokens != null
-						? `↑${meta.inputTokens.toLocaleString()}`
+						? `↑${formatTokenCount(meta.inputTokens)}`
 						: "";
 				const tokenInfo = (
 					<div className="flex items-center gap-1.5">
@@ -414,7 +419,9 @@ export function ChatMessageList({
 				);
 				const tokenInfoEl =
 					meta?.inputTokens != null ? (
-						<Tooltip title={`Tokens: ↑${meta.inputTokens.toLocaleString()}`}>
+						<Tooltip
+							title={`Tokens: ↑${formatTokenCountExact(meta.inputTokens)}`}
+						>
 							{tokenInfo}
 						</Tooltip>
 					) : (
@@ -600,12 +607,28 @@ export function ChatMessageList({
 				</div>
 			);
 
-			// Content: interleave assistant text + tool cards
-			const contentRender = () => {
-				const parts: React.ReactNode[] = [];
-				for (let i = 0; i < aiMessages.length; i++) {
-					const m = aiMessages[i];
-					if (m.role === "assistant") {
+				// Content: interleave assistant text + tool cards
+				const contentRender = () => {
+					const parts: React.ReactNode[] = [];
+					for (let i = 0; i < aiMessages.length; i++) {
+						const m = aiMessages[i];
+						if (m.role === "assistant") {
+							// When the assistant turn failed mid-stream, useChat
+							// converts the placeholder into a `type:'error'`
+							// message via markMessageAsError. Render the
+							// structured ErrorCard in place of the regular text
+							// parts so the failure reason, model, endpoint, and
+							// triggering query stay first-class.
+							if (m.type === "error") {
+							parts.push(
+								<ErrorCard
+									key={`${m.id}:error`}
+									message={m}
+									onRetry={retryMessage}
+								/>,
+							);
+							continue;
+						}
 						const isLastInTurn = i === aiMessages.length - 1;
 						const assistantParts = messageToParts(m).filter(
 							(part) => part.type !== "tool",
@@ -723,22 +746,25 @@ export function ChatMessageList({
 					);
 				}
 				if (footerMeta?.tokens != null) {
-					const parts = [`Tokens: ${footerMeta.tokens.toLocaleString()}`];
+					// Tooltip line keeps full precision (1,234,567).
+					const parts = [`Tokens: ${formatTokenCountExact(footerMeta.tokens)}`];
 					if (footerMeta.inputTokens != null)
-						parts.push(`↑${footerMeta.inputTokens.toLocaleString()}`);
+						parts.push(`↑${formatTokenCountExact(footerMeta.inputTokens)}`);
 					if (footerMeta.outputTokens != null)
-						parts.push(`↓${footerMeta.outputTokens.toLocaleString()}`);
+						parts.push(`↓${formatTokenCountExact(footerMeta.outputTokens)}`);
 					tooltipLines.push(parts.join(" "));
 				}
 
+				// Visible footer chip uses compact form (1.9K / 1.8M …) so the
+				// row width doesn't jump as token counts grow over a long chat.
 				let tokenText = "";
 				if (
 					footerMeta?.inputTokens != null &&
 					footerMeta?.outputTokens != null
 				) {
-					tokenText = `↑${footerMeta.inputTokens.toLocaleString()} ↓${footerMeta.outputTokens.toLocaleString()}`;
+					tokenText = `↑${formatTokenCount(footerMeta.inputTokens)} ↓${formatTokenCount(footerMeta.outputTokens)}`;
 				} else if (footerMeta?.tokens != null) {
-					tokenText = `${footerMeta.tokens.toLocaleString()} tokens`;
+					tokenText = `${formatTokenCount(footerMeta.tokens)} tokens`;
 				}
 
 				const tokenInfo = (
@@ -848,6 +874,10 @@ export function ChatMessageList({
 				);
 			})();
 
+			// Full-width override for ErrorCard turns is handled by a
+			// scoped `:has` CSS rule inside `ErrorCard.tsx` — per-item
+			// `styles` overrides on Bubble items don't reliably win over
+			// the role-level `display: inline-block`.
 			result.push({
 				key: firstAssistant?.id || aiMessages[0].id,
 				role: "ai" as const,

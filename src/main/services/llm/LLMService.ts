@@ -12,6 +12,11 @@ import type {
 import { getApprovalGrantStore } from "../runtime/ApprovalGrantStore";
 import { getRuntimePolicyService } from "../runtime/RuntimePolicyService";
 import { getSessionRuntimeResolver } from "../runtime/SessionRuntimeResolver";
+import { logger } from "../../utils/logger";
+import {
+	buildLLMErrorContext,
+	formatLLMErrorMessage,
+} from "./errorContext";
 import { applyPlanModeGate } from "./planModeGate";
 import { drainFullStream } from "./streamEventBridge";
 import { mapExtraParams } from "./extraParamsMapper";
@@ -61,6 +66,8 @@ export type ToolExecutor = (
 	name: string,
 	args: Record<string, unknown>,
 ) => Promise<unknown>;
+
+const log = logger.withContext("LLMService");
 
 export class LLMService {
 	private activeStreams = new Map<string, AbortController>();
@@ -474,11 +481,18 @@ export class LLMService {
 			});
 
 			await drainFullStream(result.fullStream, {
-				requestId: request.requestId,
-				broadcast: taggingBroadcast,
-				startTime,
-				abortSignal: controller.signal,
-			});
+					requestId: request.requestId,
+					broadcast: taggingBroadcast,
+					startTime,
+					abortSignal: controller.signal,
+					// Pass the originating request so the bridge can build a
+					// structured `LLMErrorContext` (HTTP / response body /
+					// stack / parsed provider error) when streamText surfaces
+					// an `error` part or throws during iteration — the outer
+					// catch below doesn't fire in that case because the
+					// bridge already broadcasts the failure itself.
+					request,
+				});
 
 			// postResponse hook: broadcast tail delta if hook mutated the
 			// response, matching legacy behaviour.
@@ -502,10 +516,24 @@ export class LLMService {
 			}
 		} catch (error: unknown) {
 			if (controller.signal.aborted) return;
+			// Enrich the bare SDK message with request context — apiFormat /
+			// baseUrl / model / HTTP status — so config mismatches surface
+			// clearly to both the renderer and the main-process log.
+			const enriched = formatLLMErrorMessage(error, request);
+			const errorContext = buildLLMErrorContext(error, request);
+			log.error(
+				"LLM stream failed",
+				error instanceof Error ? error : new Error(String(error)),
+				errorContext,
+			);
+			// Broadcast both the legacy flattened string (for HTTP SSE clients
+			// and any older consumer) and the structured context that drives
+			// the renderer's ErrorCard.
 			this.broadcast({
 				requestId: request.requestId,
 				type: "error",
-				error: error instanceof Error ? error.message : "Stream failed",
+				error: enriched,
+				errorContext,
 			});
 		} finally {
 			this.activeStreams.delete(request.requestId);

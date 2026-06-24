@@ -234,6 +234,12 @@ export interface AssistantMessageEvent extends BaseEvent {
 	id: string;
 	content: string;
 	metadata?: Message["metadata"];
+	/**
+	 * 回放时映射到 `Message.type`。缺省（旧记录）回退为 `"text"`。
+	 * 当 stream 出错被 `markMessageAsError` 转写时为 `"error"`，
+	 * 让 ErrorCard 在刷新后仍能正确渲染。
+	 */
+	messageType?: "text" | "error";
 }
 
 /** Structured assistant output part event. New JSONL writes can stream rich parts. */

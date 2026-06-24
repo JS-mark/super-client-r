@@ -148,6 +148,23 @@
 	"stream": {
 		"watchdogTimeout": "连接超时，已重置状态"
 	},
+	"errorCard": {
+		"title": "请求失败",
+		"query": "触发的请求",
+		"responseBody": "原始响应",
+		"stack": "错误堆栈",
+		"retry": "重试",
+		"copyDetails": "复制详情",
+		"copied": "已复制到剪贴板",
+		"copyFailed": "复制失败",
+		"fields": {
+			"model": "模型",
+			"provider": "服务商",
+			"apiFormat": "API 格式",
+			"endpoint": "请求地址",
+			"code": "错误代码"
+		}
+	},
 	"inspector": {
 		"toggle": "环境检视"
 	},
@@ -299,7 +316,10 @@
 			"authorizedToolsDesc": "无需确认即可执行的工具",
 			"noTools": "暂无可用工具",
 			"selected": "已选择",
-			"searchTools": "搜索工具..."
+			"searchTools": "搜索工具...",
+			"sourceBuiltin": "内置 (Claude Code)",
+			"sourceMcp": "MCP",
+			"sourceSkill": "Skill"
 		}
 	},
 	"toolCall": {

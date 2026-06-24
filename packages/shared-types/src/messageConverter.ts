@@ -109,7 +109,12 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 		];
 	}
 
-	if (msg.type === "error") {
+	// Pre-`messageType` behaviour: error messages were lumped into a
+	// session_marker event with no rendering implications. We now route
+	// assistant-role errors through the `assistant_message` branch below
+	// (carrying `messageType: "error"`) so the ErrorCard survives a
+	// session reload. Non-assistant errors keep the legacy marker.
+	if (msg.type === "error" && msg.role !== "assistant") {
 		return [
 			{
 				type: "session_marker",
@@ -147,6 +152,11 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 				ts,
 				content,
 				...(msg.metadata ? { metadata: msg.metadata } : {}),
+				// Persist Message.type so jsonl replay can restore an
+				// ErrorCard bubble after a refresh. Currently only `"error"`
+				// is meaningful for assistant_message records — `"text"` is
+				// the default consumer behaviour on the read path.
+				...(msg.type === "error" ? { messageType: "error" as const } : {}),
 			},
 		];
 		for (const part of persistentParts) {

@@ -98,6 +98,7 @@ export type {
 	ResolvedAttachmentContext,
 	EffectiveSessionRuntime,
 	ConversationSummaryUpdate,
+	LLMErrorContext,
 } from "@super-client/shared-types/chat";
 
 export type {
@@ -145,6 +146,12 @@ export type {
 	ExtensionHealth,
 	ExtensionBackingRef,
 } from "@super-client/shared-types/extensions";
+
+// Re-imported here (the block above already re-exports it) so the type can
+// be referenced as a type annotation in interfaces declared in this same
+// module — `export type {…} from "…"` does not create a local binding in
+// TypeScript.
+import type { LLMErrorContext } from "@super-client/shared-types/chat";
 
 // ============ Main 进程独有的类型 ============
 
@@ -405,6 +412,13 @@ export interface ChatStreamEvent {
 		| "tool_rejected";
 	content?: string;
 	error?: string;
+	/**
+	 * Structured request/response context for `type:'error'` events. Built by
+	 * `buildLLMErrorContext` in the main process — preset/apiFormat/baseUrl/
+	 * model + HTTP status + parsed provider error code/message + raw body
+	 * snippet. Drives the renderer's ErrorCard.
+	 */
+	errorContext?: LLMErrorContext;
 	toolCall?: {
 		id: string;
 		name: string;

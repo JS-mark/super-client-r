@@ -15,7 +15,8 @@
  * or any compatible async iterable (used by tests).
  */
 
-import type { ChatStreamEvent } from "../../ipc/types";
+import type { ChatStreamEvent, ChatCompletionRequest } from "../../ipc/types";
+import { buildLLMErrorContext } from "./errorContext";
 
 /**
  * Minimal shape we need from a `streamText` `.fullStream`. We rely solely on
@@ -31,13 +32,23 @@ export interface DrainArgs {
 	/** Wall-clock at the moment `streamText()` was called, for `totalMs`. */
 	startTime: number;
 	abortSignal?: AbortSignal;
+	/**
+	 * The originating request — used by the bridge to build a structured
+	 * `LLMErrorContext` (preset / apiFormat / baseUrl / model + HTTP /
+	 * stack + parsed provider body) when the SDK surfaces an error part
+	 * or the iterator throws. Optional so tests can omit it; production
+	 * callers always pass it.
+	 */
+	request?: ChatCompletionRequest;
 }
 
 export async function drainFullStream(
 	stream: AsyncIterable<StreamPart>,
 	args: DrainArgs,
 ): Promise<void> {
-	const { requestId, broadcast, startTime, abortSignal } = args;
+	const { requestId, broadcast, startTime, abortSignal, request } = args;
+	const enrich = (err: unknown) =>
+		request ? buildLLMErrorContext(err, request) : undefined;
 	let firstTokenTime: number | undefined;
 	let usage:
 		| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
@@ -69,17 +80,19 @@ export async function drainFullStream(
 			} else if (part.type === "abort") {
 				aborted = true;
 				break;
-			} else if (part.type === "error") {
+				} else if (part.type === "error") {
 				if (abortSignal?.aborted) {
 					aborted = true;
 					break;
 				}
 				errored = true;
 				const err = (part as { error?: unknown }).error;
+				const errorContext = enrich(err);
 				broadcast({
 					requestId,
 					type: "error",
 					error: err instanceof Error ? err.message : String(err),
+					...(errorContext ? { errorContext } : {}),
 				});
 			}
 			// tool-call / tool-result parts: intentionally ignored — see header.
@@ -89,10 +102,12 @@ export async function drainFullStream(
 			aborted = true;
 		} else {
 			errored = true;
+			const errorContext = enrich(err);
 			broadcast({
 				requestId,
 				type: "error",
 				error: err instanceof Error ? err.message : String(err),
+				...(errorContext ? { errorContext } : {}),
 			});
 		}
 	}

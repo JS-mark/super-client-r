@@ -249,10 +249,20 @@ export class AgentRuntimeIpcBroker {
 		entry: InflightEntry,
 	): Promise<void> {
 		let lastEvent: AgentRuntimeStreamEvent | null = null;
+		// Track whether the runtime already yielded its own structured
+		// `error` event so the broker's fallback catch doesn't emit a
+		// SECOND, less-detailed error event that would clobber the rich
+		// LLMErrorContext (HTTP status, response body, stack, etc.) on the
+		// renderer side. See ClaudeCodeAgentRuntime.createQuery — when an
+		// underlying LLM call fails, the runtime yields the translator's
+		// error event *and* re-throws the captured `errored` from the
+		// iterator's finalizer, so this code path used to fire twice.
+		let runtimeEmittedError = false;
 		try {
 			for await (const ev of runtime.createQuery(req)) {
 				lastEvent = ev;
 				if (ev.type === "result") entry.resultEmitted = true;
+				if (ev.type === "error") runtimeEmittedError = true;
 				entry.nextSeq = Math.max(entry.nextSeq, ev.seq + 1);
 				this.deps.trace.record(req.requestId, {
 					kind: "event",
@@ -267,13 +277,18 @@ export class AgentRuntimeIpcBroker {
 			}
 		} catch (err) {
 			// adapter 抛出未捕获异常 → 转 fatal error event + result
-			const errEv = makeErrorEvent(req, runtime, err, entry.nextSeq++);
-			this.deps.trace.record(req.requestId, {
-				kind: "event",
-				payload: { kind: "event", event: errEv },
-			});
-			if (!sender.isDestroyed()) sender.send(AGENT_STREAM_CHANNEL, errEv);
-			lastEvent = errEv;
+			// Skip the synthesized error event when the runtime already
+			// emitted its own — keeping the structured one (with
+			// statusCode / stack / response body) intact on the renderer.
+			if (!runtimeEmittedError) {
+				const errEv = makeErrorEvent(req, runtime, err, entry.nextSeq++);
+				this.deps.trace.record(req.requestId, {
+					kind: "event",
+					payload: { kind: "event", event: errEv },
+				});
+				if (!sender.isDestroyed()) sender.send(AGENT_STREAM_CHANNEL, errEv);
+				lastEvent = errEv;
+			}
 			if (!entry.resultEmitted) {
 				const resEv = makeResultEvent(req, runtime, "error", entry.nextSeq++);
 				this.deps.trace.record(req.requestId, {
@@ -321,12 +336,34 @@ function makeErrorEvent(
 	const e = err as { code?: string; message?: string };
 	const code =
 		err instanceof AgentRuntimeError ? err.code : (e?.code ?? "Internal");
+	// Capture a minimal LLMErrorContext from the broker-level exception so
+	// the renderer's ErrorCard has at least preset/model/runtime + stack to
+	// show, even when the failure didn't originate from LLMService (e.g.
+	// IPC/runtime/spawn failures).
+	const rawStack =
+		err instanceof Error && typeof err.stack === "string"
+			? err.stack
+			: undefined;
+	const stack = rawStack ? rawStack.slice(0, 4_000) : undefined;
+	const errorContext = {
+		preset: undefined,
+		apiFormat: undefined,
+		baseUrl: undefined,
+		model: undefined,
+		statusCode: undefined,
+		endpointUrl: undefined,
+		responseBodySnippet: undefined,
+		providerErrorCode: code,
+		providerErrorMessage: e?.message ?? String(err),
+		...(stack ? { stack } : {}),
+	};
 	return {
 		v: 1,
 		type: "error",
 		fatal: true,
 		code,
 		message: e?.message ?? String(err),
+		errorContext,
 		requestId: req.requestId,
 		conversationId: req.conversationId,
 		seq,
