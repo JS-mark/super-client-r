@@ -271,6 +271,11 @@ export class StoreManager {
 			const StoreClass = (Store as any).default || Store;
 			this._configStore = new StoreClass({
 				name: "config",
+				// projectName is a fallback for environments where Electron's
+				// `app.name` is unavailable (vitest unit tests). Electron itself
+				// prefers `app.name` from the running app, so this doesn't affect
+				// production behaviour.
+				projectName: "super-client-r",
 				defaults: {
 					theme: "auto",
 					language: "en",
@@ -286,6 +291,7 @@ export class StoreManager {
 			const StoreClass = (Store as any).default || Store;
 			this._dataStore = new StoreClass({
 				name: "data",
+				projectName: "super-client-r",
 				defaults: {
 					sessions: [],
 				},
