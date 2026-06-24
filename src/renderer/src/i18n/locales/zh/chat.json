@@ -331,7 +331,8 @@
 			"local": "本地",
 			"network": "网络",
 			"browser": "浏览器",
-			"external": "外部"
+			"external": "外部",
+			"builtin": "内置"
 		}
 	},
 	"remoteChat": {

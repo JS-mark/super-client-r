@@ -331,7 +331,8 @@
 			"local": "Local",
 			"network": "Network",
 			"browser": "Browser",
-			"external": "External"
+			"external": "External",
+			"builtin": "Built-in"
 		}
 	},
 	"remoteChat": {

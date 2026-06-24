@@ -39,11 +39,16 @@ function formatToolName(name: string): { server: string | null; tool: string } {
 
 /**
  * Map server prefix to environment type for badge display.
+ *
+ * `builtin` is the new category for the @scp/agent-builtins MCP server
+ * (Read/Write/Edit/Bash/Grep/Glob/WebFetch/Task) so the renderer can
+ * distinguish first-party agent tools from user-installed MCP servers.
  */
 function getEnvType(
 	server: string | null,
-): "sandbox" | "local" | "network" | "browser" | "external" {
+): "sandbox" | "local" | "network" | "browser" | "builtin" | "external" {
 	if (!server) return "external";
+	if (server.startsWith("scp-agent-builtins")) return "builtin";
 	if (server.startsWith("scp-python") || server.startsWith("scp-javascript"))
 		return "sandbox";
 	if (server.startsWith("scp-file-system") || server.startsWith("scp-nodejs"))
@@ -58,6 +63,12 @@ const ENV_COLORS: Record<
 	string,
 	{ light: string; dark: string; text: string; darkText: string }
 > = {
+	builtin: {
+		light: "#e6f7ff",
+		dark: "#1a2e3a",
+		text: "#1677ff",
+		darkText: "#69b1ff",
+	},
 	sandbox: {
 		light: "#e6f7e6",
 		dark: "#1a3a1a",
