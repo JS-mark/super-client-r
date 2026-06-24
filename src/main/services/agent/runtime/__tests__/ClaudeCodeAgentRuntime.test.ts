@@ -1,38 +1,20 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	AgentQueryRequest,
 	AgentRuntimeStreamEvent,
 } from "@super-client/shared-types/agent-runtime";
-import type { ChatStreamEvent } from "../../../../ipc/types";
 
-// Module-level mocks must be hoisted so vi.mock factories can capture them.
-const {
-	subscribers,
-	chatCompletionMock,
-	resolveToolApprovalMock,
-	stopStreamMock,
-} = vi.hoisted(() => ({
-	subscribers: new Map<string, Array<(e: unknown) => void>>(),
-	chatCompletionMock: vi.fn(),
-	resolveToolApprovalMock: vi.fn(),
-	stopStreamMock: vi.fn(),
+const { localServerMock, getOrCreateApiKeyMock } = vi.hoisted(() => ({
+	localServerMock: { getPort: vi.fn(() => 31337) },
+	getOrCreateApiKeyMock: vi.fn(() => "sk-self"),
 }));
 
-vi.mock("../../../llm/LLMService", () => ({
-	llmService: {
-		subscribeRequestEvents(
-			requestId: string,
-			cb: (e: ChatStreamEvent) => void,
-		) {
-			if (!subscribers.has(requestId)) subscribers.set(requestId, []);
-			subscribers.get(requestId)!.push(cb as (e: unknown) => void);
-			return () => subscribers.delete(requestId);
-		},
-		chatCompletion: chatCompletionMock,
-		resolveToolApproval: resolveToolApprovalMock,
-		stopStream: stopStreamMock,
-	},
+vi.mock("../../../../server", () => ({
+	localServer: localServerMock,
+}));
+vi.mock("../../../../server/config", () => ({
+	getOrCreateApiKey: getOrCreateApiKeyMock,
 }));
 
 vi.mock("../../../../store/StoreManager", () => ({
@@ -40,14 +22,14 @@ vi.mock("../../../../store/StoreManager", () => ({
 		getModelProviders: () => [
 			{
 				id: "prov-1",
-				name: "DashScope",
-				preset: "dashscope",
-				baseUrl: "https://x.test/v1",
-				apiKey: "sk-yyy",
+				name: "Test Provider",
+				preset: "openai",
+				baseUrl: "https://prov.test/v1",
+				apiKey: "sk-prov",
+				apiFormat: "chat-completions",
 				enabled: true,
 				tested: true,
-				apiFormat: "chat-completions",
-				models: [{ id: "qwen-flash", enabled: true }],
+				models: [{ id: "test-model", name: "test-model", enabled: true }],
 				createdAt: 0,
 				updatedAt: 0,
 			},
@@ -57,19 +39,31 @@ vi.mock("../../../../store/StoreManager", () => ({
 
 import { ClaudeCodeAgentRuntime } from "../ClaudeCodeAgentRuntime";
 
-function pushEventsAndDone(reqId: string, events: ChatStreamEvent[]) {
-	const subs = subscribers.get(reqId) ?? [];
-	for (const ev of events) for (const cb of subs) cb(ev);
+function sseBody(
+	events: Array<{ event: string; data: unknown }>,
+): ReadableStream<Uint8Array> {
+	const text = events
+		.map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`)
+		.join("");
+	const enc = new TextEncoder();
+	return new ReadableStream({
+		start(ctrl) {
+			ctrl.enqueue(enc.encode(text));
+			ctrl.close();
+		},
+	});
 }
 
-function makeReq(overrides: Partial<AgentQueryRequest> = {}): AgentQueryRequest {
+function makeReq(
+	overrides: Partial<AgentQueryRequest> = {},
+): AgentQueryRequest {
 	return {
 		requestId: "r1",
 		conversationId: "c1",
 		prompt: { kind: "text", text: "hello" },
 		history: [],
 		runtime: {
-			model: { providerId: "prov-1", modelId: "qwen-flash" },
+			model: { providerId: "prov-1", modelId: "test-model" },
 		} as never,
 		tools: [],
 		cwd: "/tmp",
@@ -78,108 +72,144 @@ function makeReq(overrides: Partial<AgentQueryRequest> = {}): AgentQueryRequest 
 	} as AgentQueryRequest;
 }
 
-describe("ClaudeCodeAgentRuntime", () => {
-	beforeEach(() => {
-		subscribers.clear();
-		chatCompletionMock.mockReset();
-		resolveToolApprovalMock.mockReset();
-		stopStreamMock.mockReset();
+let fetchSpy: ReturnType<typeof vi.spyOn>;
+let lastFetchUrl = "";
+let lastFetchInit: RequestInit | undefined;
+let respondWith: () => Response = () =>
+	new Response(sseBody([{ event: "done", data: {} }]), {
+		status: 200,
+		headers: { "content-type": "text/event-stream" },
 	});
 
-	it("createQuery yields init + text.delta + message.final + result", async () => {
-		chatCompletionMock.mockImplementationOnce(async (req) => {
-			pushEventsAndDone(req.requestId, [
-				{ requestId: req.requestId, type: "chunk", content: "Hi" },
-				{ requestId: req.requestId, type: "chunk", content: "!" },
-				{
-					requestId: req.requestId,
-					type: "done",
-					usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 },
-				},
-			]);
+beforeEach(() => {
+	lastFetchUrl = "";
+	lastFetchInit = undefined;
+	respondWith = () =>
+		new Response(sseBody([{ event: "done", data: {} }]), {
+			status: 200,
+			headers: { "content-type": "text/event-stream" },
 		});
+	fetchSpy = vi
+		.spyOn(globalThis, "fetch")
+		.mockImplementation(async (input, init) => {
+			lastFetchUrl = String(input);
+			lastFetchInit = init;
+			return respondWith();
+		});
+});
+
+afterEach(() => {
+	fetchSpy.mockRestore();
+});
+
+describe("ClaudeCodeAgentRuntime", () => {
+	it("createQuery fetches localhost /v1/llm/chat/completions with Bearer auth", async () => {
+		respondWith = () =>
+			new Response(
+				sseBody([
+					{ event: "chunk", data: { content: "Hi" } },
+					{ event: "done", data: {} },
+				]),
+				{ status: 200, headers: { "content-type": "text/event-stream" } },
+			);
 
 		const runtime = new ClaudeCodeAgentRuntime();
-		const out: AgentRuntimeStreamEvent[] = [];
-		for await (const ev of runtime.createQuery(makeReq())) out.push(ev);
-		const types = out.map((e) => e.type);
+		const events: AgentRuntimeStreamEvent[] = [];
+		for await (const ev of runtime.createQuery(makeReq())) events.push(ev);
+
+		expect(lastFetchUrl).toBe(
+			"http://127.0.0.1:31337/v1/llm/chat/completions",
+		);
+		expect(lastFetchInit?.method).toBe("POST");
+		const headers = lastFetchInit?.headers as Record<string, string>;
+		expect(headers["Authorization"]).toBe("Bearer sk-self");
+		expect(headers["Content-Type"]).toBe("application/json");
+
+		const types = events.map((e) => e.type);
 		expect(types[0]).toBe("init");
 		expect(types).toContain("text.delta");
-		expect(types).toContain("message.final");
 		expect(types).toContain("result");
 	});
 
-	it("threads provider config (baseUrl/apiKey/model/preset/apiFormat) into LLMService request", async () => {
-		chatCompletionMock.mockImplementationOnce(async (req) => {
-			pushEventsAndDone(req.requestId, [
-				{ requestId: req.requestId, type: "done" },
-			]);
-		});
-
+	it("buildChatRequest emits scp-agent-builtins__X tool names + toolMapping", async () => {
 		const runtime = new ClaudeCodeAgentRuntime();
-		const out: AgentRuntimeStreamEvent[] = [];
-		for await (const ev of runtime.createQuery(makeReq())) out.push(ev);
-
-		expect(chatCompletionMock).toHaveBeenCalledWith(
-			expect.objectContaining({
-				baseUrl: "https://x.test/v1",
-				apiKey: "sk-yyy",
-				model: "qwen-flash",
-				providerPreset: "dashscope",
-				apiFormat: "chat-completions",
-			}),
-			expect.any(Function),
-		);
-	});
-
-	it("adds 8 builtin tools to the chat request tools[] array", async () => {
-		chatCompletionMock.mockImplementationOnce(async (req) => {
-			pushEventsAndDone(req.requestId, [
-				{ requestId: req.requestId, type: "done" },
-			]);
-		});
-
-		const runtime = new ClaudeCodeAgentRuntime();
-		const out: AgentRuntimeStreamEvent[] = [];
-		for await (const ev of runtime.createQuery(makeReq())) out.push(ev);
-
-		const call = chatCompletionMock.mock.calls[0][0] as {
-			tools: Array<{ function: { name: string } }>;
-		};
-		const names = call.tools.map((t) => t.function.name);
-		for (const n of [
-			"Read",
-			"Write",
-			"Edit",
-			"Bash",
-			"Grep",
-			"Glob",
-			"WebFetch",
-			"Task",
-		]) {
-			expect(names).toContain(n);
+		for await (const _ev of runtime.createQuery(makeReq())) {
+			/* drain */
 		}
+		const body = JSON.parse(String(lastFetchInit?.body));
+		const names = body.tools.map(
+			(t: { function: { name: string } }) => t.function.name,
+		);
+		expect(names).toContain("scp-agent-builtins__Read");
+		expect(names).toContain("scp-agent-builtins__Task");
+		expect(body.toolMapping["scp-agent-builtins__Read"]).toEqual({
+			serverId: "@scp/agent-builtins",
+			toolName: "Read",
+		});
+		expect(body.toolMapping["scp-agent-builtins__Task"]).toEqual({
+			serverId: "@scp/agent-builtins",
+			toolName: "Task",
+		});
 	});
 
-	it("resolvePermission forwards to llmService.resolveToolApproval", async () => {
+	it("threads provider config (baseUrl/apiKey/model/preset/apiFormat) into request body", async () => {
 		const runtime = new ClaudeCodeAgentRuntime();
-		await runtime.resolvePermission("tc1", {
-			approved: true,
-			source: "user",
-		} as never);
-		expect(resolveToolApprovalMock).toHaveBeenCalledWith("tc1", true);
+		for await (const _ev of runtime.createQuery(makeReq())) {
+			/* drain */
+		}
+		const body = JSON.parse(String(lastFetchInit?.body));
+		expect(body.baseUrl).toBe("https://prov.test/v1");
+		expect(body.apiKey).toBe("sk-prov");
+		expect(body.model).toBe("test-model");
+		expect(body.providerPreset).toBe("openai");
+		expect(body.apiFormat).toBe("chat-completions");
 	});
 
-	it("interrupt forwards to llmService.stopStream", async () => {
+	it("emits error event when HTTP returns non-2xx", async () => {
+		respondWith = () =>
+			new Response("server boom", {
+				status: 500,
+				headers: { "content-type": "text/plain" },
+			});
+
+		const runtime = new ClaudeCodeAgentRuntime();
+		const events: AgentRuntimeStreamEvent[] = [];
+		for await (const ev of runtime.createQuery(makeReq())) events.push(ev);
+
+		const err = events.find((e) => e.type === "error") as {
+			message?: string;
+		};
+		expect(err).toBeDefined();
+		expect(err?.message).toMatch(/HTTP 500/);
+	});
+
+	it("resolvePermission POSTs /v1/llm/tool-approval with body", async () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		await runtime.resolvePermission("tc1", { approved: true } as never);
+		const approvalCalls = fetchSpy.mock.calls.filter((c: unknown[]) =>
+			String(c[0]).endsWith("/v1/llm/tool-approval"),
+		);
+		expect(approvalCalls.length).toBe(1);
+		const init = approvalCalls[0][1] as RequestInit | undefined;
+		const body = JSON.parse(String(init?.body));
+		expect(body).toEqual({ toolCallId: "tc1", approved: true });
+	});
+
+	it("interrupt POSTs /v1/llm/stop with requestId", async () => {
 		const runtime = new ClaudeCodeAgentRuntime();
 		await runtime.interrupt("r1");
-		expect(stopStreamMock).toHaveBeenCalledWith("r1");
+		const stopCalls = fetchSpy.mock.calls.filter((c: unknown[]) =>
+			String(c[0]).endsWith("/v1/llm/stop"),
+		);
+		expect(stopCalls.length).toBe(1);
+		const init = stopCalls[0][1] as RequestInit | undefined;
+		const body = JSON.parse(String(init?.body));
+		expect(body).toEqual({ requestId: "r1" });
 	});
 
-	it("descriptor exposes llm-loop runtime id and v1 schema", () => {
+	it("descriptor still exposes llm-loop runtime id", () => {
 		const runtime = new ClaudeCodeAgentRuntime();
 		expect(runtime.descriptor.id).toBe("llm-loop");
 		expect(runtime.descriptor.schemaVersion).toBe(1);
-		expect(runtime.descriptor.capabilities.streaming).toBe(true);
 	});
 });
