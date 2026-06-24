@@ -7,6 +7,8 @@
 import { ipcMain } from "electron";
 import { llmService } from "../../services/llm";
 import { buildToolExecutorFromRequest } from "../../services/llm/toolExecutorFactory";
+import { localServer } from "../../server";
+import { getOrCreateApiKey } from "../../server/config";
 import { LLM_CHANNELS } from "../channels";
 import type { ChatCompletionRequest, IPCResponse } from "../types";
 
@@ -23,8 +25,12 @@ export function registerModelHandlers(): void {
 				// Build a tool executor that maps prefixed tool names back to MCP
 				// servers / skills. Shared with the HTTP route (see
 				// `src/main/server/routes/llm.ts`) so both entry points have
-				// identical dispatch semantics.
-				const toolExecutor = buildToolExecutorFromRequest(request);
+				// identical dispatch semantics. Pass scpPort/scpApiKey so the
+				// agent-builtins Task tool can HTTP-recurse for subagents.
+				const toolExecutor = buildToolExecutorFromRequest(request, {
+					scpPort: localServer.getPort(),
+					scpApiKey: getOrCreateApiKey(),
+				});
 
 				// Fire and forget — stream events are sent via BrowserWindow.send
 				llmService.chatCompletion(request, toolExecutor);

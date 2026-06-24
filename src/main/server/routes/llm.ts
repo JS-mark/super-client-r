@@ -23,6 +23,8 @@ import type Koa from "koa";
 import { randomUUID } from "crypto";
 import { llmService } from "../../services/llm";
 import { buildToolExecutorFromRequest } from "../../services/llm/toolExecutorFactory";
+import { localServer } from "..";
+import { getOrCreateApiKey } from "../config";
 import { logger } from "../../utils/logger";
 import type {
 	ChatCompletionRequest,
@@ -301,7 +303,10 @@ export class LLMController {
 		});
 
 		try {
-			const toolExecutor = buildToolExecutorFromRequest(fullRequest);
+			const toolExecutor = buildToolExecutorFromRequest(fullRequest, {
+				scpPort: localServer.getPort(),
+				scpApiKey: getOrCreateApiKey(),
+			});
 			// Fire and forget — events flow through the subscriber. Errors from
 			// the underlying call still need to be surfaced as an SSE `error`
 			// frame in case the broadcast path didn't emit one.

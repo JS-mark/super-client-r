@@ -23,9 +23,33 @@ import type { ToolExecutor } from "./LLMService";
 
 const log = logger.withContext("ToolExecutorFactory");
 
-const SERVERS_WITH_PATH_ARGS = new Set(["@scp/file-system", "@scp/grep"]);
+const SERVERS_WITH_PATH_ARGS = new Set([
+	"@scp/file-system",
+	"@scp/grep",
+	"@scp/agent-builtins", // Read/Write/Edit/Glob need cwd-relative path resolution
+]);
 const PATH_ARG_KEYS = ["path", "source", "destination"];
 const SERVERS_WITH_STORAGE = new Set(["@scp/plan", "@scp/task"]);
+const AGENT_BUILTINS_SERVER = "@scp/agent-builtins";
+
+/**
+ * Extra context the agent-builtins server's Task tool needs. The HTTP route
+ * (server/routes/llm.ts) and IPC handler (modelHandlers.ts) populate this
+ * from the inbound request + LocalServer + getOrCreateApiKey so the Task
+ * handler can HTTP-recurse into a subagent.
+ */
+export interface AgentBuiltinsContext {
+	provider?: {
+		baseUrl?: string;
+		apiKey?: string;
+		model?: string;
+		providerPreset?: string;
+		apiFormat?: string;
+	};
+	scpPort?: number;
+	scpApiKey?: string;
+	parentRequestId?: string;
+}
 
 /**
  * Get the working directory used as `cwd` for tools in a chat completion.
@@ -44,35 +68,55 @@ function getConversationCwd(conversationId?: string): string | undefined {
 
 /**
  * Resolve relative file paths in tool arguments against the workspace
- * directory. Also injects `_storageDir` for servers that need persistent
- * storage.
+ * directory and inject host-side context blobs (_storageDir for stores,
+ * _cwd + _provider + _scpPort + _scpApiKey for the agent-builtins Task tool).
+ *
+ * Exported for unit testing.
  */
-function resolveToolPaths(
+export function injectBuiltinArgs(
 	serverId: string,
 	args: Record<string, unknown>,
 	workspaceDir?: string,
+	agentBuiltinsCtx?: AgentBuiltinsContext,
 ): Record<string, unknown> {
-	if (!workspaceDir) return args;
-
+	// Servers that get a per-workspace storage dir (plan/todo).
 	if (SERVERS_WITH_STORAGE.has(serverId)) {
+		if (!workspaceDir) return args;
 		return { ...args, _storageDir: path.join(workspaceDir, "todo") };
 	}
 
-	if (!SERVERS_WITH_PATH_ARGS.has(serverId)) return args;
+	// Servers that take file-path-like arguments — resolve relative to cwd.
+	const wantsPathArgs = SERVERS_WITH_PATH_ARGS.has(serverId);
+	if (!wantsPathArgs && serverId !== AGENT_BUILTINS_SERVER) return args;
 
 	const resolved: Record<string, unknown> = { ...args };
-	for (const key of PATH_ARG_KEYS) {
-		const val = resolved[key];
-		if (typeof val === "string" && val && !path.isAbsolute(val)) {
-			resolved[key] = path.resolve(workspaceDir, val);
-			log.debug("Resolved relative path", {
-				key,
-				original: val,
-				resolved: resolved[key],
-				workspaceDir,
-			});
+
+	if (workspaceDir) {
+		for (const key of PATH_ARG_KEYS) {
+			const val = resolved[key];
+			if (typeof val === "string" && val && !path.isAbsolute(val)) {
+				resolved[key] = path.resolve(workspaceDir, val);
+				log.debug("Resolved relative path", {
+					key,
+					original: val,
+					resolved: resolved[key],
+					workspaceDir,
+				});
+			}
 		}
 	}
+
+	// agent-builtins gets workspace cwd + Task recursion context.
+	if (serverId === AGENT_BUILTINS_SERVER) {
+		if (workspaceDir) resolved._cwd = workspaceDir;
+		if (agentBuiltinsCtx?.provider) resolved._provider = agentBuiltinsCtx.provider;
+		if (agentBuiltinsCtx?.scpPort) resolved._scpPort = agentBuiltinsCtx.scpPort;
+		if (agentBuiltinsCtx?.scpApiKey)
+			resolved._scpApiKey = agentBuiltinsCtx.scpApiKey;
+		if (agentBuiltinsCtx?.parentRequestId)
+			resolved._parentRequestId = agentBuiltinsCtx.parentRequestId;
+	}
+
 	return resolved;
 }
 
@@ -96,11 +140,27 @@ function resolveToolMapping(
  */
 export function buildToolExecutorFromRequest(
 	request: ChatCompletionRequest,
+	extras?: {
+		scpPort?: number;
+		scpApiKey?: string;
+	},
 ): ToolExecutor | undefined {
 	if (!request.toolMapping) return undefined;
 
 	const workspaceDir = getConversationCwd(request.conversationId);
 	const toolTimeoutMs = (request.toolTimeout ?? 180) * 1000;
+	const agentBuiltinsCtx: AgentBuiltinsContext = {
+		provider: {
+			baseUrl: request.baseUrl,
+			apiKey: request.apiKey,
+			model: request.model,
+			providerPreset: request.providerPreset,
+			apiFormat: request.apiFormat,
+		},
+		scpPort: extras?.scpPort,
+		scpApiKey: extras?.scpApiKey,
+		parentRequestId: request.requestId,
+	};
 
 	return async (name: string, args: Record<string, unknown>) => {
 		const mapping = resolveToolMapping(request.toolMapping!, name);
@@ -135,10 +195,11 @@ export function buildToolExecutorFromRequest(
 		}
 
 		// MCP tool dispatch
-		const resolvedArgs = resolveToolPaths(
+		const resolvedArgs = injectBuiltinArgs(
 			mapping.serverId,
 			args,
 			workspaceDir,
+			agentBuiltinsCtx,
 		);
 		const callPromise = mcpService.callTool(
 			mapping.serverId,
