@@ -20,6 +20,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { mcpService } from "../../McpService";
 import type {
 	InternalMcpServer,
 	InternalToolDefinition,
@@ -239,15 +240,110 @@ const editHandler: InternalToolHandler = async (args) => {
 	}
 };
 
+// ── MCP-delegating handlers ──────────────────────────────────────────
+// Bash/Grep/Glob/WebFetch all forward to an existing internal MCP server.
+// We unwrap the inner envelope and rethrow as our InternalToolResult.
+
+async function delegate(
+	serverId: string,
+	toolName: string,
+	args: Record<string, unknown>,
+	options: Record<string, unknown> = {},
+): Promise<InternalToolResult> {
+	const result = await mcpService.callTool(serverId, toolName, args, options);
+	if (!result.success) {
+		return textErr(result.error ?? `${toolName}: ${serverId} failed`);
+	}
+	const data = result.data as
+		| { content?: InternalToolResult["content"]; isError?: boolean }
+		| undefined;
+	if (data?.isError) {
+		const text =
+			data.content?.map((c) => ("text" in c ? c.text : "")).join("") ?? "";
+		return textErr(text || `${toolName}: tool returned isError`);
+	}
+	return {
+		content: data?.content ?? [],
+		isError: false,
+	};
+}
+
+const bashHandler: InternalToolHandler = async (args) => {
+	try {
+		const command = String(args.command ?? "");
+		if (!command) throw new Error("command is required");
+		const cwd = resolveCwd(args);
+		const timeout = Number(args.timeout) || undefined;
+		return await delegate("@scp/bash", "execute_command", {
+			command,
+			workingDir: cwd,
+			timeout,
+			confirmed: true,
+		});
+	} catch (err) {
+		return textErr(`Bash: ${(err as Error).message}`);
+	}
+};
+
+const grepHandler: InternalToolHandler = async (args) => {
+	try {
+		const pattern = String(args.pattern ?? "");
+		if (!pattern) throw new Error("pattern is required");
+		const path = String(args.path ?? resolveCwd(args));
+		const searchPath = isAbsolute(path) ? path : resolve(resolveCwd(args), path);
+		const delegateArgs: Record<string, unknown> = {
+			pattern,
+			path: searchPath,
+			ignoreCase: Boolean(args.ignoreCase),
+			filesOnly: Boolean(args.filesOnly),
+		};
+		if (typeof args.glob === "string") delegateArgs.include = args.glob;
+		if (typeof args.contextLines === "number") {
+			delegateArgs.contextLines = Math.max(0, Math.min(5, args.contextLines));
+		}
+		if (typeof args.maxResults === "number") {
+			delegateArgs.maxResults = Math.max(1, Math.min(1000, args.maxResults));
+		}
+		return await delegate("@scp/grep", "grep", delegateArgs);
+	} catch (err) {
+		return textErr(`Grep: ${(err as Error).message}`);
+	}
+};
+
+const globHandler: InternalToolHandler = async (args) => {
+	try {
+		const pattern = String(args.pattern ?? "");
+		if (!pattern) throw new Error("pattern is required");
+		const path = String(args.path ?? resolveCwd(args));
+		const searchPath = isAbsolute(path) ? path : resolve(resolveCwd(args), path);
+		return await delegate("@scp/file-system", "search_files", {
+			pattern,
+			path: searchPath,
+		});
+	} catch (err) {
+		return textErr(`Glob: ${(err as Error).message}`);
+	}
+};
+
+const webfetchHandler: InternalToolHandler = async (args) => {
+	try {
+		const url = String(args.url ?? "");
+		if (!url) throw new Error("url is required");
+		return await delegate("@scp/fetch", "fetch_html", { url });
+	} catch (err) {
+		return textErr(`WebFetch: ${(err as Error).message}`);
+	}
+};
+
 export function createAgentBuiltinsServer(): InternalMcpServer {
 	const handlers = new Map<string, InternalToolHandler>();
 	handlers.set("Read", readHandler);
 	handlers.set("Write", writeHandler);
 	handlers.set("Edit", editHandler);
-	handlers.set("Bash", placeholder("Bash"));
-	handlers.set("Grep", placeholder("Grep"));
-	handlers.set("Glob", placeholder("Glob"));
-	handlers.set("WebFetch", placeholder("WebFetch"));
+	handlers.set("Bash", bashHandler);
+	handlers.set("Grep", grepHandler);
+	handlers.set("Glob", globHandler);
+	handlers.set("WebFetch", webfetchHandler);
 	handlers.set("Task", placeholder("Task"));
 	return {
 		id: "@scp/agent-builtins",

@@ -1,8 +1,16 @@
 // @vitest-environment node
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const { callToolMock } = vi.hoisted(() => ({
+	callToolMock: vi.fn(),
+}));
+vi.mock("../../../McpService", () => ({
+	mcpService: { callTool: callToolMock },
+}));
+
 import {
 	AGENT_BUILTIN_TOOL_NAMES,
 	createAgentBuiltinsServer,
@@ -49,12 +57,125 @@ describe("agentBuiltinsServer skeleton", () => {
 		}
 	});
 
-	it("placeholder handlers (Bash/Grep/Glob/WebFetch/Task) return isError until implemented", async () => {
+	it("Task is still placeholder until E2.9", async () => {
 		const server = createAgentBuiltinsServer();
-		for (const name of ["Bash", "Grep", "Glob", "WebFetch", "Task"]) {
-			const result = await server.handlers.get(name)!({});
-			expect(result.isError).toBe(true);
-		}
+		const result = await server.handlers.get("Task")!({});
+		expect(result.isError).toBe(true);
+	});
+});
+
+describe("Bash handler (delegates @scp/bash)", () => {
+	it("forwards command + workingDir to @scp/bash::execute_command", async () => {
+		callToolMock.mockResolvedValueOnce({
+			success: true,
+			data: { content: [{ type: "text", text: "stdout" }], isError: false },
+		});
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Bash")!({
+			command: "echo hi",
+			_cwd: "/proj",
+		});
+		expect(result.isError).toBeFalsy();
+		expect(callToolMock).toHaveBeenCalledWith(
+			"@scp/bash",
+			"execute_command",
+			expect.objectContaining({
+				command: "echo hi",
+				workingDir: "/proj",
+				confirmed: true,
+			}),
+			expect.any(Object),
+		);
+	});
+
+	it("isError when downstream returns isError", async () => {
+		callToolMock.mockResolvedValueOnce({
+			success: true,
+			data: { content: [{ type: "text", text: "stderr" }], isError: true },
+		});
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Bash")!({
+			command: "false",
+			_cwd: "/proj",
+		});
+		expect(result.isError).toBe(true);
+	});
+
+	it("isError on missing command", async () => {
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Bash")!({ _cwd: "/proj" });
+		expect(result.isError).toBe(true);
+	});
+});
+
+describe("Grep handler (delegates @scp/grep)", () => {
+	it("forwards pattern + path + glob → include", async () => {
+		callToolMock.mockResolvedValueOnce({
+			success: true,
+			data: { content: [{ type: "text", text: "match" }] },
+		});
+		const server = createAgentBuiltinsServer();
+		await server.handlers.get("Grep")!({
+			pattern: "foo",
+			glob: "*.ts",
+			_cwd: "/proj",
+		});
+		expect(callToolMock).toHaveBeenCalledWith(
+			"@scp/grep",
+			"grep",
+			expect.objectContaining({
+				pattern: "foo",
+				path: "/proj",
+				include: "*.ts",
+			}),
+			expect.any(Object),
+		);
+	});
+});
+
+describe("Glob handler (delegates @scp/file-system::search_files)", () => {
+	it("forwards pattern + cwd", async () => {
+		callToolMock.mockResolvedValueOnce({
+			success: true,
+			data: { content: [{ type: "text", text: "/proj/a.ts" }] },
+		});
+		const server = createAgentBuiltinsServer();
+		await server.handlers.get("Glob")!({
+			pattern: "**/*.ts",
+			_cwd: "/proj",
+		});
+		expect(callToolMock).toHaveBeenCalledWith(
+			"@scp/file-system",
+			"search_files",
+			expect.objectContaining({ pattern: "**/*.ts", path: "/proj" }),
+			expect.any(Object),
+		);
+	});
+});
+
+describe("WebFetch handler (delegates @scp/fetch::fetch_html)", () => {
+	it("forwards url", async () => {
+		callToolMock.mockResolvedValueOnce({
+			success: true,
+			data: { content: [{ type: "text", text: "page body" }] },
+		});
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("WebFetch")!({
+			url: "https://example.test",
+		});
+		expect(textOf(result)).toBe("page body");
+		expect(callToolMock).toHaveBeenCalledWith(
+			"@scp/fetch",
+			"fetch_html",
+			{ url: "https://example.test" },
+			expect.any(Object),
+		);
+	});
+
+	it("isError on missing url", async () => {
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("WebFetch")!({});
+		expect(result.isError).toBe(true);
 	});
 });
 
