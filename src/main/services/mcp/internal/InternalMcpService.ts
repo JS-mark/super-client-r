@@ -188,6 +188,9 @@ export class InternalMcpService {
 		const { createGrepServer } = await import("./servers/grepServer");
 		const { createPlanServer } = await import("./servers/planServer");
 		const { createTaskServer } = await import("./servers/taskServer");
+		const { createAgentBuiltinsServer } = await import(
+			"./servers/agentBuiltinsServer"
+		);
 
 		const servers = [
 			createFetchServer(),
@@ -201,6 +204,7 @@ export class InternalMcpService {
 			createGrepServer(),
 			createPlanServer(),
 			createTaskServer(),
+			createAgentBuiltinsServer(),
 		];
 
 		for (const server of servers) {
