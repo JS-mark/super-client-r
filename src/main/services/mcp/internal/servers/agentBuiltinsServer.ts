@@ -18,6 +18,8 @@
  * the project's MCP tool naming convention (see useChat.sanitizeServerId).
  */
 
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, resolve } from "node:path";
 import type {
 	InternalMcpServer,
 	InternalToolDefinition,
@@ -148,9 +150,105 @@ function placeholder(name: string): InternalToolHandler {
 	});
 }
 
+function textOk(text: string): InternalToolResult {
+	return { content: [{ type: "text", text }], isError: false };
+}
+
+function textErr(text: string): InternalToolResult {
+	return { content: [{ type: "text", text }], isError: true };
+}
+
+function resolveCwd(args: Record<string, unknown>): string {
+	const cwd = args._cwd;
+	return typeof cwd === "string" && cwd.length > 0 ? cwd : process.cwd();
+}
+
+function resolvePath(args: Record<string, unknown>, key: string): string {
+	const raw = String(args[key] ?? "");
+	if (!raw) throw new Error(`${key} is required`);
+	return isAbsolute(raw) ? raw : resolve(resolveCwd(args), raw);
+}
+
+// ── Handlers ──────────────────────────────────────────────────────────
+
+const readHandler: InternalToolHandler = async (args) => {
+	try {
+		const abs = resolvePath(args, "path");
+		const offset = Math.max(1, Number(args.offset ?? 1) | 0);
+		const limit = Number(args.limit ?? 0) | 0;
+		const content = await readFile(abs, "utf-8");
+		const lines = content.split("\n");
+		const start = offset - 1;
+		const end = limit > 0 ? start + limit : lines.length;
+		const view = lines.slice(start, end);
+		const text = view
+			.map((l, i) => `${(start + i + 1).toString().padStart(4)}\t${l}`)
+			.join("\n");
+		return textOk(text);
+	} catch (err) {
+		return textErr(`Read: ${(err as Error).message}`);
+	}
+};
+
+const writeHandler: InternalToolHandler = async (args) => {
+	try {
+		const abs = resolvePath(args, "path");
+		const content = String(args.content ?? "");
+		await mkdir(dirname(abs), { recursive: true });
+		await writeFile(abs, content, "utf-8");
+		return textOk(`Wrote ${content.length} bytes to ${abs}`);
+	} catch (err) {
+		return textErr(`Write: ${(err as Error).message}`);
+	}
+};
+
+const editHandler: InternalToolHandler = async (args) => {
+	try {
+		const abs = resolvePath(args, "path");
+		const oldStr = String(args.old_string ?? "");
+		const newStr = String(args.new_string ?? "");
+		const replaceAll = Boolean(args.replace_all);
+		if (!oldStr) throw new Error("old_string must be non-empty");
+		if (oldStr === newStr) {
+			throw new Error("old_string and new_string are identical — no-op");
+		}
+		const content = await readFile(abs, "utf-8");
+		let count = 0;
+		let idx = -1;
+		while ((idx = content.indexOf(oldStr, idx + 1)) !== -1) count++;
+		if (count === 0) {
+			throw new Error(
+				`anchor not found in ${abs}. Read the file and pick a substring that appears verbatim.`,
+			);
+		}
+		if (count > 1 && !replaceAll) {
+			throw new Error(
+				`anchor matches ${count} times in ${abs}; pass replace_all:true OR include more surrounding context to make old_string unique.`,
+			);
+		}
+		const next = replaceAll
+			? content.split(oldStr).join(newStr)
+			: content.replace(oldStr, newStr);
+		await writeFile(abs, next, "utf-8");
+		const replaced = replaceAll ? count : 1;
+		return textOk(
+			`Edited ${abs}: ${replaced} replacement${replaced === 1 ? "" : "s"}`,
+		);
+	} catch (err) {
+		return textErr(`Edit: ${(err as Error).message}`);
+	}
+};
+
 export function createAgentBuiltinsServer(): InternalMcpServer {
 	const handlers = new Map<string, InternalToolHandler>();
-	for (const def of toolDefs) handlers.set(def.name, placeholder(def.name));
+	handlers.set("Read", readHandler);
+	handlers.set("Write", writeHandler);
+	handlers.set("Edit", editHandler);
+	handlers.set("Bash", placeholder("Bash"));
+	handlers.set("Grep", placeholder("Grep"));
+	handlers.set("Glob", placeholder("Glob"));
+	handlers.set("WebFetch", placeholder("WebFetch"));
+	handlers.set("Task", placeholder("Task"));
 	return {
 		id: "@scp/agent-builtins",
 		name: "Agent Built-ins",
