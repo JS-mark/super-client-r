@@ -30,6 +30,7 @@ import {
 	type SessionContextResolver,
 } from "../../services/agent/runtime/AgentRuntimeIpcBroker";
 import { getAgentRuntimeRegistry } from "../../services/agent/runtime/AgentRuntimeRegistry";
+import { listBuiltinTools } from "../../services/agent/runtime/tools/BuiltinToolRegistry";
 import { getAgentTraceCollector } from "../../services/agent/trace/AgentTraceCollector";
 import { getSessionRuntimeResolver } from "../../services/runtime/SessionRuntimeResolver";
 import { getSessionStorage } from "../../services/storage/SessionStorageService";
@@ -54,6 +55,7 @@ export const AGENT_RUNTIME_CHANNELS = {
 	LIST_NATIVE_SESSIONS: "agent-runtime:list-native-sessions",
 	FORK_NATIVE_SESSION: "agent-runtime:fork-native-session",
 	LIST_RUNTIMES: "agent-runtime:list-runtimes",
+	LIST_BUILTIN_TOOLS: "agent-runtime:list-builtin-tools",
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -170,6 +172,15 @@ export function registerAgentRuntimeHandlers(): void {
 	ipcMain.handle(AGENT_RUNTIME_CHANNELS.LIST_RUNTIMES, async () => ({
 		success: true,
 		data: getAgentRuntimeRegistry().list(),
+	}));
+
+	// agent-runtime:list-builtin-tools — static metadata for the 8 facade tools
+	// (Read/Write/Edit/Bash/Grep/Glob/WebFetch/Task). Used by the renderer to
+	// list them in the conversation-settings "预授权工具" panel so they can be
+	// pre-authorized just like MCP tools.
+	ipcMain.handle(AGENT_RUNTIME_CHANNELS.LIST_BUILTIN_TOOLS, async () => ({
+		success: true,
+		data: listBuiltinTools(),
 	}));
 
 	// agent:list-native-sessions

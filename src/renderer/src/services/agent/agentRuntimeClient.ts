@@ -86,6 +86,21 @@ export async function listNativeSessions(
 	return unwrap(r);
 }
 
+/**
+ * 列举 ClaudeCodeAgentRuntime 内置 facade 工具的静态元数据
+ * （Read/Write/Edit/Bash/Grep/Glob/WebFetch/Task）。
+ */
+export async function listBuiltinTools(): Promise<
+	Array<{
+		name: string;
+		description: string;
+		inputSchema: Record<string, unknown>;
+	}>
+> {
+	const r = await window.electron.agentRuntime.listBuiltinTools();
+	return unwrap(r);
+}
+
 /** Fork 一个原生 session；返回新 sessionId。 */
 export async function forkNativeSession(
 	runtimeId: AgentRuntimeId | CustomAgentRuntimeId,
@@ -107,6 +122,7 @@ export const agentRuntimeClient = {
 	interrupt,
 	onStreamEvent,
 	listRuntimes,
+	listBuiltinTools,
 	listNativeSessions,
 	forkNativeSession,
 };

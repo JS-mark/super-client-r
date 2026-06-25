@@ -25,7 +25,11 @@ interface ChatModalsProps {
 	onModelChange: (val: string) => void;
 	groupedModelOptions: any[];
 	isStreaming: boolean;
-	availableTools: Array<{ prefixedName: string; displayName: string }>;
+	availableTools: Array<{
+		prefixedName: string;
+		displayName: string;
+		source: "builtin" | "mcp" | "skill";
+	}>;
 	// RemoteBinding
 	remoteBindModalOpen: boolean;
 	onRemoteBindClose: () => void;

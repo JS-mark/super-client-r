@@ -369,6 +369,20 @@ export interface ElectronAPIMigrated {
 		}) => Promise<IPCResponse<{ ok: boolean }>>;
 		/** 列举注册的 runtime descriptors。 */
 		listRuntimes: () => Promise<IPCResponse<AgentRuntimeDescriptor[]>>;
+		/**
+		 * 列举 ClaudeCodeAgentRuntime 注入的 8 个内置 facade 工具的静态元数据
+		 * （Read/Write/Edit/Bash/Grep/Glob/WebFetch/Task）。供 ChatSettingsModal
+		 * 的“预授权工具”面板渲染。
+		 */
+		listBuiltinTools: () => Promise<
+			IPCResponse<
+				Array<{
+					name: string;
+					description: string;
+					inputSchema: Record<string, unknown>;
+				}>
+			>
+		>;
 		/** 仅 `nativeSession=true` 的 adapter 支持。 */
 		listNativeSessions: (args: {
 			runtimeId: AgentRuntimeId | CustomAgentRuntimeId;

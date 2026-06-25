@@ -208,8 +208,16 @@ function PermissionModeCards({
 
 /* ── Tool Authorization List ─────────────────────────── */
 
+type ToolSource = "builtin" | "mcp" | "skill";
+
+interface ToolEntry {
+	prefixedName: string;
+	displayName: string;
+	source: ToolSource;
+}
+
 interface ToolAuthorizationListProps {
-	tools: Array<{ prefixedName: string; displayName: string }>;
+	tools: ToolEntry[];
 	authorizedTools: string[];
 	searchQuery: string;
 	onSearchChange: (query: string) => void;
@@ -225,6 +233,36 @@ function ToolAuthorizationList({
 }: ToolAuthorizationListProps) {
 	const { token } = theme.useToken();
 	const { t } = useTranslation("chat");
+
+	// Group entries by source while preserving original order within each group.
+	const groups: Array<{ source: ToolSource; entries: ToolEntry[] }> = useMemo(
+		() => {
+			const buckets: Record<ToolSource, ToolEntry[]> = {
+				builtin: [],
+				mcp: [],
+				skill: [],
+			};
+			for (const tool of tools) buckets[tool.source].push(tool);
+			const result: Array<{ source: ToolSource; entries: ToolEntry[] }> = [];
+			(["builtin", "mcp", "skill"] as const).forEach((source) => {
+				if (buckets[source].length > 0)
+					result.push({ source, entries: buckets[source] });
+			});
+			return result;
+		},
+		[tools],
+	);
+
+	const sourceLabel = (source: ToolSource): string => {
+		switch (source) {
+			case "builtin":
+				return t("settings.permission.sourceBuiltin", "Built-in (Claude Code)");
+			case "mcp":
+				return t("settings.permission.sourceMcp", "MCP");
+			case "skill":
+				return t("settings.permission.sourceSkill", "Skill");
+		}
+	};
 
 	return (
 		<div className="mt-1">
@@ -249,44 +287,67 @@ function ToolAuthorizationList({
 				className="mb-2"
 			/>
 			{tools.length > 0 ? (
-				<div className="flex flex-col gap-1.5 max-h-[180px] overflow-y-auto">
-					{tools.map((tool) => {
-						const isAuthorized = authorizedTools.includes(tool.prefixedName);
-						return (
-							<div
-								key={tool.prefixedName}
-								className="flex items-center justify-between px-3 py-2 rounded-md border transition-colors"
-								style={{
-									borderColor: isAuthorized
-										? token.colorPrimaryBorder
-										: token.colorBorderSecondary,
-									backgroundColor: isAuthorized
-										? token.colorPrimaryBg
-										: token.colorBgContainer,
-								}}
-							>
-								<div className="flex flex-col min-w-0 mr-3">
-									<span
-										className="text-[12px] font-medium truncate"
-										style={{ color: token.colorText }}
-									>
-										{tool.displayName}
-									</span>
-									<span
-										className="text-[10px] truncate"
-										style={{ color: token.colorTextQuaternary }}
-									>
-										{tool.prefixedName}
-									</span>
-								</div>
-								<Switch
-									size="small"
-									checked={isAuthorized}
-									onChange={(checked) => onToggle(tool.prefixedName, checked)}
-								/>
+				<div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto">
+					{groups.map(({ source, entries }) => (
+						<div key={source} className="flex flex-col gap-1.5">
+							<div className="flex items-center gap-2 px-1 pt-0.5">
+								<span
+									className="text-[10px] uppercase tracking-[0.08em] font-semibold"
+									style={{ color: token.colorTextTertiary }}
+								>
+									{sourceLabel(source)}
+								</span>
+								<span
+									className="text-[10px]"
+									style={{ color: token.colorTextQuaternary }}
+								>
+									{entries.length}
+								</span>
+								<div className="flex-1 h-px bg-[var(--ant-color-split)]" />
 							</div>
-						);
-					})}
+							{entries.map((tool) => {
+								const isAuthorized = authorizedTools.includes(
+									tool.prefixedName,
+								);
+								return (
+									<div
+										key={tool.prefixedName}
+										className="flex items-center justify-between px-3 py-2 rounded-md border transition-colors"
+										style={{
+											borderColor: isAuthorized
+												? token.colorPrimaryBorder
+												: token.colorBorderSecondary,
+											backgroundColor: isAuthorized
+												? token.colorPrimaryBg
+												: token.colorBgContainer,
+										}}
+									>
+										<div className="flex flex-col min-w-0 mr-3">
+											<span
+												className="text-[12px] font-medium truncate"
+												style={{ color: token.colorText }}
+											>
+												{tool.displayName}
+											</span>
+											<span
+												className="text-[10px] truncate"
+												style={{ color: token.colorTextQuaternary }}
+											>
+												{tool.prefixedName}
+											</span>
+										</div>
+										<Switch
+											size="small"
+											checked={isAuthorized}
+											onChange={(checked) =>
+												onToggle(tool.prefixedName, checked)
+											}
+										/>
+									</div>
+								);
+							})}
+						</div>
+					))}
 				</div>
 			) : (
 				<div
@@ -314,7 +375,7 @@ interface ChatSettingsModalProps {
 		options: Array<{ label: ReactNode; value: string; icon?: ReactNode }>;
 	}>;
 	isStreaming: boolean;
-	availableTools?: Array<{ prefixedName: string; displayName: string }>;
+	availableTools?: ToolEntry[];
 }
 
 export function ChatSettingsModal({
