@@ -51,7 +51,7 @@ function getEnvType(
 	if (server.startsWith("scp-agent-builtins")) return "builtin";
 	if (server.startsWith("scp-python") || server.startsWith("scp-javascript"))
 		return "sandbox";
-	if (server.startsWith("scp-file-system") || server.startsWith("scp-nodejs"))
+	if (server.startsWith("scp-file-system") || server.startsWith("scp-bash"))
 		return "local";
 	if (server.startsWith("scp-fetch") || server.startsWith("scp-image"))
 		return "network";

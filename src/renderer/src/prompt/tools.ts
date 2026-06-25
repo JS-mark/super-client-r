@@ -27,12 +27,12 @@ For complex multi-step tasks, create a plan to track progress:
 3. Call \`get_plan\` to review current progress
 - Only one plan is active at a time; creating a new plan archives the old one
 
-## Task Management: create_task / update_task / list_tasks / delete_task
+## TODO Management: create_todo / update_todo / list_todos / delete_todo
 For managing independent work items:
-- \`create_task\`: Create a task with title, optional description, priority (low/medium/high/critical), and tags
-- \`update_task\`: Update status (pending → in_progress → completed/blocked/cancelled), priority, description, or tags
-- \`list_tasks\`: Filter by status, priority, or tag to see relevant tasks
-- \`delete_task\`: Remove a task by ID
+- \`create_todo\`: Create a TODO with title, optional description, priority (low/medium/high/critical), and tags
+- \`update_todo\`: Update status (pending → in_progress → completed/blocked/cancelled), priority, description, or tags
+- \`list_todos\`: Filter by status, priority, or tag to see relevant TODOs
+- \`delete_todo\`: Remove a TODO by ID
 
 ## Batch File Operations
 When the user asks to move, copy, rename, or delete **multiple files**, prefer a single shell command over calling file tools (move_file, copy_file, etc.) one-by-one:

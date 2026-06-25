@@ -10,246 +10,244 @@ import type { InternalMcpServer, InternalToolResult } from "./types";
 const log = logger.withContext("InternalMCP");
 
 export class InternalMcpService {
-	private servers: Map<string, InternalMcpServer> = new Map();
+  private servers: Map<string, InternalMcpServer> = new Map();
 
-	/**
-	 * 注册一个 internal MCP 服务器
-	 */
-	register(server: InternalMcpServer): void {
-		log.info("Registering internal server", {
-			id: server.id,
-			name: server.name,
-			toolCount: server.tools.length,
-		});
-		this.servers.set(server.id, server);
-	}
+  /**
+   * 注册一个 internal MCP 服务器
+   */
+  register(server: InternalMcpServer): void {
+    log.info("Registering internal server", {
+      id: server.id,
+      name: server.name,
+      toolCount: server.tools.length,
+    });
+    this.servers.set(server.id, server);
+  }
 
-	/**
-	 * 调用工具
-	 */
-	async callTool(
-		serverId: string,
-		toolName: string,
-		args: Record<string, unknown>,
-	): Promise<InternalToolResult> {
-		const server = this.servers.get(serverId);
-		if (!server) {
-			return {
-				content: [
-					{ type: "text", text: `Internal server ${serverId} not found` },
-				],
-				isError: true,
-			};
-		}
+  /**
+   * 调用工具
+   */
+  async callTool(
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<InternalToolResult> {
+    const server = this.servers.get(serverId);
+    if (!server) {
+      return {
+        content: [
+          { type: "text", text: `Internal server ${serverId} not found` },
+        ],
+        isError: true,
+      };
+    }
 
-		const handler = server.handlers.get(toolName);
-		if (!handler) {
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Tool ${toolName} not found in server ${serverId}`,
-					},
-				],
-				isError: true,
-			};
-		}
+    const handler = server.handlers.get(toolName);
+    if (!handler) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Tool ${toolName} not found in server ${serverId}`,
+          },
+        ],
+        isError: true,
+      };
+    }
 
-		log.debug("Calling internal tool", { serverId, toolName });
+    log.debug("Calling internal tool", { serverId, toolName });
 
-		try {
-			return await handler(args);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			log.error(
-				"Internal tool call failed",
-				error instanceof Error ? error : new Error(message),
-				{
-					serverId,
-					toolName,
-				},
-			);
-			return {
-				content: [{ type: "text", text: `Error: ${message}` }],
-				isError: true,
-			};
-		}
-	}
+    try {
+      return await handler(args);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.error(
+        "Internal tool call failed",
+        error instanceof Error ? error : new Error(message),
+        {
+          serverId,
+          toolName,
+        },
+      );
+      return {
+        content: [{ type: "text", text: `Error: ${message}` }],
+        isError: true,
+      };
+    }
+  }
 
-	/**
-	 * 获取指定服务器的工具列表（McpTool 格式）
-	 */
-	getTools(serverId: string): McpTool[] {
-		const server = this.servers.get(serverId);
-		if (!server) return [];
+  /**
+   * 获取指定服务器的工具列表（McpTool 格式）
+   */
+  getTools(serverId: string): McpTool[] {
+    const server = this.servers.get(serverId);
+    if (!server) return [];
 
-		return server.tools.map((t) => ({
-			name: t.name,
-			description: t.description,
-			inputSchema: t.inputSchema,
-		}));
-	}
+    return server.tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    }));
+  }
 
-	/**
-	 * 获取所有 internal 服务器的 McpServerConfig 格式
-	 */
-	getAllServerConfigs(): McpServerConfig[] {
-		return Array.from(this.servers.values()).map((server) => ({
-			id: server.id,
-			name: server.name,
-			type: "internal" as const,
-			transport: "internal" as const,
-			description: server.description,
-			version: server.version,
-			enabled: true,
-		}));
-	}
+  /**
+   * 获取所有 internal 服务器的 McpServerConfig 格式
+   */
+  getAllServerConfigs(): McpServerConfig[] {
+    return Array.from(this.servers.values()).map((server) => ({
+      id: server.id,
+      name: server.name,
+      type: "internal" as const,
+      transport: "internal" as const,
+      description: server.description,
+      version: server.version,
+      enabled: true,
+    }));
+  }
 
-	/**
-	 * 获取所有 internal 服务器的工具（带 serverId）
-	 */
-	getAllTools(): Array<{ serverId: string; tool: McpTool }> {
-		const tools: Array<{ serverId: string; tool: McpTool }> = [];
-		for (const [serverId, server] of this.servers.entries()) {
-			for (const t of server.tools) {
-				tools.push({
-					serverId,
-					tool: {
-						name: t.name,
-						description: t.description,
-						inputSchema: t.inputSchema,
-					},
-				});
-			}
-		}
-		return tools;
-	}
+  /**
+   * 获取所有 internal 服务器的工具（带 serverId）
+   */
+  getAllTools(): Array<{ serverId: string; tool: McpTool }> {
+    const tools: Array<{ serverId: string; tool: McpTool }> = [];
+    for (const [serverId, server] of this.servers.entries()) {
+      for (const t of server.tools) {
+        tools.push({
+          serverId,
+          tool: {
+            name: t.name,
+            description: t.description,
+            inputSchema: t.inputSchema,
+          },
+        });
+      }
+    }
+    return tools;
+  }
 
-	// Track dynamic server ownership (serverId → pluginId)
-	private dynamicOwners: Map<string, string> = new Map();
+  // Track dynamic server ownership (serverId → pluginId)
+  private dynamicOwners: Map<string, string> = new Map();
 
-	/**
-	 * 插件动态注册 MCP 服务器
-	 */
-	registerDynamic(server: InternalMcpServer, ownerId: string): void {
-		log.info("Registering dynamic server", {
-			id: server.id,
-			name: server.name,
-			ownerId,
-			toolCount: server.tools.length,
-		});
-		this.servers.set(server.id, server);
-		this.dynamicOwners.set(server.id, ownerId);
-	}
+  /**
+   * 插件动态注册 MCP 服务器
+   */
+  registerDynamic(server: InternalMcpServer, ownerId: string): void {
+    log.info("Registering dynamic server", {
+      id: server.id,
+      name: server.name,
+      ownerId,
+      toolCount: server.tools.length,
+    });
+    this.servers.set(server.id, server);
+    this.dynamicOwners.set(server.id, ownerId);
+  }
 
-	/**
-	 * 插件停用时清理动态注册的服务器
-	 */
-	unregisterDynamic(ownerId: string): void {
-		for (const [serverId, owner] of this.dynamicOwners) {
-			if (owner === ownerId) {
-				const server = this.servers.get(serverId);
-				if (server?.cleanup) {
-					server.cleanup().catch((err) => {
-						log.error(
-							"Failed to cleanup dynamic server",
-							err instanceof Error ? err : new Error(String(err)),
-							{ serverId },
-						);
-					});
-				}
-				this.servers.delete(serverId);
-				this.dynamicOwners.delete(serverId);
-				log.info("Dynamic server unregistered", {
-					serverId,
-					ownerId,
-				});
-			}
-		}
-	}
+  /**
+   * 插件停用时清理动态注册的服务器
+   */
+  unregisterDynamic(ownerId: string): void {
+    for (const [serverId, owner] of this.dynamicOwners) {
+      if (owner === ownerId) {
+        const server = this.servers.get(serverId);
+        if (server?.cleanup) {
+          server.cleanup().catch((err) => {
+            log.error(
+              "Failed to cleanup dynamic server",
+              err instanceof Error ? err : new Error(String(err)),
+              { serverId },
+            );
+          });
+        }
+        this.servers.delete(serverId);
+        this.dynamicOwners.delete(serverId);
+        log.info("Dynamic server unregistered", {
+          serverId,
+          ownerId,
+        });
+      }
+    }
+  }
 
-	/**
-	 * 初始化所有内置服务器
-	 */
-	async initialize(): Promise<void> {
-		log.info("Initializing internal MCP servers");
+  /**
+   * 初始化所有内置服务器
+   */
+  async initialize(): Promise<void> {
+    log.info("Initializing internal MCP servers");
 
-		// 延迟加载各服务器实现，避免循环依赖
-		const { createFetchServer } = await import("./servers/fetchServer");
-		const { createFileSystemServer } = await import(
-			"./servers/fileSystemServer"
-		);
-		const { createPythonServer } = await import("./servers/pythonServer");
-		const { createJavaScriptServer } = await import("./servers/jsServer");
-		const { createBrowserServer } = await import("./servers/browserServer");
-		const { createImageGenServer } = await import("./servers/imageGenServer");
-		const { createNodejsServer } = await import("./servers/nodejsServer");
-		const { createBashServer } = await import("./servers/bashServer");
-		const { createGrepServer } = await import("./servers/grepServer");
-		const { createPlanServer } = await import("./servers/planServer");
-		const { createTaskServer } = await import("./servers/taskServer");
-		const { createAgentBuiltinsServer } = await import(
-			"./servers/agentBuiltinsServer"
-		);
+    // 延迟加载各服务器实现，避免循环依赖
+    const { createFetchServer } = await import("./servers/fetchServer");
+    const { createFileSystemServer } = await import(
+      "./servers/fileSystemServer"
+    );
+    const { createPythonServer } = await import("./servers/pythonServer");
+    const { createJavaScriptServer } = await import("./servers/jsServer");
+    const { createBrowserServer } = await import("./servers/browserServer");
+    const { createImageGenServer } = await import("./servers/imageGenServer");
+    const { createBashServer } = await import("./servers/bashServer");
+    const { createGrepServer } = await import("./servers/grepServer");
+    const { createPlanServer } = await import("./servers/planServer");
+    const { createAgentBuiltinsServer } = await import(
+      "./servers/agentBuiltinsServer"
+    );
+    const { createTodoServer } = await import("./servers/todoServer");
 
-		const servers = [
-			createFetchServer(),
-			createFileSystemServer(),
-			createPythonServer(),
-			createJavaScriptServer(),
-			createNodejsServer(),
-			createBashServer(),
-			createBrowserServer(),
-			createImageGenServer(),
-			createGrepServer(),
-			createPlanServer(),
-			createTaskServer(),
-			createAgentBuiltinsServer(),
-		];
+    const servers = [
+      createFetchServer(),
+      createFileSystemServer(),
+      createPythonServer(),
+      createJavaScriptServer(),
+      createBashServer(),
+      createBrowserServer(),
+      createImageGenServer(),
+      createGrepServer(),
+      createPlanServer(),
+      createAgentBuiltinsServer(),
+      createTodoServer(),
+    ];
 
-		for (const server of servers) {
-			this.register(server);
-			if (server.initialize) {
-				try {
-					await server.initialize();
-					log.info("Internal server initialized", { id: server.id });
-				} catch (error) {
-					log.error(
-						"Failed to initialize internal server",
-						error instanceof Error ? error : new Error(String(error)),
-						{ id: server.id },
-					);
-				}
-			}
-		}
+    for (const server of servers) {
+      this.register(server);
+      if (server.initialize) {
+        try {
+          await server.initialize();
+          log.info("Internal server initialized", { id: server.id });
+        } catch (error) {
+          log.error(
+            "Failed to initialize internal server",
+            error instanceof Error ? error : new Error(String(error)),
+            { id: server.id },
+          );
+        }
+      }
+    }
 
-		log.info("Internal MCP servers initialized", {
-			count: this.servers.size,
-			servers: Array.from(this.servers.keys()),
-		});
-	}
+    log.info("Internal MCP servers initialized", {
+      count: this.servers.size,
+      servers: Array.from(this.servers.keys()),
+    });
+  }
 
-	/**
-	 * 清理所有内置服务器
-	 */
-	async cleanup(): Promise<void> {
-		log.info("Cleaning up internal MCP servers");
-		for (const [id, server] of this.servers.entries()) {
-			if (server.cleanup) {
-				try {
-					await server.cleanup();
-					log.info("Internal server cleaned up", { id });
-				} catch (error) {
-					log.error(
-						"Failed to cleanup internal server",
-						error instanceof Error ? error : new Error(String(error)),
-						{ id },
-					);
-				}
-			}
-		}
-		this.servers.clear();
-	}
+  /**
+   * 清理所有内置服务器
+   */
+  async cleanup(): Promise<void> {
+    log.info("Cleaning up internal MCP servers");
+    for (const [id, server] of this.servers.entries()) {
+      if (server.cleanup) {
+        try {
+          await server.cleanup();
+          log.info("Internal server cleaned up", { id });
+        } catch (error) {
+          log.error(
+            "Failed to cleanup internal server",
+            error instanceof Error ? error : new Error(String(error)),
+            { id },
+          );
+        }
+      }
+    }
+    this.servers.clear();
+  }
 }
 
 export const internalMcpService = new InternalMcpService();

@@ -39,6 +39,12 @@ You have a focused tool set inspired by Claude Code:
 
 Additional tools provided by the host (MCP servers, user-installed skills) may also be available.
 
+> Note: \`Task\` (this built-in) **dispatches a subagent**; it is unrelated to
+> the \`@scp/todo\` MCP server (\`create_todo\` / \`update_todo\` / \`list_todos\` /
+> \`delete_todo\`), which persists a TODO list for the conversation. Use Task
+> when you want help completing a sub-problem; use @scp/todo when you want to
+> track work items.
+
 # Operating principles
 
 1. **Plan first**, then act. For non-trivial tasks state a brief plan before invoking tools.

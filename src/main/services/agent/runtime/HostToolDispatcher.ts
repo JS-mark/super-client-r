@@ -63,10 +63,10 @@ export interface HostToolDispatcherDeps {
 
 const SERVERS_WITH_PATH_ARGS = new Set(["@scp/file-system", "@scp/grep"]);
 const PATH_ARG_KEYS = ["path", "source", "destination"];
-const SERVERS_WITH_STORAGE = new Set(["@scp/plan", "@scp/task"]);
+const SERVERS_WITH_STORAGE = new Set(["@scp/plan", "@scp/todo"]);
 
 /**
- * 把相对路径拼到 cwd 上、给 plan/task 注入 `_storageDir`。
+ * 把相对路径拼到 cwd 上、给 plan/todo 注入 `_storageDir`。
  *
  * 仅供内部使用；export 仅为单测能直接验证（与 spec §11 内置 MCP 回归套件对齐）。
  */
