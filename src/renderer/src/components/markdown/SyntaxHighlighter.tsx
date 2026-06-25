@@ -25,6 +25,7 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { cn } from "../../lib/utils";
 import { useThemeStore } from "../../stores/themeStore";
 import { CopyButton } from "./CopyButton";
 
@@ -63,12 +64,22 @@ interface SyntaxHighlighterProps {
 	code: string;
 	language?: string;
 	streaming?: boolean;
+	showChrome?: boolean;
+	showLineNumbers?: boolean;
+	wrapLines?: boolean;
+	trimCode?: boolean;
+	className?: string;
 }
 
 export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 	code,
 	language,
 	streaming = false,
+	showChrome = true,
+	showLineNumbers = true,
+	wrapLines = true,
+	trimCode = true,
+	className,
 }) => {
 	const { token } = useToken();
 	const actualTheme = useThemeStore((s) => s.actualTheme);
@@ -92,25 +103,30 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 			actualTheme === "dark" ? vscodeDark : vscodeLight,
 			// Fallback highlight style for any token the theme misses
 			syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-			// UI features
-			lineNumbers(),
 			highlightSpecialChars(),
 			bracketMatching(),
-			// Line wrapping (auto word-wrap)
-			EditorView.lineWrapping,
-			// Custom fold gutter
-			foldGutter({
-				markerDOM(open) {
-					const span = document.createElement("span");
-					span.className = `cm-fold-marker ${open ? "cm-fold-open" : "cm-fold-closed"}`;
-					span.textContent = open ? "\u25BE" : "\u25B8";
-					return span;
-				},
-			}),
 			// Read-only
 			EditorState.readOnly.of(true),
 			EditorView.editable.of(false),
 		];
+
+		if (wrapLines) {
+			exts.push(EditorView.lineWrapping);
+		}
+
+		if (showLineNumbers) {
+			exts.push(lineNumbers());
+			exts.push(
+				foldGutter({
+					markerDOM(open) {
+						const span = document.createElement("span");
+						span.className = `cm-fold-marker ${open ? "cm-fold-open" : "cm-fold-closed"}`;
+						span.textContent = open ? "\u25BE" : "\u25B8";
+						return span;
+					},
+				}),
+			);
+		}
 
 		// Language parser (provides tokens for highlighting + fold ranges)
 		if (language) {
@@ -120,7 +136,7 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 		}
 
 		return exts;
-	}, [language, actualTheme]);
+	}, [language, actualTheme, showLineNumbers, wrapLines]);
 
 	// Create / destroy EditorView directly (no @uiw wrapper)
 	useEffect(() => {
@@ -129,7 +145,7 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 
 		const view = new EditorView({
 			state: EditorState.create({
-				doc: code.trim(),
+				doc: trimCode ? code.trim() : code,
 				extensions,
 			}),
 			parent: container,
@@ -150,14 +166,14 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 		};
 		// extensions 变化时重建 view；streaming 变化时触发首次创建
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [extensions, streaming]);
+	}, [extensions, streaming, trimCode]);
 
 	// Update document content without recreating the view
 	useEffect(() => {
 		const view = viewRef.current;
 		if (!view) return;
 
-		const newDoc = code.trim();
+		const newDoc = trimCode ? code.trim() : code;
 		const currentDoc = view.state.doc.toString();
 		if (newDoc !== currentDoc) {
 			view.dispatch({
@@ -170,14 +186,18 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 				}
 			});
 		}
-	}, [code, streaming]);
+	}, [code, streaming, trimCode]);
 
 	if (streaming) {
 		return (
 			<pre
-				className="rounded-lg p-4 overflow-x-auto text-sm"
+				className={cn(
+					"overflow-x-auto rounded-lg p-4 text-sm",
+					!wrapLines && "whitespace-pre",
+					className,
+				)}
 				style={{
-					backgroundColor: token.colorFillQuaternary,
+					backgroundColor: showChrome ? token.colorFillQuaternary : "transparent",
 					color: token.colorTextSecondary,
 				}}
 			>
@@ -186,25 +206,33 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 		);
 	}
 
-	const isCollapsed = overflows && collapsed;
+	const isCollapsed = showChrome && overflows && collapsed;
 
 	return (
 		<div
-			className="code-block-cm rounded-lg overflow-hidden my-4"
-			style={{ backgroundColor: token.colorFillQuaternary }}
+			className={cn(
+				"code-block-cm overflow-hidden",
+				showChrome && "my-4 rounded-lg",
+				className,
+			)}
+			style={{
+				backgroundColor: showChrome ? token.colorFillQuaternary : "transparent",
+			}}
 		>
-			<div
-				className="flex items-center justify-between px-3 py-1.5"
-				style={{ backgroundColor: token.colorFillTertiary }}
-			>
-				<span
-					className="text-xs font-medium"
-					style={{ color: token.colorTextSecondary }}
+			{showChrome && (
+				<div
+					className="flex items-center justify-between px-3 py-1.5"
+					style={{ backgroundColor: token.colorFillTertiary }}
 				>
-					{displayLang}
-				</span>
-				<CopyButton getText={getCode} />
-			</div>
+					<span
+						className="text-xs font-medium"
+						style={{ color: token.colorTextSecondary }}
+					>
+						{displayLang}
+					</span>
+					<CopyButton getText={getCode} />
+				</div>
+			)}
 			<div
 				ref={wrapperRef}
 				className="relative overflow-hidden"
@@ -222,7 +250,7 @@ export const SyntaxHighlighter: FC<SyntaxHighlighterProps> = ({
 					/>
 				)}
 			</div>
-			{overflows && (
+			{showChrome && overflows && (
 				<div
 					className="flex items-center justify-center py-1.5 cursor-pointer select-none transition-colors duration-150"
 					style={{

@@ -8,6 +8,27 @@ function render(part: MessagePart): string {
 }
 
 describe("StreamPartRenderer", () => {
+	it("renders code block parts with dedicated code card chrome", () => {
+		const html = render({
+			id: "code-1",
+			type: "code_block",
+			state: "complete",
+			createdAt: 1,
+			updatedAt: 1,
+			language: "ts",
+			title: "ts",
+			content: 'const answer: number = 42;\nconsole.log(answer);',
+			lineCount: 2,
+		});
+
+		expect(html).toContain("structured-code-card");
+		expect(html).toContain("TS");
+		expect(html).toContain("ts");
+		expect(html).toContain("Copy code");
+		expect(html).toContain("Enable line wrap");
+		expect(html).not.toContain("code-block-cm rounded-lg overflow-hidden my-4");
+	});
+
 	it("renders table parts as safe table markup", () => {
 		const html = render({
 			id: "table-1",

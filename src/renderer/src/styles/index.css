@@ -505,6 +505,57 @@ body {
 	opacity: 0.8;
 }
 
+/* ---- Structured chat code part ---- */
+.structured-code-card .structured-code-highlighter {
+	margin: 0;
+	background: transparent !important;
+}
+
+.structured-code-card .cm-editor {
+	background: transparent !important;
+	color: #474d66;
+	font-family:
+		"SFMono-Regular", "Cascadia Code", "JetBrains Mono", "Fira Code",
+		Consolas, "Liberation Mono", Menlo, monospace;
+	font-size: 15px;
+	line-height: 1.75;
+}
+
+.structured-code-card .cm-scroller {
+	overflow: auto;
+	font-family: inherit;
+}
+
+.structured-code-card .cm-content {
+	padding: 4px 0 18px;
+}
+
+.structured-code-card .cm-line {
+	padding: 0;
+}
+
+.structured-code-card .cm-gutters {
+	display: none !important;
+}
+
+.structured-code-card .cm-activeLine {
+	background: transparent !important;
+}
+
+.structured-code-card .cm-selectionBackground,
+.structured-code-card .cm-focused .cm-selectionBackground {
+	background: rgba(20, 149, 232, 0.18) !important;
+}
+
+.dark .structured-code-card .cm-editor {
+	color: rgba(255, 255, 255, 0.82);
+}
+
+.dark .structured-code-card .cm-selectionBackground,
+.dark .structured-code-card .cm-focused .cm-selectionBackground {
+	background: rgba(97, 183, 255, 0.24) !important;
+}
+
 /* ---- Blockquote ---- */
 .x-markdown blockquote {
 	border-left: 0.25em solid var(--md-border-color);
@@ -920,9 +971,25 @@ body {
 		color 150ms ease,
 		opacity 150ms ease;
 	white-space: nowrap;
-	max-width: 240px;
+	/* Bumped 240 → 320 to keep names like `阿里云百炼 · qwen3-coder-plus-latest`
+	   readable without truncation; long ones still ellipsis via the inner
+	   `.composer-pill-text` span below. */
+	max-width: 320px;
+	/* No `overflow: hidden` here — would silently chop the inner span on
+	   flex containers (text-overflow doesn't propagate to flex children).
+	   The inner `.composer-pill-text` owns the truncation. */
+}
+
+/* Inner text wrapper — owns the actual ellipsis. Without `min-width: 0`
+   a flex item refuses to shrink below its intrinsic content width, which
+   means `text-overflow: ellipsis` never has a too-narrow box to clip
+   against. With it, the span shrinks within the button's max-width and
+   shows `…` correctly. */
+.composer-pill-text {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .composer-pill > .anticon {
