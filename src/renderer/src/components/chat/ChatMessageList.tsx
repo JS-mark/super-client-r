@@ -19,6 +19,7 @@ import type * as React from "react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { List, useDynamicRowHeight, useListRef } from "react-window";
+import { formatSmartTime } from "../../lib/formatTime";
 import {
 	formatTokenCount,
 	formatTokenCountExact,
@@ -339,15 +340,13 @@ export function ChatMessageList({
 		[],
 	);
 
-	// Format timestamp: MM/DD HH:mm
-	const formatHeaderTime = useCallback((ts: number) => {
-		const d = new Date(ts);
-		const month = String(d.getMonth() + 1).padStart(2, "0");
-		const day = String(d.getDate()).padStart(2, "0");
-		const hour = String(d.getHours()).padStart(2, "0");
-		const minute = String(d.getMinutes()).padStart(2, "0");
-		return `${month}/${day} ${hour}:${minute}`;
-	}, []);
+	// Smart relative time: today → HH:mm, yesterday → 昨天 HH:mm,
+	// this year → MM/DD HH:mm, older → YYYY/MM/DD HH:mm. Pure delegation
+	// to `formatSmartTime` so the formatting rule lives next to its tests.
+	const formatHeaderTime = useCallback(
+		(ts: number) => formatSmartTime(ts, t),
+		[t],
+	);
 
 	// ── Build bubble items ──
 	const bubbleItems = useMemo(() => {
@@ -559,16 +558,22 @@ export function ChatMessageList({
 			const modelName = meta?.model;
 			const providerName = meta?.providerName;
 
+			// Mirror the user-side header layout but anchored left: avatar on the
+			// left, two stacked lines on the right — model + provider on top,
+			// timestamp below. Lining model/provider on its own row keeps long
+			// provider names from pushing the time off-screen on narrow widths.
 			const aiHeader = (
-				<div className="flex items-center gap-2 mb-1">
+				<div className="flex items-start gap-2 mb-1">
 					{avatarNode}
-					<div className="flex items-baseline gap-1.5">
+					<div className="flex flex-col gap-0.5 min-w-0">
 						{modelName ? (
 							<span
+								className="truncate"
 								style={{
 									fontSize: 13,
 									fontWeight: 500,
 									color: token.colorText,
+									lineHeight: 1.25,
 								}}
 							>
 								{modelName}
@@ -590,6 +595,7 @@ export function ChatMessageList({
 									fontSize: 13,
 									fontWeight: 500,
 									color: token.colorText,
+									lineHeight: 1.25,
 								}}
 							>
 								AI
@@ -599,6 +605,7 @@ export function ChatMessageList({
 							style={{
 								fontSize: 11,
 								color: token.colorTextQuaternary,
+								lineHeight: 1.25,
 							}}
 						>
 							{timeText}
