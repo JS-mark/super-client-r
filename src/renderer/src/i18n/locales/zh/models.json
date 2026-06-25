@@ -49,7 +49,11 @@
 		"baseUrlPlaceholder": "https://api.example.com/v1",
 		"baseUrlRequired": "请输入 Base URL",
 		"apiFormat": "API 格式",
-		"apiFormatHelp": "决定后端用哪种 HTTP 协议与该服务商通信(默认按服务商类型推断)"
+		"apiFormatHelp": "决定后端用哪种 HTTP 协议与该服务商通信(默认按服务商类型推断)",
+		"bailianAnthropicHint": {
+			"title": "阿里云百炼 · Anthropic Messages 模式",
+			"body": "模型名请使用百炼裸名（小写，如 qwen3-max / qwen3-coder-plus / glm-5 / deepseek-v4-pro / MiniMax-M2.5），不要带 vendor 前缀（如 MiniMax/MiniMax-M2.7、ZHIPU/GLM-5）。Base URL 保持 /compatible-mode/v1 即可，运行时会自动切到 /apps/anthropic/v1 走 Anthropic 协议；同时『测试连接 / 获取模型列表』按钮仍然走 OpenAI 兼容路径。"
+		}
 	},
 	"messages": {
 		"saveSuccess": "服务商保存成功",

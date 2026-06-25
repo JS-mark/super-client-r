@@ -29,8 +29,81 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { ModelProviderPreset } from "../../ipc/types";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("LLMProviders");
 
 export type ApiFormat = "anthropic-messages" | "chat-completions" | "responses";
+
+// Bailian / DashScope hostnames — used by `coerceBaseUrlForAnthropic` to
+// recognise an Alibaba Cloud Model Studio endpoint even when the user saved
+// it without a matching preset. Sources:
+//   - docs/aliyun-bailian/Anthropic-Messages.md (regional base_url table)
+//   - docs/aliyun-bailian/OpenAI-Chat.md
+const BAILIAN_HOST_SUFFIXES = [
+	".cn-beijing.maas.aliyuncs.com",
+	".ap-southeast-1.maas.aliyuncs.com",
+	".eu-central-1.maas.aliyuncs.com",
+	".ap-northeast-1.maas.aliyuncs.com",
+] as const;
+const BAILIAN_HOSTS = new Set([
+	"dashscope.aliyuncs.com",
+	"dashscope-intl.aliyuncs.com",
+	"dashscope-us.aliyuncs.com",
+]);
+
+function isBailianHost(hostname: string): boolean {
+	if (BAILIAN_HOSTS.has(hostname)) return true;
+	return BAILIAN_HOST_SUFFIXES.some((s) => hostname.endsWith(s));
+}
+
+/**
+ * Bailian (Alibaba Cloud Model Studio / DashScope) exposes Anthropic Messages
+ * under a **different path** than its OpenAI-compatible mode:
+ *
+ *   OpenAI Chat / Responses:    {host}/compatible-mode/v1
+ *   Anthropic Messages (HTTP):  POST {host}/apps/anthropic/v1/messages
+ *
+ * Path convention quirk:
+ *   - Anthropic's *official* SDK auto-appends `/v1/messages` → the Bailian
+ *     docs say `baseURL = ".../apps/anthropic"` (no `/v1`).
+ *   - `@ai-sdk/anthropic` (Vercel AI SDK) only appends `/messages`; its
+ *     default baseURL is `https://api.anthropic.com/v1` (with `/v1`).
+ *     See node_modules/@ai-sdk/anthropic .../index.js line 5077.
+ *
+ * So when our backend (Vercel SDK) targets Bailian, the correct baseURL is
+ * `.../apps/anthropic/v1` so the final request hits `.../apps/anthropic/v1/messages`.
+ *
+ * Most users hit this 404 by configuring a Qwen / MiniMax / DeepSeek / Kimi
+ * / GLM model through Bailian's OpenAI-compat baseUrl
+ * (`.../compatible-mode/v1`) and then flipping the apiFormat to
+ * anthropic-messages without re-pasting the URL. We detect the situation (by
+ * preset OR hostname) and rewrite the path to `/apps/anthropic/v1`.
+ * Idempotent — already-correct URLs pass through.
+ *
+ * Reference: docs/aliyun-bailian/Anthropic-Messages.md
+ */
+export function coerceBaseUrlForAnthropic(
+	baseUrl: string,
+	preset: ModelProviderPreset | undefined,
+): string {
+	if (!baseUrl) return baseUrl;
+	let url: URL;
+	try {
+		url = new URL(baseUrl);
+	} catch {
+		return baseUrl;
+	}
+	const looksLikeBailian =
+		preset === "dashscope" || isBailianHost(url.hostname);
+	if (!looksLikeBailian) return baseUrl;
+	// Always normalise: even when path is already correct, strip trailing
+	// slash so the SDK appends `/messages` cleanly (no double slash).
+	url.pathname = "/apps/anthropic/v1";
+	url.search = "";
+	url.hash = "";
+	return url.toString().replace(/\/+$/, "");
+}
 
 export interface ResolveProviderArgs {
 	preset: ModelProviderPreset | undefined;
@@ -68,9 +141,17 @@ export function resolveProvider(args: ResolveProviderArgs): LanguageModelV3 {
 
 	switch (apiFormat) {
 		case "anthropic-messages": {
+			const effectiveBaseUrl = coerceBaseUrlForAnthropic(baseUrl, preset);
+			if (effectiveBaseUrl !== baseUrl) {
+				log.warn("Coerced baseUrl for Anthropic Messages mode", {
+					from: baseUrl,
+					to: effectiveBaseUrl,
+					preset,
+				});
+			}
 			const provider = createAnthropic({
 				apiKey: apiKey || "",
-				baseURL: baseUrl || undefined,
+				baseURL: effectiveBaseUrl || undefined,
 				headers: args.headers,
 			});
 			return provider(model);

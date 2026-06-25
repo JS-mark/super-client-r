@@ -11,6 +11,7 @@ import {
 	ThunderboltOutlined,
 } from "@ant-design/icons";
 import {
+	Alert,
 	App,
 	Button,
 	Divider,
@@ -47,6 +48,60 @@ import { ProviderIcon } from "./ProviderIcon";
 
 const { Text } = Typography;
 const { useToken } = theme;
+
+/**
+ * Inline hint shown inside the provider editor when the user picks
+ * `preset = dashscope` (or a Bailian baseUrl) together with
+ * `apiFormat = anthropic-messages`. The runtime auto-corrects the URL path
+ * (see `coerceBaseUrlForAnthropic` in main), but the model naming convention
+ * is different and we cannot guess it — so we tell the user to use the bare
+ * model name from the Bailian docs (`qwen3-max`, `MiniMax-M2.5`, etc.) and
+ * NOT the vendor-prefixed form (`MiniMax/MiniMax-M2.7`).
+ */
+function BailianAnthropicHint({ form }: { form: import("antd").FormInstance }) {
+	const { t } = useTranslation();
+	const preset = Form.useWatch("preset", form);
+	const apiFormat = Form.useWatch("apiFormat", form);
+	const baseUrl: string | undefined = Form.useWatch("baseUrl", form);
+
+	const isBailianHost = (() => {
+		if (!baseUrl) return false;
+		try {
+			const host = new URL(baseUrl).hostname;
+			return (
+				host === "dashscope.aliyuncs.com" ||
+				host === "dashscope-intl.aliyuncs.com" ||
+				host === "dashscope-us.aliyuncs.com" ||
+				host.endsWith(".cn-beijing.maas.aliyuncs.com") ||
+				host.endsWith(".ap-southeast-1.maas.aliyuncs.com") ||
+				host.endsWith(".eu-central-1.maas.aliyuncs.com") ||
+				host.endsWith(".ap-northeast-1.maas.aliyuncs.com")
+			);
+		} catch {
+			return false;
+		}
+	})();
+
+	if (apiFormat !== "anthropic-messages") return null;
+	if (preset !== "dashscope" && !isBailianHost) return null;
+
+	return (
+		<Alert
+			type="info"
+			showIcon
+			className="!mb-4"
+			message={t("form.bailianAnthropicHint.title", {
+				ns: "models",
+				defaultValue: "阿里云百炼 · Anthropic Messages 模式",
+			})}
+			description={t("form.bailianAnthropicHint.body", {
+				ns: "models",
+				defaultValue:
+					"模型名请使用百炼裸名（小写，如 qwen3-max / qwen3-coder-plus / glm-5 / deepseek-v4-pro / MiniMax-M2.5），不要带 vendor 前缀（如 MiniMax/MiniMax-M2.7、ZHIPU/GLM-5）。Base URL 保持 /compatible-mode/v1 即可，运行时会自动切到 /apps/anthropic/v1 走 Anthropic 协议。",
+			})}
+		/>
+	);
+}
 
 interface ModelListProps {
 	addTrigger?: number;
@@ -668,6 +723,13 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 											}))}
 										/>
 									</Form.Item>
+
+									{/* Bailian + anthropic-messages hint: baseUrl path is
+									    auto-corrected at runtime, but the model naming
+									    convention differs (bare names like `qwen3-max`,
+									    `MiniMax-M2.5` — no `vendor/` prefix). Surface this
+									    before the user hits a 404. */}
+									<BailianAnthropicHint form={form} />
 
 									{/* Test Connection */}
 									<div className="flex items-center gap-3 mb-4">
