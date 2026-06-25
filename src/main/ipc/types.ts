@@ -442,6 +442,18 @@ export interface ChatStreamEvent {
 		toolCallId: string;
 		name: string;
 		arguments: string;
+		/**
+		 * Origin of the approval request. `tool-permission` (default) is the
+		 * legacy `ToolPermissionConfig.mode !== "auto"` prompt;
+		 * `runtime-policy` means the workspace runtime policy returned
+		 * `needs-approval` (e.g. `command-exec` with non-system-access
+		 * sandbox). Renderer can use this to tailor the prompt copy.
+		 */
+		source?: "tool-permission" | "runtime-policy";
+		/** Machine-readable policy code, e.g. `runtime.needsApproval`. */
+		code?: string;
+		/** Human-readable reason, e.g. `workspace-policy:command-approval-required`. */
+		reason?: string;
 	};
 	usage?: {
 		inputTokens?: number;

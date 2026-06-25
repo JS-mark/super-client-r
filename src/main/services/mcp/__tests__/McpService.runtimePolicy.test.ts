@@ -138,6 +138,80 @@ describe("McpService runtime policy gate", () => {
 		});
 	});
 
+	it("downgrades command needs-approval to allow when approvalGranted is passed", () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "workspace-write",
+			approvalMode: "request",
+		});
+
+		const service = new McpService();
+		const result = (
+			service as unknown as {
+				evaluateRuntimePolicy: (
+					conversationId: string | undefined,
+					serverId: string,
+					toolName: string,
+					args: Record<string, unknown>,
+					gateOptions: { approvalGranted?: boolean },
+				) => { allowed: boolean; code?: string };
+			}
+		).evaluateRuntimePolicy(
+			session.id,
+			"@scp/bash",
+			"execute_command",
+			{ command: "pwd" },
+			{ approvalGranted: true },
+		);
+
+		expect(result.allowed).toBe(true);
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			operation: "@scp/bash:execute_command",
+			decision: "allowed",
+		});
+		// The override note keeps the original policy reason for auditing.
+		expect(runtimePolicy.getAuditLog().at(-1)?.reason).toMatch(
+			/^approval-granted:/,
+		);
+	});
+
+	it("still hard-denies read-only writes even when approvalGranted is set", () => {
+		// `deny` outranks the approval override; only `needs-approval` is
+		// downgraded. Guards against the override being interpreted as a
+		// general bypass.
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "read-only",
+			approvalMode: "request",
+		});
+
+		const service = new McpService();
+		const result = (
+			service as unknown as {
+				evaluateRuntimePolicy: (
+					conversationId: string | undefined,
+					serverId: string,
+					toolName: string,
+					args: Record<string, unknown>,
+					gateOptions: { approvalGranted?: boolean },
+				) => { allowed: boolean; code?: string };
+			}
+		).evaluateRuntimePolicy(
+			session.id,
+			"@scp/file-system",
+			"write_file",
+			{ path: "/tmp/super-client-project/a.txt" },
+			{ approvalGranted: true },
+		);
+
+		expect(result).toMatchObject({
+			allowed: false,
+			code: "runtime.writeBlockedReadOnly",
+		});
+	});
+
 	it("denies MCP network requests when project policy blocks network", () => {
 		const runtimePolicy = getRuntimePolicyService();
 		runtimePolicy.clearAuditLog();

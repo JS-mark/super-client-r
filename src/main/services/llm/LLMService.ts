@@ -62,19 +62,49 @@ function extractTarget(_toolName: string, args: unknown): string | undefined {
 	return undefined;
 }
 
+export interface ToolExecuteOptions {
+	/**
+	 * Caller has already collected a one-shot approval from the user via the
+	 * `tool_approval_request` event. The executor must propagate this into
+	 * the underlying tool dispatch so the runtime-policy gate downgrades any
+	 * `needs-approval` decision to `allow`.
+	 */
+	approvalGranted?: boolean;
+}
+
 export type ToolExecutor = (
 	name: string,
 	args: Record<string, unknown>,
+	options?: ToolExecuteOptions,
 ) => Promise<unknown>;
+
+/**
+ * Thrown by `ToolExecutor` when `mcpService.callTool` returns a runtime-policy
+ * `needs-approval` denial. Carries the policy `code` so the caller
+ * (`toolAdapter`) can distinguish "ask the user" from a permanent failure.
+ *
+ * Subclasses `Error` so existing `try/catch` paths keep treating it as a
+ * tool failure if they don't know to look for it.
+ */
+export class RuntimeApprovalRequiredError extends Error {
+	readonly code: string;
+	constructor(message: string, code: string) {
+		super(message);
+		this.name = "RuntimeApprovalRequiredError";
+		this.code = code;
+	}
+}
 
 const log = logger.withContext("LLMService");
 
 export class LLMService {
 	private activeStreams = new Map<string, AbortController>();
-	// Pending tool approval requests awaiting user response
+	// Pending tool approval requests awaiting user response. `requestId`
+	// is tracked so `stopStream` can release any approvals tied to an
+	// aborted stream — otherwise the Promise leaks until process exit.
 	private pendingApprovals = new Map<
 		string,
-		{ resolve: (approved: boolean) => void }
+		{ resolve: (approved: boolean) => void; requestId: string }
 	>();
 	// Chat hook registry (injected from PluginManager)
 	private chatHookRegistry:
@@ -159,10 +189,15 @@ export class LLMService {
 		this.broadcast({
 			requestId,
 			type: "tool_approval_request",
-			toolApproval: { toolCallId, name: toolName, arguments: toolArgs },
+			toolApproval: {
+				toolCallId,
+				name: toolName,
+				arguments: toolArgs,
+				source: "tool-permission",
+			},
 		});
 		const approved = await new Promise<boolean>((resolve) => {
-			this.pendingApprovals.set(toolCallId, { resolve });
+			this.pendingApprovals.set(toolCallId, { resolve, requestId });
 		});
 		if (!approved && conversationId) {
 			getApprovalGrantStore().recordDeny(
@@ -174,6 +209,38 @@ export class LLMService {
 			);
 		}
 		return approved;
+	}
+
+	/**
+	 * Prompt the user for a one-shot runtime-policy approval. Shares the
+	 * `tool_approval_request` channel with `checkToolPermission` (and thus
+	 * the renderer-side `ApprovalDecisionCard`) so the renderer needs no new
+	 * event type. Carries the policy `code` and human-readable `reason` so
+	 * the prompt can show *why* approval is required.
+	 */
+	private async awaitToolRuntimeApproval(
+		requestId: string,
+		toolCallId: string,
+		toolName: string,
+		toolArgs: string,
+		code: string,
+		reason: string,
+	): Promise<boolean> {
+		this.broadcast({
+			requestId,
+			type: "tool_approval_request",
+			toolApproval: {
+				toolCallId,
+				name: toolName,
+				arguments: toolArgs,
+				source: "runtime-policy",
+				code,
+				reason,
+			},
+		});
+		return new Promise<boolean>((resolve) => {
+			this.pendingApprovals.set(toolCallId, { resolve, requestId });
+		});
 	}
 
 	private evaluateToolRuntimePolicy(
@@ -437,6 +504,21 @@ export class LLMService {
 					toolName,
 					args,
 				),
+			awaitRuntimeApproval: ({
+				toolCallId,
+				toolName,
+				toolArgs,
+				code,
+				message,
+			}) =>
+				this.awaitToolRuntimeApproval(
+					request.requestId,
+					toolCallId,
+					toolName,
+					toolArgs,
+					code,
+					message,
+				),
 		});
 
 		const mapped = mapExtraParams(
@@ -541,6 +623,16 @@ export class LLMService {
 	}
 
 	stopStream(requestId: string): boolean {
+		// Release any tool approvals parked on this request so the await
+		// inside `toolAdapter` resolves and the executor cleans up promptly.
+		// Without this, an abort mid-prompt leaks the Promise (and its
+		// upstream tool execution) until process exit.
+		for (const [toolCallId, pending] of this.pendingApprovals.entries()) {
+			if (pending.requestId === requestId) {
+				pending.resolve(false);
+				this.pendingApprovals.delete(toolCallId);
+			}
+		}
 		const controller = this.activeStreams.get(requestId);
 		if (controller) {
 			controller.abort();

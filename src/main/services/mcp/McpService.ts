@@ -43,6 +43,13 @@ export interface UnifiedToolCallResult {
 
 export interface McpToolCallOptions {
 	conversationId?: string;
+	/**
+	 * Caller has already prompted the user and obtained a one-shot approval
+	 * for this specific tool call. The runtime gate downgrades any
+	 * `needs-approval` decision to `allow` when this is true. `deny` is still
+	 * honoured — approval cannot override a hard block.
+	 */
+	approvalGranted?: boolean;
 }
 
 export class McpService extends EventEmitter {
@@ -388,6 +395,7 @@ export class McpService extends EventEmitter {
 			serverId,
 			toolName,
 			args,
+			{ approvalGranted: options.approvalGranted },
 		);
 		if (!runtimeGate.allowed) {
 			const duration = Date.now() - startTime;
@@ -503,6 +511,7 @@ export class McpService extends EventEmitter {
 		serverId: string,
 		toolName: string,
 		args: Record<string, unknown>,
+		gateOptions: { approvalGranted?: boolean } = {},
 	): { allowed: true } | { allowed: false; code: string; message: string } {
 		const fallbackCtx = {
 			workspaceId: "",
@@ -543,6 +552,18 @@ export class McpService extends EventEmitter {
 				};
 			}
 			if (evaluation.decision === "needs-approval") {
+				// Caller (toolAdapter) has already collected the user's one-shot
+				// approval via `tool_approval_request` / `permission_request`.
+				// Record this as an explicit user-allow so the audit trail keeps
+				// both the policy decision and the override.
+				if (gateOptions.approvalGranted) {
+					getRuntimePolicyService().record(
+						ctx,
+						"allowed",
+						`approval-granted:${evaluation.reason ?? evaluation.code ?? "needs-approval"}`,
+					);
+					return { allowed: true };
+				}
 				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
 				return {
 					allowed: false,

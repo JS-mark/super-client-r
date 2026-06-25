@@ -17,7 +17,7 @@ import type {
 	ChatCompletionRequest,
 	ChatStreamEvent,
 } from "../../ipc/types";
-import type { ToolExecutor } from "./LLMService";
+import { RuntimeApprovalRequiredError, type ToolExecutor } from "./LLMService";
 
 export interface BuildToolSetArgs {
 	request: ChatCompletionRequest;
@@ -34,6 +34,18 @@ export interface BuildToolSetArgs {
 		toolName: string,
 		args: Record<string, unknown>,
 	) => { allowed: true } | { allowed: false; code: string; message: string };
+	/**
+	 * Prompt the user for a one-shot runtime-policy approval. Resolves `true`
+	 * when the user picks "allow"; `false` otherwise (including request abort).
+	 * Reuses the same `tool_approval_request` channel `checkPermission` uses.
+	 */
+	awaitRuntimeApproval: (args: {
+		toolCallId: string;
+		toolName: string;
+		toolArgs: string;
+		code: string;
+		message: string;
+	}) => Promise<boolean>;
 }
 
 export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
@@ -43,6 +55,7 @@ export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
 		broadcast,
 		checkPermission,
 		evaluateRuntimePolicy,
+		awaitRuntimeApproval,
 	} = args;
 	if (!request.tools || request.tools.length === 0 || !toolExecutor)
 		return undefined;
@@ -87,24 +100,60 @@ export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
 					throw new Error("Tool call was rejected by user.");
 				}
 
+				// Pre-flight policy check. Two outcomes branch differently:
+				//   - hard deny → emit `tool_error` and abort (status quo).
+				//   - needs-approval → prompt the user via the same approval
+				//     channel `checkPermission` uses, then re-dispatch with
+				//     `approvalGranted: true` so the McpService gate lets it
+				//     through. The renderer-side `ApprovalDecisionCard` already
+				//     renders the prompt when `permission_request` lands.
+				let runtimeApprovalGranted = false;
 				const policy = evaluateRuntimePolicy(name, argsObj);
 				if (!policy.allowed) {
-					broadcast({
-						requestId: request.requestId,
-						type: "tool_error",
-						toolError: {
+					if (policy.code === "runtime.needsApproval") {
+						const approvedByUser = await awaitRuntimeApproval({
 							toolCallId,
-							name,
-							error: policy.message,
+							toolName: name,
+							toolArgs: argsJson,
 							code: policy.code,
-						},
-					});
-					throw new Error(policy.message);
+							message: policy.message,
+						});
+						if (!approvedByUser) {
+							const message =
+								"Workspace policy: command approval declined.";
+							broadcast({
+								requestId: request.requestId,
+								type: "tool_error",
+								toolError: {
+									toolCallId,
+									name,
+									error: message,
+									code: policy.code,
+								},
+							});
+							throw new Error(message);
+						}
+						runtimeApprovalGranted = true;
+					} else {
+						broadcast({
+							requestId: request.requestId,
+							type: "tool_error",
+							toolError: {
+								toolCallId,
+								name,
+								error: policy.message,
+								code: policy.code,
+							},
+						});
+						throw new Error(policy.message);
+					}
 				}
 
 				const started = Date.now();
 				try {
-					const result = await toolExecutor(name, argsObj);
+					const result = await toolExecutor(name, argsObj, {
+						approvalGranted: runtimeApprovalGranted,
+					});
 					const duration = Date.now() - started;
 					broadcast({
 						requestId: request.requestId,
@@ -113,6 +162,66 @@ export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
 					});
 					return result;
 				} catch (err) {
+					// Second-chance approval: the policy gate inside
+					// `McpService.callTool` re-evaluates and may raise
+					// `needs-approval` even when the pre-flight check above said
+					// allow (e.g. policy resolved with stale workspace state).
+					// Prompt the user once and retry rather than surfacing as
+					// a raw failure.
+					if (err instanceof RuntimeApprovalRequiredError) {
+						const approvedByUser = await awaitRuntimeApproval({
+							toolCallId,
+							toolName: name,
+							toolArgs: argsJson,
+							code: err.code,
+							message: err.message,
+						});
+						if (approvedByUser) {
+							const retryStarted = Date.now();
+							try {
+								const result = await toolExecutor(name, argsObj, {
+									approvalGranted: true,
+								});
+								const duration = Date.now() - retryStarted;
+								broadcast({
+									requestId: request.requestId,
+									type: "tool_result",
+									toolResult: { toolCallId, name, result, duration },
+								});
+								return result;
+							} catch (retryErr) {
+								const duration = Date.now() - retryStarted;
+								const retryMessage =
+									retryErr instanceof Error
+										? retryErr.message
+										: String(retryErr);
+								broadcast({
+									requestId: request.requestId,
+									type: "tool_error",
+									toolError: {
+										toolCallId,
+										name,
+										error: retryMessage,
+										duration,
+									},
+								});
+								throw retryErr;
+							}
+						}
+						const declined = "Workspace policy: command approval declined.";
+						broadcast({
+							requestId: request.requestId,
+							type: "tool_error",
+							toolError: {
+								toolCallId,
+								name,
+								error: declined,
+								code: err.code,
+							},
+						});
+						throw new Error(declined);
+					}
+
 					const duration = Date.now() - started;
 					const message = err instanceof Error ? err.message : String(err);
 					broadcast({

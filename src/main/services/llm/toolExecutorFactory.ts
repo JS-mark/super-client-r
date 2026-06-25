@@ -19,7 +19,7 @@ import { getSkillService } from "../skill/SkillService";
 import { resolveConversationCwd } from "../runtime/conversationCwd";
 import { logger } from "../../utils/logger";
 import type { ChatCompletionRequest } from "../../ipc/types";
-import type { ToolExecutor } from "./LLMService";
+import { RuntimeApprovalRequiredError, type ToolExecutor } from "./LLMService";
 
 const log = logger.withContext("ToolExecutorFactory");
 
@@ -162,7 +162,11 @@ export function buildToolExecutorFromRequest(
 		parentRequestId: request.requestId,
 	};
 
-	return async (name: string, args: Record<string, unknown>) => {
+	return async (
+		name: string,
+		args: Record<string, unknown>,
+		execOptions?: { approvalGranted?: boolean },
+	) => {
 		const mapping = resolveToolMapping(request.toolMapping!, name);
 		if (!mapping) throw new Error(`Unknown tool: ${name}`);
 
@@ -205,10 +209,22 @@ export function buildToolExecutorFromRequest(
 			mapping.serverId,
 			mapping.toolName,
 			resolvedArgs,
-			{ conversationId: request.conversationId },
+			{
+				conversationId: request.conversationId,
+				approvalGranted: execOptions?.approvalGranted,
+			},
 		);
 		const result = await Promise.race([callPromise, timeoutPromise]);
 		if (!result.success) {
+			// Preserve the runtime-policy needs-approval signal as a typed
+			// error so `toolAdapter` can route it through the inline
+			// approval UI instead of treating it as a generic tool failure.
+			if (result.errorCode === "runtime.needsApproval") {
+				throw new RuntimeApprovalRequiredError(
+					result.error || "runtime-policy-needs-approval",
+					result.errorCode,
+				);
+			}
 			throw new Error(result.error || "Tool call failed");
 		}
 		return result.data;
