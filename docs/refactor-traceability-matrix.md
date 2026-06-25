@@ -1,6 +1,7 @@
 # Refactor Traceability Matrix
 
 > 入口：[refactor-plan](./refactor-plan.md) ·
+> 进度：[refactor-progress](./refactor-progress.md) ·
 > 缺口 review：[refactor-gap-review](./refactor-gap-review.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
@@ -75,6 +76,7 @@ Before declaring the refactor plan “complete enough to implement”:
 - [ ] Every P0 row has a concrete implementation task and test evidence.
 - [ ] Every No-Go gate in §3 has a chosen decision, not multiple options.
 - [ ] [refactor-plan](./refactor-plan.md) links all active docs listed here.
+- [ ] [refactor-progress](./refactor-progress.md) records current implementation evidence and remaining gaps.
 - [ ] [refactor-execution-gates](./refactor-execution-gates.md) has evidence requirements for all P0/P1 areas.
 - [ ] `pnpm docs:build` passes.
 - [ ] Local Markdown link scan reports `missing=0`.

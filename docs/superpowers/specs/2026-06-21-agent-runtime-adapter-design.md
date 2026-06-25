@@ -509,7 +509,7 @@ Claude Agent SDK 提供 `canUseTool` 回调，但默认 MCP 调用在子进程�
 - SDK 调起 tool 时不会自己执行，回到我们这边——**走 dispatcher.execute**
 - result 通过 SDK 的 tool result API 喂回
 
-> 这是 Phase 1 实现的最大风险点（与现行行为不同）。Phase 1 spec 必须为 ClaudeSdkRuntime 的内置 MCP 通路写**端到端回归套件**（`@scp/file-system` 读写、`@scp/grep`、`@scp/plan`、`@scp/task` 全覆盖），并由 `AgentTraceCollector` 验证。
+> 这是 Phase 1 实现的最大风险点（与现行行为不同）。Phase 1 spec 必须为 ClaudeSdkRuntime 的内置 MCP 通路写**端到端回归套件**（`@scp/file-system` 读写、`@scp/grep`、`@scp/plan`、`@scp/todo`（原 `@scp/task`）全覆盖），并由 `AgentTraceCollector` 验证。
 
 ---
 
@@ -822,7 +822,7 @@ export class CodexRuntime implements AgentRuntime {
 - **`HostToolDispatcher`** 隔离测试：mock `McpService` / `SkillService` / `ApprovalGrantStore`
 - **真实 adapter 集成**：录制 SDK 响应 fixture（vitest + fs fixture）
 - **事件归一化对照**：每个 adapter 提供 `normalize.test.ts`
-- **Phase 1 内置 MCP 回归套件**：`@scp/file-system` 读 / 写 / 列、`@scp/grep` 查找、`@scp/plan` 增删改、`@scp/task` 流程——全部走 ClaudeSdkRuntime 端到端，结果用 `AgentTraceCollector` 验证事件序列
+- **Phase 1 内置 MCP 回归套件**：`@scp/file-system` 读 / 写 / 列、`@scp/grep` 查找、`@scp/plan` 增删改、`@scp/todo` 流程（前身 `@scp/task`）——全部走 ClaudeSdkRuntime 端到端，结果用 `AgentTraceCollector` 验证事件序列
 
 ---
 

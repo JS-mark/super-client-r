@@ -2,6 +2,8 @@
 
 > 本文是重构工作的唯一总入口。具体功能 plan 保留在各自文档中，通过本文索引进入。
 >
+> 当前进度：[refactor-progress](./refactor-progress.md)
+>
 > 维护规则：新重构决策先更新本文；功能级实现细节写到对应 plan；不要继续往旧的 `workspace-session-ui-plan.md` 追加新章节。
 
 ## 1. 当前结论
@@ -47,6 +49,7 @@
 | [refactor-gap-review.md](./refactor-gap-review.md) | 缺口 review：功能缺失、边界条件、文档矛盾、建议新增的前置矩阵 | 进入实现前做风险收敛时 |
 | [refactor-execution-gates.md](./refactor-execution-gates.md) | 执行门禁 | 定义 ready / implemented / verified / shippable 的证据要求；开始实现或声称完成前必须读。 |
 | [refactor-traceability-matrix.md](./refactor-traceability-matrix.md) | 覆盖矩阵 | 把用户需求、GAP-1~GAP-16、负责文档、No-Go gate 和剩余证据串起来。 |
+| [refactor-progress.md](./refactor-progress.md) | 进度记录 | 独立记录当前实现进度、最近验证命令、已完成证据和剩余 gap；不要把功能细节塞回总计划。 |
 | [workspace-session-index.md](./workspace-session-index.md) | 兼容入口 | 保留给旧链接；实际入口应跳转到本文。 |
 | [superpowers/plans/2026-06-20-chat-composer-redesign.md](./superpowers/plans/2026-06-20-chat-composer-redesign.md) | 功能级 plan | Composer 视觉与交互改造，不属于数据模型主线。 |
 | [superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md](./superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md) | 功能级 plan | Sidebar quick actions / global search 计划，不属于数据模型主线。 |
@@ -98,6 +101,7 @@
 | Settings overlay | [project-settings-overlay.md](./project-settings-overlay.md) | 改 global/project/session runtime settings 合并逻辑前 |
 | 执行门禁 / 完成证据 | [refactor-execution-gates.md](./refactor-execution-gates.md) | 准备开始实现、合并阶段、或把 task 标记完成前 |
 | 覆盖追踪 / 完整性审计 | [refactor-traceability-matrix.md](./refactor-traceability-matrix.md) | 准备判断 plan 是否完整、是否可开工、是否所有 gap 都有 owner 前 |
+| 当前重构进度 | [refactor-progress.md](./refactor-progress.md) | 查询当前实现进度、最近验证证据、剩余 gap 和本批次进展时 |
 | Remote session lifecycle | [remote-session-lifecycle.md](./remote-session-lifecycle.md) | 改 IM bot binding、remote message routing、remote-bound delete、webhook replay 前 |
 | Settings 项目管理入口 | [project-management-settings-ia.md](./project-management-settings-ia.md) | 改 archived/orphan/import/deleted/tombstone recovery UI 前 |
 | Git worktree preflight | [git-worktree-preflight.md](./git-worktree-preflight.md) | 改 Project 右键 worktree、Composer LaunchModePill、新 git IPC 前 |

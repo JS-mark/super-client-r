@@ -120,8 +120,8 @@ MCP 服务管理 **4 种类型** 的服务器，使用不同的传输方式：
 
 ```
 @scp/fetch, @scp/file-system, @scp/python, @scp/javascript,
-@scp/browser, @scp/image-gen, @scp/nodejs, @scp/bash, @scp/grep,
-@scp/plan, @scp/task
+@scp/browser, @scp/image-gen, @scp/bash, @scp/grep,
+@scp/plan, @scp/todo
 ```
 
 ### 2.2 工具发现
