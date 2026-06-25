@@ -4,6 +4,7 @@ import type { AgentRuntimeStreamEvent } from "@super-client/shared-types/agent-r
 import {
 	adaptRuntimeEventToSdk,
 	adaptSdkRequestToRuntime,
+	createSdkAdapterState,
 } from "../agentSdkLegacyAdapter";
 
 describe("adaptSdkRequestToRuntime", () => {
@@ -155,5 +156,37 @@ describe("adaptRuntimeEventToSdk", () => {
 				}),
 			),
 		).toBeNull();
+	});
+
+	it("usage event populates SdkAdapterState.usage; subsequent result carries it", () => {
+		const state = createSdkAdapterState();
+		// usage arrives first (translator emits message.final → usage → result)
+		expect(
+			adaptRuntimeEventToSdk(
+				base("usage", { inputTokens: 123, outputTokens: 45 }),
+				state,
+			),
+		).toBeNull();
+		expect(state.usage).toEqual({ inputTokens: 123, outputTokens: 45 });
+
+		const out = adaptRuntimeEventToSdk(
+			base("result", { reason: "completed" }),
+			state,
+		) as { result: { usage: { inputTokens: number; outputTokens: number }; durationMs: number } };
+		expect(out.result.usage).toEqual({ inputTokens: 123, outputTokens: 45 });
+		// durationMs is Date.now() - state.startedAt; both stamped just now,
+		// so it lands somewhere in [0, a few ms]. Assert it's a real number
+		// rather than the legacy hard-coded zero — the renderer reads this
+		// to render "回答耗时 X.X s".
+		expect(Number.isFinite(out.result.durationMs)).toBe(true);
+		expect(out.result.durationMs).toBeGreaterThanOrEqual(0);
+	});
+
+	it("result without state falls back to zero usage / duration (legacy default)", () => {
+		const out = adaptRuntimeEventToSdk(
+			base("result", { reason: "completed" }),
+		) as { result: { usage: { inputTokens: number; outputTokens: number }; durationMs: number } };
+		expect(out.result.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
+		expect(out.result.durationMs).toBe(0);
 	});
 });

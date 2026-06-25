@@ -13,6 +13,7 @@ import { ipcMain } from "electron";
 import {
 	adaptRuntimeEventToSdk,
 	adaptSdkRequestToRuntime,
+	createSdkAdapterState,
 } from "../../services/agent/runtime/agentSdkLegacyAdapter";
 import { getAgentRuntimeRegistry } from "../../services/agent/runtime/AgentRuntimeRegistry";
 import { logger } from "../../utils/logger";
@@ -68,10 +69,16 @@ export function registerStreamingHandlers(): void {
 
 				// Pump in the background; ack returns immediately and events
 				// flow via agent-sdk:stream-event.
+				//
+				// `adapterState` is per-request — folds the runtime's separate
+				// `usage` + `result` events into a single legacy SDK `result`
+				// event with real `usage` + `durationMs`. Without it the
+				// renderer's footer shows "0 tokens, 0.0s".
+				const adapterState = createSdkAdapterState();
 				(async () => {
 					try {
 						for await (const ev of runtime.createQuery(runtimeReq)) {
-							const legacy = adaptRuntimeEventToSdk(ev);
+							const legacy = adaptRuntimeEventToSdk(ev, adapterState);
 							if (legacy) {
 								if (legacy.type && legacy.type !== "chunk") {
 									log.info("agent-sdk:stream-event forwarded", {
