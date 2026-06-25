@@ -1708,22 +1708,28 @@ export function useChat() {
       };
       addMessage(userMessage);
 
+      // Pre-resolve the active model from renderer state (no IPC) so the
+      // assistant bubble's header shows the *real* model name and provider
+      // icon from the very first frame. `sendAgentMessage` still does the
+      // authoritative IPC resolve and will update `currentModelInfoRef` /
+      // metadata in-place if the answer changes.
+      const preResolved = getEffectiveModel();
       const assistantMessage: Message = {
         id: `assistant_${Date.now()}`,
         role: "assistant",
         content: "",
         timestamp: Date.now(),
         metadata: {
-          model: "agent",
-          providerPreset: "anthropic",
-          providerName: "Agent SDK",
+          model: preResolved?.model.id ?? "agent",
+          providerPreset: preResolved?.provider.preset ?? "anthropic",
+          providerName: preResolved?.provider.name ?? "Agent SDK",
         },
       };
       addMessage(assistantMessage);
 
       await sendAgentMessage(userContent);
     },
-    [addMessage, deleteMessagesFrom, sendAgentMessage],
+    [addMessage, deleteMessagesFrom, getEffectiveModel, sendAgentMessage],
   );
 
   /**
@@ -1797,15 +1803,21 @@ export function useChat() {
       addMessage(userMessage);
       setInput("");
 
+      // Pre-resolve the active model from renderer state so the bubble
+      // header reflects the real model / provider icon immediately on send.
+      // The `sendAgentMessage` path below still does the authoritative IPC
+      // resolve and patches `currentModelInfoRef` (and the message metadata
+      // via stream events) if the resolved model differs.
+      const preResolved = getEffectiveModel();
       const assistantMessage: Message = {
         id: `assistant_${Date.now()}`,
         role: "assistant",
         content: "",
         timestamp: Date.now(),
         metadata: {
-          model: "agent",
-          providerPreset: "anthropic",
-          providerName: "Agent SDK",
+          model: preResolved?.model.id ?? "agent",
+          providerPreset: preResolved?.provider.preset ?? "anthropic",
+          providerName: preResolved?.provider.name ?? "Agent SDK",
         },
       };
       addMessage(assistantMessage);
@@ -1857,6 +1869,7 @@ export function useChat() {
       selectedCommandName,
       addMessage,
       deleteMessagesFrom,
+      getEffectiveModel,
       sendAgentMessage,
       sendSkillMessage,
       setSelectedCommandName,
