@@ -183,7 +183,10 @@ describe("tool_use", () => {
 });
 
 describe("error / tool_result / unknown", () => {
-	it("error type → session_marker with diagnostic payload", () => {
+	// Assistant-role errors flow through the assistant_message branch and
+	// carry messageType:"error" so a jsonl reload can rehydrate the chat
+	// ErrorCard bubble. See messageConverter.ts:112-159 for the rationale.
+	it("assistant error → assistant_message with messageType:error", () => {
 		const msg: ChatMessagePersist = {
 			id: "e1",
 			role: "assistant",
@@ -194,9 +197,30 @@ describe("error / tool_result / unknown", () => {
 		const events = convertChatMessageToEvents(msg);
 		expect(events).toHaveLength(1);
 		expect(events[0]).toMatchObject({
+			type: "assistant_message",
+			id: "e1",
+			content: "boom",
+			messageType: "error",
+		});
+	});
+
+	// Non-assistant errors (system / tool) keep the legacy session_marker
+	// path because they have no rendered bubble of their own — the marker
+	// is purely diagnostic for replay tooling.
+	it("non-assistant error → session_marker with diagnostic payload", () => {
+		const msg: ChatMessagePersist = {
+			id: "e2",
+			role: "system",
+			content: "config drift",
+			timestamp: 6500,
+			type: "error",
+		};
+		const events = convertChatMessageToEvents(msg);
+		expect(events).toHaveLength(1);
+		expect(events[0]).toMatchObject({
 			type: "session_marker",
 			key: "error",
-			value: { id: "e1", content: "boom" },
+			value: { id: "e2", content: "config drift" },
 		});
 	});
 
