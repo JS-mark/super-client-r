@@ -1,7 +1,13 @@
 // @vitest-environment node
 //
 // 纯函数 computeContextUsage 单测。
-// hook 本体依赖 zustand/electron，留给 e2e 验。
+//
+// 直接 import 自 ./contextUsageMath（hook 本体抽出来的纯逻辑模块）。
+// 通过 useContextUsage 入口转手会拖入 zustand store → apiService →
+// `window.electron.ipc` 的 top-level 引用，在 node env 下立刻 throw
+// 'window is not defined'。pure module 没这条依赖链。
+//
+// hook 本体（useContextUsage）需要 zustand / electron，留给 e2e 验。
 
 import { describe, expect, it } from "vitest";
 import type { Message } from "../../stores/chatMessageStore";
@@ -9,7 +15,7 @@ import {
 	buildMessagesText,
 	computeContextUsage,
 	inferContextWindowFromModelId,
-} from "../useContextUsage";
+} from "../contextUsageMath";
 
 function mkAssistant(opts: {
 	id: string;
