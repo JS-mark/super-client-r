@@ -1,30 +1,12 @@
 /**
- * Shared utilities for internal MCP servers
+ * Shared utilities for internal MCP servers.
+ *
+ * `BLOCKED_PATHS` / `isBlockedPath` were promoted to `src/main/utils/pathSafety.ts`
+ * so the runtime builtin tools (Read/Write/Edit) can reuse the same blocklist.
+ * Re-exported here to keep existing import sites working.
  */
 
-import * as path from "path";
-
-export const BLOCKED_PATHS = [
-	"/etc",
-	"/System",
-	"/Library",
-	"/private",
-	"/bin",
-	"/sbin",
-	"/usr/bin",
-	"/usr/sbin",
-	"C:\\Windows",
-	"C:\\Program Files",
-	"C:\\Program Files (x86)",
-];
-
-export function isBlockedPath(targetPath: string): boolean {
-	const resolved = path.resolve(targetPath);
-	return BLOCKED_PATHS.some(
-		(blocked) =>
-			resolved === blocked || resolved.startsWith(blocked + path.sep),
-	);
-}
+export { BLOCKED_PATHS, isBlockedPath } from "../../../../utils/pathSafety";
 
 export function textResult(text: string, isError = false) {
 	return { content: [{ type: "text" as const, text }], isError };
