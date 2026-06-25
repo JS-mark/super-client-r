@@ -681,6 +681,13 @@ export function ChatInputArea({
 						) {
 							e.preventDefault();
 							handleSend(input);
+							// `@ant-design/x` 的 Sender 内部 Enter 提交是以
+							// `onKeyDown(e) === false` 作为「已被外部处理」的信号
+							// （见 node_modules/@ant-design/x/lib/sender/components/TextArea.js
+							// 的 onInternalKeyDown：`if (... || eventRes === false) return;`）。
+							// preventDefault 不够；不返回 false 会导致 Sender 再次
+							// 触发 onSubmit -> handleSend，消息被发两条。
+							return false;
 						}
 					}}
 					renderFooter={existingFooterFn}
