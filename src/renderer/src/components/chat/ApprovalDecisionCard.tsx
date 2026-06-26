@@ -1,7 +1,18 @@
 import type * as React from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button, Radio, Tooltip, theme } from "antd";
 
 const { useToken } = theme;
+
+// Tick at 1s — the visible `(Ns)` badge only renders whole seconds, and the
+// progress bar uses a matching `transition: width 1s linear` so the browser
+// interpolates between ticks without us having to setState more often.
+// The earlier 250ms cadence caused a 4Hz re-render storm on every mounted
+// approval card (and inserted a fresh `<style>` tag with a `:has()` rule
+// each tick) — see the perf investigation in
+// `docs/code-review-2026-06-25.md`. Display still uses `Math.ceil` so the
+// badge starts at the full requested second (`20s … 1s … fire`).
+const COUNTDOWN_TICK_MS = 1000;
 
 export interface ApprovalDecisionOption {
 	value: string;
@@ -31,6 +42,22 @@ interface ApprovalDecisionCardProps {
 	tone?: "default" | "warning" | "success";
 	maxWidth?: number;
 	density?: "default" | "compact";
+	/**
+	 * When true the card grows to fill its container instead of capping at
+	 * `maxWidth`. Used by tool-approval prompts so they feel like a prominent
+	 * inline interrupt rather than a small confirmation pill. Has no effect
+	 * on `AskUserQuestionCard`, which keeps the old, narrower look.
+	 */
+	fullWidth?: boolean;
+	/**
+	 * Optional auto-reject countdown in milliseconds. The reject button shows
+	 * a `(Ns)` suffix and a thin progress bar slides across the card's bottom.
+	 * On expiry we invoke `onAutoReject` (or fall back to `onReject`). Hovering
+	 * over the card pauses the countdown so the user has time to read; leaving
+	 * resumes from where it paused. Pass `0` / `undefined` to disable.
+	 */
+	autoRejectAfterMs?: number;
+	onAutoReject?: () => void;
 }
 
 export function ApprovalDecisionCard({
@@ -54,10 +81,79 @@ export function ApprovalDecisionCard({
 	tone = "default",
 	maxWidth,
 	density = "default",
+	fullWidth = true,
+	autoRejectAfterMs,
+	onAutoReject,
 }: ApprovalDecisionCardProps) {
 	const { token } = useToken();
 	const compact = density === "compact";
-	const resolvedMaxWidth = maxWidth ?? (compact ? 520 : 560);
+	// ── Auto-reject countdown ──────────────────────────────────────────────
+	const countdownEnabled =
+		typeof autoRejectAfterMs === "number" && autoRejectAfterMs > 0;
+	const [remainingMs, setRemainingMs] = useState(autoRejectAfterMs ?? 0);
+	const [paused, setPaused] = useState(false);
+	const firedRef = useRef(false);
+
+	// Callbacks live in refs so the interval effect doesn't have to list them
+	// as deps. Without this, parent re-renders (which happen on every
+	// streaming chunk) would pass fresh function identities, tearing down +
+	// recreating setInterval before any tick fires — that's what caused the
+	// earlier "countdown stuck until you click" bug.
+	const onRejectRef = useRef(onReject);
+	const onAutoRejectRef = useRef(onAutoReject);
+	useEffect(() => {
+		onRejectRef.current = onReject;
+		onAutoRejectRef.current = onAutoReject;
+	}, [onReject, onAutoReject]);
+
+	// Reset on autoRejectAfterMs change (or on enable). Resetting both the
+	// display and the fired guard here is the only state mutation needed —
+	// the ticking effect below is purely a side-effect with no setState in
+	// its setup path (we deferred all state writes into the interval
+	// callback to avoid render-loop interactions with the parent).
+	useEffect(() => {
+		if (!countdownEnabled) return;
+		firedRef.current = false;
+		setRemainingMs(autoRejectAfterMs ?? 0);
+	}, [autoRejectAfterMs, countdownEnabled]);
+
+	// Single ticking effect. Decrements `remainingMs` by COUNTDOWN_TICK_MS
+	// every tick via the functional setter, so we don't capture stale
+	// `remainingMs` in a closure and don't have to list it as a dep (which
+	// would tear down the interval on every tick). When `remainingMs` reaches
+	// 0 the next render of the side-effect effect below fires the callback.
+	useEffect(() => {
+		if (!countdownEnabled || paused) return;
+		const id = window.setInterval(() => {
+			setRemainingMs((prev) => {
+				if (prev <= COUNTDOWN_TICK_MS) return 0;
+				return prev - COUNTDOWN_TICK_MS;
+			});
+		}, COUNTDOWN_TICK_MS);
+		return () => window.clearInterval(id);
+	}, [countdownEnabled, paused]);
+
+	// Fire onAutoReject (or onReject) exactly once when remainingMs hits 0.
+	// Split out so the ticking effect stays a pure "decrement on a timer";
+	// putting the callback inside the setter is a React side-effect smell.
+	useEffect(() => {
+		if (!countdownEnabled) return;
+		if (remainingMs > 0) return;
+		if (firedRef.current) return;
+		firedRef.current = true;
+		(onAutoRejectRef.current ?? onRejectRef.current)?.();
+	}, [countdownEnabled, remainingMs]);
+
+	const totalMs = autoRejectAfterMs ?? 0;
+	const remainingSec =
+		countdownEnabled && remainingMs > 0
+			? Math.max(1, Math.ceil(remainingMs / 1000))
+			: 0;
+	const progressPct =
+		countdownEnabled && totalMs > 0
+			? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100))
+			: 0;
+
 	const toneColor =
 		tone === "warning"
 			? token.colorWarning
@@ -77,17 +173,80 @@ export function ApprovalDecisionCard({
 				? token.colorSuccessBorder
 				: token.colorBorderSecondary;
 
+	// Stable per-instance id used by the scoped `:has` escape rule below.
+	// React's `useId` gives us a deterministic value across renders so the
+	// style tag and the data-attribute stay in sync.
+	const rawId = useId();
+	const escapeId = useMemo(
+		() => rawId.replace(/[^a-zA-Z0-9_-]/g, "_"),
+		[rawId],
+	);
+	// Memoised so the `<style>` tag's text node identity doesn't churn on
+	// every parent re-render (and so it isn't rebuilt every countdown tick).
+	// `useId` is stable for the lifetime of the component, so this string is
+	// effectively computed once.
+	const fullWidthStyle = useMemo(
+		() =>
+			`.ant-bubble:has([data-approval-card-id="${escapeId}"]) > .ant-bubble-body{flex:1!important;min-width:0!important;}\n` +
+			`.ant-bubble-content:has([data-approval-card-id="${escapeId}"]){display:block!important;width:100%!important;max-width:none!important;margin:0!important;}`,
+		[escapeId],
+	);
+
 	return (
-		<div
-			className="my-2 overflow-hidden"
-			style={{
-				border: `1px solid ${token.colorBorderSecondary}`,
-				backgroundColor: token.colorBgContainer,
-				maxWidth: resolvedMaxWidth,
-				borderRadius: compact ? 12 : 10,
-				boxShadow: compact ? token.boxShadowTertiary : token.boxShadowSecondary,
-			}}
-		>
+		<>
+			{fullWidth && (
+				// Scoped style escape — same trick `ErrorCard.tsx` uses.
+				// The antd-x bubble chain that bites us when we want a wide
+				// card is THREE layers, not just one, and lifting only the
+				// innermost (`.ant-bubble-content`) is the trap I hit first:
+				//
+				//   .ant-bubble                    (display: flex, row)
+				//     ├─ .ant-bubble-avatar
+				//     └─ .ant-bubble-body          (flex item, default shrink-to-fit)
+				//          └─ .ant-bubble-content  (display: inline-block from AI role,
+				//                                   plus max-width: 56rem from
+				//                                   `bubbleListStyles.content`)
+				//
+				// To fill the chat column we need all three lifted:
+				//   1) `.ant-bubble-body` gets `flex: 1` so it stops sizing
+				//      to its child and grows into the bubble row.
+				//   2) `.ant-bubble-content` is forced to `display: block;
+				//      width: 100%; max-width: none` so the 56rem cap and
+				//      the inline-block shrink-to-fit are both undone.
+				//   3) `min-width: 0` on the body is required for it to be
+				//      allowed to shrink below its content's intrinsic min
+				//      on narrow viewports — without it, CJK text without
+				//      breakpoints would refuse to wrap.
+				//
+				// Targeted via :has() so only the bubble owning THIS card is
+				// affected; siblings keep their normal shrink-to-fit chrome.
+				// Chromium ≥105 supports :has; Electron's bundled Chromium
+				// is well past that.
+				<style>{fullWidthStyle}</style>
+			)}
+			<div
+				data-approval-card-id={fullWidth ? escapeId : undefined}
+				className="my-2 overflow-hidden relative"
+				onMouseEnter={countdownEnabled ? () => setPaused(true) : undefined}
+				onMouseLeave={countdownEnabled ? () => setPaused(false) : undefined}
+				style={{
+					border: `1px solid ${token.colorBorderSecondary}`,
+					backgroundColor: token.colorBgContainer,
+					// `fullWidth` lets the card stretch to fill the bubble's
+					// content area (whose 56rem cap is lifted by the `:has`
+					// rule above). The `minWidth` keeps a sensible floor on
+					// narrow viewports where the chat column itself is
+					// smaller than 720px.
+					...(fullWidth
+						? {
+								width: "100%",
+								minWidth: "min(720px, calc(100vw - 4rem))",
+							}
+						: {}),
+					borderRadius: compact ? 12 : 10,
+					boxShadow: compact ? token.boxShadowTertiary : token.boxShadowSecondary,
+				}}
+			>
 			<div
 				className="flex items-center gap-2.5"
 				style={{
@@ -273,9 +432,15 @@ export function ApprovalDecisionCard({
 								minWidth: compact ? 128 : 112,
 								height: compact ? 34 : 36,
 								fontWeight: 600,
+								fontVariantNumeric: "tabular-nums",
 							}}
 						>
 							{rejectLabel}
+							{countdownEnabled && remainingSec > 0 && (
+								<span style={{ marginInlineStart: 6, opacity: 0.72 }}>
+									({remainingSec}s)
+								</span>
+							)}
 						</Button>
 					)}
 					{onConfirm && (
@@ -297,6 +462,83 @@ export function ApprovalDecisionCard({
 					)}
 				</div>
 			)}
+
+			{countdownEnabled && (
+				<>
+					{/*
+					  Thin progress bar at the very bottom edge — purely
+					  decorative reinforcement of the `(Ns)` badge so the
+					  countdown is perceptible even when the user's eyes are
+					  on the description text. Width animates linearly with
+					  the remaining ms; pauses on hover with the rest of the
+					  countdown.
+					*/}
+					<div
+						aria-hidden
+						style={{
+							position: "absolute",
+							left: 0,
+							right: 0,
+							bottom: 0,
+							height: 2,
+							backgroundColor: token.colorFillQuaternary,
+							overflow: "hidden",
+							pointerEvents: "none",
+						}}
+					>
+						<div
+							style={{
+								width: `${progressPct}%`,
+								height: "100%",
+								backgroundColor:
+									tone === "warning"
+										? token.colorWarning
+										: tone === "success"
+											? token.colorSuccess
+											: token.colorPrimary,
+								// Transition duration matches the tick cadence
+								// (`COUNTDOWN_TICK_MS`) so the browser linearly
+								// interpolates the bar between ticks and it
+								// looks continuous rather than stepping. We
+								// kill the transition while paused so it
+								// doesn't slide a phantom tick on resume.
+								transition: paused
+									? "none"
+									: `width ${COUNTDOWN_TICK_MS}ms linear`,
+								opacity: paused ? 0.55 : 1,
+							}}
+						/>
+					</div>
+					{/*
+					  Live region for screen readers — `polite` so it doesn't
+					  interrupt, but periodically announces the remaining
+					  time. We only emit at whole-second changes via
+					  `remainingSec` to avoid spam.
+					*/}
+					<span
+						role="status"
+						aria-live="polite"
+						style={{
+							position: "absolute",
+							width: 1,
+							height: 1,
+							padding: 0,
+							margin: -1,
+							overflow: "hidden",
+							clip: "rect(0,0,0,0)",
+							whiteSpace: "nowrap",
+							border: 0,
+						}}
+					>
+						{paused
+							? "Countdown paused"
+							: remainingSec > 0
+								? `Auto-reject in ${remainingSec} seconds`
+								: "Auto-reject triggered"}
+					</span>
+				</>
+			)}
 		</div>
+		</>
 	);
 }

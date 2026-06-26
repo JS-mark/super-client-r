@@ -354,6 +354,16 @@ export const ToolCallCard: React.FC<{
 					tone="warning"
 					density={compact ? "compact" : "default"}
 					maxWidth={compact ? 520 : undefined}
+					// Non-compact tool approvals span the chat bubble so the
+					// prompt feels like a deliberate interrupt; compact mode
+					// (e.g. nested popovers) keeps the historical 520 cap.
+					fullWidth={!compact}
+					// Default 20s auto-reject. Hovering the card pauses the
+					// countdown — see ApprovalDecisionCard. We route auto-reject
+					// through the same handler as the manual button so the
+					// upstream state machine sees one and only one decision.
+					autoRejectAfterMs={20000}
+					onAutoReject={handleApprovalReject}
 			>
 				<div className="flex items-center gap-2">
 					{server && (

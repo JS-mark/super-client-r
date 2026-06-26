@@ -623,7 +623,7 @@ export function ChatInputArea({
 				}}
 			/>
 			{pendingToolMessage?.toolCall && respondToApproval ? (
-				<div className="chat-composer relative w-full mx-auto max-w-2xl">
+				<div className="chat-composer relative w-full mx-auto">
 					{isAskUserQuestionToolCall(pendingToolMessage.toolCall) ? (
 						<AskUserQuestionCard
 							toolCall={pendingToolMessage.toolCall}
