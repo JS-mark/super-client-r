@@ -7,7 +7,7 @@ import { useChatMessageStore } from "../stores/chatMessageStore";
 import { EChartsBlock } from "./EChartsBlock";
 import { MermaidChart } from "./MermaidChart";
 import { CopyButton } from "./markdown/CopyButton";
-import { SyntaxHighlighter } from "./markdown/SyntaxHighlighter";
+import { StructuredCodeCard } from "./markdown/StructuredCodeCard";
 
 interface MarkdownProps {
 	content: string;
@@ -52,7 +52,7 @@ const CodeBlock: FC<ComponentProps> = ({
 	if (block) {
 		const code = extractTextContent(domNode);
 		return (
-			<SyntaxHighlighter
+			<StructuredCodeCard
 				code={code}
 				language={lang}
 				streaming={streamStatus === "loading"}

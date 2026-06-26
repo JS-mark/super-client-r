@@ -25,7 +25,9 @@ describe("StreamPartRenderer", () => {
 		expect(html).toContain("TS");
 		expect(html).toContain("ts");
 		expect(html).toContain("Copy code");
-		expect(html).toContain("Enable line wrap");
+		// Wrap is on by default (chat bubbles are narrow), so the toggle's
+		// tooltip is the "off" affordance: "Disable line wrap".
+		expect(html).toContain("Disable line wrap");
 		expect(html).not.toContain("code-block-cm rounded-lg overflow-hidden my-4");
 	});
 

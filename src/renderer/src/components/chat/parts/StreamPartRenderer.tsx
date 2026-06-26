@@ -1,5 +1,4 @@
-import { Check, Copy, WrapText } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo } from "react";
 import type {
 	ArtifactMessagePart,
 	CodeBlockMessagePart,
@@ -11,8 +10,7 @@ import type {
 	TableMessagePart,
 	TreeMessagePart,
 } from "@super-client/shared-types/chat";
-import { cn } from "../../../lib/utils";
-import { SyntaxHighlighter } from "../../markdown/SyntaxHighlighter";
+import { StructuredCodeCard } from "../../markdown/StructuredCodeCard";
 import { TextPartRenderer } from "./TextPartRenderer";
 
 export interface StreamPartRendererProps {
@@ -81,145 +79,15 @@ function JsonFallback({ value }: { value: unknown }) {
 }
 
 function CodeBlockPartRenderer({ part }: { part: CodeBlockMessagePart }) {
-	const [wrapLines, setWrapLines] = useState(false);
-	const [copied, setCopied] = useState(false);
-	const displayLanguage = part.language || getLanguageFromPath(part.path) || "code";
-	const title = part.title || part.path || displayLanguage;
-	const badge = getLanguageBadge(displayLanguage);
-	const meta = useMemo(
-		() =>
-			[
-				typeof part.lineCount === "number" ? `${part.lineCount} lines` : null,
-				part.state === "streaming" ? "streaming" : null,
-			]
-				.filter(Boolean)
-				.join(" · "),
-		[part.lineCount, part.state],
-	);
-
-	const handleCopy = useCallback(async () => {
-		await navigator.clipboard.writeText(part.content);
-		setCopied(true);
-		window.setTimeout(() => setCopied(false), 1500);
-	}, [part.content]);
-
-	const handleToggleWrap = useCallback(() => {
-		setWrapLines((value) => !value);
-	}, []);
-
 	return (
-		<section className="structured-code-card my-3 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[#111318]">
-			<div className="flex min-w-0 items-center justify-between gap-4 px-5 py-4">
-				<div className="flex min-w-0 items-center gap-3">
-					<span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-[2px] bg-[#1495e8] px-1 text-[10px] font-bold uppercase leading-none text-white">
-						{badge}
-					</span>
-					<div className="min-w-0">
-						<div className="truncate font-mono text-lg font-semibold leading-6 text-[#202437] dark:text-white/90">
-							{title}
-						</div>
-						{meta && (
-							<div className="mt-0.5 text-xs text-[#7b8197] dark:text-white/45">
-								{meta}
-							</div>
-						)}
-					</div>
-				</div>
-				<div className="flex shrink-0 items-center gap-1.5">
-					<CodeIconButton
-						active={wrapLines}
-						title={wrapLines ? "Disable line wrap" : "Enable line wrap"}
-						onClick={handleToggleWrap}
-					>
-						<WrapText size={18} strokeWidth={2} />
-					</CodeIconButton>
-					<CodeIconButton title="Copy code" onClick={handleCopy}>
-						{copied ? (
-							<Check size={18} strokeWidth={2.2} />
-						) : (
-							<Copy size={18} strokeWidth={2} />
-						)}
-					</CodeIconButton>
-				</div>
-			</div>
-			<div className="px-5 pb-5">
-				<SyntaxHighlighter
-					code={part.content}
-					language={displayLanguage}
-					streaming={part.state === "streaming"}
-					showChrome={false}
-					showLineNumbers={false}
-					wrapLines={wrapLines}
-					trimCode={false}
-					className="structured-code-highlighter"
-				/>
-			</div>
-		</section>
+		<StructuredCodeCard
+			code={part.content ?? ""}
+			language={part.language}
+			path={part.path}
+			title={part.title}
+			streaming={part.state === "streaming"}
+		/>
 	);
-}
-
-function CodeIconButton({
-	active = false,
-	title,
-	onClick,
-	children,
-}: {
-	active?: boolean;
-	title: string;
-	onClick: () => void;
-	children: React.ReactNode;
-}) {
-	return (
-		<button
-			type="button"
-			aria-label={title}
-			title={title}
-			onClick={onClick}
-			className={cn(
-				"flex h-8 w-8 items-center justify-center rounded-md border-0 bg-transparent text-[#1f2433] transition-colors hover:bg-black/5 dark:text-white/75 dark:hover:bg-white/10",
-				active && "bg-black/5 text-[#0b84d8] dark:bg-white/10 dark:text-[#61b7ff]",
-			)}
-		>
-			{children}
-		</button>
-	);
-}
-
-function getLanguageBadge(language: string): string {
-	const normalized = language.trim().toLowerCase();
-	const aliases: Record<string, string> = {
-		typescript: "TS",
-		tsx: "TSX",
-		javascript: "JS",
-		jsx: "JSX",
-		python: "PY",
-		shell: "SH",
-		bash: "SH",
-		zsh: "SH",
-		markdown: "MD",
-		json: "JSON",
-		yaml: "YAML",
-	};
-	const shortName = aliases[normalized] ?? normalized.slice(0, 4);
-	return (shortName || "CODE").toUpperCase();
-}
-
-function getLanguageFromPath(path?: string): string | undefined {
-	const extension = path?.split(".").pop()?.trim().toLowerCase();
-	if (!extension || extension === path) return undefined;
-	const aliases: Record<string, string> = {
-		ts: "ts",
-		tsx: "tsx",
-		js: "js",
-		jsx: "jsx",
-		py: "python",
-		md: "markdown",
-		json: "json",
-		yml: "yaml",
-		yaml: "yaml",
-		sh: "bash",
-	};
-	return aliases[extension] ?? extension;
 }
 
 function DiffPartRenderer({ part }: { part: DiffMessagePart }) {
