@@ -20,10 +20,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { List, useDynamicRowHeight, useListRef } from "react-window";
 import { formatSmartTime } from "../../lib/formatTime";
-import {
-	formatTokenCount,
-	formatTokenCountExact,
-} from "../../lib/formatTokens";
+import { formatTokenCount } from "../../lib/formatTokens";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import type { Message } from "../../stores/chatMessageStore";
 import { useMessageStore } from "../../stores/messageStore";
@@ -332,6 +329,13 @@ export function ChatMessageList({
 				loadingRender: () => <ThinkingIndicator />,
 				styles: {
 					content: {
+						// inline-block keeps short text replies shrink-to-fit
+						// (so the left edge doesn't anchor a tiny "好的"
+						// against a 56rem-wide invisible box). Block-level
+						// children that need to escape this (ErrorCard,
+						// ApprovalDecisionCard with fullWidth) lift the
+						// constraint via their own scoped `:has` style — see
+						// ErrorCard.tsx and ApprovalDecisionCard.tsx.
 						display: "inline-block",
 					},
 				},
@@ -419,7 +423,7 @@ export function ChatMessageList({
 				const tokenInfoEl =
 					meta?.inputTokens != null ? (
 						<Tooltip
-							title={`Tokens: ↑${formatTokenCountExact(meta.inputTokens)}`}
+							title={`Tokens: ↑${formatTokenCount(meta.inputTokens)}`}
 						>
 							{tokenInfo}
 						</Tooltip>
@@ -753,13 +757,22 @@ export function ChatMessageList({
 					);
 				}
 				if (footerMeta?.tokens != null) {
-					// Tooltip line keeps full precision (1,234,567).
-					const parts = [`Tokens: ${formatTokenCountExact(footerMeta.tokens)}`];
+					// Tooltip uses the same compact K/M form as the chip so the
+					// two views are consistent and the long total digits don't
+					// dominate the line. Total is split from the in/out
+					// breakdown with " / " so the eye can tell them apart
+					// (otherwise "5K ↑4.1K ↓909" reads as one continuous run).
+					const breakdown: string[] = [];
 					if (footerMeta.inputTokens != null)
-						parts.push(`↑${formatTokenCountExact(footerMeta.inputTokens)}`);
+						breakdown.push(`↑${formatTokenCount(footerMeta.inputTokens)}`);
 					if (footerMeta.outputTokens != null)
-						parts.push(`↓${formatTokenCountExact(footerMeta.outputTokens)}`);
-					tooltipLines.push(parts.join(" "));
+						breakdown.push(`↓${formatTokenCount(footerMeta.outputTokens)}`);
+					const total = `Tokens: ${formatTokenCount(footerMeta.tokens)}`;
+					tooltipLines.push(
+						breakdown.length
+							? `${total} / ${breakdown.join(" ")}`
+							: total,
+					);
 				}
 
 				// Visible footer chip uses compact form (1.9K / 1.8M …) so the

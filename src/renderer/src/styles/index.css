@@ -984,12 +984,18 @@ body {
    a flex item refuses to shrink below its intrinsic content width, which
    means `text-overflow: ellipsis` never has a too-narrow box to clip
    against. With it, the span shrinks within the button's max-width and
-   shows `…` correctly. */
+   shows `…` correctly.
+   `line-height: 1.4` (vs the button's 1) gives descenders like `g/p/y`
+   room to render before `overflow: hidden` clips them — without this,
+   names like `glm-5.1` lose the bottom of the `g`. Vertical centering
+   is handled by the button's `align-items: center`, so a taller inner
+   line-height doesn't shift the layout. */
 .composer-pill-text {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	line-height: 1.4;
 }
 
 .composer-pill > .anticon {

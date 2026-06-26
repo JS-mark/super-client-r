@@ -155,7 +155,7 @@ const Home = () => {
 							</div>
 						</div>
 
-						<p className="text-slate-400 max-w-2xl mb-6">
+						<p className="text-slate-400 mb-6">
 							{t(
 								"home.description",
 								"Super Client is a powerful AI desktop application that integrates multiple AI services, skills, and MCP servers for seamless productivity.",

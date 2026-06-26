@@ -53,7 +53,7 @@ export function ChatComposer({
 	return (
 		<div
 			ref={wrapperRef}
-			className="chat-composer relative w-full mx-auto max-w-4xl"
+			className="chat-composer relative w-full mx-auto"
 		>
 			{topOverlay}
 			<Sender
