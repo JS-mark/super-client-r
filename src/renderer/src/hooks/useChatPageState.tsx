@@ -214,20 +214,24 @@ export function useChatPageState({
 	// Auto-send after input state has updated (float widget flow).
 	// D-3: float-widget 自动建普通对话（无 projectId），跟 sidebar 顶部 + 新建对话
 	// 行为一致。
+	// 复用规则：默认新建一个对话；唯一例外是「当前焦点会话已经是个新建但尚未发言
+	// 的空壳」（messages.length === 0）——此时复用它，避免重复堆出空对话。
 	useEffect(() => {
 		if (floatAutoSend && input.trim()) {
 			setFloatAutoSend(false);
 			const doSend = async () => {
-				if (!useChatStore.getState().currentConversationId) {
-					await useChatStore
-						.getState()
-						.createConversation(input.trim().slice(0, 50), "agent");
+				const { currentConversationId, createConversation } =
+					useChatStore.getState();
+				const reuseEmpty =
+					currentConversationId !== null && messages.length === 0;
+				if (!reuseEmpty) {
+					await createConversation(input.trim().slice(0, 50), "agent");
 				}
 				sendMessage({ mode: "agent" });
 			};
 			doSend();
 		}
-	}, [floatAutoSend, input, sendMessage]);
+	}, [floatAutoSend, input, messages, sendMessage]);
 
 	// Consume pendingSkillId from Skills page navigation (skill is independent of mode)
 	useEffect(() => {
