@@ -124,9 +124,13 @@ describe("McpService runtime policy gate", () => {
 			command: "pwd",
 		});
 
+		// Needs-approval is normalised to the generic `runtime.needsApproval`
+		// marker so `toolExecutorFactory` can route through the inline
+		// approval UI without knowing the kind-specific code. The original
+		// reason is still recorded in the audit log for debugging.
 		expect(result).toMatchObject({
 			allowed: false,
-			code: "runtime.commandNeedsApproval",
+			code: "runtime.needsApproval",
 		});
 		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
 			source: "mcp",
@@ -135,6 +139,50 @@ describe("McpService runtime policy gate", () => {
 			target: "pwd",
 			decision: "denied",
 			reason: "workspace-policy:command-approval-required",
+		});
+	});
+
+	it("normalises file-write needs-approval to runtime.needsApproval (regression: file-write-approval-required surfaced as raw tool_error)", () => {
+		// Regression: when a session has `approvalMode: "request"` and the
+		// LLM calls a `file-write` tool, the runtime policy returns
+		// `needs-approval` with the kind-specific code
+		// `runtime.writeNeedsApproval`. `toolExecutorFactory` only knows the
+		// generic `runtime.needsApproval` marker, so the kind-specific code
+		// fell through and rendered as a raw `tool_error` with the message
+		// `workspace-policy:file-write-approval-required`. Both `command-exec`
+		// and `file-write` (and any other `*NeedsApproval`) must collapse
+		// to the same marker.
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "workspace-write",
+			approvalMode: "request",
+		});
+
+		const service = new McpService();
+		const result = (
+			service as unknown as {
+				evaluateRuntimePolicy: (
+					conversationId: string | undefined,
+					serverId: string,
+					toolName: string,
+					args: Record<string, unknown>,
+				) => { allowed: boolean; code?: string };
+			}
+		).evaluateRuntimePolicy(session.id, "@scp/file-system", "write_file", {
+			path: "/tmp/super-client-project/a.txt",
+		});
+
+		expect(result).toMatchObject({
+			allowed: false,
+			code: "runtime.needsApproval",
+		});
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			source: "mcp",
+			operation: "@scp/file-system:write_file",
+			kind: "file-write",
+			decision: "denied",
+			reason: "workspace-policy:file-write-approval-required",
 		});
 	});
 

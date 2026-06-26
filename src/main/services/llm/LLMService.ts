@@ -282,15 +282,29 @@ export class LLMService {
 				ctx,
 				runtime.runtimePolicy,
 			);
-			if (
-				evaluation.decision === "deny" ||
-				evaluation.decision === "needs-approval"
-			) {
+			if (evaluation.decision === "deny") {
 				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
 				return {
 					allowed: false,
 					code: evaluation.code ?? "runtime.policyDenied",
 					message: evaluation.reason ?? "runtime-policy-denied",
+				};
+			}
+			if (evaluation.decision === "needs-approval") {
+				// Pre-flight needs-approval. toolAdapter detects this generic
+				// marker code and routes through the inline approval UI rather
+				// than emitting a `tool_error`. We deliberately drop the
+				// kind-specific code (e.g. `runtime.writeNeedsApproval`) to keep
+				// a single contract with the adapter — the original reason is
+				// preserved in `message` for audit / debugging.
+				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				return {
+					allowed: false,
+					code: "runtime.needsApproval",
+					message:
+						evaluation.reason ??
+						evaluation.code ??
+						"runtime-policy-needs-approval",
 				};
 			}
 			getRuntimePolicyService().record(

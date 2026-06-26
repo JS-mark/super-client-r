@@ -565,9 +565,17 @@ export class McpService extends EventEmitter {
 					return { allowed: true };
 				}
 				getRuntimePolicyService().record(ctx, "denied", evaluation.reason);
+				// Normalise to the generic `runtime.needsApproval` marker:
+				// `toolExecutorFactory` looks for exactly this code on the
+				// returned `UnifiedToolCallResult.errorCode` to raise
+				// `RuntimeApprovalRequiredError` (which the `toolAdapter` catches
+				// and routes through the inline approval UI). Leaking the
+				// kind-specific code (e.g. `runtime.writeNeedsApproval`) caused
+				// `file-write` / `network-request` needs-approval results to
+				// surface as a raw `tool_error` to the user.
 				return {
 					allowed: false,
-					code: evaluation.code ?? "runtime.needsApproval",
+					code: "runtime.needsApproval",
 					message:
 						evaluation.reason ??
 						evaluation.code ??
