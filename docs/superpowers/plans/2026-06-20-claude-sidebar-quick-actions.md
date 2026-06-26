@@ -168,37 +168,19 @@ import {
 } from "@ant-design/icons";
 ```
 
-- [ ] **Step 2: 添加 handler**
+- [ ] **Step 2: 不再添加 Extensions 聚合入口**
 
-Right below `handleImBot`:
+最新 refactor 口径已取消 Extensions 聚合页。这里不要新增 `handleExtensions`，MCP、Skills、应用插件继续通过各自独立市场入口进入。
 
-```tsx
-const handleExtensions = useCallback(() => {
-  navigate("/extensions");
-}, [navigate]);
-```
+- [ ] **Step 3: 不追加 Extensions QuickActionRow**
 
-- [ ] **Step 3: 追加 QuickActionRow**
-
-In the quick actions block, append after the IM 机器人 row:
-
-```tsx
-<QuickActionRow
-  icon={<AppstoreAddOutlined />}
-  label="扩展"
-  onClick={handleExtensions}
-  hoverBg={hoverBg}
-  textColor={textColor}
-  mutedColor={mutedColor}
-  chipBg={chipBg}
-/>
-```
+不要添加“扩展”聚合行；如后续需要快速入口，应分别设计 MCP、Skills、应用插件的独立入口。
 
 - [ ] **Step 4: 验证跳转**
 
 Run: `pnpm dev`
 
-Expected: 点击 sidebar 的"扩展"行，路由切到 `/extensions`。
+Expected: sidebar 不出现 Extensions 聚合入口；IM 机器人行仍可跳转到 `/imbot`。
 
 - [ ] **Step 5: 提交**
 
@@ -235,7 +217,7 @@ function makeConv(
     messageCount: overrides.messageCount ?? 0,
     preview: overrides.preview ?? "",
     workspaceId: overrides.workspaceId ?? "default",
-    chatMode: overrides.chatMode ?? "direct",
+    chatMode: overrides.chatMode ?? "agent",
     remote: overrides.remote,
     session: overrides.session as ConversationSummary["session"],
   };
@@ -666,7 +648,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 - [ ] **Step 3: 添加 handler**
 
-Right below `handleExtensions`:
+Place near the other quick action handlers:
 
 ```tsx
 const handleSessionSearch = useCallback(() => {
@@ -676,7 +658,7 @@ const handleSessionSearch = useCallback(() => {
 
 - [ ] **Step 4: 在 quick actions 区域追加"会话搜索" row（排在"库"和"IM 机器人"之间）**
 
-Modify the quick actions block to look like (top-down: 新建对话 / 库 / 会话搜索 / IM 机器人 / 扩展):
+Modify the quick actions block to look like (top-down: 新建对话 / 库 / 会话搜索 / IM 机器人):
 
 ```tsx
 <QuickActionRow
@@ -712,15 +694,6 @@ Modify the quick actions block to look like (top-down: 新建对话 / 库 / 会�
   icon={<ClusterOutlined />}
   label="IM 机器人"
   onClick={handleImBot}
-  hoverBg={hoverBg}
-  textColor={textColor}
-  mutedColor={mutedColor}
-  chipBg={chipBg}
-/>
-<QuickActionRow
-  icon={<AppstoreAddOutlined />}
-  label="扩展"
-  onClick={handleExtensions}
   hoverBg={hoverBg}
   textColor={textColor}
   mutedColor={mutedColor}

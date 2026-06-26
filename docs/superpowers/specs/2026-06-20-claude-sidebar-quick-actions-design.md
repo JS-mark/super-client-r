@@ -29,14 +29,14 @@
 
 | 决策点 | 选择 |
 |---|---|
-| mcp / 技能 / 插件 是否独立 sidebar 入口 | **不独立**。按 §14 路由迁移表，统一进 `/extensions?tab=...`。`menu.ts` 默认配置已经 `enabled: false` 三项独立菜单。 |
+| mcp / 技能 / 插件 是否独立 sidebar 入口 | **独立入口保留**。最新 refactor 口径已取消 Extensions 聚合页；MCP、Skills、应用插件分别进入 `/mcp`、`/skills`、`/plugins`。 |
 | 会话搜索的范围 | v1 搜 conversation title + 内存中已有的最后一条消息片段（chatStore 在 sidebar 已加载的字段，不读 messages.json 文件，IO 零成本）。匹配不区分大小写。结果项展示 title + 时间 + 命中片段（如有）。完整跨文件消息内容搜索留 v2。 |
 | IM 机器人入口路由 | 跳 `/imbot`（DEFAULT_MENU_CONFIG 现有路由，对应 RemoteChatPane / IM 绑定页）。 |
-| 扩展入口路由 | 跳 `/extensions`（无 tab 参数，让目标页用默认 tab）。 |
+| 扩展入口路由 | 不提供 Extensions 聚合入口；如需要 quick action，应分别跳 `/mcp`、`/skills`、`/plugins`。 |
 | SectionHeader 新字号 | `text-[13px]` + 保留 `tracking-wide font-medium`。比当前 11px 增加 2px，与正文 conversation 行的 `text-sm` 拉开层次。 |
-| 入口排序 | 现有：新建对话 / 库 → 新增：会话搜索 / IM 机器人 / 扩展。新增项排在已有项下方，不重排。 |
-| 图标 | 会话搜索 → `SearchOutlined`；IM 机器人 → `ClusterOutlined`（沿用 menu.ts 中 imbot 的图标）；扩展 → `AppstoreAddOutlined`（沿用 menu.ts 中 extensions 的图标）。 |
-| 快捷键 | 会话搜索：`mod+p`，与 implementation plan 的 `global-search` 默认键一致；保留 `quick-search` 原语义。IM 机器人 / 扩展：暂不绑定快捷键。 |
+| 入口排序 | 现有：新建对话 / 库 → 新增：会话搜索 / IM 机器人；MCP / Skills / 应用插件按独立市场入口处理。 |
+| 图标 | 会话搜索 → `SearchOutlined`；IM 机器人 → `ClusterOutlined`（沿用 menu.ts 中 imbot 的图标）。 |
+| 快捷键 | 会话搜索：`mod+p`，与 implementation plan 的 `global-search` 默认键一致；保留 `quick-search` 原语义。IM 机器人暂不绑定快捷键。 |
 | i18n | 沿用 ClaudeSidebar 现有"中文硬编码"风格（"新建对话" / "库" 都是中文常量）。后续整体 i18n 化时一并处理。 |
 
 ## 组件结构
@@ -99,8 +99,6 @@ ClaudeSidebar
        └─ onClick → setSearchModalOpen(true)
   └─ QuickActionRow "IM 机器人"
        └─ onClick → navigate("/imbot")
-  └─ QuickActionRow "扩展"
-       └─ onClick → navigate("/extensions")
 
 ClaudeSidebar
   └─ GlobalSessionSearchModal (open={searchModalOpen})
@@ -121,8 +119,8 @@ ClaudeSidebar
 
 ### 批次 A — 字号 + 静态入口（独立可合）
 - `SectionHeader` 字号调整。
-- 新增 2 个 `QuickActionRow`：IM 机器人（navigate `/imbot`）、扩展（navigate `/extensions`）。
-- 验收：4 个 quick action（新建对话 / 库 / IM 机器人 / 扩展）视觉正常，跳转正常。
+- 新增 1 个 `QuickActionRow`：IM 机器人（navigate `/imbot`）。
+- 验收：3 个 quick action（新建对话 / 库 / IM 机器人）视觉正常，跳转正常。
 - 注意：**会话搜索按钮不在批次 A**——避免合入后留一个无效按钮。统一在批次 B 一起做。
 
 ### 批次 B — 会话搜索 modal + 入口

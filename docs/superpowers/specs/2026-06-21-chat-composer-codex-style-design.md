@@ -7,6 +7,8 @@
 **前置**：[2026-06-20-chat-composer-redesign-design.md](./2026-06-20-chat-composer-redesign-design.md)
 **参考**：用户提供的 6 张 Codex 截图（项目下拉、模式下拉、分支下拉、+ 菜单、approval、model+reasoning）
 
+> 当前口径：产品固定 Agent-only。本文保留 Codex 风格 composer 视觉、项目/分支/审批/model/reasoning 交互参考；不再实现 direct/chat/plan 模式切换。
+
 ## 目标
 
 在 v1 已统一 composer 视觉的基础上，进一步把对话窗口对齐 Codex 截图的双层卡片结构：
@@ -379,7 +381,7 @@ Add
 | `workspaceId` | `string` | ProjectPill |
 | `worktreePath` | `string?` | LaunchMode = worktree 时存在 |
 | `reasoningEffort` | `"low" \| "medium" \| "high" \| "max"?` | ModelPill |
-| `chatMode` | `"direct" \| "agent" \| "plan"` | ChatMode 扩展 plan |
+| `chatMode` | `"agent"` compatibility metadata | 固定 Agent-only；不提供 direct/chat/plan 模式切换 |
 | `persistentGoal` | `string?` | + 菜单 Goal（顶层字段，非 metadata 容器） |
 
 ### 仅渲染态（不持久化）

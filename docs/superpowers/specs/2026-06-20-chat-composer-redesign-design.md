@@ -4,12 +4,14 @@
 **状态**：spec
 **关联**：用户参考截图（codex 风格，深色圆角 composer + 标题 + project/session context 信息行）
 
+> 历史说明：本文 v1 里的“模式胶囊 / chatMode 切换”已被当前 Agent-only 产品口径 supersede。后续实现只保留 Agent 运行路径；`chatMode` 字段最多作为兼容 metadata，不提供用户可切换的 direct/chat 模式。
+
 ## 目标
 
 把"新建会话欢迎页"和"会话内输入框"两处的 composer 在视觉与底部交互上统一为同一种设计语言：
 
 - 大圆角深色容器，聚焦时浅边 + 微光晕
-- 底部左侧：附件 + 模式胶囊 +（仅 agent 模式）权限胶囊 + 搜索引擎图标
+- 底部左侧：附件 + Agent 状态/权限胶囊 + 搜索引擎图标；不再提供 direct/chat 模式切换
 - 底部右侧：模型胶囊 + 麦克风占位 + 发送按钮（流式中切换为 stop 形态）
 - composer 下方：信息行（project/session context · 本地/远程 · 预留分支位）
 - 欢迎页标题改为 project/session context 维度："我们应该在 X 中构建什么?"
@@ -38,7 +40,7 @@
 | 底层输入组件 | 统一用 `Sender`。`ClaudeEmptyChatHome` 跟着升级，欢迎页**获得 slash 命令支持**。 |
 | 欢迎页标题 | project/session context 视角："我们应该在 {contextName} 中构建什么?"；普通对话显示通用版："今天想做什么?"。去掉时间问候。 |
 | chips / notice | 全删，欢迎页只剩"标题 + composer + 信息行"。 |
-| 模式按钮位置 | 胶囊样式，与权限胶囊并排。Agent 模式时同时显示两个胶囊。 |
+| 模式按钮位置 | 已废弃用户可切换模式按钮。当前只展示 Agent 状态/权限相关控件。 |
 | approval mode 语义 | project 级（来自 `projectSettings.runtimePolicy.approvalMode`，legacy workspace 作为兼容 fallback）。胶囊 tooltip 标注"项目级权限策略"。 |
 | 普通对话时的 approval pill | 隐藏（无 project settings）。 |
 | 信息行点击 project/context | v3 暂时**只读**，不弹切换面板。等 ProjectSwitcher / picker 重做后再接。 |
@@ -60,7 +62,7 @@
 Props:
   value, onChange, onSubmit  // 调用方负责 submit 语义；ChatComposer 不做创建会话
   isStreaming, onStopStream
-  chatMode, isModeLocked, onModeSelect
+  chatMode="agent" compatibility metadata only; no user-facing mode switch
   approvalMode (project 级，可能 undefined)
   onApprovalModeChange
   selectedSearchEngineId, onSelectSearchEngine, searchEngines
@@ -78,7 +80,7 @@ Layout:
   │ │ placeholder=随心输入                       │  │
   │ └────────────────────────────────────────────┘ │
   │ ┌ Footer ───────────────────────────────────┐  │
-  │ │ + | [Mode] [审批胶囊] [搜索引擎]   M🎙️  ↑ │  │
+  │ │ + | [Agent/审批] [搜索引擎]        M🎙️  ↑ │  │
   │ └────────────────────────────────────────────┘ │
   +───────────────────────────────────────────────+
   ChatComposerInfoBar (在 Sender 外、composer 容器下方)
@@ -88,7 +90,7 @@ Layout:
 
 ### ApprovalModePill
 
-仅当 `chatMode === "agent"` 且 `approvalMode !== undefined` 时渲染。
+仅当 `approvalMode !== undefined` 时渲染；当前产品固定 Agent 模式，不再依赖用户可切换的 `chatMode`。
 
 ```
 States:
@@ -133,8 +135,7 @@ ChatInputArea / ClaudeEmptyChatHome
   └─ ChatComposer
        ├─ Sender (textarea + footer slot)
        │    ├─ + button → ChatToolsMenu (Popover)
-       │    ├─ ChatModePanel trigger (胶囊样式)
-       │    ├─ ApprovalModePill (agent only)
+       │    ├─ Agent status / ApprovalModePill
        │    ├─ SearchEnginePanel trigger (icon)
        │    ├─ Model pill → window.dispatchEvent('chat:open-model-switcher')
        │    ├─ Mic (disabled placeholder)

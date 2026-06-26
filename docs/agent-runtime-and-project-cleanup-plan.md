@@ -87,11 +87,11 @@
 - Settings 删除菜单配置 tab。
 - 菜单配置组件保留为兼容死代码，后续 cleanup PR 可物理删除 `MenuSettings/MenuRow/MenuEditModal/MenuIconConfig/menuStore`。
 
-### 问题 3：保留独立市场页面，取消 Extensions 聚合页
+### 问题 3：保留独立市场页面，取消 Extensions 聚合入口
 
 现状：
 
-- `/extensions` 聚合页会削弱原有 MCP 市场、Skill 市场、应用插件市场的清晰入口。
+- 聚合入口会削弱原有 MCP 市场、Skill 市场、应用插件市场的清晰入口。
 - MCP、Skill、应用插件不是同一个产品实体：
   - MCP / Skill 是 Agent 可用能力与运行时上下文。
   - 应用插件是扩展 app UI、app 功能和可能的能力贡献。
@@ -99,14 +99,14 @@
 
 目标：
 
-- 取消用户可见的 `/extensions` 页面和菜单入口。
+- 取消用户可见的 Extensions 聚合页面和菜单入口。
 - `/mcp`、`/skills`、`/plugins` 作为一级市场/管理入口保留。
 - App Plugin 中文名统一为“应用插件”，定位为 app UI、app 功能和能力贡献扩展。
 - 如果应用插件未来贡献 Agent-facing capability，只在 runtime capability / approval 层体现，不改变应用插件的产品入口。
 
 本轮实现：
 
-- 删除 `/extensions` route 和默认菜单项。
+- 删除 Extensions 聚合 route 和默认菜单项。
 - sidebar / quick menu 不再显示 Extensions。
 - feature flag `unifiedNavigation` 仅保留兼容字段，不再控制可见入口。
 - `/skills`、`/mcp`、`/plugins` 保留原市场/管理页面。

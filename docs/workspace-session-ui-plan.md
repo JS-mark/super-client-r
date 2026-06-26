@@ -6,11 +6,21 @@
 > 实现差距：[implementation-audit](./workspace-session-implementation-audit.md) ·
 > 计划审查：[plan-review](./workspace-session-plan-review.md)
 >
-> 注意：本文是历史 Workspace/Session 主计划。所有"Workspace 作为独立配置实体"的章节已被 `project-session-redesign-plan.md` supersede；后续不要继续向本文追加新功能章节。
+> **Archived / historical reference only.**
+>
+> 本文是历史 Workspace/Session 主计划，不再作为可执行实现计划。当前权威口径只看
+> [refactor-plan](./refactor-plan.md) 和对应功能 plan：
+>
+> - `Workspace` 一等产品实体已被 `Project = cwd + 展示元数据` 取代。
+> - 产品只保留 Agent 模式；本文里的 `direct` / `chatMode` 模式切换均为历史描述。
+> - 不再提供 Extensions 聚合页；MCP、Skills、应用插件保持独立入口。
+> - 项目会话数据写入 app-managed userData，不写入项目 cwd `.scr-data`。
+>
+> 可复用内容仅限交互参考、approval/sandbox/attachment 等概念性约束。不要按本文的旧导航、旧数据模型、旧任务拆解继续实现。
 
 ## 1. Review Summary
 
-This document is the reviewed and corrected implementation plan for reshaping Super Client R around a `Workspace -> Session` model, with Claude desktop / Codex desktop style interaction profiles, unified extension management, session-level model switching, attachments, plan modes, permissions, and sandboxing.
+This document is the archived implementation plan for the earlier `Workspace -> Session` model. It is preserved for historical context and for reusable interaction/runtime ideas only; it has been superseded by the current Project/Session refactor plan.
 
 The scope is not a UI refresh. The expected result requires kernel-level product behavior: durable workspace/session state, main-process-enforced runtime policy, real attachment context resolution, unified approval semantics across execution paths, and an extension model that controls both app UI contributions and agent/runtime capabilities.
 
@@ -77,7 +87,7 @@ The original plan was directionally correct, but several points needed tightenin
 | Permission approval and sandboxing were mixed together. | `Full access` could be misunderstood as bypassing hard safety limits. | Separate approval policy from sandbox policy. Approval controls prompts; sandbox controls hard execution boundaries. |
 | Model switching was described as a control, but not as a first-class chat workflow. | A small dropdown would not support provider comparison, capability warnings, or session override behavior. | Add a command-palette style `Model Switcher` modal with provider list, model list, advanced parameters, and explicit session/workspace actions. |
 | Attachments did not define context behavior. | Large files or external resources could be silently injected into context or read without clear consent. | Every attachment gets a source, status, and context mode: include content, reference only, ask before read, or ignore for model. |
-| Extension unification could blur agent capabilities with app UI plugins. | App UI extensions and agent runtime capabilities require different trust and permission models. | Rename existing app-level plugins to `App Plugins`. Keep MCP, Skills, Hooks, and capability packages under `Extensions`, but make their type and scope visible. |
+| Extension unification could blur agent capabilities with app UI plugins. | App UI extensions and agent runtime capabilities require different trust and permission models. | **Superseded:** do not create a unified Extensions product page. Keep MCP, Skills, and App Plugins as independent market/management entries. |
 | Interaction profile could become cosmetic only. | Claude desktop / Codex desktop mode would not meaningfully change behavior. | Define concrete layout, density, approval, timeline, command, and inspector differences per profile. |
 | The plan still leaned too much toward UI aggregation. | The app could look like Claude desktop / Codex desktop while still running on old, inconsistent model, permission, attachment, and extension paths. | Move kernel work earlier: persistence, runtime policy, approval adapter, attachment resolver, and extension descriptors must land before final UI polish. |
 | Migration was too broad. | A large rewrite would destabilize existing chat, MCP, skill, and plugin flows. | Use phased migration: stabilize the runtime contract first, then expose it through UI, then migrate backing services gradually. |
@@ -139,15 +149,19 @@ Implementation note from plan review:
 
 ## 3. Main Navigation
 
-Reduce first-level navigation to:
+**Superseded historical proposal.** Current navigation must keep MCP, Skills, and App Plugins independent; do not implement the old Extensions aggregate navigation.
+
+Current first-level navigation direction:
 
 1. `Chat` - current workspace sessions and agent interaction.
 2. `Workspaces` - workspace creation, switching, and overview.
 3. `Tasks` - long-running tasks, background sessions, plan sessions, automations, and remote sessions.
-4. `Extensions` - MCP servers, skills, hooks, app plugins, themes, and capability packages.
-5. `Settings` - global settings, account, shortcuts, logs, and developer tools.
+4. `MCP` - MCP market, installed servers, and runtime tools.
+5. `Skills` - built-in skills, market, installed skills, and activation.
+6. `App Plugins` - application plugins, themes/UI plugins, and plugin management.
+7. `Settings` - global settings, account, shortcuts, logs, and developer tools.
 
-The existing `MCP Market`, `Skills`, and `Plugins` pages should no longer appear as first-level navigation items after Phase 1. Keep the old routes temporarily for compatibility and redirects.
+The old recommendation to demote MCP / Skills / Plugins into a single Extensions entry is cancelled.
 
 ## 4. Pre-Phase 1 Corrections
 
@@ -648,7 +662,18 @@ Rules:
 
 ## 14. Extensions
 
-Use one `Extensions` page and one normalized descriptor model.
+**Superseded. Do not implement a unified Extensions page.**
+
+Current direction:
+
+- MCP, Skills, and App Plugins remain independent market/management pages.
+- `ExtensionDescriptor` may remain as a read-only compatibility/debug projection, but it must not become the user-facing product model.
+- App Plugin extends application UI and app features: pages, sidebar items, settings panels, themes, windows, menus.
+- Agent-facing capabilities should not be presented as generic app plugins.
+- Write/admin operations stay on service-specific APIs: MCP connection management, Skill install/validation, App Plugin install/reload/permissions.
+- Descriptor adapters must not hide lifecycle differences between MCP, Skill, and App Plugin.
+
+Historical extension categories, kept only for vocabulary:
 
 Extension categories:
 
@@ -661,15 +686,7 @@ Extension categories:
 
 Existing `Plugin` should be renamed in the UI to `App Plugin`.
 
-Rules:
-
-- `App Plugin` extends application UI and app features: pages, sidebar items, settings panels, themes, windows, menus.
-- Agent-facing capabilities should not be presented as generic app plugins.
-- Every extension item must show type, scope, source, enabled state, permissions, health, and contribution points.
-- Scope must be explicit: `global`, `workspace`, or `session`.
-- `ExtensionDescriptor` is a read-only projection for UI, search, health, and policy.
-- Write/admin operations stay on service-specific APIs: MCP connection management, Skill install/validation, App Plugin install/reload/permissions.
-- Descriptor adapters must not hide lifecycle differences between MCP, Skill, and App Plugin.
+Do not use the historical category list to build a single product page.
 
 ## 15. Workspace Settings
 
@@ -1006,12 +1023,10 @@ Goal: expose the new kernel model clearly without duplicating state.
 
 Tasks:
 
-- Add `Extensions` page as the unified entry.
-- Move MCP, skills, and app plugins into tabs/sections under `Extensions`.
-- Hide old `MCP`, `Skills`, and `Plugins` first-level sidebar items.
-- Keep existing routes for compatibility, but redirect or render the matching `Extensions` tab.
-- Add a menu migration for users with persisted menu config.
-- Migrate navigation shortcuts that point to old extension routes.
+- Keep MCP, Skills, and App Plugins as independent pages.
+- Do not add an Extensions aggregate menu entry.
+- Add a menu migration only to hide legacy aggregate entries and preserve independent market entries.
+- Migrate navigation shortcuts away from any historical aggregate entry.
 - Add workspace settings pages: overview, interaction, models, runtime, capabilities, context, automation, advanced.
 - Render settings from persisted/effective runtime state rather than independent UI-only state.
 
@@ -1019,19 +1034,19 @@ Legacy route strategy:
 
 | Existing route/action | New target | Notes |
 | --- | --- | --- |
-| `/mcp` | `/extensions?tab=mcp` | Keep route shell during migration so deep links do not break. |
-| `/skills` | `/extensions?tab=skills` | Preserve skill detail/use-in-chat flows. |
-| `/plugins` | `/extensions?tab=app-plugins` | User-facing copy becomes `App Plugin`. |
-| persisted menu id `mcp` | menu id `extensions`, tab `mcp` | Migrate only first-level nav state, not MCP service state. |
-| persisted menu id `skills` | menu id `extensions`, tab `skills` | Shortcut labels should change to Extensions/Skills tab. |
-| persisted menu id `plugins` | menu id `extensions`, tab `app-plugins` | Preserve plugin page routes under `/plugin/:pluginId/*`. |
+| `/mcp` | `/mcp` | Latest refactor keeps MCP as an independent market/management page. |
+| `/skills` | `/skills` | Latest refactor keeps Skills as an independent market/management page. |
+| `/plugins` | `/plugins` | Latest refactor keeps App Plugins as an independent market/management page. |
+| persisted menu id `mcp` | menu id `mcp` | Do not migrate into an Extensions aggregate menu item. |
+| persisted menu id `skills` | menu id `skills` | Do not migrate into an Extensions aggregate menu item. |
+| persisted menu id `plugins` | menu id `plugins` | Preserve plugin page routes under `/plugin/:pluginId/*`. |
 
 Validation:
 
 - Existing MCP, skill, and plugin flows still work.
 - Changing workspace settings updates effective runtime.
-- Legacy navigation entries do not remain as first-level items after migration.
-- Old shortcuts and deep links land on the correct `Extensions` tab.
+- Historical aggregate navigation entries do not remain as first-level items after migration.
+- Old shortcuts and deep links land on the correct independent market page.
 
 ### Phase 6 - Composer, Model Switcher, and Plan Mode
 
@@ -1136,7 +1151,7 @@ Feature flags:
 - `workspaceRuntime.enabled`: use main-process `WorkspaceConfig` and conversation-backed session metadata.
 - `effectiveRuntimeResolver.enabled`: route chat execution through `EffectiveSessionRuntime`.
 - `runtimePolicy.enforce`: enforce operation classifier decisions instead of logging only.
-- `extensionsUnified.enabled`: show unified `Extensions` route and migrated navigation.
+- `extensionsUnified.enabled`: **historical flag only**; do not use it to show an aggregate route.
 - `chatFileArtifacts.enabled`: render file cards and changed-file summaries.
 - `profileLayouts.enabled`: enable Claude / Codex profile-specific layout changes.
 
@@ -1144,7 +1159,7 @@ Rollback strategy:
 
 - Keep existing conversation storage and per-conversation workspace directories stable through Phase 3.
 - Keep old MCP, Skill, and Plugin backing services active while descriptor adapters are introduced.
-- Allow disabling unified `Extensions` navigation while old routes still render their existing pages.
+- Keep MCP, Skill, and Plugin backing services active while descriptor adapters are introduced.
 - Allow runtime policy to run in audit-only mode before enforcement is enabled.
 - Allow `EffectiveSessionRuntime` to fall back to global model/provider state only when workspace/session model state is absent.
 - Store migrations must be additive and idempotent; do not delete renderer workspace or legacy menu data until a later cleanup phase.
@@ -1172,11 +1187,11 @@ Suggested initial task order:
 17. `chat-file-artifact-capture`: capture file artifacts from file-system/write/patch/tool result paths.
 18. `chat-file-card`: render Codex-style file cards inside assistant turns.
 19. `changed-files-summary`: render collapsible changed-files summary with additions/deletions and file rows.
-20. `extension-descriptor-adapter`: normalize MCP/Skill/App Plugin for runtime and unified UI without replacing service-specific admin APIs.
-21. `workspace-capability-state`: connect enabled extension descriptors to workspace/session runtime.
-22. `extensions-shell`: create unified Extensions page shell and route.
-23. `legacy-extension-route-redirects`: redirect `/mcp`, `/skills`, and `/plugins` to the correct Extensions tab.
-24. `menu-migration-extensions`: add Extensions nav item and demote legacy MCP/Skills/Plugins entries.
+20. `extension-descriptor-adapter`: optional read-only compatibility/debug projection; do not replace service-specific admin APIs.
+21. `workspace-capability-state`: historical naming; use current Project/Session settings source if capability state is needed.
+22. `independent-marketplaces`: keep MCP, Skills, and App Plugins independent.
+23. `legacy-extension-route-cleanup`: remove any aggregate-route assumptions.
+24. `menu-migration-independent-markets`: hide aggregate entry and preserve MCP/Skills/Plugins entries.
 25. `workspace-settings-shell`: add workspace settings pages wired to real config/effective runtime.
 26. `model-switcher-direct-skill`: implement model switcher modal using effective runtime for direct/skill chat.
 27. `composer-status-bar`: add model, plan mode, approval, sandbox, and context status chips.
@@ -1192,10 +1207,10 @@ Suggested initial task order:
 
 These tasks replace the historical "5 surfaces, 3 implicit types" sprawl with the canonical 3-intent design. Sequence-wise they sit after the per-conversation workspace binding (§4) lands and after the right-click context menu (§23.2) ships, but before any further UI on top of creation flows.
 
-35. `35-link-1` sidebar 新建对话 rebound to `default` workspace (drop "current workspace" semantics).
+35. `35-link-1` sidebar 新建对话 creates a casual Agent conversation (drop "current workspace" semantics).
 36. `35-link-2` remove TitleBar More menu's separate `新建 Agent 对话` / `新建远程对话` items; add unified `新建对话…` that opens the modal.
-37. `35-link-3` build `<NewConversationModal>` (workspace / mode / remote-bot picker) wired to `chat:open-new-conversation` window event.
-38. `35-link-4` add `chatStore.createConversationAdvanced` action that handles workspace switch + create + remote bind in one call.
+37. `35-link-3` build `<NewConversationModal>` (project/casual target + remote-bot picker; no mode picker) wired to `chat:open-new-conversation` window event.
+38. `35-link-4` add `chatStore.createConversationAdvanced` action that handles project/casual target + create + remote bind in one call.
 39. `35-link-5` refactor `chatStore.deleteConversation` to resolve "next current" before delete, auto-unbind remote, and clear `fileArtifactStore`.
 40. `35-link-6` `SessionContextMenu.handleDelete` surfaces remote-binding warning ("此会话已绑定 IM bot，删除会同时解绑") in the confirm modal.
 
@@ -1219,7 +1234,7 @@ The redesign is complete when:
 - File cards support open, reveal, copy path, and later open-with-app actions through runtime policy.
 - File write/edit turns render changed-files summaries with additions/deletions and expandable detail.
 - Chat supports plan mode selection before sending.
-- MCP, skills, hooks, app plugins, and themes appear under one Extensions area.
+- MCP, Skills, and App Plugins remain independent first-class pages.
 - Existing app plugins are presented as `App Plugins`.
 - Approval mode has three options: request approval, auto approve safe, full access.
 - `Allow once` and `Allow for session` are backed by real grant lookup/write behavior.
@@ -1230,7 +1245,7 @@ The redesign is complete when:
 - Codex-style coding sessions have project-grouped sessions on the left, transcript/timeline in the center, and an environment inspector on the right.
 - The Codex environment inspector displays real changes, runtime mode, branch, commit/push action, approvals, and source/context state.
 - Existing MCP, skill, plugin, model, and chat flows continue to work during migration.
-- Legacy `/mcp`, `/skills`, and `/plugins` navigation remains compatible while first-level navigation moves to `Extensions`.
+- Legacy `/mcp`, `/skills`, and `/plugins` navigation remains compatible as independent market navigation.
 - Rollback flags can disable unified navigation, runtime enforcement, file artifacts, and profile layouts without corrupting stored conversations.
 - Session creation surfaces match the canonical three intents documented in §25.2; legacy "5 ad-hoc surfaces" is gone.
 - Session list items expose the right-click context-menu actions defined in §23.2; deletion follows the §25.4 link (next-focus resolution → remote unbind → physical delete → artifact cleanup).
@@ -1244,22 +1259,24 @@ The redesign is complete when:
 
 > **Authoritative spec moved to §25**. This subsection now only enumerates the surfaces; the contract for each surface (which workspace, which mode, what gets pre-selected) lives in §25.2 so there is one source of truth.
 
+**Superseded historical creation model.** Current product is Agent-only; do not implement `direct` mode creation from this section.
+
 Allowed creation surfaces, post-refactor:
 
-1. **Sidebar quick action 新建对话** — fixed to `default` workspace, `direct` mode. Shortcut `Cmd/Ctrl+N`.
-2. **Sidebar project row hover `+`** — fixed to that project workspace, `direct` mode.
-3. **TitleBar More menu 新建对话…** — opens `<NewConversationModal>` where workspace / mode / remote are explicit user choices.
-4. **Empty home composer (Claude profile)** — first-message lazy creation under the current workspace + `direct` mode.
+1. **Sidebar quick action 新建对话** — creates an Agent-mode casual conversation. Shortcut `Cmd/Ctrl+N`.
+2. **Sidebar project row hover `+`** — creates an Agent-mode project conversation.
+3. **TitleBar More menu 新建对话…** — opens `<NewConversationModal>` where project/casual target and remote options are explicit user choices; mode is fixed to Agent.
+4. **Empty home composer (Claude profile)** — first-message lazy creation under Agent mode.
 
 Removed surfaces (folded into the modal in surface 3):
-- ❌ TitleBar `新建 Agent 对话` (subsumed by modal mode picker)
+- ❌ TitleBar `新建 Agent 对话` (subsumed by the Agent-only new conversation modal)
 - ❌ TitleBar `新建远程对话` (subsumed by modal remote toggle)
 
 Persistence shape, regardless of surface, remains a single `ConversationSummary` + `SessionMetadata` row.
 
 Rules:
-- Workspace inheritance: every surface must explicitly pass `workspaceId`. "Use whichever workspace happens to be current" is the historical bug fixed in §25.
-- Mode lock: once first message is sent, `chatMode` becomes immutable.
+- Project/casual target: every surface must explicitly pass `projectId` or `null`. "Use whichever workspace happens to be current" is the historical bug fixed in §25.
+- Mode lock: current product is always Agent-mode; `chatMode` remains compatibility metadata only.
 - Session metadata defaults: `planMode = "chat"`, `attachmentIds = []`, `interactionProfile = workspace default`.
 
 ### 23.2 Right-click context menu
@@ -1331,19 +1348,19 @@ All sessions persist as one `ConversationSummary` row. They differ along **three
 
 | Axis | Values | Default | Notes |
 |---|---|---|---|
-| `workspaceId` | `default` \| user-created workspace id | current workspace | Every session belongs to exactly one workspace. |
-| `chatMode` | `direct` \| `agent` | `direct` | Locked after first user message. |
+| `projectId` | `null` \| user-created project id | current project/casual | Every session is either casual or belongs to one project. |
+| `chatMode` | `agent` | `agent` | Compatibility field only; no user-facing mode switch. |
 | `remote` | `undefined` \| `RemoteBinding` | undefined | Set only when an IM bot bridges this conversation. |
 
 Three product names from the user reference, mapped to the axes:
 
 | Product name | workspaceId | chatMode | remote |
 |---|---|---|---|
-| 普通对话 (general) | `default` | `direct` | — |
-| 项目对话 (project) | user workspace | `direct` or `agent` | — |
-| 远端对话 (remote) | any workspace | `direct` (typically) | bound |
+| 普通对话 (general) | casual / no project | `agent` | — |
+| 项目对话 (project) | user project | `agent` | — |
+| 远端对话 (remote) | any project/casual | `agent` where supported | bound |
 
-There is no "session without a workspace" — the seeded `default` workspace is the catch-all.
+Casual sessions are first-class; they are not represented by a fake `default` workspace.
 
 ### 25.2 Creation entry points (canonical, after refactor)
 
@@ -1351,14 +1368,14 @@ Reduce the surfaces to **three clear intents**:
 
 | Intent | Surface | Workspace | Mode | Remote | Speed |
 |---|---|---|---|---|---|
-| Quick general chat | Sidebar top quick action `新建对话` · `Cmd/Ctrl+N` | `default` | `direct` | — | 0 click after trigger |
-| Project chat | Sidebar project row `+` (hover) | that project | `direct` | — | 0 click after trigger |
-| Advanced (agent / remote / pick workspace) | TitleBar More menu `新建对话…` → modal | user picks | user picks | user picks | 1 modal |
+| Quick general chat | Sidebar top quick action `新建对话` · `Cmd/Ctrl+N` | casual | `agent` | — | 0 click after trigger |
+| Project chat | Sidebar project row `+` (hover) | that project | `agent` | — | 0 click after trigger |
+| Advanced (remote / pick project) | TitleBar More menu `新建对话…` → modal | user picks | `agent` | user picks | 1 modal |
 
 After refactor:
-- **Removed** from sidebars: `搜索` already removed; the standalone "新建对话" handler still exists but **always creates under the `default` workspace** (matches the visible "普通对话" intent — current code creates under whatever workspace happens to be selected, which is confusing).
-- **Removed** from TitleBar More menu: the standalone `新建 Agent 对话` and `新建远程对话` items. They are subsumed by `新建对话…` modal where the user explicitly picks mode + remote.
-- **Kept**: ClaudeEmptyChatHome composer first-message creation continues to lazily create a session in current workspace + `direct` mode. (Same as Cmd+N path.)
+- **Removed** from sidebars: `搜索` already removed; the standalone "新建对话" handler should create a casual Agent conversation unless a project is explicitly selected by a project row/action.
+- **Removed** from TitleBar More menu: the standalone `新建 Agent 对话` and `新建远程对话` items. They are subsumed by `新建对话…` modal where the user explicitly picks project/casual target and remote options; mode remains Agent-only.
+- **Kept**: ClaudeEmptyChatHome composer first-message creation continues to lazily create an Agent-mode session.
 
 ### 25.3 Advanced creation modal
 
@@ -1366,8 +1383,8 @@ Component: `<NewConversationModal>` (new). Trigger: TitleBar More menu, deep-lin
 
 Form fields (Antd `Form`):
 1. **工作区** — Select listing all workspaces, default = current.
-2. **模式** — Radio.Group: `direct (标准对话)` / `agent (Agent SDK，带工具)`.
-3. **远端绑定** — optional Switch + secondary fields. When on, requires picking an IM bot from the registered bots and a chat id (or "create on send"). Disables `agent` mode (mutual exclusion: remote conversations must be `direct` for now).
+2. **模式** — no user-facing direct/agent switch; all new sessions are Agent-mode.
+3. **远端绑定** — optional Switch + secondary fields. When on, requires picking an IM bot from the registered bots and a chat id (or "create on send"). Remote limitations must be documented separately; do not reintroduce direct mode.
 4. **名称** — optional text. Defaults to `新对话` if omitted.
 
 Submit:
@@ -1396,9 +1413,9 @@ No batch delete in this iteration. Soft delete = `archive`; hard delete = this m
 
 | Trigger | Result |
 |---|---|
-| Sidebar `新建对话` | Create in `default` workspace, `direct`, navigate `/chat`. |
-| Sidebar project row `+` | Create in that workspace, `direct`, expand the project group. |
-| TitleBar `新建对话…` | Open modal. User chooses workspace + mode + remote. |
+| Sidebar `新建对话` | Create a casual Agent conversation, navigate `/chat`. |
+| Sidebar project row `+` | Create an Agent conversation for that project, expand the project group. |
+| TitleBar `新建对话…` | Open modal. User chooses project/casual target and remote options; mode is fixed to Agent. |
 | `Cmd/Ctrl+N` | Equivalent to sidebar `新建对话`. |
 | Right-click → 删除对话 | Confirm → unbind remote (if any) → delete → focus next. |
 | Right-click → 派生到本地 | Create copy in same workspace (existing). |
@@ -1408,9 +1425,9 @@ No batch delete in this iteration. Soft delete = `archive`; hard delete = this m
 
 | ID | Task | Status |
 |---|---|---|
-| 35-link-1 | Sidebar `新建对话` rebound to `default` workspace path (drop "current workspace" semantics). | ✅ |
+| 35-link-1 | Sidebar `新建对话` rebound to casual Agent path (drop "current workspace" semantics). | ✅ |
 | 35-link-2 | Remove `新建 Agent 对话` / `新建远程对话` items from TitleBar More menu; replace with `新建对话…`. | ✅ |
-| 35-link-3 | Build `<NewConversationModal>` (workspace / mode / remote bot picker). | ✅ |
+| 35-link-3 | Build `<NewConversationModal>` (project/casual target + remote bot picker; no mode picker). | ✅ |
 | 35-link-4 | `chatStore.createConversationAdvanced` action + wire to modal. | ✅ |
 | 35-link-5 | Refactor `chatStore.deleteConversation` to resolve "next current" and clear file artifacts; auto-unbind remote. | ✅ |
 | 35-link-6 | Update `SessionContextMenu.handleDelete` to surface remote-binding warning when relevant ("此会话已绑定 IM bot，删除会同时解绑"). | ✅ |

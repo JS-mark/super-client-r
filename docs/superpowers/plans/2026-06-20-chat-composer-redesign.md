@@ -4,6 +4,8 @@
 >
 > 本文是功能级 plan，只维护 Chat Composer 的实现步骤；主线优先级与跨功能决策以总入口为准。
 >
+> 历史说明：本文早期包含 `ChatModePill` 和 direct/chat 切换设计。当前产品已固定 Agent-only，相关任务和代码片段只作为历史记录，不得按原样实现。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把"会话内输入框"和"欢迎页"两个 composer 视觉与底部交互统一为同一种深色圆角 + 胶囊化设计；新增权限胶囊（Agent 模式 + 工作区 approval 策略）；toolbar 子功能收敛进 `+` 菜单；信息行替代旧 ComposerStatusBar。
@@ -21,8 +23,8 @@
 | 路径 | 操作 | 责任 |
 |---|---|---|
 | `src/renderer/src/components/chat/composer/ChatComposer.tsx` | 新建 | 共用 composer：包装 Sender、暴露 footer/info-bar 插槽、支持 hideToolbar |
-| `src/renderer/src/components/chat/composer/ApprovalModePill.tsx` | 新建 | 权限胶囊（仅 agent 模式渲染） |
-| `src/renderer/src/components/chat/composer/ChatModePill.tsx` | 新建 | 模式胶囊（chat / agent 切换器，胶囊样式） |
+| `src/renderer/src/components/chat/composer/ApprovalModePill.tsx` | 新建 | 权限胶囊（Agent-only 路径渲染） |
+| `src/renderer/src/components/chat/composer/ChatModePill.tsx` | 废弃 | 历史模式胶囊；当前固定 Agent-only，不新增用户可切换模式 |
 | `src/renderer/src/components/chat/composer/ChatComposerInfoBar.tsx` | 新建 | composer 下方信息行 + ⋯ popup 容纳 plan/sandbox/context |
 | `src/renderer/src/components/chat/composer/ChatToolsMenu.tsx` | 新建 | `+` 弹出菜单，聚合附件 / Prompt / 引用 / Tools 入口 |
 | `src/renderer/src/components/chat/ChatInputArea.tsx` | 修改 | 切换到 ChatComposer 渲染；移除直接渲染的 ChatToolbar / ComposerStatusBar |
@@ -158,15 +160,7 @@ Open `src/renderer/src/components/chat/ChatInputArea.tsx`. 把原本直接渲染
    ```tsx
    const topOverlay = (
      <>
-       {!hideToolbar && modePanelOpen && (
-         <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-           <ChatModePanel
-             chatMode={chatMode}
-             onSelect={handleModeSelect}
-             onClose={() => setModePanelOpen(false)}
-           />
-         </div>
-       )}
+      {/* Agent-only: do not render ChatModePanel / mode switch UI. */}
        {!hideToolbar && slashPanelOpen && (
          <div className="absolute bottom-full left-0 right-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
            <SlashCommandPanel
@@ -266,7 +260,7 @@ Expected: PASS；应用启动后 ChatInputArea 视觉与改前一致；slash 命
 1. 输入消息 → Enter 发送（不换行）
 2. Shift+Enter 换行
 3. 输入 `/` 弹 slash panel
-4. 切换 chat / agent 模式
+4. 确认没有 chat / agent 模式切换入口
 5. 流式中按 stop 按钮中止
 
 - [ ] **Step 4: 提交**
@@ -546,7 +540,7 @@ export interface ApprovalModePillProps {
 }
 
 /**
- * 工作区级权限胶囊。仅在 agent 模式 + projectId !== null + approvalMode 已知时由调用方决定渲染。
+ * 项目级权限胶囊。Agent-only 路径下由调用方根据 projectId 和 approvalMode 决定渲染。
  * 写回路径：useProjectStore.saveSettings(projectId, { runtimePolicy: { approvalMode } })。
  */
 export function ApprovalModePill({ projectId, approvalMode }: ApprovalModePillProps) {
@@ -643,94 +637,10 @@ git commit -m "feat(composer): add ApprovalModePill with workspace-level write-b
 
 ---
 
-### Task 5: ChatModePill（chat / agent 切换胶囊）
+### Task 5: ChatModePill（superseded，不再实现 chat / agent 切换）
 
-**Files:**
-- Create: `src/renderer/src/components/chat/composer/ChatModePill.tsx`
-
-- [ ] **Step 1: 创建组件**
-
-Create `src/renderer/src/components/chat/composer/ChatModePill.tsx`:
-
-```tsx
-import { DownOutlined, RobotOutlined, ThunderboltOutlined } from "@ant-design/icons";
-import { Tooltip } from "antd";
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { ChatModePanel } from "../ChatModePanel";
-import type { ChatMode } from "../../../hooks/useChat";
-import type { ChatModeSelection } from "../ChatModePanel";
-
-export interface ChatModePillProps {
-  chatMode: ChatMode;
-  isModeLocked: boolean;
-  onSelect: (selection: ChatModeSelection) => void;
-}
-
-export function ChatModePill({ chatMode, isModeLocked, onSelect }: ChatModePillProps) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-
-  const isAgent = chatMode === "agent";
-  const label = t(`chatMode.${chatMode}`, { ns: "chat", defaultValue: chatMode });
-
-  const handleSelect = (selection: ChatModeSelection) => {
-    onSelect(selection);
-    setOpen(false);
-  };
-
-  return (
-    <div className="relative inline-flex">
-      {open && (
-        <div className="absolute bottom-full left-0 mb-2 shadow-lg rounded-lg overflow-hidden z-50">
-          <ChatModePanel
-            chatMode={chatMode}
-            onSelect={handleSelect}
-            onClose={() => setOpen(false)}
-          />
-        </div>
-      )}
-      <Tooltip
-        title={
-          isModeLocked
-            ? t("chatMode.modeLocked", { ns: "chat", defaultValue: "Mode locked" })
-            : t("chatMode.switchMode", "切换模式", { ns: "chat" })
-        }
-      >
-        <button
-          type="button"
-          disabled={isModeLocked}
-          onClick={() => !isModeLocked && setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-          style={{
-            background: open ? "rgba(0,0,0,0.06)" : "transparent",
-            border: "none",
-            cursor: isModeLocked ? "not-allowed" : "pointer",
-            opacity: isModeLocked ? 0.6 : 1,
-          }}
-        >
-          {isAgent ? <ThunderboltOutlined style={{ fontSize: 12 }} /> : <RobotOutlined style={{ fontSize: 12 }} />}
-          <span>{label}</span>
-          {!isModeLocked && <DownOutlined style={{ fontSize: 10, opacity: 0.7 }} />}
-        </button>
-      </Tooltip>
-    </div>
-  );
-}
-```
-
-- [ ] **Step 2: 类型检查**
-
-Run: `pnpm check`
-
-Expected: PASS。
-
-- [ ] **Step 3: 提交**
-
-```bash
-git add src/renderer/src/components/chat/composer/ChatModePill.tsx
-git commit -m "feat(composer): add ChatModePill (pill-style mode switcher)"
-```
+> 当前产品固定 Agent-only。本任务废弃，不创建 `ChatModePill.tsx`，不新增 direct/chat 用户切换入口。
+> 如需要展示运行状态，使用只读 Agent 状态/审批控件，并把 legacy `chatMode` 当作 compatibility metadata。
 
 ---
 
@@ -739,7 +649,7 @@ git commit -m "feat(composer): add ChatModePill (pill-style mode switcher)"
 **Files:**
 - Modify: `src/renderer/src/components/chat/ChatInputArea.tsx`
 
-> 目标：把 Task 2 中保留的旧 footer JSX 替换为：左侧 [+] [ChatModePill] [ApprovalModePill (agent)] [搜索引擎 icon]，右侧 [模型胶囊] [mic placeholder] [发送/stop]。
+> 目标：把 Task 2 中保留的旧 footer JSX 替换为：左侧 [+] [Agent/Approval 状态] [搜索引擎 icon]，右侧 [模型胶囊] [mic placeholder] [发送/stop]。
 > ChatToolbar 的子功能（附件 / Prompt / 引用 / Tools）批次 C 才收敛到 +；本任务暂保留 ChatToolbar 在右侧，作为过渡。
 
 - [ ] **Step 1: 把 useProjectSettings + ApprovalModePill 接入**
@@ -748,7 +658,6 @@ In `ChatInputArea.tsx` 顶部 import：
 
 ```tsx
 import { ApprovalModePill } from "./composer/ApprovalModePill";
-import { ChatModePill } from "./composer/ChatModePill";
 import { useProjectSettings } from "../../stores/projectStore";
 ```
 
@@ -791,14 +700,7 @@ renderFooter={(_footerNode, { components }) => {
       <Flex align="center" gap={8}>
         {/* + 入口（批次 C 之前先复用 ChatToolbar 第一个图标的逻辑；过渡期保留原 ChatToolbar 在右侧；这里先放占位的 + 按钮，仅打开附件入口） */}
         {/* 批次 C 把 ChatToolsMenu 接到这个位置 */}
-        <ChatModePill
-          chatMode={chatMode}
-          isModeLocked={isModeLocked}
-          onSelect={onModeSelect}
-        />
-        {chatMode === "agent" && (
-          <ApprovalModePill projectId={projectId} approvalMode={approvalMode} />
-        )}
+        <ApprovalModePill projectId={projectId} approvalMode={approvalMode} />
         {selectedSkillId && (
           <Tag
             color="green"
@@ -851,7 +753,7 @@ renderFooter={(_footerNode, { components }) => {
 }}
 ```
 
-> 把原本独立的 ChatModePanel button block（Tooltip 包着 Button 的那段）整段移除——已被 ChatModePill 取代。
+> 把原本独立的 ChatModePanel button block（Tooltip 包着 Button 的那段）整段移除；不要用新的模式切换控件替代。
 
 - [ ] **Step 3: 类型检查**
 
@@ -864,15 +766,15 @@ Expected: PASS。
 Run: `pnpm dev`
 
 Expected：
-1. agent 模式下底部能看到 ChatModePill + ApprovalModePill 两个胶囊。
+1. 底部不出现 chat / agent 模式切换；项目会话可看到 ApprovalModePill。
 2. ApprovalModePill 点击弹 popover，选另一个值 → ProjectSettings 变更（短暂等待后 popover 关闭，下次点击显示新值）。
-3. chat 模式下只看到 ChatModePill；ApprovalModePill 不渲染。
+3. 普通 casual 会话没有项目级 approval settings 时不渲染 ApprovalModePill。
 
 - [ ] **Step 5: 提交**
 
 ```bash
 git add src/renderer/src/components/chat/ChatInputArea.tsx
-git commit -m "feat(composer): replace footer with ChatModePill + ApprovalModePill"
+git commit -m "feat(composer): replace footer with approval controls"
 ```
 
 ---
@@ -1186,7 +1088,7 @@ import { ChatToolsMenu } from "./composer/ChatToolsMenu";
 Run: `pnpm check && pnpm dev`
 
 Expected：
-1. composer 底部左侧只有 + 按钮 + 搜索引擎图标（agent 模式还有 ChatModePill / ApprovalModePill）。
+1. composer 底部左侧只有 + 按钮、搜索引擎图标和可用时的 ApprovalModePill；没有模式切换控件。
 2. 点击 + 弹菜单：附件 / Prompt / 引用 / Tools 四项。
 3. 选其中任何一项，菜单关闭，对应 panel 弹出。
 4. 搜索引擎图标点击 → SearchEnginePanel 打开。
@@ -1322,8 +1224,8 @@ Find the existing `<h1 className="m-0" ...>` block. Replace its inner JSX with:
 Run: `pnpm dev`
 
 Expected：
-1. 进入项目下的会话（workspaceId !== "default"），欢迎页标题显示"我们应该在 {项目名} 中构建什么?"。
-2. casual 会话（default workspace），标题显示"今天想做什么?"。
+1. 进入项目会话，欢迎页标题显示"我们应该在 {项目名} 中构建什么?"。
+2. casual 会话标题显示"今天想做什么?"。
 
 - [ ] **Step 4: 提交**
 

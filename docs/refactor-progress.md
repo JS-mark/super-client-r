@@ -4,7 +4,7 @@
 > 覆盖矩阵：[refactor-traceability-matrix](./refactor-traceability-matrix.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
-> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-06-24。
+> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-06-25。
 
 ## Current Status
 
@@ -12,12 +12,23 @@
 
 ## Latest Verified Commands
 
+2026-06-25 复核验证记录：
+
+- `git status --short`：干净工作区。
+- Extensions aggregate route 扫描：未发现用户可见 route；仅剩只读 descriptor service / compatibility API。
+- `pnpm test:run src/renderer/src/lib/__tests__/menuConfig.test.ts src/renderer/src/components/chat/__tests__/ChatMessageList.test.ts src/renderer/src/components/chat/__tests__/StreamPartRenderer.test.tsx src/renderer/src/components/chat/__tests__/messagePartsAdapter.test.ts src/renderer/src/components/chat/__tests__/messageTurns.test.ts`：通过，5 个测试文件 / 18 个测试。
+- `pnpm check`：通过。
+- `pnpm lint`：通过，37 个 warning / 0 个 error；warning 为既有 cleanup 项。
+- `pnpm i18n:check`：通过。
+
 本次更新验证记录：
 
 - `pnpm test:run src/renderer/src/components/chat/__tests__/StreamPartRenderer.test.tsx`：通过，1 个测试文件 / 4 个测试。
 - `pnpm check`：通过。
 - `pnpm lint`：通过，33 个 warning / 0 个 error；warning 为既有未清理项。
 - `pnpm i18n:check`：通过。
+- 历史文档清理扫描：`/extensions` 用户路由、`handleExtensions` 可执行示例、Extensions 聚合页任务、direct/chat 模式实现任务已改为 archived/superseded/compatibility 说明；仅保留明确标注的历史上下文和 compatibility 字段。
+- 本条是 docs-only 更新；未重新运行代码测试，当前工作区预期存在文档 diff。
 
 上一轮完整验证记录：
 
@@ -44,6 +55,8 @@
 | Legacy import Option A | Implemented | 旧 chats 保守导入 casual session；invalid JSON/partial failure/rerun/no silent done flag 有测试覆盖。 |
 | Session deletion | Implemented / partial | session delete tombstone、restoreDeleted、deleted append blocking 有测试覆盖。 |
 | Message list virtualization | Implemented / partial | `ChatMessageList` 已按 turn 构建并在大列表走 virtual list；仍需性能证据和 pending interaction 行高回归。 |
+| Independent marketplace navigation | Implemented / partial | `getEffectiveMenuItems()` 强制隐藏 `extensions` 并保持 MCP / Skills / Plugins 可见；router 扫描未发现 Extensions 聚合用户 route。 |
+| Historical docs cleanup | Implemented / partial | 旧 Workspace 主计划、任务队列、审计文档、composer/sidebar superpowers plan 已标记 archived/superseded；旧 Extensions 聚合页和 direct/chat 模式示例不再作为可执行计划。 |
 
 ## In Progress
 
@@ -62,7 +75,7 @@
 | Settings recovery UI | tombstone/orphan/archive/relink/import wizard 仍停留在 IA / plan 层。 |
 | Privacy/export/backup | redaction、diagnostic export、JSONL backup manifest 未实现。 |
 | Full structured event stream | native code/diff/data/table/tree/source/artifact 专用 stream event 和 delta batching 尚未完成。 |
-| Compatibility cleanup | 旧 workspace/chatMode/direct 文档示例、兼容 API/type 还需要最后清理或明确 compatibility 标注。 |
+| Compatibility cleanup | 旧 workspace/chatMode/direct 兼容 API/type 仍需跟代码实际依赖一起分批收口；文档里保留的历史术语必须继续带 archived/superseded/compatibility 标注。 |
 | Dev runtime smoke | 当前环境未成功完成 `pnpm dev` 手动验证；不能把真实运行体验标成 verified。 |
 
 ## Update Rules

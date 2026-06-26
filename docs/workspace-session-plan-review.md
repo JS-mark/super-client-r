@@ -160,7 +160,7 @@ The plan says "Keep the old routes temporarily for compatibility and redirects" 
 
 Gaps:
 
-- No redirect mapping table (e.g. `/mcp` -> `/extensions?tab=mcp`).
+- No independent-route retention table for `/mcp`, `/skills`, and `/plugins`.
 - No removal milestone (after Phase 5? after one release?).
 - No handling for user-bookmarked legacy routes.
 

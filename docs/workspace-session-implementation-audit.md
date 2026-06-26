@@ -367,12 +367,12 @@ The plan in `docs/workspace-session-ui-plan.md` remains directionally correct, w
 
 1. Treat existing `Conversation` as the initial backing store for `Session`.
 2. Add `workspaceId` to conversation metadata before adding a separate session store.
-3. Implement model switcher first for direct/skill mode; Agent SDK model control is a later task.
+3. Superseded: do not implement direct/skill chat mode switching. Current product is Agent-only; model control must target Agent runtime and compatibility metadata only.
 4. Split attachment work into persistence, context mode, resolver, and model payload support.
 5. Implement unified approvals as an adapter over existing LLM and Agent SDK events.
 6. Build `RuntimePolicyService` incrementally; do not assume current code has central sandbox enforcement.
-7. Implement Extensions as an adapter over MCP/Skill/App Plugin services first.
-8. Add menu migration for legacy MCP/Skills/Plugins first-level entries.
+7. Superseded: do not implement an Extensions aggregate product page. Keep MCP, Skills, and App Plugins as independent first-class markets/settings surfaces.
+8. Remove or hide only stale aggregate Extensions routes/menu entries; do not demote independent MCP/Skills/App Plugins entries.
 
 ## 10. Revised Development Order
 
@@ -387,17 +387,17 @@ Recommended first tasks:
    - Backfill existing conversations to default workspace.
    - Sync workspace `sessionIds` from conversation metadata.
 
-3. `extensions-shell-readonly`
-   - Add Extensions page that reads current MCP, skill, and app plugin data without changing write paths.
+3. `extension-descriptor-readonly-compat`
+   - Optional compatibility/debug projection only. Do not add a user-facing Extensions aggregate page.
 
-4. `menu-migration-extensions`
-   - Add Extensions nav item.
-   - Hide or demote legacy MCP/Skills/Plugins entries with a safe migration.
+4. `independent-marketplace-navigation`
+   - Keep MCP, Skills, and App Plugins as independent first-level product areas.
+   - Remove only stale aggregate Extensions entries/routes if present.
 
-5. `model-switcher-direct-skill`
+5. `model-switcher-agent-only`
    - Extract model switching from `ChatSettingsModal`.
    - Support `Use for this session` and reset.
-   - Do not claim Agent SDK model support yet.
+   - Target Agent runtime. Legacy direct/chat metadata is compatibility-only.
 
 6. `composer-plan-mode-state`
    - Add plan mode state to session metadata.

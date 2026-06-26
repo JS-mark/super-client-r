@@ -6,6 +6,7 @@
 > 历史主计划：[ui-plan](./workspace-session-ui-plan.md)
 >
 > 注意：本文是旧 Workspace/Session 任务推进记录。新的主线 phase 和功能索引以 `refactor-plan.md` 为准。
+> 其中 `extensions-*`、`menu-migration-extensions`、`model-switcher-direct-*` 等旧任务名只保留历史追踪含义，不代表当前仍要实现 Extensions 聚合页或 direct/chat 模式。
 
 按 `superpowers:subagent-driven-development` 流程，由 main agent 作为 orchestrator
 串行 dispatch implementer subagent 完成剩余任务。每个 task 完成后做 spec verify
@@ -36,13 +37,13 @@
 | 16 | file-operation-action-adapter                 | ✅         |
 | 17 | chat-file-artifact-capture                    | ✅         |
 | 18 | chat-file-card                                | ✅         |
-| 20 | extension-descriptor-adapter                  | ✅         |
+| 20 | extension-descriptor-adapter（历史兼容只读投影） | ✅         |
 | 21 | workspace-capability-state                    | ✅         |
-| 22 | extensions-shell                              | ✅         |
-| 23 | legacy-extension-route-redirects              | ✅         |
-| 24 | menu-migration-extensions                     | ✅ partial |
+| 22 | extensions-shell（已废弃，不再作为产品页）       | superseded |
+| 23 | legacy-extension-route-cleanup                | ✅         |
+| 24 | independent-marketplace-navigation            | ✅ partial |
 | 25 | workspace-settings-shell                      | ✅         |
-| 26 | model-switcher-direct-skill                   | ✅         |
+| 26 | model-switcher-agent-only                     | ✅         |
 | 27 | composer-status-bar                           | ✅         |
 | 28 | plan-mode-state                               | ✅         |
 | 30 | approval-ui                                   | ✅         |

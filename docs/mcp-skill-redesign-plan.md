@@ -29,7 +29,7 @@ MCP 和 Skill 需要重新设计，但不是删除市场，也不是合并进 Ex
 - `/skills`：built-in / market / installed / activation。
 - `/plugins`：应用插件市场、已安装插件、命令、主题/UI 扩展。
 
-不提供用户可见的 `/extensions` 聚合页。Agent-facing capability overview 后续如有需要，应作为调试/详情视图或 runtime 子视图，而不是替代三个市场入口。
+不提供用户可见的 Extensions 聚合页。Agent-facing capability overview 后续如有需要，应作为调试/详情视图或 runtime 子视图，而不是替代三个市场入口。
 
 应用插件开发说明按现有实现处理：本地 API 服务已提供 `/plugin-dev` 静态说明页，作为“如何开发/使用应用插件”的 Web 入口。后续只需要在 Settings → API 服务或应用插件中心补稳定入口和文案，不再另起 Extensions 页面承载这部分内容。
 
@@ -82,7 +82,7 @@ Skill 与 MCP 的差异：
 
 ### P0: Restore Independent Marketplaces
 
-- 删除用户可见的 `/extensions` 页面和菜单入口。
+- 删除用户可见的 Extensions 聚合页面和菜单入口。
 - 直接路由 `/mcp`、`/skills`、`/plugins` 保留。
 - 应用插件不再归入 Agent capability descriptor 展示。
 
@@ -127,7 +127,7 @@ Skill 与 MCP 的差异：
 ## Validation
 
 - Sidebar / quick menu 中可以分别进入 MCP 市场、Skill 市场、应用插件中心。
-- `/extensions` 不作为用户可见页面或菜单入口。
+- Extensions 聚合页不作为用户可见页面或菜单入口。
 - 旧路由 `/mcp`、`/skills`、`/plugins` 可继续打开。
 - MCP server “安装 / 启用 / 可调用 / 需要审批 / 错误”状态可被明确区分。
 - Skill “内置 / 市场 / 已安装 / 当前项目启用 / 当前会话可用”状态可被明确区分。
