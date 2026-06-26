@@ -5,6 +5,7 @@ import { SkillsController } from "./proxy";
 import { McpController } from "./mcp";
 import { AppConfigController } from "./appConfig";
 import { LLMController } from "./llm";
+import { AgentController } from "./agent";
 
 export const setupRoutes = () => {
 	const router = new SwaggerRouter({}, swaggerConfig);
@@ -16,6 +17,7 @@ export const setupRoutes = () => {
 	router.map(McpController, {});
 	router.map(AppConfigController, {});
 	router.map(LLMController, {});
+	router.map(AgentController, {});
 
 	// 注册 Swagger 路由（必须在 map 之后调用）
 	router.swagger(swaggerConfig);

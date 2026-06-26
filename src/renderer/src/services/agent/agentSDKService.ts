@@ -1,7 +1,21 @@
 /**
  * Agent SDK Service Client
  *
- * Renderer 侧 Agent SDK 客户端，通过 preload 安全桥接调用 Main Process
+ * Renderer 侧 Agent SDK 客户端。
+ *
+ * **流式聊天链路（createQuery / interruptQuery / resolvePermission /
+ * onStreamEvent）已迁移到本地 HTTP 服务**：
+ *   - SSE  `POST /v1/agent/query`
+ *   - POST `/v1/agent/interrupt`
+ *   - POST `/v1/agent/approval`
+ *
+ * SSE 帧由 in-renderer dispatcher fan-out 给所有 `onStreamEvent` 订阅者，
+ * 旧的 `agent-sdk:stream-event` IPC 订阅不再发起。
+ *
+ * 其余 settings 类 RPC（sessions / profiles / teams / config 等）仍走 IPC，
+ * 因为它们不在热点路径上，迁移收益低。
+ *
+ * Preload `window.electron.agentSDK.*` 接口完整保留作为回滚兜底。
  */
 
 import type {
@@ -13,33 +27,111 @@ import type {
 	AgentProfile,
 	AgentTeam,
 } from "@super-client/shared-types/agent-sdk";
+import { httpJson, sseStream } from "../localApiClient";
+
+// ─── In-renderer SSE dispatcher for /v1/agent/query ─────────────────────────
+
+type StreamListener = (event: AgentSDKStreamEvent) => void;
+
+const streamListeners = new Set<StreamListener>();
+const activeStreams = new Map<string, AbortController>();
+
+function dispatchStreamEvent(event: AgentSDKStreamEvent): void {
+	for (const cb of streamListeners) {
+		try {
+			cb(event);
+		} catch (err) {
+			console.error("[agentSDKService] stream listener threw:", err);
+		}
+	}
+}
+
+function errorMessage(err: unknown): string {
+	return err instanceof Error ? err.message : String(err);
+}
 
 /**
- * 创建查询（启动 agent）
+ * 创建查询（启动 agent）。
+ *
+ * 走本地 HTTP SSE：`POST /v1/agent/query`。`fire-and-forget` 语义，立即
+ * 返回 `{requestId}`；事件通过 in-renderer dispatcher 推送给
+ * `onStreamEvent` 订阅者。任何流式错误都会被合成为 `type:"error"` 事件，
+ * 不会以异常的形式抛回调用方（与原 IPC 行为一致）。
  */
 export async function createQuery(
 	requestId: string,
 	request: AgentSDKQueryRequest,
 ): Promise<{ requestId: string }> {
-	const response = await window.electron.agentSDK.createQuery(
-		requestId,
-		request,
-	);
-	if (!response.success) {
-		throw new Error(response.error || "Failed to create query");
+	// 重入保护：若同 requestId 已有在飞流，先 abort。
+	const prior = activeStreams.get(requestId);
+	if (prior) {
+		try {
+			prior.abort();
+		} catch {
+			// ignore
+		}
 	}
-	return response.data;
+
+	const controller = new AbortController();
+	activeStreams.set(requestId, controller);
+
+	void (async () => {
+		try {
+			for await (const event of sseStream<AgentSDKStreamEvent>(
+				"/v1/agent/query",
+				{ requestId, request },
+				controller.signal,
+			)) {
+				dispatchStreamEvent(event);
+			}
+		} catch (err) {
+			if (controller.signal.aborted) return;
+			dispatchStreamEvent({
+				requestId,
+				type: "error",
+				error: errorMessage(err),
+			} as AgentSDKStreamEvent);
+		} finally {
+			// 只在自己仍是当前活跃 controller 时才删；并发重入已替换它的话不动。
+			if (activeStreams.get(requestId) === controller) {
+				activeStreams.delete(requestId);
+			}
+		}
+	})();
+
+	return { requestId };
 }
 
 /**
- * 中断查询
+ * 中断查询。
+ *
+ * 双保险：(1) 本地 abort 当前 SSE fetch（让 server 端 `ctx.req.on("close")`
+ * 触发 `runtime.interrupt`），(2) 显式 POST `/v1/agent/interrupt` 兜底。
  */
 export async function interruptQuery(requestId: string): Promise<boolean> {
-	const response = await window.electron.agentSDK.interrupt(requestId);
-	if (!response.success) {
-		throw new Error(response.error || "Failed to interrupt query");
+	const controller = activeStreams.get(requestId);
+	if (controller) {
+		try {
+			controller.abort();
+		} catch (err) {
+			console.error("[agentSDKService] abort threw:", err);
+		}
+		activeStreams.delete(requestId);
 	}
-	return response.data;
+
+	try {
+		const data = await httpJson<{ interrupted: boolean }>(
+			"/v1/agent/interrupt",
+			{
+				method: "POST",
+				body: { requestId },
+			},
+		);
+		return data?.interrupted ?? !!controller;
+	} catch (err) {
+		console.error("[agentSDKService] interrupt HTTP failed:", err);
+		return !!controller; // local abort already happened
+	}
 }
 
 /**
@@ -94,34 +186,47 @@ export async function setModel(
 }
 
 /**
- * 解决权限请求
+ * 解决权限请求。
+ *
+ * 走本地 HTTP：`POST /v1/agent/approval`。`updatedInput` 和
+ * `updatedPermissions` 这两个参数在主进程从来没被消费过（见
+ * `src/main/ipc/api-impl.ts` 里 `_updatedInput` / `_updatedPermissions`
+ * 用 `_` 前缀标记为忽略），所以这里不再透传。签名保留 4 参数以兼容
+ * 调用点 `useChat.ts`。
  */
 export async function resolvePermission(
 	toolUseId: string,
 	allowed: boolean,
-	updatedInput?: Record<string, unknown>,
-	updatedPermissions?: Array<Record<string, unknown>>,
+	_updatedInput?: Record<string, unknown>,
+	_updatedPermissions?: Array<Record<string, unknown>>,
 ): Promise<boolean> {
-	const response = await window.electron.agentSDK.resolvePermission(
-		toolUseId,
-		allowed,
-		updatedInput,
-		updatedPermissions,
-	);
-	if (!response.success) {
-		throw new Error(response.error || "Failed to resolve permission");
+	try {
+		await httpJson("/v1/agent/approval", {
+			method: "POST",
+			body: { toolUseId, approved: allowed },
+		});
+		return true;
+	} catch (err) {
+		console.error("[agentSDKService] approval HTTP failed:", err);
+		throw err instanceof Error ? err : new Error(String(err));
 	}
-	return response.data;
 }
 
 /**
- * 订阅流式事件
+ * 订阅流式事件。
+ *
+ * 订阅源是 in-renderer dispatcher（由 `createQuery` 的 SSE 消费循环喂事件），
+ * 不再监听 `agent-sdk:stream-event` IPC 推送。
+ *
  * @returns 取消订阅函数
  */
 export function onStreamEvent(
 	callback: (event: AgentSDKStreamEvent) => void,
 ): () => void {
-	return window.electron.agentSDK.onStreamEvent(callback);
+	streamListeners.add(callback);
+	return () => {
+		streamListeners.delete(callback);
+	};
 }
 
 /**

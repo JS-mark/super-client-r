@@ -129,3 +129,166 @@ export async function httpJson<T = unknown>(
 	}
 	return (envelope?.data as T) ?? (undefined as T);
 }
+
+// ─── Streaming (SSE) helpers ────────────────────────────────────────────────
+
+interface HttpFetchOptions {
+	method?: "GET" | "POST" | "PUT" | "DELETE";
+	body?: unknown;
+	signal?: AbortSignal;
+	accept?: string;
+}
+
+/**
+ * Lower-level fetch wrapper that returns the raw `Response` so the caller can
+ * consume `response.body` as a stream (SSE / NDJSON / etc.). Adds the same
+ * `Authorization: Bearer <apiKey>` header and resolves the local server's
+ * `http://localhost:<port>` base URL via the cached lookups above.
+ *
+ * Does NOT auto-throw on non-2xx — caller decides (SSE consumers usually want
+ * to surface the failure as an inline event, not an exception).
+ */
+export async function httpFetch(
+	path: string,
+	opts: HttpFetchOptions = {},
+): Promise<Response> {
+	const [url, key] = await Promise.all([
+		baseUrl().then((b) => `${b}${path}`),
+		getKey(),
+	]);
+	const headers: Record<string, string> = {
+		Authorization: `Bearer ${key}`,
+	};
+	if (opts.accept) headers.Accept = opts.accept;
+	let body: string | undefined;
+	if (opts.body !== undefined) {
+		headers["Content-Type"] = "application/json";
+		body = JSON.stringify(opts.body);
+	}
+	return fetch(url, {
+		method: opts.method ?? "GET",
+		headers,
+		body,
+		signal: opts.signal,
+	});
+}
+
+/**
+ * POST a JSON `body` and consume the response as a Server-Sent Events stream,
+ * yielding each parsed payload as `TEvent`.
+ *
+ * The server writes frames in the standard SSE format:
+ * ```
+ * event: <type>
+ * data: <full event JSON>
+ *
+ * ```
+ * (see `src/main/server/routes/llm.ts` / `routes/agent.ts` `writeEvent`).
+ * The `event:` line is ignored here because the same `type` field is already
+ * inside the `data:` JSON payload — we only parse `data:` and JSON-decode it.
+ *
+ * - Uses `TextDecoder({ stream: true })` so multi-byte UTF-8 codepoints are
+ *   never split across chunk boundaries.
+ * - Frames are separated by a blank line (`\n\n` or `\r\n\r\n`). Empty frames
+ *   (keep-alive comments) are skipped.
+ * - On non-2xx response, throws so the caller can synthesize an event in the
+ *   right shape (different consumers want different `type` fields, so we
+ *   don't synthesize here).
+ *
+ * Cancellation: pass an `AbortSignal`. When aborted, `fetch` rejects and the
+ * generator silently returns. The server-side route picks up the dropped
+ * socket via `ctx.req.on("close", ...)` and stops the underlying stream.
+ */
+export async function* sseStream<TEvent>(
+	path: string,
+	body: unknown,
+	signal: AbortSignal,
+): AsyncGenerator<TEvent> {
+	let res: Response;
+	try {
+		res = await httpFetch(path, {
+			method: "POST",
+			body,
+			signal,
+			accept: "text/event-stream",
+		});
+	} catch (err) {
+		if (signal.aborted) return;
+		throw err instanceof Error ? err : new Error(String(err));
+	}
+
+	if (!res.ok || !res.body) {
+		let message = `HTTP ${res.status} ${res.statusText}`.trim();
+		try {
+			const text = await res.text();
+			if (text) {
+				try {
+					const parsed = JSON.parse(text) as { message?: string };
+					if (parsed?.message) message = parsed.message;
+				} catch {
+					message = text.slice(0, 500);
+				}
+			}
+		} catch {
+			// keep the HTTP status message
+		}
+		throw new Error(message);
+	}
+
+	const reader = res.body.getReader();
+	const decoder = new TextDecoder("utf-8", { fatal: false });
+	let buffer = "";
+
+	try {
+		while (true) {
+			const { value, done } = await reader.read();
+			if (done) {
+				buffer += decoder.decode();
+				const trimmed = buffer.trim();
+				if (trimmed) {
+					const evt = parseSseFrame<TEvent>(trimmed);
+					if (evt !== null) yield evt;
+				}
+				return;
+			}
+			buffer += decoder.decode(value, { stream: true });
+			buffer = buffer.replace(/\r\n/g, "\n");
+
+			let sep: number;
+			while ((sep = buffer.indexOf("\n\n")) !== -1) {
+				const frame = buffer.slice(0, sep);
+				buffer = buffer.slice(sep + 2);
+				const evt = parseSseFrame<TEvent>(frame);
+				if (evt !== null) yield evt;
+			}
+		}
+	} catch (err) {
+		if (signal.aborted) return;
+		throw err instanceof Error ? err : new Error(String(err));
+	} finally {
+		try {
+			reader.releaseLock();
+		} catch {
+			// reader may already be closed
+		}
+	}
+}
+
+function parseSseFrame<TEvent>(frame: string): TEvent | null {
+	const lines = frame.split("\n");
+	const dataParts: string[] = [];
+	for (const line of lines) {
+		if (line.startsWith(":")) continue; // comment / keep-alive
+		if (line.startsWith("data:")) {
+			const v = line.slice(5);
+			dataParts.push(v.startsWith(" ") ? v.slice(1) : v);
+		}
+		// `event:` / `id:` / `retry:` ignored — type already lives in data JSON.
+	}
+	if (dataParts.length === 0) return null;
+	try {
+		return JSON.parse(dataParts.join("\n")) as TEvent;
+	} catch {
+		return null;
+	}
+}
