@@ -46,6 +46,35 @@ export interface BuildToolSetArgs {
 		code: string;
 		message: string;
 	}) => Promise<boolean>;
+	/**
+	 * Interactive `AskUserQuestion` flow. Resolves to the user's
+	 * `{questions, answers}` payload, or `null` when skipped / aborted.
+	 * The renderer reads `toolCall.input` directly for the questions array,
+	 * so we don't need to ship it again here — only the `toolCallId` is used
+	 * to correlate the renderer's response.
+	 */
+	awaitUserQuestionAnswer: (args: {
+		toolCallId: string;
+		toolName: string;
+		toolArgs: string;
+	}) => Promise<Record<string, unknown> | null>;
+}
+
+/**
+ * Strip the optional internal-MCP prefix (`scp-agent-builtins__`,
+ * `@scp/...`, etc.) so we can match a tool name regardless of how the
+ * runtime wrapped it. Lowercased.
+ */
+function bareToolName(name: string): string {
+	const lower = name.toLowerCase();
+	if (lower.includes("__")) return lower.split("__").pop() ?? lower;
+	if (lower.includes(":")) return lower.split(":").pop() ?? lower;
+	return lower;
+}
+
+function isAskUserQuestionTool(name: string): boolean {
+	const bare = bareToolName(name);
+	return bare === "askuserquestion" || bare === "ask_user_question";
 }
 
 export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
@@ -56,6 +85,7 @@ export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
 		checkPermission,
 		evaluateRuntimePolicy,
 		awaitRuntimeApproval,
+		awaitUserQuestionAnswer,
 	} = args;
 	if (!request.tools || request.tools.length === 0 || !toolExecutor)
 		return undefined;
@@ -80,6 +110,64 @@ export function buildToolSet(args: BuildToolSetArgs): ToolSet | undefined {
 					type: "tool_call",
 					toolCall: { id: toolCallId, name, arguments: argsJson },
 				});
+
+				// ── AskUserQuestion interception ────────────────────────────
+				// The "tool" is really a UI affordance: the renderer reads
+				// `toolCall.input` from the tool_call event above and renders
+				// `AskUserQuestionCard`, then submits answers through the
+				// approval IPC. We skip the permission/policy gates and the
+				// MCP executor entirely; the user's payload becomes the
+				// tool_result.
+				if (isAskUserQuestionTool(name)) {
+					const payload = await awaitUserQuestionAnswer({
+						toolCallId,
+						toolName: name,
+						toolArgs: argsJson,
+					});
+					if (payload === null) {
+						// Skipped / aborted — surface as tool_error so the model
+						// sees a clean signal and can fall back to plain text.
+						const skipMessage =
+							"User skipped the clarification — proceed using sensible defaults or ask in prose.";
+						broadcast({
+							requestId: request.requestId,
+							type: "tool_error",
+							toolError: {
+								toolCallId,
+								name,
+								error: skipMessage,
+								code: "ASK_USER_QUESTION_SKIPPED",
+							},
+						});
+						throw new Error(skipMessage);
+					}
+					// Build the tool_result the model sees.
+					// IMPORTANT: don't echo `questions` back — that's the same
+					// array the model just sent as the tool argument, and at
+					// least DeepSeek-v3.2 (and a few other non-Anthropic models)
+					// then misread the response as "the tool wants me to ask
+					// these questions" and re-asks the user in plain markdown.
+					// What the model actually needs is "the user answered, here
+					// are their picks, proceed". Use a result envelope whose
+					// `status` + `user_answers` shape leaves no ambiguity.
+					const userAnswers =
+						payload && typeof payload === "object" && "answers" in payload
+							? ((payload as { answers?: Record<string, unknown> })
+									.answers ?? {})
+							: {};
+					const modelResult = {
+						status: "answered" as const,
+						user_answers: userAnswers,
+						note:
+							"The user provided the answers above. Use them as the source of truth and continue with the next step. Do NOT call AskUserQuestion again for the same topic, and do NOT repeat the same questions in plain text.",
+					};
+					broadcast({
+						requestId: request.requestId,
+						type: "tool_result",
+						toolResult: { toolCallId, name, result: modelResult },
+					});
+					return modelResult;
+				}
 
 				const approved = await checkPermission({
 					toolCallId,

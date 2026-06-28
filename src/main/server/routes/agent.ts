@@ -239,13 +239,21 @@ export class AgentController {
 			required: false,
 			description: "授权范围：once / session / always（默认 once）",
 		},
+		payload: {
+			type: "object",
+			required: false,
+			description:
+				"用户在授权卡片里提供的结构化数据（如 AskUserQuestion 的 answers），会被透传给 LLMService.resolveToolApproval。",
+		},
 	})
 	async approval(ctx: Koa.Context) {
 		try {
-			const { toolUseId, approved, scope } = (ctx.request.body ?? {}) as {
+			const { toolUseId, approved, scope, payload } = (ctx.request.body ??
+				{}) as {
 				toolUseId?: string;
 				approved?: boolean;
 				scope?: string;
+				payload?: Record<string, unknown>;
 			};
 			if (!toolUseId) {
 				ctx.body = createResponse(ctx, 400, "toolUseId is required");
@@ -257,6 +265,7 @@ export class AgentController {
 					approved: !!approved,
 					scope:
 						(scope as "once" | "session" | "workspace" | "global") ?? "once",
+					payload,
 				});
 			}
 			ctx.body = createResponse(ctx, 200, "Success");

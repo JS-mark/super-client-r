@@ -134,6 +134,15 @@ export interface ChatStreamEvent {
 		toolCallId: string;
 		name: string;
 		arguments: string;
+		/**
+		 * Origin of the approval prompt. Mirrors the main-process
+		 * `ChatStreamEvent.toolApproval.source` so the renderer can
+		 * dispatch to the right card (e.g. `ask-user-question` →
+		 * AskUserQuestionCard).
+		 */
+		source?: "tool-permission" | "runtime-policy" | "ask-user-question";
+		code?: string;
+		reason?: string;
 	};
 	usage?: {
 		inputTokens?: number;

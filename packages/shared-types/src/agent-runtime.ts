@@ -352,6 +352,14 @@ export interface PermissionDecision {
 	approved: boolean;
 	scope: ToolCallApprovalScope;
 	reason?: string;
+	/**
+	 * 用户在授权卡片里提供的结构化数据（例如 `AskUserQuestion` 的
+	 * `{questions, answers}`）。AgentRuntime 实现应将其透传到下游
+	 * 的 `LLMService.resolveToolApproval` 的 `payload` 形参，以便挂在
+	 * `pendingApprovals` 上的拦截器（如 `awaitUserQuestionAnswer`）能
+	 * 拿到用户答案并回填给模型。
+	 */
+	payload?: Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────────

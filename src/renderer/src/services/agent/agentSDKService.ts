@@ -188,22 +188,22 @@ export async function setModel(
 /**
  * 解决权限请求。
  *
- * 走本地 HTTP：`POST /v1/agent/approval`。`updatedInput` 和
- * `updatedPermissions` 这两个参数在主进程从来没被消费过（见
- * `src/main/ipc/api-impl.ts` 里 `_updatedInput` / `_updatedPermissions`
- * 用 `_` 前缀标记为忽略），所以这里不再透传。签名保留 4 参数以兼容
- * 调用点 `useChat.ts`。
+ * 走本地 HTTP：`POST /v1/agent/approval`。`updatedInput` 透传到主进程，
+ * 一路传到 `LLMService.resolveToolApproval` 的 `payload` 形参；这是
+ * `AskUserQuestion` 这种需要回传结构化结果（`{questions, answers}`）的
+ * 工具拿到用户答案的唯一通道。`updatedPermissions` 主进程目前还没消费，
+ * 保留签名以便未来扩展。
  */
 export async function resolvePermission(
 	toolUseId: string,
 	allowed: boolean,
-	_updatedInput?: Record<string, unknown>,
+	updatedInput?: Record<string, unknown>,
 	_updatedPermissions?: Array<Record<string, unknown>>,
 ): Promise<boolean> {
 	try {
 		await httpJson("/v1/agent/approval", {
 			method: "POST",
-			body: { toolUseId, approved: allowed },
+			body: { toolUseId, approved: allowed, payload: updatedInput },
 		});
 		return true;
 	} catch (err) {

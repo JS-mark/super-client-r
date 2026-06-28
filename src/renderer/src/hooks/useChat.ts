@@ -19,6 +19,7 @@ import {
   getProjectIdFromConversation,
   useChatStore,
 } from "../stores/chatStore";
+import { useChatInputStore } from "../stores/chatInputStore";
 import { type Message, useChatMessageStore } from "../stores/chatMessageStore";
 import { useFileArtifactStore } from "../stores/fileArtifactStore";
 import { useMcpStore } from "../stores/mcpStore";
@@ -188,7 +189,11 @@ export function useChat() {
   const deleteMessage = useChatMessageStore((s) => s.deleteMessage);
   const deleteMessagesFrom = useChatMessageStore((s) => s.deleteMessagesFrom);
 
-  const [input, setInput] = useState("");
+  // Composer text lives in `useChatInputStore` (see store comment for the
+  // perf rationale). We read it via `getState()` where we need a one-shot
+  // snapshot (sendMessage fallback, conversation-name derivation) and write
+  // via `getState().setValue / .clear` from the edit/send flows below. No
+  // subscription here, so typing doesn't re-render `useChat`.
   const editingMessageIdRef = useRef<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
@@ -232,12 +237,51 @@ export function useChat() {
       updatedInput?: Record<string, unknown>,
       updatedPermissions?: Array<Record<string, unknown>>,
     ) => {
+      // Resume the stream watchdog — we're un-pausing now that the user
+      // has decided. Re-arm a fresh 60s clock so we can still detect a
+      // stuck post-submit roundtrip (e.g. main process never sending the
+      // follow-up tool_result event, OpenRouter network hang, etc.).
+      awaitingUserApprovalRef.current = false;
+      if (
+        useChatMessageStore.getState().sessionStatus !== "idle" &&
+        currentRequestIdRef.current
+      ) {
+        kickWatchdog();
+      }
       // Optimistic update: immediately reflect in UI
       const toolMsgId = `tool_${toolCallId}`;
       if (approved) {
+        // AskUserQuestion belt-and-suspenders: also stash the answers on
+        // `toolCall.approval.userAnswers`. The `tool_result` handler will
+        // shallow-overwrite `toolCall.result` with whatever the main
+        // process echoes back (which in some IPC paths arrives missing
+        // the `answers` field), but it does NOT touch `approval`. The
+        // read-only summary in `AskUserQuestionCard` prefers
+        // `approval.userAnswers` first, falling back to `result.answers`
+        // so this stays a no-op for the normal happy path.
+        const existing = useChatMessageStore
+          .getState()
+          .messages.find((m) => m.id === toolMsgId);
+        const existingApproval = existing?.toolCall?.approval;
+        const askAnswers =
+          updatedInput &&
+          typeof updatedInput === "object" &&
+          "answers" in updatedInput &&
+          updatedInput.answers &&
+          typeof updatedInput.answers === "object"
+            ? (updatedInput.answers as Record<string, string>)
+            : undefined;
         updateMessageToolCall(toolMsgId, {
           status: "pending",
           ...(updatedInput ? { result: updatedInput } : {}),
+          ...(askAnswers
+            ? {
+                approval: {
+                  ...(existingApproval ?? {}),
+                  userAnswers: askAnswers,
+                },
+              }
+            : {}),
         });
       } else {
         updateMessageToolCall(toolMsgId, {
@@ -254,7 +298,15 @@ export function useChat() {
             updatedPermissions,
           );
         } else {
-          await window.electron.llm.toolApprovalResponse(toolCallId, approved);
+          // `updatedInput` is currently only populated by the
+          // AskUserQuestionCard submit (`{questions, answers}`). The
+          // legacy approval/runtime-policy cards don't use it, so
+          // passing it through unconditionally is safe.
+          await window.electron.llm.toolApprovalResponse(
+            toolCallId,
+            approved,
+            updatedInput,
+          );
         }
       } catch (err) {
         console.error("[useChat] toolApprovalResponse failed:", err);
@@ -352,11 +404,30 @@ export function useChat() {
    */
   const STREAM_WATCHDOG_MS = 60_000;
   const streamWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * Watchdog is paused while we're blocked on user input (approval prompt
+   * / `AskUserQuestion` card / runtime-policy decision). Without this
+   * gate, a user who takes >60s to read & answer would trip the
+   * "connection timed out" watchdog even though the stream is healthy
+   * and main process is just waiting on `resolveToolApproval`. Set by
+   * `tool_approval_request` arrival, cleared by `respondToApproval`.
+   *
+   * While true, `kickWatchdog()` no-ops so any spurious in-flight
+   * stream events (rare but possible — e.g. a late `chunk` arriving
+   * after the request flipped into approval-wait) can't restart the
+   * timer.
+   */
+  const awaitingUserApprovalRef = useRef(false);
   const clearWatchdog = useCallback(() => {
     if (streamWatchdogRef.current) {
       clearTimeout(streamWatchdogRef.current);
       streamWatchdogRef.current = null;
     }
+    // Also drop the pause flag so a new stream that re-uses this hook
+    // instance doesn't inherit a stale "awaiting user" state from a
+    // previous turn — terminal events, stopStream and unmount all funnel
+    // through clearWatchdog().
+    awaitingUserApprovalRef.current = false;
   }, []);
 
   /**
@@ -445,6 +516,11 @@ export function useChat() {
   );
 
   const kickWatchdog = useCallback(() => {
+    // Don't re-arm while we're blocked on a user decision (approval card
+    // / AskUserQuestion). The next legitimate kick happens in
+    // `respondToApproval` when the user submits and we expect the stream
+    // to resume.
+    if (awaitingUserApprovalRef.current) return;
     if (streamWatchdogRef.current) {
       clearTimeout(streamWatchdogRef.current);
     }
@@ -755,6 +831,20 @@ export function useChat() {
         finalizeAssistantStreamContent();
         clearAssistantStreamContent();
 
+        // AskUserQuestion is a UI affordance, not a real tool — tag the
+        // tool message so `isAskUserQuestionToolCall` picks the
+        // `AskUserQuestionCard` renderer regardless of whether the model
+        // called the bare name or the `scp-agent-builtins__` prefixed
+        // variant. The main process's `toolAdapter` flips the same
+        // tool message into `awaiting_approval` via the
+        // `tool_approval_request` event a moment later.
+        const bareName = event.toolCall.name
+          .toLowerCase()
+          .split("__")
+          .pop();
+        const isAskUserQuestion =
+          bareName === "askuserquestion" || bareName === "ask_user_question";
+
         // Model is calling a tool — show a tool message in the chat
         const toolMessage: Message = {
           id: `tool_${event.toolCall.id}`,
@@ -773,6 +863,9 @@ export function useChat() {
               }
             })(),
             status: "pending",
+            ...(isAskUserQuestion
+              ? { approval: { kind: "ask-user-question" } }
+              : {}),
           },
         };
         addMessage(toolMessage);
@@ -780,9 +873,48 @@ export function useChat() {
         setSessionStatus("streaming");
         // Tool execution completed — update the tool message
         const toolMsgId = `tool_${event.toolResult.toolCallId}`;
+
+        // AskUserQuestion guard: the renderer's `respondToApproval`
+        // optimistic update already wrote the canonical
+        // `{questions, answers}` payload into `toolCall.result` BEFORE
+        // sending the IPC. The main-process echo can lose fields
+        // depending on the IPC serialization path (and in practice has
+        // been observed to arrive with empty `answers`). Treat the
+        // optimistic value as authoritative — only promote `status`
+        // to terminal and write `result` when we don't already have
+        // the structured answers, so we never regress from "showing
+        // the user's selections" to "showing 未作答 placeholders".
+        const existing = useChatMessageStore
+          .getState()
+          .messages.find((m) => m.id === toolMsgId);
+        const existingResult = existing?.toolCall?.result as
+          | { answers?: Record<string, unknown> }
+          | undefined;
+        const isAskUserQuestionMsg =
+          existing?.toolCall &&
+          (existing.toolCall.approval?.kind === "ask-user-question" ||
+            (() => {
+              const lower = existing.toolCall.name.toLowerCase();
+              const bare = lower.includes("__")
+                ? (lower.split("__").pop() ?? lower)
+                : lower;
+              return (
+                bare === "askuserquestion" || bare === "ask_user_question"
+              );
+            })());
+        const optimisticAlreadyHasAnswers = Boolean(
+          existingResult?.answers &&
+            typeof existingResult.answers === "object" &&
+            Object.keys(existingResult.answers).length > 0,
+        );
+        const keepOptimisticResult =
+          isAskUserQuestionMsg && optimisticAlreadyHasAnswers;
+
         updateMessageToolCall(toolMsgId, {
           status: event.toolResult.isError ? "error" : "success",
-          result: event.toolResult.result,
+          ...(keepOptimisticResult
+            ? {}
+            : { result: event.toolResult.result }),
           error: event.toolResult.isError
             ? String(event.toolResult.result)
             : undefined,
@@ -861,11 +993,25 @@ export function useChat() {
         };
         addMessage(assistantMessage);
       } else if (event.type === "tool_approval_request" && event.toolApproval) {
-        // Update tool message to show inline approval UI
+        // Update tool message to show inline approval UI. When the main
+        // process tags `source:"ask-user-question"`, also stamp
+        // `approval.kind` so the renderer dispatches to
+        // `AskUserQuestionCard` (matches the Agent SDK path's behaviour).
         const toolMsgId = `tool_${event.toolApproval.toolCallId}`;
+        const isAskUserQuestion =
+          event.toolApproval.source === "ask-user-question";
         updateMessageToolCall(toolMsgId, {
           status: "awaiting_approval",
+          ...(isAskUserQuestion
+            ? { approval: { kind: "ask-user-question" } }
+            : {}),
         });
+        // Pause the stream watchdog while we wait for the user. The
+        // top-of-handler `kickWatchdog()` already ran for this event and
+        // would otherwise tick down for 60s while the user reads/answers,
+        // killing a healthy stream with a "connection timeout".
+        awaitingUserApprovalRef.current = true;
+        clearWatchdog();
       } else if (event.type === "tool_rejected" && event.toolResult) {
         // Update tool message to show rejection
         const toolMsgId = `tool_${event.toolResult.toolCallId}`;
@@ -1191,6 +1337,12 @@ export function useChat() {
             },
             `Permission required: ${perm.displayName || perm.toolName}`,
           );
+          // Pause the stream watchdog — same reasoning as the LLM path's
+          // `tool_approval_request` branch: user reading/answering can
+          // take longer than the 60s watchdog window. Re-armed when the
+          // user clicks Approve/Reject/Submit in `respondToApproval`.
+          awaitingUserApprovalRef.current = true;
+          clearWatchdog();
           break;
         }
 
@@ -1743,9 +1895,11 @@ export function useChat() {
       if (!target || target.role !== "user") return;
 
       editingMessageIdRef.current = messageId;
-      setInput(target.content);
+      // Push the message body into the composer via the shared store so
+      // we don't need to thread a setter through Chat.tsx anymore.
+      useChatInputStore.getState().setValue(target.content);
     },
-    [setInput],
+    [],
   );
 
   /**
@@ -1753,7 +1907,11 @@ export function useChat() {
    */
   const sendMessage = useCallback(
     async (options?: ChatOptions) => {
-      const content = (options?.content ?? input).trim();
+      // Snapshot read — we don't want sendMessage to re-create on every
+      // keystroke, so we go through `getState()` rather than subscribing.
+      const content = (
+        options?.content ?? useChatInputStore.getState().value
+      ).trim();
       if (!content) return;
 
       const mode: ChatMode = "agent";
@@ -1801,7 +1959,7 @@ export function useChat() {
           : undefined,
       };
       addMessage(userMessage);
-      setInput("");
+      useChatInputStore.getState().clear();
 
       // Pre-resolve the active model from renderer state so the bubble
       // header reflects the real model / provider icon immediately on send.
@@ -1863,7 +2021,10 @@ export function useChat() {
       );
     },
     [
-      input,
+      // `input` is intentionally NOT a dep — we snapshot it inside the
+      // callback via `useChatInputStore.getState()`. Including it would
+      // re-create `sendMessage` on every keystroke, which is exactly the
+      // re-render cascade we moved the state out of the tree to avoid.
       selectedAgentId,
       selectedSkillId,
       selectedCommandName,
@@ -1939,7 +2100,6 @@ export function useChat() {
   return {
     // State
     messages,
-    input,
     sessionStatus,
     isStreaming,
     selectedAgentId,
@@ -1948,9 +2108,15 @@ export function useChat() {
     sessionModelOverride,
     sessionSettings,
     availableTools,
+    // NOTE: `input` / `setInput` were removed in the 2026-06-28 perf pass.
+    // Composer text now lives in `useChatInputStore` — components that
+    // *display* the value subscribe to the store directly, and one-shot
+    // consumers (editMessage, sendMessage, slash insertion, etc.) call
+    // `useChatInputStore.getState().setValue / .value` instead. This kept
+    // `useChat`'s memoised return value referentially stable across
+    // keystrokes, so `Chat.tsx` no longer re-renders on every character.
 
     // Setters
-    setInput,
     setSelectedAgentId,
     setSelectedSkillId,
     setSelectedCommandName,

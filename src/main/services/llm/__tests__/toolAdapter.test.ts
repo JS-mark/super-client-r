@@ -37,6 +37,11 @@ const defaultGates = {
 	checkPermission: async () => true,
 	evaluateRuntimePolicy: () => ({ allowed: true } as const),
 	awaitRuntimeApproval: async () => false,
+	// AskUserQuestion interception is not exercised by these tests; the
+	// default never resolves (the special-case path only fires when the
+	// tool name matches `AskUserQuestion`, which is never the case in
+	// the fixtures below).
+	awaitUserQuestionAnswer: async () => null,
 };
 
 describe("buildToolSet", () => {

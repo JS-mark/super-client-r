@@ -378,16 +378,23 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 			conversationId?: string;
 			toolTimeout?: number;
 		}) => Promise<IPCResponse>;
-		stopStream: (requestId: string) => Promise<IPCResponse>;
-		toolApprovalResponse: (
-			toolCallId: string,
-			approved: boolean,
-		) => Promise<IPCResponse>;
-		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
-	};
+			stopStream: (requestId: string) => Promise<IPCResponse>;
+			toolApprovalResponse: (
+				toolCallId: string,
+				approved: boolean,
+				/**
+				 * Optional structured payload returned alongside the approval
+				 * decision. Currently used by the `AskUserQuestion` flow to
+				 * hand the renderer-collected `{questions, answers}` back to
+				 * the awaiting tool execution.
+				 */
+				payload?: Record<string, unknown>,
+			) => Promise<IPCResponse>;
+			onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
+		};
 
-	// 皮肤 API
-	skin: {
+		// 皮肤 API
+		skin: {
 		getActiveSkin: () => Promise<
 			IPCResponse<{ pluginId: string; themeId: string } | null>
 		>;
@@ -2001,8 +2008,20 @@ const electronAPI: ElectronAPI = {
 		chatCompletion: (request) =>
 			ipcRenderer.invoke("llm:chat-completion", request),
 		stopStream: (requestId) => ipcRenderer.invoke("llm:stop-stream", requestId),
-		toolApprovalResponse: (toolCallId, approved) =>
-			ipcRenderer.invoke("llm:tool-approval-response", toolCallId, approved),
+		toolApprovalResponse: (toolCallId, approved, payload) =>
+			// Bundle all args into ONE object. Previously this invoked with
+			// three positional args (`toolCallId, approved, payload`); in
+			// practice the third arg arrived as `undefined` at the
+			// `ipcMain.handle` site even after a full restart, silently
+			// dropping the AskUserQuestion answers. Electron's preload/main
+			// boundary does not reliably clone trailing optional positional
+			// args across HMR reloads, so we marshal everything into a
+			// single object — one positional arg, no optional tail.
+			ipcRenderer.invoke("llm:tool-approval-response", {
+				toolCallId,
+				approved,
+				payload,
+			}),
 		onStreamEvent: (callback: (event: ChatStreamEvent) => void) => {
 			const listener = (_event: unknown, data: ChatStreamEvent) =>
 				callback(data);

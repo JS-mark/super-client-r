@@ -49,11 +49,25 @@ export function registerModelHandlers(): void {
 		LLM_CHANNELS.TOOL_APPROVAL_RESPONSE,
 		async (
 			_event,
-			toolCallId: string,
-			approved: boolean,
+			req: {
+				toolCallId: string;
+				approved: boolean;
+				payload?: Record<string, unknown>;
+			},
 		): Promise<IPCResponse> => {
 			try {
-				llmService.resolveToolApproval(toolCallId, approved);
+				// Preload now bundles all args into ONE object. Previously
+				// invoked with three positional args; the trailing optional
+				// arg was silently dropped at this boundary, breaking the
+				// AskUserQuestion flow with an empty `user_answers`.
+				if (!req || typeof req !== "object" || !req.toolCallId) {
+					return { success: false, error: "Missing toolCallId" };
+				}
+				llmService.resolveToolApproval(
+					req.toolCallId,
+					Boolean(req.approved),
+					req.payload,
+				);
 				return { success: true };
 			} catch (error: unknown) {
 				const message =

@@ -29,12 +29,13 @@ function textOf(result: AnyResult): string {
 }
 
 describe("agentBuiltinsServer skeleton", () => {
-	it("exposes 8 tools with canonical names", () => {
+	it("exposes 9 tools with canonical names", () => {
 		const server = createAgentBuiltinsServer();
 		expect(server.id).toBe("@scp/agent-builtins");
 		expect(server.name).toBe("Agent Built-ins");
 		expect(server.tools.map((t) => t.name).sort()).toEqual(
 			[
+				"AskUserQuestion",
 				"Bash",
 				"Edit",
 				"Glob",

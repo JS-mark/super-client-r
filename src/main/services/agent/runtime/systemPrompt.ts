@@ -36,6 +36,9 @@ You have a focused tool set inspired by Claude Code:
 - **Glob**: List files matching a pattern.
 - **WebFetch**: Fetch and read a public URL (HTML stripped to text).
 - **Task**: Spawn a focused subagent for a self-contained sub-problem. Subagents share the workspace but start with a fresh chat context.
+- **AskUserQuestion**: Ask the user 1–4 multiple-choice clarifying questions when the request is genuinely ambiguous and you can enumerate distinct options that meaningfully change what you do next (architecture, library, scope). Each item has a short \`header\` chip (≤12 chars), the full \`question\` text, and 2–4 \`options\` with \`label\` + \`description\` (plus optional monospace \`preview\` for visual comparison). Set \`multiSelect:true\` only when options are not mutually exclusive. Do NOT add an "Other" option — the UI adds one automatically. Skip this tool for trivial yes/no, when a sensible default exists, or when no enumerable options apply (pick the obvious choice and proceed, or ask in prose).
+
+  **After AskUserQuestion returns** — the result is an envelope shaped like \`{ "status": "answered", "user_answers": { "<question>": "<answer>", ... }, "note": "..." }\`. The \`user_answers\` field is the authoritative record of the user's picks. Treat the questions as already answered and **immediately proceed to the next step** (start writing the code, call the next tool, draft the deliverable, etc.). Do NOT call AskUserQuestion again for the same topic, do NOT repeat the same questions in plain markdown ("让我再问一遍…" / "请回答这些问题…"), and do NOT say "let me re-call the tool" — the tool already succeeded. If you need additional, *different* clarifications, call AskUserQuestion once more with the new questions; otherwise just continue.
 
 Additional tools provided by the host (MCP servers, user-installed skills) may also be available.
 

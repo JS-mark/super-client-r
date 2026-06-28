@@ -365,18 +365,25 @@ export class LLMController {
 	@body({
 		toolCallId: { type: "string", required: true, description: "工具调用 ID" },
 		approved: { type: "boolean", required: true, description: "是否允许" },
+		payload: {
+			type: "object",
+			required: false,
+			description:
+				"用户在授权卡片里提供的结构化数据（例如 AskUserQuestion 的 {questions, answers}），会被透传给挂在 pendingApprovals 上的拦截器。",
+		},
 	})
 	async toolApproval(ctx: Koa.Context) {
 		try {
-			const { toolCallId, approved } = (ctx.request.body ?? {}) as {
+			const { toolCallId, approved, payload } = (ctx.request.body ?? {}) as {
 				toolCallId?: string;
 				approved?: boolean;
+				payload?: Record<string, unknown>;
 			};
 			if (!toolCallId) {
 				ctx.body = createResponse(ctx, 400, "toolCallId is required");
 				return;
 			}
-			llmService.resolveToolApproval(toolCallId, !!approved);
+			llmService.resolveToolApproval(toolCallId, !!approved, payload);
 			ctx.body = createResponse(ctx, 200, "Success");
 		} catch (error) {
 			ctx.body = createResponse(

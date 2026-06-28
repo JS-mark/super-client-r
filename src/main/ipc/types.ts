@@ -443,13 +443,19 @@ export interface ChatStreamEvent {
 		name: string;
 		arguments: string;
 		/**
-		 * Origin of the approval request. `tool-permission` (default) is the
-		 * legacy `ToolPermissionConfig.mode !== "auto"` prompt;
-		 * `runtime-policy` means the workspace runtime policy returned
-		 * `needs-approval` (e.g. `command-exec` with non-system-access
-		 * sandbox). Renderer can use this to tailor the prompt copy.
+		 * Origin of the approval request.
+		 *   - `tool-permission` (default): legacy `ToolPermissionConfig.mode
+		 *     !== "auto"` prompt;
+		 *   - `runtime-policy`: workspace runtime policy returned
+		 *     `needs-approval` (e.g. `command-exec` with non-system-access
+		 *     sandbox);
+		 *   - `ask-user-question`: the model called the `AskUserQuestion`
+		 *     builtin and the renderer should render `AskUserQuestionCard`
+		 *     instead of the generic approval card. The eventual response
+		 *     carries the user's `{questions, answers}` payload (passed back
+		 *     via `toolApprovalResponse`'s optional `updatedInput`).
 		 */
-		source?: "tool-permission" | "runtime-policy";
+		source?: "tool-permission" | "runtime-policy" | "ask-user-question";
 		/** Machine-readable policy code, e.g. `runtime.needsApproval`. */
 		code?: string;
 		/** Human-readable reason, e.g. `workspace-policy:command-approval-required`. */

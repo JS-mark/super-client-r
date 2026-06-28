@@ -28,10 +28,16 @@ function nowFromMessage(message: Message): number {
 }
 
 export function isAskUserQuestionToolCall(toolCall: ToolCall): boolean {
-	const name = toolCall.name.toLowerCase();
+	// `toolCall.name` may arrive with an internal-MCP prefix (e.g.
+	// `scp-agent-builtins__AskUserQuestion`) when invoked through the
+	// unified LLM loop, or with a bare name when emitted by the Agent SDK
+	// path. Strip the prefix before matching, and fall back to the
+	// approval kind we stamp in `useChat.ts`.
+	const lower = toolCall.name.toLowerCase();
+	const bare = lower.includes("__") ? (lower.split("__").pop() ?? lower) : lower;
 	return (
-		name === "askuserquestion" ||
-		name === "ask_user_question" ||
+		bare === "askuserquestion" ||
+		bare === "ask_user_question" ||
 		toolCall.approval?.kind === "ask-user-question"
 	);
 }

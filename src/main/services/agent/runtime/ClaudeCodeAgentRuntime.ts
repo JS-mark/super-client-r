@@ -183,6 +183,10 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 	): Promise<void> {
 		const port = localServer.getPort();
 		const apiKey = getOrCreateApiKey();
+		// Forward the optional structured payload (e.g. AskUserQuestion's
+		// `{questions, answers}`) all the way down to LLMService. The
+		// interceptor that parked the pending resolver is the only place
+		// that can deliver these answers back into the tool_result.
 		await fetch(`http://127.0.0.1:${port}/v1/llm/tool-approval`, {
 			method: "POST",
 			headers: {
@@ -192,6 +196,7 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 			body: JSON.stringify({
 				toolCallId: approvalId,
 				approved: decision.approved,
+				payload: decision.payload,
 			}),
 		}).catch(() => {
 			/* non-fatal */

@@ -230,7 +230,17 @@ export function ApprovalDecisionCard({
 				onMouseEnter={countdownEnabled ? () => setPaused(true) : undefined}
 				onMouseLeave={countdownEnabled ? () => setPaused(false) : undefined}
 				style={{
-					border: `1px solid ${token.colorBorderSecondary}`,
+					// Outer chrome: border-only (no shadow). We use the stronger
+					// `colorBorder` token here — without the previous shadow,
+					// `colorBorderSecondary` looked too faint to separate the
+					// card from the chat bubble background, especially in dark
+					// mode. `colorBorder` is theme-aware (antd flips it to a
+					// lighter grey in dark themes), so both modes stay legible.
+					// Inner separators (header underline, option-row borders)
+					// continue to use `colorBorderSecondary` so the visual
+					// hierarchy "outer chrome stronger, inner divisions softer"
+					// reads correctly.
+					border: `1px solid ${token.colorBorder}`,
 					backgroundColor: token.colorBgContainer,
 					// `fullWidth` lets the card stretch to fill the bubble's
 					// content area (whose 56rem cap is lifted by the `:has`
@@ -244,7 +254,6 @@ export function ApprovalDecisionCard({
 							}
 						: {}),
 					borderRadius: compact ? 12 : 10,
-					boxShadow: compact ? token.boxShadowTertiary : token.boxShadowSecondary,
 				}}
 			>
 			<div

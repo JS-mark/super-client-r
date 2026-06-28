@@ -102,9 +102,23 @@ export class LLMService {
 	// Pending tool approval requests awaiting user response. `requestId`
 	// is tracked so `stopStream` can release any approvals tied to an
 	// aborted stream — otherwise the Promise leaks until process exit.
+	//
+	// Two flavors share the same map keyed by toolCallId:
+	//   - boolean approval (`checkToolPermission` / `awaitToolRuntimeApproval`)
+	//     → resolver consumes `{approved}`.
+	//   - AskUserQuestion answer (`awaitUserQuestionAnswer`) → resolver
+	//     consumes the full `{approved, payload}` so it can lift `payload`
+	//     (the questions+answers JSON the user submitted) back into the
+	//     tool_result.
 	private pendingApprovals = new Map<
 		string,
-		{ resolve: (approved: boolean) => void; requestId: string }
+		{
+			resolve: (result: {
+				approved: boolean;
+				payload?: Record<string, unknown>;
+			}) => void;
+			requestId: string;
+		}
 	>();
 	// Chat hook registry (injected from PluginManager)
 	private chatHookRegistry:
@@ -197,7 +211,10 @@ export class LLMService {
 			},
 		});
 		const approved = await new Promise<boolean>((resolve) => {
-			this.pendingApprovals.set(toolCallId, { resolve, requestId });
+			this.pendingApprovals.set(toolCallId, {
+				resolve: ({ approved }) => resolve(approved),
+				requestId,
+			});
 		});
 		if (!approved && conversationId) {
 			getApprovalGrantStore().recordDeny(
@@ -239,7 +256,46 @@ export class LLMService {
 			},
 		});
 		return new Promise<boolean>((resolve) => {
-			this.pendingApprovals.set(toolCallId, { resolve, requestId });
+			this.pendingApprovals.set(toolCallId, {
+				resolve: ({ approved }) => resolve(approved),
+				requestId,
+			});
+		});
+	}
+
+	/**
+	 * Interactive `AskUserQuestion` flow. Shares the `tool_approval_request`
+	 * channel with the other approval prompts but tags `source` so the
+	 * renderer renders `AskUserQuestionCard` (vs the generic approval card).
+	 * Resolves with the renderer-submitted `{questions, answers}` payload, or
+	 * `null` when the user skipped / the stream was aborted.
+	 *
+	 * The questions live inside `toolArgs` (the original tool_call arguments
+	 * JSON); the renderer reads `toolCall.input.questions` directly, so the
+	 * card already has what it needs from the prior `tool_call` event.
+	 */
+	private async awaitUserQuestionAnswer(
+		requestId: string,
+		toolCallId: string,
+		toolName: string,
+		toolArgs: string,
+	): Promise<Record<string, unknown> | null> {
+		this.broadcast({
+			requestId,
+			type: "tool_approval_request",
+			toolApproval: {
+				toolCallId,
+				name: toolName,
+				arguments: toolArgs,
+				source: "ask-user-question",
+			},
+		});
+		return new Promise<Record<string, unknown> | null>((resolve) => {
+			this.pendingApprovals.set(toolCallId, {
+				resolve: ({ approved, payload }) =>
+					resolve(approved ? payload ?? {} : null),
+				requestId,
+			});
 		});
 	}
 
@@ -325,11 +381,18 @@ export class LLMService {
 
 	/**
 	 * Resolve a pending tool approval request from the renderer.
+	 * `payload` carries optional structured data — currently only used by
+	 * the `AskUserQuestion` flow to hand the user's `{questions, answers}`
+	 * back to the awaiting tool execution.
 	 */
-	resolveToolApproval(toolCallId: string, approved: boolean): void {
+	resolveToolApproval(
+		toolCallId: string,
+		approved: boolean,
+		payload?: Record<string, unknown>,
+	): void {
 		const pending = this.pendingApprovals.get(toolCallId);
 		if (pending) {
-			pending.resolve(approved);
+			pending.resolve({ approved, payload });
 			this.pendingApprovals.delete(toolCallId);
 		} else {
 			console.warn(
@@ -533,6 +596,13 @@ export class LLMService {
 					code,
 					message,
 				),
+			awaitUserQuestionAnswer: ({ toolCallId, toolName, toolArgs }) =>
+				this.awaitUserQuestionAnswer(
+					request.requestId,
+					toolCallId,
+					toolName,
+					toolArgs,
+				),
 		});
 
 		const mapped = mapExtraParams(
@@ -643,7 +713,10 @@ export class LLMService {
 		// upstream tool execution) until process exit.
 		for (const [toolCallId, pending] of this.pendingApprovals.entries()) {
 			if (pending.requestId === requestId) {
-				pending.resolve(false);
+				// `approved:false` covers both the boolean-approval flavors
+				// (rejected) and the AskUserQuestion flavor (treated as
+				// skipped → `awaitUserQuestionAnswer` returns null).
+				pending.resolve({ approved: false });
 				this.pendingApprovals.delete(toolCallId);
 			}
 		}

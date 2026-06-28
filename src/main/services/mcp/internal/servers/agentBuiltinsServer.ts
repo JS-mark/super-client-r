@@ -143,6 +143,67 @@ const toolDefs: InternalToolDefinition[] = [
 			required: ["description", "prompt"],
 		},
 	},
+	{
+		// Interactive clarification tool. NOT dispatched through this MCP
+		// server — `toolAdapter.ts` intercepts the call, emits a
+		// `tool_approval_request` with `source:"ask-user-question"`, and
+		// returns the user's answers as the tool_result. The def lives here
+		// only so `ClaudeCodeAgentRuntime` advertises it in the OpenAI
+		// tools[] list (same source of truth as the other facade tools).
+		name: "AskUserQuestion",
+		description:
+			"Ask the user 1–4 multiple-choice clarifying questions when their request is ambiguous and you can enumerate distinct options. Use only when answers materially change what you do next (architecture, library, scope). Don't use for trivial yes/no, or when sensible defaults exist — pick the obvious option and proceed. Each question has a short `header` chip (≤12 chars), the full `question` text, and 2–4 mutually exclusive `options`. Set `multiSelect:true` only when choices are not mutually exclusive. Options may include a `description` and an optional `preview` (monospace mockup). Do NOT include an 'Other' option — the UI adds one automatically.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				questions: {
+					type: "array",
+					minItems: 1,
+					maxItems: 4,
+					description: "1–4 questions to present together.",
+					items: {
+						type: "object",
+						properties: {
+							question: {
+								type: "string",
+								description:
+									"Full question text, ending with a question mark.",
+							},
+							header: {
+								type: "string",
+								description: "Very short chip label, max 12 chars.",
+							},
+							multiSelect: {
+								type: "boolean",
+								description:
+									"true if multiple options can be selected; default false.",
+							},
+							options: {
+								type: "array",
+								minItems: 2,
+								maxItems: 4,
+								items: {
+									type: "object",
+									properties: {
+										label: { type: "string" },
+										description: { type: "string" },
+										preview: {
+											type: "string",
+											description:
+												"Optional monospace mockup / code snippet for visual comparison.",
+										},
+									},
+									required: ["label", "description"],
+								},
+							},
+						},
+						required: ["question", "header", "options"],
+					},
+				},
+			},
+			required: ["questions"],
+		},
+	},
 ];
 
 export const AGENT_BUILTIN_TOOL_NAMES = toolDefs.map((t) => t.name);
@@ -441,6 +502,16 @@ const taskHandler: InternalToolHandler = async (args) => {
 	}
 };
 
+// AskUserQuestion is intercepted by `toolAdapter.ts` before reaching this MCP
+// server. If it ever falls through (e.g. a future code path forgets the
+// interception), surface a clear error rather than silently returning empty.
+const askUserQuestionFallthroughHandler: InternalToolHandler = async () => {
+	return textErr(
+		"AskUserQuestion must be handled by the LLM tool adapter (toolAdapter.ts). " +
+			"Reaching the MCP dispatch path means the interception was bypassed.",
+	);
+};
+
 export function createAgentBuiltinsServer(): InternalMcpServer {
 	const handlers = new Map<string, InternalToolHandler>();
 	handlers.set("Read", readHandler);
@@ -451,6 +522,7 @@ export function createAgentBuiltinsServer(): InternalMcpServer {
 	handlers.set("Glob", globHandler);
 	handlers.set("WebFetch", webfetchHandler);
 	handlers.set("Task", taskHandler);
+	handlers.set("AskUserQuestion", askUserQuestionFallthroughHandler);
 	return {
 		id: "@scp/agent-builtins",
 		name: "Agent Built-ins",

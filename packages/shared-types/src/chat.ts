@@ -542,6 +542,16 @@ export interface ToolCallApproval {
 	blockedPath?: string;
 	decisionReason?: string;
 	agentId?: string;
+	/**
+	 * AskUserQuestion-only: the renderer-collected `{question → answer}`
+	 * map at submit time. Stored on `approval` (not `result`) because the
+	 * `tool_result` / `tool_error` event handlers shallow-overwrite `result`
+	 * with whatever main-process echoes back — in some IPC paths this
+	 * arrives as `{}` and would wipe the user's answers out of the chat
+	 * history. `approval` is never touched by those handlers, so the
+	 * answers survive into the read-only summary.
+	 */
+	userAnswers?: Record<string, string>;
 }
 
 export type MessagePartState =

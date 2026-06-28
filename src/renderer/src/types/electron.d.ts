@@ -394,6 +394,14 @@ export interface ChatStreamEvent {
     toolCallId: string;
     name: string;
     arguments: string;
+    /**
+     * Origin of the approval prompt. Mirrors the main-process
+     * `ChatStreamEvent.toolApproval.source` so the renderer can dispatch
+     * to the right card (e.g. `ask-user-question` → AskUserQuestionCard).
+     */
+    source?: "tool-permission" | "runtime-policy" | "ask-user-question";
+    code?: string;
+    reason?: string;
   };
   usage?: {
     inputTokens?: number;
@@ -941,6 +949,13 @@ export interface ElectronAPI extends ElectronAPIMigrated {
     toolApprovalResponse: (
       toolCallId: string,
       approved: boolean,
+      /**
+       * Optional structured payload from the renderer. Used by the
+       * `AskUserQuestion` flow to ship the user-submitted answers back to
+       * the main-process tool execution (see `toolAdapter.ts`'s
+       * `AskUserQuestion` interception).
+       */
+      payload?: Record<string, unknown>,
     ) => Promise<IPCResponse>;
     onStreamEvent: (callback: (event: ChatStreamEvent) => void) => () => void;
   };
