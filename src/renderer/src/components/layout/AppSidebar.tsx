@@ -34,6 +34,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 import { useNewConversation } from "../../hooks/useNewConversation";
+import { ThemeToggleButton } from "./ThemeToggleButton";
 import {
 	PROJECT_MENU_IDS,
 	findMenuItem,
@@ -777,6 +778,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 						<MoreOutlined />
 					</button>
 				</Dropdown>
+				<ThemeToggleButton color={TEXT_MUTED} hoverBg={HOVER_BG} />
 				<button
 					type="button"
 					onClick={() => navigate("/settings")}

@@ -13,6 +13,7 @@ import {
 	StarOutlined,
 } from "@ant-design/icons";
 import { Input, type InputRef, Tooltip, message, theme } from "antd";
+import { ThemeToggleButton } from "./ThemeToggleButton";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -795,24 +796,27 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 							{user?.name || "访客"}
 						</span>
 					</div>
-					<Tooltip title="设置" mouseEnterDelay={0.3}>
-						<button
-							type="button"
-							onClick={handleSettings}
-							className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
-							style={{ color: mutedColor }}
-							data-testid="sidebar-settings"
-							onMouseEnter={(e) => {
-								e.currentTarget.style.background = hoverBg;
-							}}
-							onMouseLeave={(e) => {
-								e.currentTarget.style.background = "transparent";
-							}}
-						>
-							<SettingOutlined className="text-[15px]" />
-						</button>
-					</Tooltip>
-				</div>
+						<div className="flex items-center gap-1">
+							<ThemeToggleButton color={mutedColor} hoverBg={hoverBg} />
+							<Tooltip title="设置" mouseEnterDelay={0.3}>
+								<button
+									type="button"
+									onClick={handleSettings}
+									className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
+									style={{ color: mutedColor }}
+									data-testid="sidebar-settings"
+									onMouseEnter={(e) => {
+										e.currentTarget.style.background = hoverBg;
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.background = "transparent";
+									}}
+								>
+									<SettingOutlined className="text-[15px]" />
+								</button>
+							</Tooltip>
+						</div>
+					</div>
 
 				<SidebarResizeHandle currentWidth={width} onWidthChange={setWidth} />
 

@@ -1,5 +1,56 @@
 @import "tailwindcss";
 
+/* Tailwind v4 defaults the `dark:` variant to `prefers-color-scheme`. The
+ * app, however, exposes auto / light / dark in Settings and toggles `.dark`
+ * (or `.light`) on <html> via `themeStore.updateActualTheme`. Without this
+ * custom variant, every `dark:xxx` class across the codebase would only
+ * react to the OS — so users choosing dark on a light OS (or vice-versa)
+ * would see broken theming. Re-bind `dark:` to the actual class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* highlight.js theme — load the GitHub LIGHT palette as the always-on
+ * baseline. The dark palette is re-declared further down, scoped to
+ * `html.dark`, so it follows the app's explicit theme class rather than
+ * `prefers-color-scheme`. */
+@import "highlight.js/styles/github.css";
+
+/* Static highlighter — line numbers via CSS counter so scrolling/mounting
+ * doesn't touch JS. Each `<span class="static-highlighter__line">` ticks
+ * the counter and the `::before` renders the gutter number. Keeping the
+ * gutter in CSS means highlight.js output stays unchanged and React can
+ * keep using `dangerouslySetInnerHTML` with no per-line wrappers. */
+.static-highlighter {
+	counter-reset: line;
+	background: transparent !important;
+}
+.static-highlighter__line {
+	counter-increment: line;
+	display: block;
+	min-height: 1em;
+}
+.static-highlighter--numbered .static-highlighter__line {
+	/* Gutter width tuned to fit 3-digit line numbers (most chat snippets
+	 * never exceed that) — kept tight so the actual code content sits
+	 * close to the card edge. */
+	padding-left: 2.25rem;
+	position: relative;
+}
+.static-highlighter--numbered .static-highlighter__line::before {
+	content: counter(line);
+	position: absolute;
+	left: 0;
+	width: 1.75rem;
+	text-align: right;
+	color: rgba(0, 0, 0, 0.32);
+	user-select: none;
+	font-variant-numeric: tabular-nums;
+}
+.dark .static-highlighter--numbered .static-highlighter__line::before,
+[data-theme="dark"] .static-highlighter--numbered .static-highlighter__line::before {
+	color: rgba(255, 255, 255, 0.28);
+}
+
+
 @theme {
 	/* Primary Colors */
 	--color-primary: #1890ff;
@@ -911,6 +962,201 @@ body {
 	}
 }
 
+/* "Load older messages" button breathe while it's fetching the full
+   conversation. Subtle box-shadow swell — enough to telegraph activity
+   without distracting from the message list below. */
+@keyframes chat-load-older-pulse {
+	0%,
+	100% {
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+	}
+	50% {
+		box-shadow: 0 4px 16px rgba(22, 119, 255, 0.35);
+	}
+}
+
+/* ==========================================
+   Scroll-to-bottom FAB
+   ========================================== */
+
+/* Bottom-center circular pill. Entrance animates from below + scale-in;
+   hover lifts it; active state taps back down. */
+.chat-scroll-to-bottom-fab {
+	position: absolute;
+	left: 50%;
+	bottom: 16px;
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	border: 1px solid var(--color-border-secondary, rgba(0, 0, 0, 0.08));
+	background: var(--color-bg-elevated, #fff);
+	color: var(--color-text-base, rgba(0, 0, 0, 0.85));
+	cursor: pointer;
+	z-index: 20;
+	box-shadow:
+		0 4px 12px rgba(0, 0, 0, 0.08),
+		0 1px 3px rgba(0, 0, 0, 0.06);
+	transition:
+		opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+		transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1),
+		box-shadow 200ms ease,
+		background-color 160ms ease;
+	transform-origin: center bottom;
+}
+
+.chat-scroll-to-bottom-fab.is-hidden {
+	opacity: 0;
+	pointer-events: none;
+	visibility: hidden;
+	/* `translate(X, Y)` — keep horizontal centering even while hidden */
+	transform: translate(-50%, 8px) scale(0.85);
+}
+
+.chat-scroll-to-bottom-fab.is-visible {
+	opacity: 1;
+	pointer-events: auto;
+	visibility: visible;
+	transform: translate(-50%, 0) scale(1);
+	animation: chat-fab-enter 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.chat-scroll-to-bottom-fab:hover {
+	box-shadow:
+		0 8px 20px rgba(0, 0, 0, 0.12),
+		0 2px 6px rgba(0, 0, 0, 0.08);
+	transform: translate(-50%, -2px) scale(1);
+	background: var(--color-bg-container, #fafafa);
+}
+
+.chat-scroll-to-bottom-fab:active {
+	transform: translate(-50%, 0) scale(0.94);
+	transition-duration: 80ms;
+}
+
+/* Entrance: pop up + scale + tiny bounce */
+@keyframes chat-fab-enter {
+	0% {
+		opacity: 0;
+		transform: translate(-50%, 12px) scale(0.7);
+	}
+	60% {
+		opacity: 1;
+		transform: translate(-50%, -3px) scale(1.04);
+	}
+	100% {
+		opacity: 1;
+		transform: translate(-50%, 0) scale(1);
+	}
+}
+
+/* Dark theme — keyed on the explicit `.dark` class that `themeStore` puts on
+ * <html>, NOT `prefers-color-scheme`, so manual light/dark toggling in
+ * Settings actually takes effect (the app supports auto/light/dark, only
+ * "auto" follows the OS). */
+html.dark .chat-scroll-to-bottom-fab {
+	background: rgba(40, 40, 44, 0.92);
+	color: rgba(255, 255, 255, 0.92);
+	border-color: rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(8px);
+	box-shadow:
+		0 4px 12px rgba(0, 0, 0, 0.35),
+		0 1px 3px rgba(0, 0, 0, 0.25);
+}
+html.dark .chat-scroll-to-bottom-fab:hover {
+	background: rgba(55, 55, 60, 0.96);
+	box-shadow:
+		0 8px 20px rgba(0, 0, 0, 0.4),
+		0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ==========================================
+   Load older messages pill
+   ========================================== */
+
+/* Pill-shaped chip pinned to the top of the chat pane. Replaces the
+   default antd Button with a more refined chip look — icon + label,
+   thin border, soft shadow. */
+.chat-load-older-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 12px;
+	border-radius: 9999px;
+	border: 1px solid var(--color-border-secondary, rgba(0, 0, 0, 0.08));
+	background: var(--color-bg-elevated, #fff);
+	color: var(--color-text-secondary, rgba(0, 0, 0, 0.65));
+	font-size: 12px;
+	line-height: 1;
+	cursor: pointer;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+	transition:
+		transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+		box-shadow 160ms ease,
+		background-color 160ms ease,
+		color 160ms ease;
+	animation: chat-load-older-enter 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.chat-load-older-pill:hover:not(:disabled) {
+	color: var(--color-primary, #1677ff);
+	border-color: rgba(22, 119, 255, 0.3);
+	box-shadow: 0 4px 12px rgba(22, 119, 255, 0.15);
+	transform: translateY(-1px);
+}
+
+.chat-load-older-pill:active:not(:disabled) {
+	transform: translateY(0);
+	transition-duration: 80ms;
+}
+
+.chat-load-older-pill:disabled {
+	cursor: default;
+	color: var(--color-primary, #1677ff);
+	border-color: rgba(22, 119, 255, 0.35);
+	animation: chat-load-older-pulse 1.4s ease-in-out infinite;
+}
+
+.chat-load-older-pill__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	line-height: 1;
+}
+
+@keyframes chat-load-older-enter {
+	from {
+		opacity: 0;
+		transform: translateY(-6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Dark theme — same class-based gate as the FAB above. */
+html.dark .chat-load-older-pill {
+	background: rgba(40, 40, 44, 0.92);
+	color: rgba(255, 255, 255, 0.72);
+	border-color: rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(8px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+html.dark .chat-load-older-pill:hover:not(:disabled) {
+	color: #5aa6ff;
+	border-color: rgba(90, 166, 255, 0.45);
+	box-shadow: 0 4px 12px rgba(90, 166, 255, 0.25);
+}
+html.dark .chat-load-older-pill:disabled {
+	color: #5aa6ff;
+	border-color: rgba(90, 166, 255, 0.45);
+}
+
 /* ==========================================
    Composer Pills & Card
    ========================================== */
@@ -1394,4 +1640,96 @@ body {
 
 .milkdown-system-prompt .milkdown .ProseMirror blockquote {
 	font-size: 14px;
+}
+
+/* ==========================================
+   highlight.js — dark palette
+   ==========================================
+   Mirror of `highlight.js/styles/github-dark.css`, prefixed with `html.dark`
+   so it overrides the always-loaded github (light) theme whenever the user
+   picks "dark" (or "auto" resolves to dark) in Settings. Keeping this in
+   sync with the upstream theme means we don't fight with prefers-color-
+   scheme media gating, which the renderer's class-based theme switching
+   doesn't trigger. */
+html.dark .hljs {
+	color: #c9d1d9;
+	background: #0d1117;
+}
+html.dark .hljs-doctag,
+html.dark .hljs-keyword,
+html.dark .hljs-meta .hljs-keyword,
+html.dark .hljs-template-tag,
+html.dark .hljs-template-variable,
+html.dark .hljs-type,
+html.dark .hljs-variable.language_ {
+	color: #ff7b72;
+}
+html.dark .hljs-title,
+html.dark .hljs-title.class_,
+html.dark .hljs-title.class_.inherited__,
+html.dark .hljs-title.function_ {
+	color: #d2a8ff;
+}
+html.dark .hljs-attr,
+html.dark .hljs-attribute,
+html.dark .hljs-literal,
+html.dark .hljs-meta,
+html.dark .hljs-number,
+html.dark .hljs-operator,
+html.dark .hljs-variable,
+html.dark .hljs-selector-attr,
+html.dark .hljs-selector-class,
+html.dark .hljs-selector-id {
+	color: #79c0ff;
+}
+html.dark .hljs-regexp,
+html.dark .hljs-string,
+html.dark .hljs-meta .hljs-string {
+	color: #a5d6ff;
+}
+html.dark .hljs-built_in,
+html.dark .hljs-symbol {
+	color: #ffa657;
+}
+html.dark .hljs-comment,
+html.dark .hljs-code,
+html.dark .hljs-formula {
+	color: #8b949e;
+}
+html.dark .hljs-name,
+html.dark .hljs-quote,
+html.dark .hljs-selector-tag,
+html.dark .hljs-selector-pseudo {
+	color: #7ee787;
+}
+html.dark .hljs-subst {
+	color: #c9d1d9;
+}
+html.dark .hljs-section {
+	color: #1f6feb;
+	font-weight: bold;
+}
+html.dark .hljs-bullet {
+	color: #f2cc60;
+}
+html.dark .hljs-emphasis {
+	color: #c9d1d9;
+	font-style: italic;
+}
+html.dark .hljs-strong {
+	color: #c9d1d9;
+	font-weight: bold;
+}
+html.dark .hljs-addition {
+	color: #aff5b4;
+	background-color: #033a16;
+}
+html.dark .hljs-deletion {
+	color: #ffdcd7;
+	background-color: #67060c;
+}
+/* Gutter line numbers also need a dark-mode color (the base rule uses
+ * `rgba(0,0,0,0.32)` which becomes invisible on dark backgrounds). */
+html.dark .static-highlighter--numbered .static-highlighter__line::before {
+	color: rgba(255, 255, 255, 0.35);
 }
