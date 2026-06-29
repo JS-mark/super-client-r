@@ -120,15 +120,30 @@ export function getProjectIdFromConversation(
 	return conv.workspaceId;
 }
 
-async function readSessionMessages(conversationId: string): Promise<Message[]> {
+async function readSessionMessages(
+	conversationId: string,
+	options?: { tail?: number },
+): Promise<Message[]> {
 	try {
-		const res = await window.electron.sessions.readMessages(conversationId);
+		const res = await window.electron.sessions.readMessages(
+			conversationId,
+			options?.tail !== undefined ? { tail: options.tail } : undefined,
+		);
 		if (res.success && res.data) return res.data;
 	} catch (err) {
 		console.error("[chatStore] sessions.readMessages failed:", err);
 	}
 	return [];
 }
+
+/**
+ * Tail size for the initial "fast first paint" read in `switchConversation`.
+ * Tuned so that `buildMessageTurns` + bubbleItems O(N) work stays under a
+ * single frame on a typical machine. If the disk read returns exactly this
+ * many messages, we assume there's more older history available and surface
+ * a "查看更早消息" button via `chatMessageStore.hasOlderMessages`.
+ */
+const INITIAL_TAIL_MESSAGE_COUNT = 100;
 
 interface ChatState {
 	// Pending input (from plugins, float widget, etc.)
@@ -165,6 +180,12 @@ interface ChatState {
 		remote?: { botId: string; chatId: string };
 	}) => Promise<string | null>;
 	switchConversation: (conversationId: string) => Promise<void>;
+	/**
+	 * Read the full message history for the currently-active conversation
+	 * (used when the user clicks "查看更早消息" after a tailed switch). No-op
+	 * if there's nothing older to load.
+	 */
+	loadOlderMessages: () => Promise<void>;
 	deleteConversation: (conversationId: string) => Promise<void>;
 	deleteProjectConversationsLocally: (projectId: string) => Promise<void>;
 	renameConversation: (conversationId: string, name: string) => Promise<void>;
@@ -325,13 +346,61 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		if (conversationId === currentConversationId) return;
 
 		set({ currentConversationId: conversationId });
-		useChatMessageStore.getState().setMessages([]);
+		// Clear + flag loading so the chat pane shows a spinner instead of a
+		// blank gap while the next conversation's history is read from disk.
+		// We also reset the "older messages" hint here — every switch starts
+		// fresh and decides anew whether tailing left more on disk.
+		const messageStore = useChatMessageStore.getState();
+		messageStore.setMessages([]);
+		messageStore.setHasOlderMessages(false);
+		messageStore.setLoadingMessages(true);
 
 		try {
-			const messages = await readSessionMessages(conversationId);
+			// Tail-first read: keeps first-paint cost bounded for huge sessions.
+			// Buildup of turns / bubbleItems is O(N) over loaded messages so
+			// capping at INITIAL_TAIL_MESSAGE_COUNT keeps that pass cheap.
+			const messages = await readSessionMessages(conversationId, {
+				tail: INITIAL_TAIL_MESSAGE_COUNT,
+			});
+			// Guard against the user switching conversations again while we
+			// were reading — only commit if we're still on the same target.
+			if (get().currentConversationId !== conversationId) return;
 			useChatMessageStore.getState().setMessages(messages);
+			// If we got exactly the tail size, assume there might be more
+			// older history on disk. (False positives are harmless — the user
+			// just sees an unnecessary button; clicking it is a no-op when
+			// the full read returns the same set.)
+			useChatMessageStore
+				.getState()
+				.setHasOlderMessages(messages.length >= INITIAL_TAIL_MESSAGE_COUNT);
 		} catch (error) {
 			console.error("[chatStore] Failed to load messages:", error);
+		} finally {
+			useChatMessageStore.getState().setLoadingMessages(false);
+		}
+	},
+
+	loadOlderMessages: async () => {
+		const { currentConversationId } = get();
+		if (!currentConversationId) return;
+		const messageStore = useChatMessageStore.getState();
+		if (!messageStore.hasOlderMessages || messageStore.isLoadingOlderMessages) {
+			return;
+		}
+		messageStore.setLoadingOlderMessages(true);
+		try {
+			// Full read — no `tail`. The IPC payload + buildTurns pass will be
+			// expensive on long sessions, but the user explicitly asked for it.
+			const all = await readSessionMessages(currentConversationId);
+			// Guard against the user switching conversations mid-fetch.
+			if (get().currentConversationId !== currentConversationId) return;
+			const store = useChatMessageStore.getState();
+			store.setMessages(all);
+			store.setHasOlderMessages(false);
+		} catch (error) {
+			console.error("[chatStore] Failed to load older messages:", error);
+		} finally {
+			useChatMessageStore.getState().setLoadingOlderMessages(false);
 		}
 	},
 
@@ -385,11 +454,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			}
 
 			if (isCurrent && nextId) {
+				const ms = useChatMessageStore.getState();
+				ms.setHasOlderMessages(false);
+				ms.setLoadingMessages(true);
 				try {
-					const messages = await readSessionMessages(nextId);
+					// Tail-first read — same rationale as switchConversation.
+					const messages = await readSessionMessages(nextId, {
+						tail: INITIAL_TAIL_MESSAGE_COUNT,
+					});
 					useChatMessageStore.getState().setMessages(messages);
+					useChatMessageStore
+						.getState()
+						.setHasOlderMessages(messages.length >= INITIAL_TAIL_MESSAGE_COUNT);
 				} catch (err) {
 					console.error("[chatStore] failed to load next messages:", err);
+				} finally {
+					useChatMessageStore.getState().setLoadingMessages(false);
 				}
 			}
 		} catch (error) {
@@ -439,15 +519,25 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		const messageStore = useChatMessageStore.getState();
 		messageStore.setSessionStatus("idle");
 		messageStore.setStreamingContent("");
+		messageStore.setHasOlderMessages(false);
 		if (!nextId) {
 			messageStore.setMessages([]);
 			return;
 		}
+		messageStore.setLoadingMessages(true);
 		try {
-			messageStore.setMessages(await readSessionMessages(nextId));
+			const tail = await readSessionMessages(nextId, {
+				tail: INITIAL_TAIL_MESSAGE_COUNT,
+			});
+			messageStore.setMessages(tail);
+			messageStore.setHasOlderMessages(
+				tail.length >= INITIAL_TAIL_MESSAGE_COUNT,
+			);
 		} catch (err) {
 			console.error("[chatStore] failed to load fallback messages:", err);
 			messageStore.setMessages([]);
+		} finally {
+			useChatMessageStore.getState().setLoadingMessages(false);
 		}
 	},
 

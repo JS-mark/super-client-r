@@ -13,6 +13,7 @@ import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { useModelStore } from "../../stores/modelStore";
+import { useChatInputStore } from "../../stores/chatInputStore";
 import type { ModelProviderPreset } from "../../types/models";
 import { ProviderIcon } from "../models/ProviderIcon";
 
@@ -22,14 +23,12 @@ const { useToken } = theme;
 interface ChatWelcomeScreenProps {
 	hasActiveModel: boolean;
 	isModelLoading: boolean;
-	onInputChange: (text: string) => void;
 	messageApi: { success: (msg: string) => void };
 }
 
 export function ChatWelcomeScreen({
 	hasActiveModel,
 	isModelLoading,
-	onInputChange,
 	messageApi,
 }: ChatWelcomeScreenProps) {
 	const { t } = useTranslation();
@@ -81,10 +80,12 @@ export function ChatWelcomeScreen({
 		(info: { data: { key: string; label?: React.ReactNode } }) => {
 			const label = typeof info.data.label === "string" ? info.data.label : "";
 			if (label) {
-				onInputChange(label);
+				// Push into the shared composer store so the composer (which
+				// subscribes to it) picks the suggestion up as its draft text.
+				useChatInputStore.getState().setValue(label);
 			}
 		},
-		[onInputChange],
+		[],
 	);
 
 	return (

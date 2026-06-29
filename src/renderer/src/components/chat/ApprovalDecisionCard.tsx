@@ -250,7 +250,6 @@ export function ApprovalDecisionCard({
 					...(fullWidth
 						? {
 								width: "100%",
-								minWidth: "min(720px, calc(100vw - 4rem))",
 							}
 						: {}),
 					borderRadius: compact ? 12 : 10,

@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SlashItem } from "../components/chat/SlashCommandPanel";
+import { useChatInputStore } from "../stores/chatInputStore";
 
 interface UseSlashCommandsParams {
 	setSelectedSkillId: (id: string | null) => void;
 	setSelectedCommandName: (name: string | null) => void;
-	setInput: (value: string) => void;
+	// NOTE: `setInput` used to be threaded from the host component; the composer
+	// input value now lives in `chatInputStore` so keystrokes no longer re-render
+	// Chat.tsx. See the 2026-06-28 perf comment in `useChat.ts`.
 }
 
 export function useSlashCommands({
 	setSelectedSkillId,
 	setSelectedCommandName,
-	setInput,
 }: UseSlashCommandsParams) {
 	const [slashPanelOpen, setSlashPanelOpen] = useState(false);
 	const [slashQuery, setSlashQuery] = useState("");
@@ -79,11 +81,13 @@ export function useSlashCommands({
 				setSelectedSkillId(item.skill.id);
 				setSelectedCommandName(null);
 			}
-			setInput("");
+			// Clear the shared composer input — selecting a slash command picks a
+			// skill/command and should reset whatever draft the user was typing.
+			useChatInputStore.getState().clear();
 			setSlashPanelOpen(false);
 			setSlashQuery("");
 		},
-		[setSelectedSkillId, setSelectedCommandName, setInput],
+		[setSelectedSkillId, setSelectedCommandName],
 	);
 
 	// Use refs so the native capture listener always sees fresh values

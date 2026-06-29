@@ -30,6 +30,7 @@ import {
 	getProjectIdFromConversation,
 	useChatStore,
 } from "../../stores/chatStore";
+import { useChatInputStore } from "../../stores/chatInputStore";
 import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
 import { useEffectiveModel } from "../../hooks/useEffectiveModel";
@@ -55,8 +56,12 @@ import { isAskUserQuestionToolCall } from "./messagePartsAdapter";
 const { useToken } = theme;
 
 interface ChatInputAreaProps {
-	input: string;
-	onInputChange: (value: string) => void;
+	// `input` / `onInputChange` are intentionally NOT threaded from the parent
+	// anymore — the composer's text lives in `chatInputStore` so typing into
+	// the textarea no longer re-renders Chat.tsx (the whole page subtree).
+	// These props are kept in the interface for clarity; the component ignores
+	// them in favor of subscribing to the store directly.
+	// See the 2026-06-28 perf comment in `useChat.ts`.
 	onSend: (value: string, attachmentIds?: string[]) => void;
 	isStreaming: boolean;
 	onStopStream: () => void;
@@ -107,8 +112,6 @@ interface ChatInputAreaProps {
 }
 
 export function ChatInputArea({
-	input,
-	onInputChange,
 	onSend,
 	isStreaming,
 	onStopStream,
@@ -143,6 +146,11 @@ export function ChatInputArea({
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const { message } = App.useApp();
+	// Subscribe to the shared composer input directly. This is the ONLY
+	// component that re-renders on each keystroke — the page (Chat.tsx) and
+	// `useChat` callbacks read snapshots via `getState()` instead.
+	const input = useChatInputStore((s) => s.value);
+	const setInput = useChatInputStore((s) => s.setValue);
 	const [attachedFiles, setAttachedFiles] = useState<Attachment[]>([]);
 	const [searchPopoverOpen, setSearchPopoverOpen] = useState(false);
 	const [promptPanelOpen, setPromptPanelOpen] = useState(false);
@@ -243,7 +251,7 @@ export function ChatInputArea({
 
 	const handleSenderChange = useCallback(
 		(val: string) => {
-			onInputChange(val);
+			setInput(val);
 			onSlashInputChange(val);
 			if (onMentionInputChange) {
 				const ta = composerWrapperRef.current?.querySelector(
@@ -253,7 +261,7 @@ export function ChatInputArea({
 				onMentionInputChange(val, caret);
 			}
 		},
-		[onInputChange, onSlashInputChange, onMentionInputChange],
+		[setInput, onSlashInputChange, onMentionInputChange],
 	);
 
 	const handleMentionItemSelect = useCallback(
@@ -263,7 +271,7 @@ export function ChatInputArea({
 			) as HTMLTextAreaElement | null;
 			const caret = ta?.selectionStart ?? input.length;
 			const next = applyMentionToValue(input, caret, item.relativePath);
-			onInputChange(next.value);
+			setInput(next.value);
 			// Restore caret position after React commits the new value.
 			requestAnimationFrame(() => {
 				const ta2 = composerWrapperRef.current?.querySelector(
@@ -276,7 +284,7 @@ export function ChatInputArea({
 			});
 			onMentionSelect?.(item);
 		},
-		[input, onInputChange, onMentionSelect],
+		[input, setInput, onMentionSelect],
 	);
 
 	// Wire the same splice handler into the hook's capture-phase Enter path.
@@ -330,9 +338,9 @@ export function ChatInputArea({
 				/\{\{(\w+)\}\}/g,
 				(_match, key: string) => `[${key}]`,
 			);
-			onInputChange(text);
+			setInput(text);
 		},
-		[onInputChange],
+		[setInput],
 	);
 
 	const handleQuoteSelect = useCallback(
@@ -343,17 +351,17 @@ export function ChatInputArea({
 					? `${msg.content.slice(0, 200)}...`
 					: msg.content;
 			const quote = `> **${role}**: ${preview}\n\n`;
-			onInputChange(input ? `${input}\n${quote}` : quote);
+			setInput(input ? `${input}\n${quote}` : quote);
 		},
-		[onInputChange, input],
+		[setInput, input],
 	);
 
 	const handleToolSelect = useCallback(
 		(tool: ToolItem) => {
 			const hint = `Please use the "${tool.name}" tool to `;
-			onInputChange(input ? `${input}\n${hint}` : hint);
+			setInput(input ? `${input}\n${hint}` : hint);
 		},
-		[onInputChange, input],
+		[setInput, input],
 	);
 
 	const topOverlay = (

@@ -1,5 +1,5 @@
 import { FolderOpenOutlined } from "@ant-design/icons";
-import { Alert, App, Button, theme } from "antd";
+import { Alert, App, Button, Spin, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,6 +23,8 @@ import { useAtMentions } from "../hooks/useAtMentions";
 
 import { useModelStore } from "../stores/modelStore";
 import { useChatStore } from "../stores/chatStore";
+import { useChatInputStore } from "../stores/chatInputStore";
+import { useChatMessageStore } from "../stores/chatMessageStore";
 import { useFeatureFlagsStore } from "../stores/featureFlagsStore";
 import { useInspectorPanelStore } from "../stores/inspectorPanelStore";
 import { useFileArtifactStore } from "../stores/fileArtifactStore";
@@ -37,8 +39,6 @@ const Chat: React.FC = () => {
 
 	const {
 		messages,
-		input,
-		setInput,
 		sendMessage,
 		isStreaming,
 		stopCurrentStream,
@@ -70,6 +70,12 @@ const Chat: React.FC = () => {
 	const isModelLoading = useModelStore((s) => s.isLoading);
 	const hasActiveModel = !!useModelStore((s) => s.getActiveProviderModel)();
 
+	// Conversation loading state — set by `chatStore.switchConversation` while
+	// reading historical messages from disk. Drives the centered spinner
+	// below; otherwise an empty `messages` array would route to the welcome
+	// screen mid-load, which feels like nothing is happening.
+	const isLoadingMessages = useChatMessageStore((s) => s.isLoadingMessages);
+
 	// Remote chat bridge
 	const {
 		binding: remoteBinding,
@@ -84,14 +90,12 @@ const Chat: React.FC = () => {
 	const pageState = useChatPageState({
 		messages,
 		sendMessage,
-		setInput,
 		setSelectedSkillId,
 		setSessionSettings,
 		remoteBinding,
 		remoteMessages,
 		checkBotOnline,
 		unbindRemote,
-		input,
 	});
 
 	// Effective interactionProfile for the current conversation.
@@ -164,7 +168,6 @@ const Chat: React.FC = () => {
 	const slash = useSlashCommands({
 		setSelectedSkillId,
 		setSelectedCommandName,
-		setInput,
 	});
 
 	// "@" file-mention panel. Selection is handled inside the host composer
@@ -187,7 +190,11 @@ const Chat: React.FC = () => {
 						workspaceId: currentProjectId ?? undefined,
 					});
 				}
-				setInput(value);
+				// Mirror the typed value into the shared composer store so that
+				// `sendMessage` (which snapshots `chatInputStore.getState().value`
+				// when `content` isn't passed) and any post-send UI stays in sync.
+				// `sendMessage` itself calls `.clear()` once it has consumed it.
+				useChatInputStore.getState().setValue(value);
 				sendMessage({
 					mode: "agent",
 					content: value,
@@ -204,7 +211,6 @@ const Chat: React.FC = () => {
 			isStreaming,
 			sendMessage,
 			currentProjectId,
-			setInput,
 			selectedSkillId,
 			selectedCommandName,
 			selectedEngine,
@@ -218,10 +224,11 @@ const Chat: React.FC = () => {
 		(value: string) => {
 			if (value.trim()) {
 				sendRemoteMessage(value.trim());
-				setInput("");
+				// Reset the shared composer store after routing to IM.
+				useChatInputStore.getState().clear();
 			}
 		},
-		[sendRemoteMessage, setInput],
+		[sendRemoteMessage],
 	);
 
 	// ── Skill clear ──
@@ -365,6 +372,24 @@ const Chat: React.FC = () => {
 								<div className="chat-message-area flex-1 overflow-hidden w-full px-4 sm:px-6">
 									{!pageState.currentConversationId ? (
 										<ChatNewSession />
+									) : isLoadingMessages ? (
+										// Take priority over the empty-state welcome: while a
+										// session's history is being read, show a centered
+										// spinner instead of bouncing through the welcome page.
+										// Lay out spinner + label in a flex column (rather than
+										// using Spin's `tip` slot) so the text gets the full
+										// available width and renders on one line.
+										<div className="flex flex-col items-center justify-center h-full w-full gap-3">
+											<Spin size="large" />
+											<div
+												className="text-sm"
+												style={{ color: token.colorTextSecondary }}
+											>
+												{t("loadingConversation", "正在加载对话...", {
+													ns: "chat",
+												})}
+											</div>
+										</div>
 									) : messages.length === 0 ? (
 										profileLayoutsEnabled &&
 										(interactionProfile === "claude-code" ||
@@ -400,7 +425,6 @@ const Chat: React.FC = () => {
 											<ChatWelcomeScreen
 												hasActiveModel={hasActiveModel}
 												isModelLoading={isModelLoading}
-												onInputChange={setInput}
 												messageApi={message}
 											/>
 										)
@@ -427,8 +451,6 @@ const Chat: React.FC = () => {
 											interactionProfile === "hybrid")
 									) && (
 										<ChatInputArea
-											input={input}
-											onInputChange={setInput}
 											onSend={handleSend}
 											isStreaming={isStreaming}
 											onStopStream={stopCurrentStream}
@@ -480,8 +502,6 @@ const Chat: React.FC = () => {
 
 								{/* Chat's own input — hideToolbar mode for IM */}
 								<ChatInputArea
-									input={input}
-									onInputChange={setInput}
 									onSend={handleRemoteSend}
 									isStreaming={false}
 									onStopStream={stopCurrentStream}

@@ -172,9 +172,35 @@ interface ChatMessageState {
 	sessionStatus: ChatSessionStatus;
 	isStreaming: boolean;
 	streamingContent: string;
+	/**
+	 * True while a conversation's message history is being read from disk
+	 * (set by `chatStore.switchConversation` / `deleteConversation`). Drives
+	 * the centered `Spin` in `ChatMessageList` so the user sees a loading
+	 * state instead of a blank pane.
+	 */
+	isLoadingMessages: boolean;
+	/**
+	 * Set to `true` after `switchConversation` reads only the tail of a long
+	 * jsonl. Drives a "查看更早消息" button at the top of the message list so
+	 * the user can opt into loading the full history.
+	 *
+	 * Background: building turns / bubbleItems is O(N) over the loaded
+	 * messages, and the IPC payload itself is O(N) too. Reading just the
+	 * tail keeps first-paint fast on long sessions; the rest is fetched on
+	 * demand. See `chatStore.loadOlderMessages`.
+	 */
+	hasOlderMessages: boolean;
+	/** True while `loadOlderMessages` is fetching the full history. */
+	isLoadingOlderMessages: boolean;
 
 	// Bulk replace — used when switching conversations.
 	setMessages: (messages: Message[]) => void;
+	/** Toggle the message-loading flag (used by chatStore on switch/delete). */
+	setLoadingMessages: (loading: boolean) => void;
+	/** Mark whether there's more history on disk beyond what's loaded. */
+	setHasOlderMessages: (has: boolean) => void;
+	/** Toggle the "loading older history" flag. */
+	setLoadingOlderMessages: (loading: boolean) => void;
 
 	// CRUD
 	addMessage: (message: Message) => void;
@@ -225,8 +251,14 @@ export const useChatMessageStore = create<ChatMessageState>()((set) => ({
 	sessionStatus: "idle",
 	isStreaming: false,
 	streamingContent: "",
+	isLoadingMessages: false,
+	hasOlderMessages: false,
+	isLoadingOlderMessages: false,
 
 	setMessages: (messages) => set({ messages }),
+	setLoadingMessages: (loading) => set({ isLoadingMessages: loading }),
+	setHasOlderMessages: (has) => set({ hasOlderMessages: has }),
+	setLoadingOlderMessages: (loading) => set({ isLoadingOlderMessages: loading }),
 
 	addMessage: (message) => {
 		set((state) => ({ messages: [...state.messages, message] }));

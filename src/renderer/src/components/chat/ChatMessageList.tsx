@@ -1,8 +1,10 @@
 import {
+	ArrowDownOutlined,
 	CopyOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
 	EditOutlined,
+	HistoryOutlined,
 	LoadingOutlined,
 	MoreOutlined,
 	ReloadOutlined,
@@ -14,15 +16,16 @@ import {
 import { Bubble } from "@ant-design/x";
 import type { BubbleItemType, BubbleListRef } from "@ant-design/x/es/bubble";
 import type { RoleType } from "@ant-design/x/es/bubble/interface";
-import { App, Avatar, Button, Dropdown, Tooltip, theme } from "antd";
+import { App, Avatar, Button, Dropdown, Spin, Tooltip, theme } from "antd";
 import type * as React from "react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { List, useDynamicRowHeight, useListRef } from "react-window";
 import { formatSmartTime } from "../../lib/formatTime";
 import { formatTokenCount } from "../../lib/formatTokens";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import type { Message } from "../../stores/chatMessageStore";
+import { useChatStore } from "../../stores/chatStore";
 import { useMessageStore } from "../../stores/messageStore";
 import type { ModelProviderPreset } from "../../types/models";
 import { Markdown } from "../Markdown";
@@ -32,7 +35,10 @@ import { ThinkingIndicator } from "./ThinkingIndicator";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import { ToolCallCard } from "./ToolCallCard";
-import { shouldVirtualizeMessageList } from "./chatMessageListVirtualization";
+import {
+	shouldVirtualizeMessageList,
+	smoothScrollToBottom,
+} from "./chatMessageListVirtualization";
 import { isAskUserQuestionToolCall, messageToParts } from "./messagePartsAdapter";
 import { buildMessageTurns } from "./messageTurns";
 import { StreamPartRenderer } from "./parts/StreamPartRenderer";
@@ -101,6 +107,15 @@ interface VirtualBubbleListProps {
 	roles: RoleType;
 	contentStyle: React.CSSProperties;
 	isStreaming: boolean;
+	/** Notified whenever the list's at-bottom state changes (for the FAB). */
+	onNearBottomChange?: (nearBottom: boolean) => void;
+	/**
+	 * Called once on mount with a stable "scroll to last row" function so the
+	 * parent's scroll-to-bottom FAB can drive the virtualized list without
+	 * threading react-window's internal ref shape (whose nullability differs
+	 * across versions and would force noisy type gymnastics).
+	 */
+	registerScrollToBottom?: (fn: () => void) => void;
 }
 
 function VirtualBubbleList({
@@ -108,6 +123,8 @@ function VirtualBubbleList({
 	roles,
 	contentStyle,
 	isStreaming,
+	onNearBottomChange,
+	registerScrollToBottom,
 }: VirtualBubbleListProps) {
 	const listRef = useListRef(null);
 	const rowHeight = useDynamicRowHeight({
@@ -121,6 +138,17 @@ function VirtualBubbleList({
 		[items],
 	);
 
+	// Expose a stable "scroll to last row" handle to the parent. Uses
+	// `smoothScrollToBottom` (rAF-driven easeOutCubic that re-reads
+	// scrollHeight every frame) so the user sees a real animation AND the
+	// scroll still reaches the true bottom even when `useDynamicRowHeight`
+	// resolves row measurements mid-flight.
+	useEffect(() => {
+		registerScrollToBottom?.(() => {
+			smoothScrollToBottom(listRef.current?.element ?? null);
+		});
+	}, [listRef, registerScrollToBottom]);
+
 	const rowProps = useMemo(
 		() => ({ items, roles, contentStyle }),
 		[items, roles, contentStyle],
@@ -130,8 +158,12 @@ function VirtualBubbleList({
 		const el = listRef.current?.element;
 		if (!el) return;
 		const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-		nearBottomRef.current = distance < 120;
-	}, [listRef]);
+		const nearBottom = distance < 120;
+		if (nearBottom !== nearBottomRef.current) {
+			nearBottomRef.current = nearBottom;
+			onNearBottomChange?.(nearBottom);
+		}
+	}, [listRef, onNearBottomChange]);
 
 	useEffect(() => {
 		if (!items.length) return;
@@ -205,6 +237,36 @@ interface ChatMessageListProps {
 	) => void;
 }
 
+interface ScrollToBottomFabProps {
+	visible: boolean;
+	onClick: () => void;
+}
+
+/**
+ * Floating "scroll to bottom" button anchored to the bottom-center of the
+ * chat pane. Pure CSS class drives the entrance/exit/hover animations so
+ * we get a real "appear" effect (scale + fade up) rather than a flat opacity
+ * toggle. See `.chat-scroll-to-bottom-fab` in `styles/index.css`.
+ */
+const ScrollToBottomFab = memo(function ScrollToBottomFab({
+	visible,
+	onClick,
+}: ScrollToBottomFabProps) {
+	const { t } = useTranslation();
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			aria-label={t("scrollToBottom", "滚动到底部", { ns: "chat" })}
+			className={`chat-scroll-to-bottom-fab ${
+				visible ? "is-visible" : "is-hidden"
+			}`}
+		>
+			<ArrowDownOutlined style={{ fontSize: 14 }} />
+		</button>
+	);
+});
+
 export function ChatMessageList({
 	messages,
 	isStreaming,
@@ -220,6 +282,65 @@ export function ChatMessageList({
 	const { message: messageApi } = App.useApp();
 	const { isBookmarked, addBookmark, removeBookmark, getBookmarkByMessageId } =
 		useMessageStore();
+	const isLoadingMessages = useChatMessageStore((s) => s.isLoadingMessages);
+	const hasOlderMessages = useChatMessageStore((s) => s.hasOlderMessages);
+	const isLoadingOlderMessages = useChatMessageStore(
+		(s) => s.isLoadingOlderMessages,
+	);
+	// One-time subscription is enough — `loadOlderMessages` is a stable
+	// action reference on the zustand store. We read it via `getState()` in
+	// the click handler below so the component doesn't need to subscribe
+	// to the entire chatStore.
+
+	// ── Scroll-to-bottom FAB state ──
+	// `isAtBottom` drives the FAB visibility; it's updated from either
+	// `Bubble.List`'s scroll DOM (non-virtual path) or `VirtualBubbleList`'s
+	// internal scroll handler (virtual path) via `onNearBottomChange`.
+	const [isAtBottom, setIsAtBottom] = useState(true);
+	// Stored "scroll to bottom" function from the virtualized list; null when
+	// the non-virtual `Bubble.List` is the active renderer.
+	const virtualScrollToBottomRef = useRef<(() => void) | null>(null);
+
+	const handleNearBottomChange = useCallback((nearBottom: boolean) => {
+		setIsAtBottom(nearBottom);
+	}, []);
+
+	const handleRegisterVirtualScrollToBottom = useCallback((fn: () => void) => {
+		virtualScrollToBottomRef.current = fn;
+	}, []);
+
+	// Attach a scroll listener to `Bubble.List`'s internal scroll DOM so the
+	// FAB hides whenever the user is near the bottom on the non-virtual path.
+	useEffect(() => {
+		const el = bubbleListRef.current?.scrollBoxNativeElement;
+		if (!el) return;
+		const handler = () => {
+			const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+			setIsAtBottom(distance < 120);
+		};
+		handler();
+		el.addEventListener("scroll", handler, { passive: true });
+		return () => el.removeEventListener("scroll", handler);
+		// `bubbleListRef.current` is mutable; re-resolve when the underlying
+		// list mounts/unmounts (covered by depending on the ref itself plus
+		// the message count to retrigger after a switch).
+	}, [bubbleListRef, messages.length]);
+
+	const handleScrollToBottom = useCallback(() => {
+		// Virtual path: defer to the registered animated scroll.
+		if (virtualScrollToBottomRef.current) {
+			virtualScrollToBottomRef.current();
+			return;
+		}
+		// Non-virtual path: same hand-rolled rAF animation as the virtual
+		// path. `Bubble.List`'s built-in smooth scroll captured the target
+		// once at start and stopped short when markdown/code blocks reflowed
+		// mid-animation; `smoothScrollToBottom` re-reads scrollHeight every
+		// frame so growing content during the scroll still counts.
+		smoothScrollToBottom(
+			bubbleListRef.current?.scrollBoxNativeElement ?? null,
+		);
+	}, [bubbleListRef]);
 
 	// ── Message action callbacks ──
 	const handleCopyMessage = useCallback(
@@ -941,18 +1062,41 @@ export function ChatMessageList({
 		respondToApproval,
 	]);
 
-	if (shouldVirtualizeMessageList(bubbleItems.length)) {
+	// ── Loading state ──
+	// Show a centered spinner while a conversation's history is being read
+	// from disk (set by `chatStore.switchConversation`). The store clears
+	// `messages` first so without this guard the pane would flash blank.
+	if (isLoadingMessages && bubbleItems.length === 0) {
 		return (
-			<VirtualBubbleList
-				items={bubbleItems}
-				roles={roles}
-				contentStyle={bubbleContentStyle}
-				isStreaming={isStreaming}
-			/>
+			<div className="flex flex-col items-center justify-center h-full w-full gap-3">
+				<Spin size="large" />
+				<div
+					className="text-sm"
+					style={{ color: token.colorTextSecondary }}
+				>
+					{t("loadingConversation", "正在加载对话...", { ns: "chat" })}
+				</div>
+			</div>
 		);
 	}
 
-	return (
+	const handleLoadOlderMessages = useCallback(() => {
+		// Stable action — read from store at click time so the callback's
+		// dep array stays empty. Aborts internally if the user has already
+		// switched conversations mid-fetch.
+		useChatStore.getState().loadOlderMessages();
+	}, []);
+
+	const list = shouldVirtualizeMessageList(bubbleItems.length) ? (
+		<VirtualBubbleList
+			items={bubbleItems}
+			roles={roles}
+			contentStyle={bubbleContentStyle}
+			isStreaming={isStreaming}
+			onNearBottomChange={handleNearBottomChange}
+			registerScrollToBottom={handleRegisterVirtualScrollToBottom}
+		/>
+	) : (
 		<Bubble.List
 			ref={bubbleListRef}
 			items={bubbleItems}
@@ -961,5 +1105,43 @@ export function ChatMessageList({
 			className="h-full"
 			styles={bubbleListStyles}
 		/>
+	);
+
+	return (
+		<div className="relative h-full w-full">
+			{list}
+			{hasOlderMessages && (
+				// Pinned to the top of the chat pane (above the scroll DOM, so
+				// it stays put while the list virtualizes). Pill style with
+				// soft border + subtle shadow — see `.chat-load-older-pill`.
+				<div className="absolute left-0 right-0 top-3 flex justify-center pointer-events-none z-10">
+					<button
+						type="button"
+						className="chat-load-older-pill pointer-events-auto"
+						disabled={isLoadingOlderMessages}
+						onClick={handleLoadOlderMessages}
+					>
+						<span className="chat-load-older-pill__icon">
+							{isLoadingOlderMessages ? (
+								<LoadingOutlined spin />
+							) : (
+								<HistoryOutlined />
+							)}
+						</span>
+						<span>
+							{isLoadingOlderMessages
+								? t("loadingOlderMessages", "正在加载更早消息", {
+										ns: "chat",
+									})
+								: t("loadOlderMessages", "查看更早消息", { ns: "chat" })}
+						</span>
+					</button>
+				</div>
+			)}
+			<ScrollToBottomFab
+				visible={!isAtBottom && bubbleItems.length > 0}
+				onClick={handleScrollToBottom}
+			/>
+		</div>
 	);
 }

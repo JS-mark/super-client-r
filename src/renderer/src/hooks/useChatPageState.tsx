@@ -5,6 +5,7 @@ import type { SessionSettings } from "../components/chat/ChatSettingsModal";
 import { ProviderIcon } from "../components/models/ProviderIcon";
 import type { Message } from "../stores/chatStore";
 import { getProjectIdFromConversation, useChatStore } from "../stores/chatStore";
+import { useChatInputStore } from "../stores/chatInputStore";
 import { useModelStore } from "../stores/modelStore";
 import { useProjectStore } from "../stores/projectStore";
 import type { ModelProviderPreset } from "../types/models";
@@ -16,7 +17,6 @@ export type ViewMode = "local" | "remote";
 interface UseChatPageStateParams {
 	messages: Message[];
 	sendMessage: (options?: ChatOptions) => Promise<void>;
-	setInput: (value: string) => void;
 	setSelectedSkillId: (id: string | null) => void;
 	setSessionSettings: (settings: SessionSettings) => void;
 	// Remote chat
@@ -24,20 +24,21 @@ interface UseChatPageStateParams {
 	remoteMessages: RemoteChatMessage[];
 	checkBotOnline: (botId: string) => Promise<boolean>;
 	unbindRemote: () => Promise<void>;
-	input: string;
+	// NOTE: composer `input` / `setInput` are no longer threaded through —
+	// see `chatInputStore` and the 2026-06-28 perf comment in `useChat.ts`.
+	// We read/write the live value via `useChatInputStore.getState()` from
+	// the few places below that touch it (auto-send, restored draft).
 }
 
 export function useChatPageState({
 	messages,
 	sendMessage,
-	setInput,
 	setSelectedSkillId,
 	setSessionSettings,
 	remoteBinding,
 	remoteMessages,
 	checkBotOnline,
 	unbindRemote,
-	input,
 }: UseChatPageStateParams) {
 	// ── Remote chat state ──
 	const [remoteBindModalOpen, setRemoteBindModalOpen] = useState(false);
@@ -196,42 +197,45 @@ export function useChatPageState({
 
 	useEffect(() => {
 		if (pendingInput) {
-			setInput(pendingInput);
+			// Push the queued draft (from the float widget / IPC handoff)
+			// into the composer store. Subscribers will re-render; this
+			// hook itself doesn't subscribe so it stays put.
+			useChatInputStore.getState().setValue(pendingInput);
 			setPendingInput(null);
 			if (pendingAutoSend) {
 				setPendingAutoSend(false);
 				setFloatAutoSend(true);
 			}
 		}
-	}, [
-		pendingInput,
-		pendingAutoSend,
-		setInput,
-		setPendingInput,
-		setPendingAutoSend,
-	]);
+	}, [pendingInput, pendingAutoSend, setPendingInput, setPendingAutoSend]);
 
-	// Auto-send after input state has updated (float widget flow).
+	// Auto-send after input has been seeded (float widget flow).
 	// D-3: float-widget 自动建普通对话（无 projectId），跟 sidebar 顶部 + 新建对话
 	// 行为一致。
 	// 复用规则：默认新建一个对话；唯一例外是「当前焦点会话已经是个新建但尚未发言
 	// 的空壳」（messages.length === 0）——此时复用它，避免重复堆出空对话。
+	//
+	// Perf (2026-06-28): we used to depend on `input` here, which meant the
+	// effect re-ran on every keystroke. After lifting the value into
+	// `useChatInputStore`, we read once via `getState()` when `floatAutoSend`
+	// flips true and don't subscribe — so typing never schedules this effect.
 	useEffect(() => {
-		if (floatAutoSend && input.trim()) {
-			setFloatAutoSend(false);
-			const doSend = async () => {
-				const { currentConversationId, createConversation } =
-					useChatStore.getState();
-				const reuseEmpty =
-					currentConversationId !== null && messages.length === 0;
-				if (!reuseEmpty) {
-					await createConversation(input.trim().slice(0, 50), "agent");
-				}
-				sendMessage({ mode: "agent" });
-			};
-			doSend();
-		}
-	}, [floatAutoSend, input, messages, sendMessage]);
+		if (!floatAutoSend) return;
+		const seeded = useChatInputStore.getState().value;
+		if (!seeded.trim()) return;
+		setFloatAutoSend(false);
+		const doSend = async () => {
+			const { currentConversationId, createConversation } =
+				useChatStore.getState();
+			const reuseEmpty =
+				currentConversationId !== null && messages.length === 0;
+			if (!reuseEmpty) {
+				await createConversation(seeded.trim().slice(0, 50), "agent");
+			}
+			sendMessage({ mode: "agent" });
+		};
+		doSend();
+	}, [floatAutoSend, messages, sendMessage]);
 
 	// Consume pendingSkillId from Skills page navigation (skill is independent of mode)
 	useEffect(() => {
