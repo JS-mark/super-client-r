@@ -93,6 +93,7 @@
 		"fs-extra": "^11.3.4",
 		"get-port": "^7.1.0",
 		"google-auth-library": "^10.6.2",
+		"highlight.js": "^11.11.1",
 		"i18next": "^25.9.0",
 		"i18next-browser-languagedetector": "^8.2.1",
 		"i18next-http-backend": "^3.0.2",

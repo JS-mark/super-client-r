@@ -1,6 +1,7 @@
 import { Check, Copy, WrapText } from "lucide-react";
 import { type FC, memo, useCallback, useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
+import { StaticHighlighter } from "./StaticHighlighter";
 import { SyntaxHighlighter } from "./SyntaxHighlighter";
 
 interface StructuredCodeCardProps {
@@ -20,15 +21,54 @@ interface StructuredCodeCardProps {
  * streaming assistant turn flips from "single text blob via XMarkdown" to
  * "structured parts" after completion.
  */
-export const StructuredCodeCard: FC<StructuredCodeCardProps> = memo(
-	function StructuredCodeCard({
-		code,
-		language,
-		path,
-		title,
-		streaming = false,
-		className,
-	}) {
+/**
+ * Streaming fast path — rendered while the assistant is still emitting tokens
+ * into this code block. Skips the full card's hooks (in particular the
+ * per-render `code.replace(/\s+$/) ` + `split("\n")` over the whole content)
+ * because those are O(N) and would fire on every chunk; for a 1k-line block
+ * mid-stream that adds up to hundreds of thousands of string ops while the
+ * user is just trying to read the reply.
+ *
+ * The toolbar isn't actionable during streaming anyway (line numbers shift
+ * around, copy would grab an in-progress snippet), so we drop straight to
+ * the lightweight `<pre><code>{code}</code></pre>` branch of
+ * `SyntaxHighlighter`. When streaming flips off the parent unmounts this
+ * subcomponent and mounts `FullCodeCard` for the post-stream UX.
+ */
+const StreamingCodeCard: FC<StructuredCodeCardProps> = ({
+	code,
+	language,
+	path,
+	className,
+}) => (
+	<section
+		className={cn(
+			"structured-code-card my-3 overflow-hidden rounded-lg border border-black/[0.08] bg-white dark:border-white/10 dark:bg-[#111318]",
+			className,
+		)}
+	>
+		<div className="px-2 py-2">
+			<SyntaxHighlighter
+				code={code ?? ""}
+				language={language || getLanguageFromPath(path) || "code"}
+				streaming
+				showChrome={false}
+				showLineNumbers={false}
+				wrapLines
+				trimCode={false}
+				className="structured-code-highlighter"
+			/>
+		</div>
+	</section>
+);
+
+const FullCodeCard: FC<StructuredCodeCardProps> = ({
+	code,
+	language,
+	path,
+	title,
+	className,
+}) => {
 		// Default to wrap-on: chat bubbles are narrow, and long single lines
 		// (URLs, shell pipelines, JSON) get a horizontal scrollbar that's awkward
 		// to use inside a scrolling message list. User can still toggle off.
@@ -55,15 +95,10 @@ export const StructuredCodeCard: FC<StructuredCodeCardProps> = memo(
 
 		const meta = useMemo(
 			() =>
-				[
-					displayLineCount > 0
-						? `${displayLineCount} ${displayLineCount === 1 ? "line" : "lines"}`
-						: null,
-					streaming ? "streaming" : null,
-				]
-					.filter(Boolean)
-					.join(" · "),
-			[displayLineCount, streaming],
+				displayLineCount > 0
+					? `${displayLineCount} ${displayLineCount === 1 ? "line" : "lines"}`
+					: "",
+			[displayLineCount],
 		);
 
 		const handleCopy = useCallback(async () => {
@@ -88,7 +123,7 @@ export const StructuredCodeCard: FC<StructuredCodeCardProps> = memo(
 				  line; badge shrinks to 16px; action buttons are 24px with 14px
 				  icons.
 				*/}
-				<div className="flex min-w-0 items-center justify-between gap-3 border-b border-black/[0.06] px-3 py-1.5 dark:border-white/[0.06]">
+				<div className="flex min-w-0 items-center justify-between gap-3 border-b border-black/[0.06] px-2 py-1.5 dark:border-white/[0.06]">
 					<div className="flex min-w-0 items-center gap-2">
 						<span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-[3px] bg-[#1495e8] px-1 text-[9px] font-bold uppercase leading-none text-white">
 							{badge}
@@ -119,19 +154,49 @@ export const StructuredCodeCard: FC<StructuredCodeCardProps> = memo(
 						</CodeIconButton>
 					</div>
 				</div>
-				<div className="px-3 py-2">
-					<SyntaxHighlighter
+				<div className="px-2 py-2">
+					{/* Read-only highlight via highlight.js — replaces the
+					    CodeMirror EditorView we used to spin up per code block.
+					    Background: profiling on 2026-06-28 attributed the
+					    chat-wide UI lag to react-window remounting batches of
+					    EditorViews on scroll/session-switch (~30ms mount × 10+
+					    blocks → multi-second long tasks). highlight.js renders
+					    the entire block to an HTML string up-front, memoised by
+					    (code, language); mount cost is dominated by a single
+					    `dangerouslySetInnerHTML` call (~1ms). */}
+					<StaticHighlighter
 						code={displayCode}
 						language={displayLanguage}
-						streaming={streaming}
-						showChrome={false}
-						showLineNumbers
 						wrapLines={wrapLines}
-						trimCode={false}
+						showLineNumbers
 						className="structured-code-highlighter"
 					/>
 				</div>
 			</section>
+		);
+};
+
+/**
+ * Public entry. Dispatches between the streaming fast-path and the full
+ * post-stream card. We split the two because the full card declares several
+ * hooks (`useState` × 2, `useMemo` × 3, `useCallback` × 2) — the Rules of
+ * Hooks forbid skipping them with an early `if (streaming) return …`, but
+ * we *do* want to skip the O(N) memoised computations they wrap on the
+ * streaming hot path. A wrapper component that picks which subtree to mount
+ * is the idiomatic way to bypass an entire hook list conditionally; React
+ * unmounts and remounts when `streaming` flips, which is exactly what we
+ * want (the in-progress `<pre>` is replaced once by the rich CodeMirror
+ * card when the assistant turn completes).
+ *
+ * Wrapped in `memo` so that parents which pass stable props (most call
+ * sites) don't re-render the chrome when their own state changes.
+ */
+export const StructuredCodeCard: FC<StructuredCodeCardProps> = memo(
+	function StructuredCodeCard(props) {
+		return props.streaming ? (
+			<StreamingCodeCard {...props} />
+		) : (
+			<FullCodeCard {...props} />
 		);
 	},
 );
