@@ -53,6 +53,80 @@ export interface FileActionResult {
 	details?: Record<string, unknown>;
 }
 
+export type SessionContentRefSource = "assistant" | "tool" | "artifact";
+
+export interface SessionContentRefReadOptions {
+	offset?: number;
+	maxBytes?: number;
+}
+
+export interface SessionContentRefReadResult {
+	contentRef: string;
+	/** Backward-compatible alias for the complete payload byte length. */
+	byteLength: number;
+	totalByteLength?: number;
+	offset?: number;
+	bytesRead?: number;
+	truncated?: boolean;
+	nextOffset?: number;
+	mediaType?: string;
+	source?: SessionContentRefSource;
+	text?: string;
+}
+
+export type SessionArchiveRedactionMode = "home-and-app-data";
+
+export interface SessionArchiveFileEntry {
+	path: string;
+	kind: "manifest" | "session-meta" | "session-jsonl";
+	byteLength?: number;
+	sha256?: string;
+	sourcePath?: string;
+}
+
+export interface SessionArchiveReferencedAttachment {
+	id: string;
+	name?: string;
+	sourcePath?: string;
+	byteLength?: number;
+	missing?: boolean;
+}
+
+export interface SessionArchiveReferencedContentRef {
+	contentRef: string;
+	sha256?: string;
+	sourcePath?: string;
+	byteLength?: number;
+	mediaType?: string;
+	source?: SessionContentRefSource;
+	missing?: boolean;
+}
+
+export interface SessionArchiveManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion?: string;
+	sessionId: string;
+	projectId: string | null;
+	redactionMode: SessionArchiveRedactionMode;
+	/** Redacted export directory recorded inside the manifest. */
+	exportDir: string;
+	files: SessionArchiveFileEntry[];
+	referencedPayloads: {
+		copied: false;
+		attachments: SessionArchiveReferencedAttachment[];
+		contentRefs: SessionArchiveReferencedContentRef[];
+	};
+}
+
+export interface SessionArchiveExportResult {
+	/** App-managed absolute export directory for later reveal/open actions. */
+	exportDir: string;
+	/** App-managed absolute manifest path inside exportDir. */
+	manifestPath: string;
+	manifest: SessionArchiveManifest;
+}
+
 /** 已迁移到 shared-types 的 ElectronAPI namespace 子集。 */
 export interface ElectronAPIMigrated {
 	runtime: {
@@ -254,6 +328,14 @@ export interface ElectronAPIMigrated {
 			sessionId: string,
 			range?: { tail?: number },
 		) => Promise<IPCResponse<Message[]>>;
+		readContentRef: (
+			sessionId: string,
+			contentRef: string,
+			options?: SessionContentRefReadOptions,
+		) => Promise<IPCResponse<SessionContentRefReadResult>>;
+		exportArchive: (
+			sessionId: string,
+		) => Promise<IPCResponse<SessionArchiveExportResult>>;
 		fork: (
 			sourceId: string,
 			opts: {

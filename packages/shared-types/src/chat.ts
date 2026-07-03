@@ -2,6 +2,15 @@
  * Chat 相关类型定义
  */
 
+import type {
+	PlanCard,
+	PlanDecision,
+	PlanDecisionAction,
+	PlanDecisionRecord,
+	PlanExecuteTurnLink,
+} from "./plan-execute";
+import type { SubagentRunSummary } from "./subagent";
+
 /** 聊天消息 */
 export interface ChatMessage {
 	id: string;
@@ -38,6 +47,14 @@ export interface ChatMessagePersist {
 	};
 	metadata?: {
 		model?: string;
+		modelSource?:
+			| "message"
+			| "session"
+			| "project"
+			| "global"
+			| "runtime-fallback"
+			| "subagent";
+		modelSourceLabel?: string;
 		tokens?: number;
 		inputTokens?: number;
 		outputTokens?: number;
@@ -49,6 +66,8 @@ export interface ChatMessagePersist {
 		firstTokenMs?: number;
 		tokensPerSecond?: number;
 		attachmentIds?: string[];
+		planDecision?: PlanDecisionRecord;
+		planExecute?: PlanExecuteTurnLink;
 	};
 }
 
@@ -572,13 +591,21 @@ export type MessagePartType =
 	| "tree"
 	| "sources"
 	| "artifact"
-	| "status";
+	| "status"
+	| "plan"
+	| "subagent";
 
 export interface BaseMessagePart {
 	id: string;
 	type: MessagePartType;
 	state: MessagePartState;
 	transient?: boolean;
+	/** Externalized payload reference for large content kept out of UI memory. */
+	contentRef?: string;
+	/** Original payload size in bytes when known. */
+	byteLength?: number;
+	/** True when the inline payload was intentionally shortened. */
+	truncated?: boolean;
 	createdAt: number;
 	updatedAt: number;
 }
@@ -676,6 +703,33 @@ export interface StatusMessagePart extends BaseMessagePart {
 	progress?: number;
 }
 
+export interface PlanMessagePart extends BaseMessagePart {
+	type: "plan";
+	plan: PlanCard;
+	decision?: PlanDecision;
+	pendingDecision?: boolean;
+	requiresDecision?: boolean;
+	status?: "pending-decision" | `decision-${PlanDecisionAction}`;
+}
+
+/**
+ * Phase 4 Multi-Agent Round 6: 子代理运行的父转录卡片。
+ *
+ * 由主 Agent 通过内置 `Task` 工具触发；渲染层默认折叠展示
+ * `{profileId, taskGoal, status, tokenUsage?, summary, resultRef?}`。
+ * 展开时 renderer 会渲染子代理自身的 timeline（Impl-17 决定 UI）。
+ *
+ * child tool timeline 不出现在父 Message[]：子代理内部产生的
+ * tool_call / tool_result 事件通过 `subagentRunId` 归属，reducer 仅
+ * 递增 `run.toolCallCount` 而不 push tool_use 消息。
+ */
+export interface SubagentMessagePart extends BaseMessagePart {
+	type: "subagent";
+	run: SubagentRunSummary;
+	/** Rendered collapsed by default. */
+	collapsed?: boolean;
+}
+
 export type MessagePart =
 	| TextMessagePart
 	| CodeBlockMessagePart
@@ -686,7 +740,9 @@ export type MessagePart =
 	| TreeMessagePart
 	| SourcesMessagePart
 	| ArtifactMessagePart
-	| StatusMessagePart;
+	| StatusMessagePart
+	| PlanMessagePart
+	| SubagentMessagePart;
 
 export type AssistantPartEvent =
 	| {
@@ -737,6 +793,14 @@ export interface Message {
 		model?: string;
 		providerPreset?: string;
 		providerName?: string;
+		modelSource?:
+			| "message"
+			| "session"
+			| "project"
+			| "global"
+			| "runtime-fallback"
+			| "subagent";
+		modelSourceLabel?: string;
 		tokens?: number;
 		inputTokens?: number;
 		outputTokens?: number;
@@ -751,7 +815,10 @@ export interface Message {
 		remoteSender?: { id: string; name: string };
 		remotePlatform?: string;
 		attachmentIds?: string[];
+		planDecision?: PlanDecisionRecord;
+		planExecute?: PlanExecuteTurnLink;
 		agentSDKSessionId?: string;
+		nativeSessionId?: string;
 		totalCostUsd?: number;
 		numTurns?: number;
 		/**

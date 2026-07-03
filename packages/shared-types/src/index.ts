@@ -19,6 +19,15 @@ export * from "./agent-runtime";
 // ============ Agent Trace 调试 / 追踪 ============
 export * from "./agent-trace";
 
+// ============ Agent Product Events (spec: 2026-06-27-agent-runtime-product-events) ============
+export * from "./agent-product-events";
+
+// ============ Plan / Execute 契约 ============
+export * from "./plan-execute";
+
+// ============ Multi-Agent Subagent 类型 (Phase 4 Round 6) ============
+export * from "./subagent";
+
 // ============ Skill 相关类型 ============
 export * from "./skill";
 

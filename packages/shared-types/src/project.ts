@@ -196,7 +196,8 @@ export interface SessionImportSource {
  * 写入 `<sessionId>.jsonl` 的每行一个 JSON 事件。事件流通过
  * `eventsToMessages(events)` reduce 成 renderer `Message[]`：
  *   - tool_call + tool_result/tool_error 配对 → 单个 `Message{type:'tool_use', toolCall:...}`
- *   - file_artifact / approval / session_marker 不进 messages，但保留在事件流以备审计 / 重放
+ *   - product approval/ask replay markers may derive tool messages; unrelated
+ *     file_artifact / session_marker events remain audit-only
  */
 export type SessionEvent =
 	| UserMessageEvent
@@ -252,6 +253,12 @@ export interface ToolCallEvent extends BaseEvent {
 	parentId?: string;
 	name: string;
 	input: Record<string, unknown>;
+	/**
+	 * Multi-Agent Round 6：当此 tool_call 由子代理触发时携带子代理运行 id。
+	 * reducer 据此把 tool 归入父转录里对应的 `SubagentMessagePart`
+	 * （递增 toolCallCount），而不是在主 Message[] 里独立展开。
+	 */
+	subagentRunId?: string;
 }
 
 /** 工具执行结果。`toolCallId` 配对 `ToolCallEvent.id`。 */
@@ -262,6 +269,8 @@ export interface ToolResultEvent extends BaseEvent {
 	/** @deprecated 新写入使用 `tool_error`；保留用于读取旧 JSONL。 */
 	isError?: boolean;
 	duration?: number;
+	/** Multi-Agent Round 6：子代理触发时携带；见 `ToolCallEvent.subagentRunId`。 */
+	subagentRunId?: string;
 }
 
 /** 工具执行失败。`toolCallId` 配对 `ToolCallEvent.id`。 */
@@ -271,6 +280,8 @@ export interface ToolErrorEvent extends BaseEvent {
 	error: unknown;
 	code?: string;
 	duration?: number;
+	/** Multi-Agent Round 6：子代理触发时携带；见 `ToolCallEvent.subagentRunId`。 */
+	subagentRunId?: string;
 }
 
 /** 审批决策（plan §12 + R-6）。落盘以便审计 / 重放。 */

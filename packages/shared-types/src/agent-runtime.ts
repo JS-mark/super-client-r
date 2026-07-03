@@ -238,6 +238,17 @@ export interface AgentEventBase {
 	timestamp: number;
 	/** Adapter 自留扩展（仅 trace 显示，业务逻辑不依赖） */
 	extra?: Record<string, unknown>;
+	/**
+	 * Multi-Agent Round 6：父 Agent 的 requestId / runId，仅在事件来自子代理
+	 * 运行时携带。主 Agent 直接产生的事件不带此字段。
+	 */
+	parentRunId?: string;
+	/**
+	 * Multi-Agent Round 6：本事件所属子代理的运行 id。主 Agent 直接产生的
+	 * 事件不带此字段；子代理内部的 `tool.call` / `tool.result` 等事件通过
+	 * 该字段在父转录里挂到对应的 `SubagentMessagePart` 上。
+	 */
+	subagentRunId?: string;
 }
 
 export interface AgentInitEvent extends AgentEventBase {
@@ -297,6 +308,12 @@ export type AgentPermissionSource = "user" | "auto-grant" | "auto-policy";
 export interface AgentPermissionResolvedEvent extends AgentEventBase {
 	type: "permission.resolved";
 	approvalId: string;
+	/**
+	 * Optional original tool name for product-event projection. Some runtimes
+	 * emit permission resolution without the request context; the host broker
+	 * may fill this from the preceding permission.request.
+	 */
+	toolName?: string;
 	decision: PermissionDecision;
 	source: AgentPermissionSource;
 }
