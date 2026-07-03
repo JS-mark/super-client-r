@@ -39,8 +39,8 @@
 		"line2": "• Mod 键在 Mac 上为 ⌘，在 Windows/Linux 上为 Ctrl",
 		"line3": "• 全局快捷键在任何页面都可用"
 	},
-	"newChat": "新建对话",
-	"newChatDesc": "创建一个新的对话",
+	"newChat": "新建 Agent 任务",
+	"newChatDesc": "创建一个新的 Agent 任务",
 	"quickSearch": "快速搜索",
 	"quickSearchDesc": "打开快速搜索面板",
 	"globalSearch": "全局会话搜索",

@@ -20,6 +20,27 @@
 			"quote": "Quote Message",
 			"tools": "Tools",
 			"triggerAriaLabel": "Add"
+		},
+		"pausedError": {
+			"title": "Agent paused",
+			"fallback": "Recover to try again.",
+			"recover": "Recover",
+			"dismiss": "Dismiss"
+		},
+		"projectPill": {
+			"tooltip": "Project · {{cwd}}"
+		},
+		"launchMode": {
+			"plan": "Plan",
+			"execute": "Execute",
+			"planDesc": "Generate a structured plan first, confirm, then execute.",
+			"executeDesc": "Run the Agent flow directly; sandbox and approval policies still apply.",
+			"tooltip": "Launch mode"
+		},
+		"branchPill": {
+			"none": "no branch",
+			"tooltip": "Branch · {{branch}}",
+			"tooltipMissing": "No git branch attached to this session"
 		}
 	},
 	"toolbar": {
@@ -82,7 +103,7 @@
 	"searchMessages": "Search Messages",
 	"searchPlaceholder": "Search chat history...",
 	"searchHistory": "Search History",
-	"newChat": "New Chat",
+	"newChat": "New Task",
 	"chatHistory": "Chat History",
 	"searching": "Searching...",
 	"searchResults": "Found {{count}} results",
@@ -110,7 +131,10 @@
 		"title": "Select Model",
 		"searchPlaceholder": "Search model ID or name…",
 		"clear": "Clear Selection",
-		"empty": "No matching models. Enable the desired models in Settings → Models."
+		"empty": "No matching models. Enable the desired models in Settings → Models.",
+		"setSessionDefault": "Set as session default",
+		"clearMessageOverride": "Clear this",
+		"clearSessionOverride": "Restore default"
 	},
 	"rename": {
 		"title": "Rename Conversation",
@@ -182,6 +206,25 @@
 			"skill": "Skill",
 			"systemPrompt": "System Prompt"
 		}
+	},
+	"contextInspector": {
+		"sectionTitle": "Context",
+		"budget": {
+			"label": "Token budget",
+			"unknown": "Model context window unknown"
+		},
+		"sources": {
+			"header": "Injected sources"
+		},
+		"chips": {
+			"systemPrompt": "System prompt",
+			"projectRules": "Project rules: AGENTS.md"
+		},
+		"compact": {
+			"header": "Compact events",
+			"defaultSummary": "Context compacted"
+		},
+		"emptyHint": "No files or project rules injected yet."
 	},
 	"viewMode": {
 		"local": "AI Chat",
@@ -412,5 +455,82 @@
 		"otherPlaceholder": "Please describe...",
 		"answered": "Answered",
 		"skipped": "Skipped"
+	},
+	"contentRef": {
+		"meta": "referenced content",
+		"summary": "Large content is stored outside the message body.",
+		"reference": "Reference",
+		"size": "Size",
+		"status": "Status",
+		"truncated": "Truncated",
+		"referenced": "Referenced",
+		"mediaType": "Media type",
+		"fullSize": "Full size",
+		"load": "Load content",
+		"loading": "Loading...",
+		"missingSession": "Content can be loaded after the session is available.",
+		"unavailableTitle": "Preview unavailable",
+		"unavailableDetail": "Binary or non-text content cannot be previewed here.",
+		"errorTitle": "Content unavailable",
+		"errorDetail": "The referenced content could not be loaded.",
+		"previewTruncated": "Showing the first {{count}} characters of {{size}}."
+	},
+		"subagent": {
+			"card": {
+				"status": {
+					"spawned": "Queued",
+					"running": "Running",
+					"completed": "Completed",
+					"failed": "Failed",
+					"cancelled": "Cancelled"
+				},
+				"toolsCount": "{{count}} tools",
+				"tokens": "{{value}} tok",
+				"expandLabel": "Expand",
+				"collapseLabel": "Collapse",
+				"taskGoalLabel": "Task goal",
+				"summaryLabel": "Summary",
+				"errorLabel": "Error",
+				"endedAtLabel": "Ended at",
+				"fallbackName": "Subagent"
+			}
+		},
+		"planCard": {
+			"title": "Plan",
+		"steps": "Steps",
+		"addStep": "Add step",
+		"stepTitle": "Step title",
+		"stepTitlePlaceholder": "Describe the step",
+		"stepDescription": "Step description",
+		"stepDescriptionPlaceholder": "Optional implementation notes",
+		"removeStep": "Remove step",
+		"expectedFiles": "Expected files",
+		"approvals": "Approvals",
+		"risks": "Risks",
+		"suggestedSubagents": "Suggested subagents",
+		"reasonLabel": "Reason (optional)",
+		"reasonPlaceholder": "Short note about this decision",
+		"instructionsLabel": "Additional instructions (optional)",
+		"instructionsPlaceholder": "Extra guidance passed to the execute/regenerate turn",
+		"execute": "Execute",
+		"cancel": "Cancel",
+		"regenerate": "Regenerate"
+	},
+	"subagentsInspector": {
+		"sectionTitle": "Subagents",
+		"emptyHint": "No subagents have run in this conversation.",
+		"toolsCount": "{{count}} tools",
+		"durationSeconds": "{{seconds}}s",
+		"fallbackName": "Subagent",
+		"status": {
+			"spawned": "spawned",
+			"running": "running",
+			"completed": "completed",
+			"failed": "failed",
+			"cancelled": "cancelled"
+		}
+	},
+	"subagentSource": {
+		"badge": "▲ From subagent: {{name}}"
 	}
 }

@@ -150,10 +150,96 @@
 	"apiKeySaveError": "保存 API Key 失败",
 	"shortcuts": "快捷键",
 	"shortcutsHint": "使用 CmdOrCtrl 实现跨平台兼容",
-	"shortcuts.newChat": "新建对话",
+	"shortcuts.newChat": "新建 Agent 任务",
 	"shortcuts.quickSearch": "快速搜索",
 	"shortcuts.toggleSidebar": "切换侧边栏",
 	"shortcuts.settings": "设置",
+	"settingsShell": {
+		"backToWorkspace": "返回工作区",
+		"onboarding": "引导",
+		"onboardingHint": "开始新手引导 (即将上线)"
+	},
+	"settingsNav": {
+		"agent": "Agent",
+		"contextMemory": "上下文与记忆",
+		"contextMemoryDesc": "上下文策略、记忆范围和项目规则会收敛在这个 Agent 设置分组中。",
+		"toolsPermissions": "工具与权限",
+		"toolsPermissionsDesc": "工具审批、沙盒和权限授权控制会收敛在这个 Agent 设置分组中。",
+		"projects": "项目",
+		"projectRecovery": "项目恢复",
+		"recovery": {
+			"description": "恢复项目可见性和历史会话访问，不删除文件。",
+			"refreshError": "刷新恢复状态失败",
+			"archiveStatus": "{{count}} 个已归档",
+			"orphanStatus": "{{count}} 个孤儿项目",
+			"importStatus": "{{count}} 条历史会话",
+			"safeModeTitle": "仅提供安全恢复",
+			"safeModeDesc": "此入口只暴露归档恢复、孤儿项目重新关联和历史导入状态。这里不提供物理删除，也不提供完整备份迁移。",
+			"archivedTitle": "已归档项目",
+			"archivedDesc": "已归档项目会从侧边栏隐藏。恢复只改变可见性，会话数据仍留在原处。",
+			"orphanTitle": "孤儿项目目录",
+			"orphanDesc": "孤儿项目是仍在项目存储目录中、但不在注册表里的项目。保存路径仍匹配时，可以重新注册。",
+			"noOrphans": "未发现孤儿项目",
+			"restore": "恢复",
+			"orphanRestoreSuccess": "项目已恢复",
+			"orphanRestoreError": "恢复失败",
+			"sessionCount": "{{count}} 条会话",
+			"sessionExportTitle": "会话导出",
+			"sessionExportDesc": "从应用管理的存储中导出当前、可见或可恢复会话归档。",
+			"sessionExportSuccess": "会话归档已导出到 {{exportDir}}",
+			"sessionExportError": "会话导出失败，未创建归档。",
+			"sessionExportSuccessTitle": "会话归档已就绪",
+			"sessionExportErrorTitle": "会话导出失败",
+			"sessionExportErrorDesc": "归档服务没有返回可用的导出目录。刷新恢复状态后再试。",
+			"noExportableSessions": "当前没有可导出的会话",
+			"exportSession": "导出",
+			"sessionExportMeta": "{{count}} 条消息 · {{project}}",
+			"casualSession": "普通会话",
+			"sessionStatus": {
+				"current": "当前",
+				"deleted": "已删除",
+				"tombstoned": "墓碑记录",
+				"visible": "可见"
+			},
+			"importTitle": "导入",
+			"importDesc": "历史会话导入会保留旧数据，并把可访问会话导入当前会话存储。",
+			"importButton": "导入历史会话",
+			"importSuccess": "已导入 {{count}} 条历史会话",
+			"importPartial": "已导入 {{imported}} 条，跳过 {{skipped}} 条，失败 {{failed}} 条。",
+			"importError": "导入失败",
+			"coverageTitle": "当前覆盖范围",
+			"tombstoneLabel": "墓碑记录",
+			"tombstoneDesc": "会话软删除后会在存储层保留 tombstone；Settings 不暴露物理删除。",
+			"relinkLabel": "重新关联",
+			"relinkDesc": "当前通过孤儿项目恢复提供有限支持，要求保存路径和项目 id 仍然匹配。",
+			"backupLabel": "备份 / 导出",
+			"backupDesc": "完整备份导出和迁移包尚未在此 Settings 入口实现。",
+			"statusTracked": "已跟踪",
+			"statusLimited": "有限支持",
+			"statusPlaceholder": "占位"
+		},
+		"mcp": "MCP",
+		"mcpDesc": "MCP 服务器管理保留在独立页面。",
+		"skills": "技能",
+		"skillsDesc": "技能安装与管理保留在独立技能页面。",
+		"appPlugins": "应用插件",
+		"appPluginsDesc": "应用插件在独立页面管理；插件自己的设置会显示在下方。",
+		"keyboard": "键盘",
+		"apiService": "API 服务",
+		"webhook": "Webhook",
+		"advanced": "高级",
+		"about": "关于",
+		"openProjects": "打开项目",
+		"openSkills": "打开技能",
+		"openAppPlugins": "打开应用插件"
+	},
+	"advancedTabs": {
+		"experimental": "实验性功能",
+		"quickActions": "快速操作",
+		"systemInfo": "系统信息",
+		"performance": "性能监控",
+		"debug": "调试工具"
+	},
 	"floatWidget": "悬浮窗",
 	"enableFloatWidget": "启用悬浮窗",
 	"floatWidgetHint": "在桌面上显示悬浮窗",
@@ -162,7 +248,12 @@
 		"label": "主题",
 		"light": "浅色",
 		"dark": "深色",
-		"auto": "跟随系统"
+		"auto": "跟随系统",
+		"tooltip": {
+			"light": "浅色",
+			"dark": "深色",
+			"auto": "自动"
+		}
 	},
 	"themeDesc": "选择应用的主题样式",
 	"updates": "更新",
@@ -267,8 +358,8 @@
 		"features": {
 			"title": "功能特性",
 			"aiChat": {
-				"title": "AI 对话",
-				"desc": "基于 Claude SDK 的智能对话"
+				"title": "Agent 工作台",
+				"desc": "面向项目和无项目任务的 Agent runtime"
 			},
 			"mcp": {
 				"title": "MCP 支持",
@@ -284,7 +375,7 @@
 			},
 			"plugin": {
 				"title": "应用插件系统",
-				"desc": "应用插件扩展、主题皮肤、市场安装"
+				"desc": "应用插件、主题皮肤、市场安装"
 			},
 			"webSearch": {
 				"title": "联网搜索",

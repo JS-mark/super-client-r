@@ -107,8 +107,16 @@
 		"systemPromptPlaceholder": "输入此模型的系统提示词...",
 		"maxTokens": "最大输出 Token",
 		"contextWindow": "上下文窗口",
+		"category": "类别",
 		"save": "保存",
 		"cancel": "取消"
+	},
+	"modelPicker": {
+		"chipVision": "视觉",
+		"chipReasoning": "推理",
+		"chipToolUse": "工具",
+		"chipWebSearch": "联网",
+		"chipContext": "上下文 {{value}}"
 	},
 	"capabilities": {
 		"vision": "视觉",

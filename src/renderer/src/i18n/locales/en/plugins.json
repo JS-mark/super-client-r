@@ -6,6 +6,8 @@
 		"installed": "Installed",
 		"install": "Install",
 		"installLocal": "Install Local App Plugin",
+		"pluginDevGuide": "Plugin Development",
+		"pluginDevServerUnavailable": "Failed to start local API server",
 		"searchPlaceholder": "Search app plugins...",
 		"noMarketPlugins": "No app plugins available",
 		"noInstalledPlugins": "No installed app plugins",

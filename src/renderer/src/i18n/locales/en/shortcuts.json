@@ -39,8 +39,8 @@
 		"line2": "• Mod key is ⌘ on Mac and Ctrl on Windows/Linux",
 		"line3": "• Global shortcuts work on any page"
 	},
-	"newChat": "New Chat",
-	"newChatDesc": "Create a new chat",
+	"newChat": "New Agent Task",
+	"newChatDesc": "Create a new Agent task",
 	"quickSearch": "Quick Search",
 	"quickSearchDesc": "Open quick search panel",
 	"globalSearch": "Global Session Search",

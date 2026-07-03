@@ -6,6 +6,8 @@
 		"installed": "已安装",
 		"install": "安装",
 		"installLocal": "安装本地应用插件",
+		"pluginDevGuide": "应用插件开发",
+		"pluginDevServerUnavailable": "无法启动本地 API 服务",
 		"searchPlaceholder": "搜索应用插件...",
 		"noMarketPlugins": "暂无可用应用插件",
 		"noInstalledPlugins": "暂无已安装的应用插件",

@@ -20,6 +20,27 @@
 			"quote": "引用消息",
 			"tools": "Tools",
 			"triggerAriaLabel": "添加"
+		},
+		"pausedError": {
+			"title": "Agent 已暂停",
+			"fallback": "点击“恢复”后重试。",
+			"recover": "恢复",
+			"dismiss": "忽略"
+		},
+		"projectPill": {
+			"tooltip": "项目 · {{cwd}}"
+		},
+		"launchMode": {
+			"plan": "Plan",
+			"execute": "Execute",
+			"planDesc": "先生成结构化计划，确认后再进入执行轮次。",
+			"executeDesc": "直接进入 Agent 执行流程，仍受沙箱和审批策略约束。",
+			"tooltip": "启动模式"
+		},
+		"branchPill": {
+			"none": "无分支",
+			"tooltip": "分支 · {{branch}}",
+			"tooltipMissing": "当前会话未关联 git 分支"
 		}
 	},
 	"toolbar": {
@@ -83,7 +104,7 @@
 	"searchPlaceholder": "搜索聊天记录...",
 	"searchHistory": "搜索历史",
 	"chatHistory": "会话历史",
-	"newChat": "新对话",
+	"newChat": "新任务",
 	"searching": "搜索中...",
 	"searchResults": "找到 {{count}} 条结果",
 	"noSearchResults": "未找到相关消息",
@@ -110,7 +131,10 @@
 		"title": "选择模型",
 		"searchPlaceholder": "搜索模型 ID 或名称…",
 		"clear": "清除选择",
-		"empty": "没有匹配的模型；请在 设置 → 模型 中启用所需模型。"
+		"empty": "没有匹配的模型；请在 设置 → 模型 中启用所需模型。",
+		"setSessionDefault": "设为会话默认",
+		"clearMessageOverride": "清除本次",
+		"clearSessionOverride": "恢复默认"
 	},
 	"rename": {
 		"title": "重命名对话",
@@ -182,6 +206,25 @@
 			"skill": "技能",
 			"systemPrompt": "系统提示词"
 		}
+	},
+	"contextInspector": {
+		"sectionTitle": "上下文",
+		"budget": {
+			"label": "Token 预算",
+			"unknown": "模型上下文窗口未知"
+		},
+		"sources": {
+			"header": "已注入来源"
+		},
+		"chips": {
+			"systemPrompt": "系统提示词",
+			"projectRules": "项目规则：AGENTS.md"
+		},
+		"compact": {
+			"header": "压缩事件",
+			"defaultSummary": "上下文已压缩"
+		},
+		"emptyHint": "尚未注入文件或项目规则。"
 	},
 	"viewMode": {
 		"local": "AI 对话",
@@ -412,5 +455,82 @@
 		"otherPlaceholder": "请描述...",
 		"answered": "已回答",
 		"skipped": "已跳过"
+	},
+	"contentRef": {
+		"meta": "引用内容",
+		"summary": "大段内容已存储在消息正文之外。",
+		"reference": "引用",
+		"size": "大小",
+		"status": "状态",
+		"truncated": "已截断",
+		"referenced": "已引用",
+		"mediaType": "媒体类型",
+		"fullSize": "完整大小",
+		"load": "加载内容",
+		"loading": "加载中...",
+		"missingSession": "会话可用后才能加载内容。",
+		"unavailableTitle": "无法预览",
+		"unavailableDetail": "二进制或非文本内容无法在此处预览。",
+		"errorTitle": "内容不可用",
+		"errorDetail": "无法加载引用内容。",
+		"previewTruncated": "当前显示前 {{count}} 个字符，完整大小 {{size}}。"
+	},
+		"subagent": {
+			"card": {
+				"status": {
+					"spawned": "已排队",
+					"running": "运行中",
+					"completed": "已完成",
+					"failed": "已失败",
+					"cancelled": "已取消"
+				},
+				"toolsCount": "{{count}} 个工具",
+				"tokens": "{{value}} tok",
+				"expandLabel": "展开",
+				"collapseLabel": "折叠",
+				"taskGoalLabel": "任务目标",
+				"summaryLabel": "摘要",
+				"errorLabel": "错误",
+				"endedAtLabel": "结束时间",
+				"fallbackName": "子代理"
+			}
+		},
+		"planCard": {
+			"title": "计划",
+		"steps": "步骤",
+		"addStep": "添加步骤",
+		"stepTitle": "步骤标题",
+		"stepTitlePlaceholder": "描述该步骤",
+		"stepDescription": "步骤说明",
+		"stepDescriptionPlaceholder": "可选的实现备注",
+		"removeStep": "移除步骤",
+		"expectedFiles": "预期文件",
+		"approvals": "所需审批",
+		"risks": "风险",
+		"suggestedSubagents": "建议的子代理",
+		"reasonLabel": "原因（可选）",
+		"reasonPlaceholder": "简要说明此次决定的理由",
+		"instructionsLabel": "补充说明（可选）",
+		"instructionsPlaceholder": "在执行/重新生成时附加的额外指引",
+		"execute": "执行",
+		"cancel": "取消",
+		"regenerate": "重新生成"
+	},
+	"subagentsInspector": {
+		"sectionTitle": "子代理",
+		"emptyHint": "本会话尚未运行子代理。",
+		"toolsCount": "{{count}} 次工具调用",
+		"durationSeconds": "{{seconds}} 秒",
+		"fallbackName": "子代理",
+		"status": {
+			"spawned": "已创建",
+			"running": "运行中",
+			"completed": "已完成",
+			"failed": "失败",
+			"cancelled": "已取消"
+		}
+	},
+	"subagentSource": {
+		"badge": "▲ 来自子代理：{{name}}"
 	}
 }

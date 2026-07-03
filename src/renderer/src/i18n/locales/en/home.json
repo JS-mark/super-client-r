@@ -29,8 +29,8 @@
 	},
 	"featured": {
 		"title": "Featured Features",
-		"chat": "Multi-Mode Chat",
-		"chatDesc": "Direct, Agent, Skill & MCP modes",
+		"chat": "Agent Workspace",
+		"chatDesc": "Agent tasks with project, Skill and MCP context",
 		"mcp": "MCP Integration",
 		"mcpDesc": "Connect to external tool servers"
 	}

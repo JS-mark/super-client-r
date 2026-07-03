@@ -107,8 +107,16 @@
 		"systemPromptPlaceholder": "Enter system prompt for this model...",
 		"maxTokens": "Max Output Tokens",
 		"contextWindow": "Context Window",
+		"category": "Category",
 		"save": "Save",
 		"cancel": "Cancel"
+	},
+	"modelPicker": {
+		"chipVision": "Vision",
+		"chipReasoning": "Reasoning",
+		"chipToolUse": "Tool",
+		"chipWebSearch": "Web",
+		"chipContext": "Ctx: {{value}}"
 	},
 	"capabilities": {
 		"vision": "Vision",

@@ -29,8 +29,8 @@
 	},
 	"featured": {
 		"title": "特色功能",
-		"chat": "多模式聊天",
-		"chatDesc": "直连、Agent、Skill 和 MCP 模式",
+		"chat": "Agent 工作台",
+		"chatDesc": "支持项目、Skill 和 MCP 上下文的 Agent 任务",
 		"mcp": "MCP 集成",
 		"mcpDesc": "连接外部工具服务器"
 	}

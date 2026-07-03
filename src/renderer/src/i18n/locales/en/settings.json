@@ -150,10 +150,96 @@
 	"apiKeySaveError": "Failed to save API Key",
 	"shortcuts": "Shortcuts",
 	"shortcutsHint": "Use CmdOrCtrl for cross-platform compatibility",
-	"shortcuts.newChat": "New Chat",
+	"shortcuts.newChat": "New Agent Task",
 	"shortcuts.quickSearch": "Quick Search",
 	"shortcuts.toggleSidebar": "Toggle Sidebar",
 	"shortcuts.settings": "Settings",
+	"settingsShell": {
+		"backToWorkspace": "Back to workspace",
+		"onboarding": "Onboarding",
+		"onboardingHint": "Start guided tour (coming soon)"
+	},
+	"settingsNav": {
+		"agent": "Agent",
+		"contextMemory": "Context & Memory",
+		"contextMemoryDesc": "Context policy, memory scope and project rules will stay in this Agent settings group as those controls land.",
+		"toolsPermissions": "Tools & Permissions",
+		"toolsPermissionsDesc": "Tool approval, sandbox and permission grant controls will stay in this Agent settings group as those controls land.",
+		"projects": "Projects",
+		"projectRecovery": "Project Recovery",
+		"recovery": {
+			"description": "Recover project visibility and imported session access without deleting files.",
+			"refreshError": "Failed to refresh recovery status",
+			"archiveStatus": "{{count}} archived",
+			"orphanStatus": "{{count}} orphaned",
+			"importStatus": "{{count}} legacy chats",
+			"safeModeTitle": "Safe recovery only",
+			"safeModeDesc": "This entry exposes archive restore, orphan relink and legacy import status. Physical delete and full backup migration are not available here.",
+			"archivedTitle": "Archived Projects",
+			"archivedDesc": "Archived projects are hidden from the sidebar. Restoring only changes visibility; sessions stay in place.",
+			"orphanTitle": "Orphan Project Directories",
+			"orphanDesc": "Orphans are project storage directories that are no longer listed in the registry. Restore re-registers them when the saved path still matches.",
+			"noOrphans": "No orphan projects found",
+			"restore": "Restore",
+			"orphanRestoreSuccess": "Project restored",
+			"orphanRestoreError": "Restore failed",
+			"sessionCount": "{{count}} sessions",
+			"sessionExportTitle": "Session Export",
+			"sessionExportDesc": "Export a current, visible or recoverable session archive from app-managed storage.",
+			"sessionExportSuccess": "Session archive exported to {{exportDir}}",
+			"sessionExportError": "Session export failed. No archive was created.",
+			"sessionExportSuccessTitle": "Session archive ready",
+			"sessionExportErrorTitle": "Session export failed",
+			"sessionExportErrorDesc": "The archive service did not return a usable export directory. Try again after refreshing recovery status.",
+			"noExportableSessions": "No sessions are currently available to export",
+			"exportSession": "Export",
+			"sessionExportMeta": "{{count}} messages · {{project}}",
+			"casualSession": "casual",
+			"sessionStatus": {
+				"current": "Current",
+				"deleted": "Deleted",
+				"tombstoned": "Tombstoned",
+				"visible": "Visible"
+			},
+			"importTitle": "Import",
+			"importDesc": "Legacy chat import keeps the old data and imports accessible chats into the current session store.",
+			"importButton": "Import Legacy Chats",
+			"importSuccess": "Imported {{count}} legacy chats",
+			"importPartial": "Imported {{imported}}, skipped {{skipped}}, failed {{failed}}.",
+			"importError": "Import failed",
+			"coverageTitle": "Current Coverage",
+			"tombstoneLabel": "Tombstones",
+			"tombstoneDesc": "Session tombstones are retained by storage after soft delete; Settings does not expose physical delete.",
+			"relinkLabel": "Relink",
+			"relinkDesc": "Available today through orphan restore when the stored path and project id still match.",
+			"backupLabel": "Backup / Export",
+			"backupDesc": "Full backup export and migration bundles are not implemented in this Settings entry yet.",
+			"statusTracked": "Tracked",
+			"statusLimited": "Limited",
+			"statusPlaceholder": "Placeholder"
+		},
+		"mcp": "MCP",
+		"mcpDesc": "MCP server management remains in its dedicated page.",
+		"skills": "Skills",
+		"skillsDesc": "Skill installation and management remain in the dedicated Skills page.",
+		"appPlugins": "App Plugins",
+		"appPluginsDesc": "Manage app plugins from their dedicated page. Plugin-specific settings appear below when provided.",
+		"keyboard": "Keyboard",
+		"apiService": "API Service",
+		"webhook": "Webhook",
+		"advanced": "Advanced",
+		"about": "About",
+		"openProjects": "Open Projects",
+		"openSkills": "Open Skills",
+		"openAppPlugins": "Open App Plugins"
+	},
+	"advancedTabs": {
+		"experimental": "Experimental Features",
+		"quickActions": "Quick Actions",
+		"systemInfo": "System Info",
+		"performance": "Performance",
+		"debug": "Debug Tools"
+	},
 	"floatWidget": "Float Widget",
 	"enableFloatWidget": "Enable Float Widget",
 	"floatWidgetHint": "Show a floating widget on desktop",
@@ -162,7 +248,12 @@
 		"label": "Theme",
 		"light": "Light",
 		"dark": "Dark",
-		"auto": "Auto"
+		"auto": "Auto",
+		"tooltip": {
+			"light": "Light",
+			"dark": "Dark",
+			"auto": "Auto"
+		}
 	},
 	"themeDesc": "Select the theme style for the application",
 	"updates": "Updates",
@@ -266,8 +357,8 @@
 		"features": {
 			"title": "Features",
 			"aiChat": {
-				"title": "AI Chat",
-				"desc": "Intelligent conversation powered by Claude SDK"
+				"title": "Agent Workbench",
+				"desc": "Agent runtime for project and non-project tasks"
 			},
 			"mcp": {
 				"title": "MCP Support",
@@ -283,7 +374,7 @@
 			},
 			"plugin": {
 				"title": "App Plugins",
-				"desc": "App plugin extensions, skins & marketplace"
+				"desc": "App plugins, skins & marketplace"
 			},
 			"webSearch": {
 				"title": "Web Search",

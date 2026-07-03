@@ -1,10 +1,9 @@
 {
-	"chat": "Chat",
+	"chat": "Agent",
 	"models": "Models",
 	"skills": "Skills",
 	"mcp": "MCP",
 	"plugins": "App Plugins",
-	"extensions": "Extensions",
 	"bookmarks": "Bookmarks",
 	"workspaces": "Workspaces",
 	"imbot": "Remote Control",
