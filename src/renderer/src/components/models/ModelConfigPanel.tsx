@@ -1,6 +1,5 @@
 import {
 	Button,
-	Checkbox,
 	Col,
 	Divider,
 	Drawer,
@@ -9,29 +8,19 @@ import {
 	InputNumber,
 	Row,
 	Select,
-	Switch,
 	Typography,
 } from "antd";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useModelStore } from "../../stores/modelStore";
 import type {
-	ModelCapability,
 	ModelPricing,
 	PricingCurrency,
 	ProviderModel,
 } from "../../types/models";
-import { SystemPromptEditor } from "./SystemPromptEditor";
+import { ModelCapabilityEditor } from "./ModelCapabilityEditor";
 
 const { Text } = Typography;
-
-const ALL_CAPABILITIES: ModelCapability[] = [
-	"vision",
-	"web_search",
-	"reasoning",
-	"tool_use",
-	"embedding",
-	"reranking",
-];
 
 const CURRENCY_OPTIONS: { label: string; value: PricingCurrency }[] = [
 	{ label: "USD", value: "USD" },
@@ -45,23 +34,22 @@ interface ModelConfigPanelProps {
 	model: ProviderModel | null;
 	existingGroups: string[];
 	onSave: (modelId: string, config: Partial<ProviderModel>) => void;
+	/**
+	 * When provided, the embedded {@link ModelCapabilityEditor} live-persists
+	 * capability edits via `useModelStore.updateModelConfig(providerId, ...)`.
+	 * The parent should keep passing the latest `model` snapshot so the drawer
+	 * stays in sync after the persist round-trip.
+	 */
+	providerId?: string;
 }
 
 interface FormValues {
 	name: string;
 	group?: string;
-	capabilities: ModelCapability[];
-	supportsStreaming: boolean;
 	pricingCurrency: PricingCurrency;
 	inputPricePerMillion: number | null;
 	outputPricePerMillion: number | null;
-	systemPrompt: string;
-	maxTokens: number | null;
-	contextWindow: number | null;
 }
-
-const DEFAULT_MAX_TOKENS = 4096;
-const DEFAULT_CONTEXT_WINDOW = 128000;
 
 export function ModelConfigPanel({
 	open,
@@ -69,24 +57,26 @@ export function ModelConfigPanel({
 	model,
 	existingGroups,
 	onSave,
+	providerId,
 }: ModelConfigPanelProps) {
 	const { t } = useTranslation();
 	const [form] = Form.useForm<FormValues>();
+	// Local draft that mirrors the current model's capability metadata so the
+	// embedded editor stays in sync even before the store round-trip completes.
+	const [capabilityDraft, setCapabilityDraft] = useState<ProviderModel | null>(
+		model,
+	);
 
 	useEffect(() => {
 		if (model && open) {
 			form.setFieldsValue({
 				name: model.name,
 				group: model.group,
-				capabilities: model.capabilities,
-				supportsStreaming: model.supportsStreaming ?? true,
 				pricingCurrency: model.pricing?.currency ?? "USD",
 				inputPricePerMillion: model.pricing?.inputPricePerMillion ?? 0,
 				outputPricePerMillion: model.pricing?.outputPricePerMillion ?? 0,
-				systemPrompt: model.systemPrompt ?? "",
-				maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,
-				contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
 			});
+			setCapabilityDraft(model);
 		}
 	}, [model, open, form]);
 
@@ -95,9 +85,25 @@ export function ModelConfigPanel({
 		[existingGroups],
 	);
 
+	const handleCapabilityChange = useCallback(
+		(patch: Partial<ProviderModel>) => {
+			if (!capabilityDraft) return;
+			const nextDraft = { ...capabilityDraft, ...patch };
+			setCapabilityDraft(nextDraft);
+			// Live-persist through the store when we know which provider owns
+			// the model. Falls back to the parent-owned save flow otherwise.
+			if (providerId) {
+				void useModelStore
+					.getState()
+					.updateModelConfig(providerId, capabilityDraft.id, patch);
+			}
+		},
+		[capabilityDraft, providerId],
+	);
+
 	const handleSave = useCallback(
 		(values: FormValues) => {
-			if (!model) return;
+			if (!model || !capabilityDraft) return;
 
 			let pricing: ModelPricing | undefined;
 			if (
@@ -114,16 +120,20 @@ export function ModelConfigPanel({
 			onSave(model.id, {
 				name: values.name,
 				group: values.group,
-				capabilities: values.capabilities,
-				supportsStreaming: values.supportsStreaming,
 				pricing,
-				systemPrompt: values.systemPrompt || undefined,
-				maxTokens: values.maxTokens ?? undefined,
-				contextWindow: values.contextWindow ?? undefined,
+				// Capability fields already live-persisted via the store; include
+				// them in the final save payload so callers that don't wire
+				// `providerId` still receive the current draft.
+				capabilities: capabilityDraft.capabilities,
+				category: capabilityDraft.category,
+				supportsStreaming: capabilityDraft.supportsStreaming,
+				systemPrompt: capabilityDraft.systemPrompt,
+				maxTokens: capabilityDraft.maxTokens,
+				contextWindow: capabilityDraft.contextWindow,
 			});
 			onClose();
 		},
-		[model, onSave, onClose],
+		[model, capabilityDraft, onSave, onClose],
 	);
 
 	return (
@@ -139,7 +149,7 @@ export function ModelConfigPanel({
 				</Button>
 			}
 		>
-			{model && (
+			{model && capabilityDraft && (
 				<Form
 					form={form}
 					layout="vertical"
@@ -190,52 +200,16 @@ export function ModelConfigPanel({
 						</Col>
 					</Row>
 
-					{/* Capabilities */}
-					<Form.Item
-						name="capabilities"
-						label={t("modelConfig.capabilities", { ns: "models" })}
-					>
-						<Checkbox.Group>
-							<div className="flex flex-wrap gap-x-4 gap-y-1">
-								{ALL_CAPABILITIES.map((cap) => (
-									<Checkbox key={cap} value={cap}>
-										{t(`capabilities.${cap}`, { ns: "models" })}
-									</Checkbox>
-								))}
-							</div>
-						</Checkbox.Group>
-					</Form.Item>
-
 					<Divider style={{ margin: "8px 0 16px" }} />
 
-					{/* Parameters: Streaming + MaxTokens + ContextWindow */}
-					<Row gutter={16} align="middle">
-						<Col span={8}>
-							<Form.Item
-								name="supportsStreaming"
-								label={t("modelConfig.streaming", { ns: "models" })}
-								valuePropName="checked"
-							>
-								<Switch />
-							</Form.Item>
-						</Col>
-						<Col span={8}>
-							<Form.Item
-								name="maxTokens"
-								label={t("modelConfig.maxTokens", { ns: "models" })}
-							>
-								<InputNumber min={1} className="w-full!" />
-							</Form.Item>
-						</Col>
-						<Col span={8}>
-							<Form.Item
-								name="contextWindow"
-								label={t("modelConfig.contextWindow", { ns: "models" })}
-							>
-								<InputNumber min={1} className="w-full!" />
-							</Form.Item>
-						</Col>
-					</Row>
+					{/* Capability metadata (streams live to modelStore.updateModelConfig
+					    when `providerId` is set) */}
+					<ModelCapabilityEditor
+						value={capabilityDraft}
+						onChange={handleCapabilityChange}
+					/>
+
+					<Divider style={{ margin: "16px 0 12px" }} />
 
 					{/* Pricing */}
 					<Form.Item
@@ -280,14 +254,6 @@ export function ModelConfigPanel({
 						{t("modelConfig.inputPrice", { ns: "models" })} /{" "}
 						{t("modelConfig.outputPrice", { ns: "models" })}
 					</div>
-
-					{/* System Prompt */}
-					<Form.Item
-						name="systemPrompt"
-						label={t("modelConfig.systemPrompt", { ns: "models" })}
-					>
-						<SystemPromptEditor />
-					</Form.Item>
 				</Form>
 			)}
 		</Drawer>

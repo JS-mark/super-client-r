@@ -441,6 +441,7 @@ export function ModelManageModal({
 				model={configModel}
 				existingGroups={existingGroups}
 				onSave={handleConfigSave}
+				providerId={provider.id}
 			/>
 		</>
 	);
