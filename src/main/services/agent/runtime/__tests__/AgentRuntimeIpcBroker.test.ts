@@ -6,8 +6,10 @@ import type {
 	AgentRuntime,
 	AgentRuntimeDescriptor,
 	AgentRuntimeStreamEvent,
+	PermissionDecision,
 } from "@super-client/shared-types/agent-runtime";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
+import type { SessionEvent } from "@super-client/shared-types/project";
 
 import { AgentTraceCollector } from "../../trace/AgentTraceCollector";
 import { AgentRuntimeRegistry } from "../AgentRuntimeRegistry";
@@ -17,6 +19,7 @@ import {
 	type BrokerSender,
 	type SessionContextResolver,
 } from "../AgentRuntimeIpcBroker";
+import { SubagentEventBridge } from "../SubagentEventBridge";
 
 // ─────────────────────────── helpers ───────────────────────────
 
@@ -112,10 +115,15 @@ function makeSender(): BrokerSender & {
 function makeResolver(): SessionContextResolver {
 	return {
 		resolve: async () => ({
-			sessionMeta: { runtimeId: "claude-sdk" },
+			sessionMeta: { projectId: null, runtimeId: "claude-sdk" },
 			effective: effectiveRuntime(),
 		}),
 	};
+}
+
+function makeStorage() {
+	const appendEvent = vi.fn<(sessionId: string, event: SessionEvent) => void>();
+	return { appendEvent };
 }
 
 const baseEvent = {
@@ -182,6 +190,153 @@ describe("AgentRuntimeIpcBroker", () => {
 		const traceEntry = trace.get("req-1");
 		expect(traceEntry?.status).toBe("completed");
 		expect(traceEntry?.events).toHaveLength(3);
+	});
+
+	it("materializes persisted product events to storage and skips transient deltas", async () => {
+		const events: AgentRuntimeStreamEvent[] = [
+			ev("init", { model: "m" }, 0),
+			ev("text.delta", { messageId: "m1", delta: "hi" }, 1),
+			ev(
+				"tool.call",
+				{ callId: "tool-1", toolName: "read_file", input: { path: "a" } },
+				2,
+			),
+			ev(
+				"tool.result",
+				{
+					callId: "tool-1",
+					content: { kind: "text", text: "ok" },
+					isError: false,
+				},
+				3,
+			),
+			ev("result", { reason: "completed" }, 4),
+		];
+		const registry = new AgentRuntimeRegistry();
+		registry.register(fakeRuntime({ events }));
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "hello" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			makeSender(),
+		);
+		await flushMicrotasks(20);
+
+		expect(storage.appendEvent).toHaveBeenCalledTimes(4);
+		expect(
+			storage.appendEvent.mock.calls.map(([sessionId]) => sessionId),
+		).toEqual(["conv-1", "conv-1", "conv-1", "conv-1"]);
+		expect(
+			storage.appendEvent.mock.calls.map(([, event]) => event.type),
+		).toEqual(["session_marker", "tool_call", "tool_result", "session_marker"]);
+		expect(storage.appendEvent.mock.calls[1][1]).toMatchObject({
+			type: "tool_call",
+			id: "tool-1",
+			name: "read_file",
+			input: { path: "a" },
+		});
+	});
+
+	it("persists AskUserQuestion request and answer with ask markers", async () => {
+		let releaseRuntime: (() => void) | undefined;
+		const resolvePermission = vi.fn().mockResolvedValue(undefined);
+		const runtime: AgentRuntime = {
+			descriptor: descriptor("claude-sdk"),
+			interrupt: vi.fn().mockResolvedValue(undefined),
+			resolvePermission,
+			async *createQuery() {
+				yield ev(
+					"permission.request",
+					{
+						approvalId: "ask-1",
+						toolName: "scp-agent-builtins__AskUserQuestion",
+						input: {
+							questions: [
+								{
+									header: "Scope",
+									question: "Which scope?",
+									options: [{ label: "Small", description: "Focused" }],
+								},
+							],
+						},
+					},
+					0,
+				);
+				await new Promise<void>((resolve) => {
+					releaseRuntime = resolve;
+				});
+				yield ev("result", { reason: "completed" }, 1);
+			},
+		};
+		const registry = new AgentRuntimeRegistry();
+		registry.register(runtime);
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			makeSender(),
+		);
+		await flushMicrotasks(10);
+
+		const decision: PermissionDecision = {
+			approved: true,
+			scope: "once",
+			payload: {
+				answers: { "Which scope?": "Small" },
+			},
+		};
+		await broker.resolvePermission("ask-1", decision);
+		expect(resolvePermission).toHaveBeenCalledWith("ask-1", decision);
+
+		const markers = storage.appendEvent.mock.calls
+			.map(([, event]) => event)
+			.filter((event) => event.type === "session_marker");
+		expect(markers).toEqual([
+			expect.objectContaining({
+				key: "ask.requested",
+				value: expect.objectContaining({
+					askId: "ask-1",
+					toolName: "scp-agent-builtins__AskUserQuestion",
+				}),
+			}),
+			expect.objectContaining({
+				key: "ask.answered",
+				value: expect.objectContaining({
+					askId: "ask-1",
+					decision: "allow_once",
+					payload: {
+						answers: { "Which scope?": "Small" },
+					},
+				}),
+			}),
+		]);
+
+		releaseRuntime?.();
+		await flushMicrotasks(20);
 	});
 
 	it("on adapter throw: emits fatal error + result(error)", async () => {
@@ -385,9 +540,8 @@ describe("AgentRuntimeIpcBroker", () => {
 			const resultCalls = sender.calls.filter(
 				(c) =>
 					(c.payload as AgentRuntimeStreamEvent).type === "result" &&
-					(
-						c.payload as AgentRuntimeStreamEvent & { type: "result" }
-					).reason === "cancelled",
+					(c.payload as AgentRuntimeStreamEvent & { type: "result" }).reason ===
+						"cancelled",
 			);
 			expect(resultCalls.length).toBeGreaterThanOrEqual(1);
 		} finally {
@@ -423,5 +577,234 @@ describe("AgentRuntimeIpcBroker", () => {
 			approved: true,
 			scope: "once",
 		});
+	});
+
+	it("fast-skips transient text.delta events without hitting the storage/materializer pipeline", async () => {
+		const events: AgentRuntimeStreamEvent[] = [
+			ev("init", { model: "m" }, 0),
+			...Array.from({ length: 30 }, (_, i) =>
+				ev("text.delta", { messageId: "m1", delta: "x" }, 1 + i),
+			),
+			ev("message.final", { messageId: "m1", text: "final" }, 31),
+			ev("result", { reason: "completed" }, 32),
+		];
+		const registry = new AgentRuntimeRegistry();
+		registry.register(fakeRuntime({ events }));
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+
+		const sender = makeSender();
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "hello" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			sender,
+		);
+		// Drain the async generator: 33 yields need enough microtask flushes.
+		await flushMicrotasks(200);
+
+		// Sender still forwards every event (33 total: init + 30 deltas + final + result).
+		expect(sender.calls).toHaveLength(33);
+
+		// But storage.appendEvent is only invoked for run.started (session_marker),
+		// message.final (assistant_message), and run.completed (session_marker) —
+		// never for any of the 30 transient text.delta events.
+		const appendedTypes = storage.appendEvent.mock.calls.map(
+			([, event]) => event.type,
+		);
+		expect(appendedTypes).toEqual([
+			"session_marker",
+			"assistant_message",
+			"session_marker",
+		]);
+		// Session-marker keys should be run.started / run.completed — nothing
+		// resembling a text delta should have slipped through the fast path.
+		const markerKeys = storage.appendEvent.mock.calls
+			.map(([, event]) => event)
+			.filter((event) => event.type === "session_marker")
+			.map((event) => (event as Extract<SessionEvent, { type: "session_marker" }>).key);
+		expect(markerKeys).toEqual(["run.started", "run.completed"]);
+	});
+
+	it("persists user permission resolution once even if runtime later emits permission.resolved", async () => {
+		let releaseRuntime: (() => void) | undefined;
+		const resolvePermission = vi.fn().mockResolvedValue(undefined);
+		const runtime: AgentRuntime = {
+			descriptor: descriptor("claude-sdk"),
+			interrupt: vi.fn().mockResolvedValue(undefined),
+			resolvePermission,
+			async *createQuery() {
+				yield ev(
+					"permission.request",
+					{
+						approvalId: "appr-1",
+						toolName: "execute_command",
+						input: { command: "pwd" },
+					},
+					0,
+				);
+				await new Promise<void>((resolve) => {
+					releaseRuntime = resolve;
+				});
+				yield ev(
+					"permission.resolved",
+					{
+						approvalId: "appr-1",
+						decision: { approved: true, scope: "once" },
+						source: "user",
+					},
+					1,
+				);
+				yield ev("result", { reason: "completed" }, 2);
+			},
+		};
+		const registry = new AgentRuntimeRegistry();
+		registry.register(runtime);
+		const storage = makeStorage();
+		const trace = new AgentTraceCollector();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace,
+			resolver: makeResolver(),
+			storage,
+		});
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			makeSender(),
+		);
+		await flushMicrotasks(10);
+
+		const decision: PermissionDecision = { approved: true, scope: "once" };
+		await broker.resolvePermission("appr-1", decision);
+		expect(resolvePermission).toHaveBeenCalledWith("appr-1", decision);
+
+		const approvalEventsAfterUserDecision =
+			storage.appendEvent.mock.calls.filter(
+				([, event]) => event.type === "approval",
+			);
+		expect(approvalEventsAfterUserDecision).toHaveLength(1);
+		expect(approvalEventsAfterUserDecision[0]).toMatchObject([
+			"conv-1",
+			{
+				type: "approval",
+				toolCallId: "appr-1",
+				decision: "allow_once",
+			},
+		]);
+
+		releaseRuntime?.();
+		await flushMicrotasks(20);
+
+		const allApprovalEvents = storage.appendEvent.mock.calls.filter(
+			([, event]) => event.type === "approval",
+		);
+		expect(allApprovalEvents).toHaveLength(1);
+		expect(
+			trace
+				.get("req-1")
+				?.events.some(
+					(record) =>
+						record.kind === "event" &&
+						record.payload.kind === "event" &&
+						record.payload.event.type === "permission.resolved",
+				),
+		).toBe(true);
+	});
+
+	it("emitSubagentEvent materializes spawned marker + assistant.part_start", () => {
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry: new AgentRuntimeRegistry(),
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+		const bridge = new SubagentEventBridge({
+			emitSubagentEvent: (event, ctx) =>
+				broker.emitSubagentEvent(event, ctx),
+			now: () => 12_345,
+		});
+		bridge.spawn({
+			parentRunId: "req-parent",
+			subagentRunId: "sub-1",
+			sessionId: "conv-1",
+			projectId: "proj-1",
+			parentAssistantMessageId: "msg-parent-1",
+			profile: { id: "builtin_programmer", name: "Programmer" },
+			taskGoal: "explore",
+		});
+
+		const events = storage.appendEvent.mock.calls.map(([, event]) => event);
+		expect(events.map((e) => e.type)).toEqual([
+			"session_marker",
+			"assistant.part_start",
+		]);
+		const marker = events[0] as Extract<SessionEvent, { type: "session_marker" }>;
+		expect(marker.key).toBe("subagent.spawned");
+		expect(marker.value).toMatchObject({
+			subagentRunId: "sub-1",
+			parentRunId: "req-parent",
+			parentAssistantMessageId: "msg-parent-1",
+		});
+		const partStart = events[1] as Extract<
+			SessionEvent,
+			{ type: "assistant.part_start" }
+		>;
+		expect(partStart.messageId).toBe("msg-parent-1");
+		expect(partStart.part.type).toBe("subagent");
+	});
+
+	it("emitSubagentEvent dedupes by eventId — second call with same id is a no-op", () => {
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry: new AgentRuntimeRegistry(),
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+		const emit = (bridge: SubagentEventBridge) =>
+			bridge.spawn({
+				parentRunId: "req-parent",
+				subagentRunId: "sub-dedupe",
+				sessionId: "conv-1",
+				parentAssistantMessageId: "msg-1",
+				taskGoal: "goal",
+			});
+		// Two bridges emit the SAME deterministic eventId — broker must dedupe.
+		emit(
+			new SubagentEventBridge({
+				emitSubagentEvent: (ev, ctx) => broker.emitSubagentEvent(ev, ctx),
+				now: () => 1,
+			}),
+		);
+		emit(
+			new SubagentEventBridge({
+				emitSubagentEvent: (ev, ctx) => broker.emitSubagentEvent(ev, ctx),
+				now: () => 2,
+			}),
+		);
+		const spawnedMarkers = storage.appendEvent.mock.calls.filter(
+			([, event]) =>
+				event.type === "session_marker" &&
+				(event as Extract<SessionEvent, { type: "session_marker" }>).key ===
+					"subagent.spawned",
+		);
+		expect(spawnedMarkers).toHaveLength(1);
 	});
 });

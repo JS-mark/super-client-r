@@ -2,8 +2,8 @@
  * AgentTrace 脱敏
  *
  * 详见 spec §17.6。三模式：
- *   - strict: API key 全 mask；attachment 内容只留 mime+size；prompt 截断 200 字
- *   - loose (默认): API key 仍 mask；prompt / attachment 完整保留——调试体验优先
+ *   - strict: diagnostic secrets/path/url/remote id 脱敏；prompt 截断 200 字
+ *   - loose (默认): diagnostic secrets/path/url/remote id 脱敏；prompt 完整保留
  *   - off:   完全不脱敏；仅开发模式可选
  *
  * 实现保持纯函数 + 无副作用，便于单测。
@@ -14,6 +14,12 @@ import type {
 	AgentTraceRecordPayload,
 	AgentTraceRedactionMode,
 } from "@super-client/shared-types/agent-trace";
+import {
+	redactDiagnosticValue,
+	type PrivacyRedactionContext,
+} from "../../privacy/redaction";
+
+export type AgentTraceRedactionContext = PrivacyRedactionContext;
 
 /** 常见敏感 key/header 名（不区分大小写）。 */
 const SENSITIVE_KEYS = new Set([
@@ -38,10 +44,10 @@ const SENSITIVE_KEYS = new Set([
 
 /** 形似 API key 的 token；保守覆盖 sk-/pk-/anth-/Bearer 前缀。 */
 const KEY_LIKE_PATTERNS: RegExp[] = [
-	/\bsk-(?:proj-)?[A-Za-z0-9_\-]{20,}\b/g,
-	/\bpk-[A-Za-z0-9_\-]{20,}\b/g,
-	/\banth(?:ropic)?-[A-Za-z0-9_\-]{20,}\b/g,
-	/\bBearer\s+[A-Za-z0-9._\-]{20,}\b/gi,
+	/\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g,
+	/\bpk-[A-Za-z0-9_-]{20,}\b/g,
+	/\banth(?:ropic)?-[A-Za-z0-9_-]{20,}\b/g,
+	/\bBearer\s+[A-Za-z0-9._-]{20,}\b/gi,
 ];
 
 const MASK = "***";
@@ -55,13 +61,14 @@ const PROMPT_TRUNCATE_LIMIT_STRICT = 200;
 export function redactRecord(
 	record: AgentTraceRecord,
 	mode: AgentTraceRedactionMode,
+	context: AgentTraceRedactionContext = {},
 ): AgentTraceRecord {
 	if (mode === "off") return record;
 	const cloned: AgentTraceRecord = {
 		...record,
 		payload: deepCloneJson(record.payload) as AgentTraceRecordPayload,
 	};
-	cloned.payload = redactPayload(cloned.payload, mode);
+	cloned.payload = redactPayload(cloned.payload, mode, context);
 	return cloned;
 }
 
@@ -69,12 +76,22 @@ export function redactRecord(
 export function redactPayload(
 	payload: AgentTraceRecordPayload,
 	mode: AgentTraceRedactionMode,
+	context: AgentTraceRedactionContext = {},
 ): AgentTraceRecordPayload {
 	if (mode === "off") return payload;
-	const masked = maskApiKeysDeep(payload) as AgentTraceRecordPayload;
-	if (mode === "loose") return masked;
+	const redacted = redactTraceDiagnosticValue(payload, mode, context);
+	if (mode === "loose") return redacted;
 	// strict
-	return strictenPayload(masked);
+	return strictenPayload(redacted);
+}
+
+export function redactTraceDiagnosticValue<T>(
+	value: T,
+	mode: AgentTraceRedactionMode,
+	context: AgentTraceRedactionContext = {},
+): T {
+	if (mode === "off") return value;
+	return redactDiagnosticValue(value, context) as T;
 }
 
 /** prompt 字符串截断；attachment 内容剥离。 */

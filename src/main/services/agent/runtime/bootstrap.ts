@@ -35,7 +35,8 @@ export function bootstrapAgentRuntime(): AgentRuntimeBootstrapResult {
 	if (booted) return booted;
 
 	// 1) Trace collector with optional jsonl persister.
-	const baseDir = join(app.getPath("userData"), "agent-traces");
+	const userDataDir = app.getPath("userData");
+	const baseDir = join(userDataDir, "agent-traces");
 	const persister = new AgentTracePersister({
 		baseDir,
 		retentionDays: 7,
@@ -49,6 +50,10 @@ export function bootstrapAgentRuntime(): AgentRuntimeBootstrapResult {
 			redactionMode: "loose",
 		},
 		persister,
+		redactionContext: {
+			homeDir: app.getPath("home"),
+			appUserDataDir: userDataDir,
+		},
 	});
 	setAgentTraceCollector(collector);
 

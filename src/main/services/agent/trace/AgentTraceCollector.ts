@@ -16,7 +16,6 @@
 import { EventEmitter } from "node:events";
 import {
 	type AgentRuntimeId,
-	type AgentRuntimeStreamEvent,
 	type AgentQueryRequest,
 	type AgentToolBinding,
 	type CustomAgentRuntimeId,
@@ -33,7 +32,11 @@ import {
 	type AgentTraceTotals,
 } from "@super-client/shared-types/agent-trace";
 
-import { redactRecord } from "./redact";
+import {
+	redactRecord,
+	redactTraceDiagnosticValue,
+	type AgentTraceRedactionContext,
+} from "./redact";
 import type { AgentTracePersister } from "./AgentTracePersister";
 
 /** Begin 阶段需要的最小信息（broker 调用时即知）。 */
@@ -61,13 +64,16 @@ export class AgentTraceCollector {
 	private readonly emitter = new EventEmitter();
 	private config: AgentTraceConfig;
 	private readonly persister?: AgentTracePersisterLike;
+	private readonly redactionContext: AgentTraceRedactionContext;
 
 	constructor(opts?: {
 		config?: Partial<AgentTraceConfig>;
 		persister?: AgentTracePersisterLike;
+		redactionContext?: AgentTraceRedactionContext;
 	}) {
-		this.config = { ...DEFAULT_AGENT_TRACE_CONFIG, ...(opts?.config ?? {}) };
+		this.config = { ...DEFAULT_AGENT_TRACE_CONFIG, ...opts?.config };
 		this.persister = opts?.persister;
+		this.redactionContext = opts?.redactionContext ?? {};
 		this.emitter.setMaxListeners(50);
 	}
 
@@ -83,7 +89,11 @@ export class AgentTraceCollector {
 			status: "running",
 			model: info.model,
 			totals: emptyTotals(),
-			promptPreview: previewPrompt(info.prompt),
+			promptPreview: previewPrompt(
+				info.prompt,
+				this.config.redactionMode,
+				this.redactionContext,
+			),
 			events: [],
 			schemaVersion: 1,
 		};
@@ -119,7 +129,11 @@ export class AgentTraceCollector {
 			tag: rec.tag,
 		};
 
-		const safe = redactRecord(full, this.config.redactionMode);
+		const safe = redactRecord(
+			full,
+			this.config.redactionMode,
+			this.redactionContext,
+		);
 		entry.events.push(safe);
 		updateTotalsForPayload(entry.totals, safe.payload);
 
@@ -310,9 +324,14 @@ function matchesEventQ(entry: AgentTraceEntry, q: string): boolean {
 	return false;
 }
 
-function previewPrompt(prompt: AgentQueryRequest["prompt"]): string {
+function previewPrompt(
+	prompt: AgentQueryRequest["prompt"],
+	mode: AgentTraceConfig["redactionMode"],
+	context: AgentTraceRedactionContext,
+): string {
 	if (prompt.kind === "text") {
-		const base = truncatePreview(prompt.text);
+		const safeText = redactTraceDiagnosticValue(prompt.text, mode, context);
+		const base = truncatePreview(safeText);
 		const att = prompt.attachments?.length
 			? ` [+${prompt.attachments.length} attachments]`
 			: "";
@@ -321,7 +340,7 @@ function previewPrompt(prompt: AgentQueryRequest["prompt"]): string {
 	// parts
 	const text = prompt.parts
 		.filter((p): p is { type: "text"; text: string } => p.type === "text")
-		.map((p) => p.text)
+		.map((p) => redactTraceDiagnosticValue(p.text, mode, context))
 		.join(" ");
 	const imageCount = prompt.parts.filter((p) => p.type === "image").length;
 	const att = imageCount > 0 ? ` [+${imageCount} images]` : "";

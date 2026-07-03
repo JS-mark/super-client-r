@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { AgentRuntimeStreamEvent } from "@super-client/shared-types/agent-runtime";
 
 import { AgentTraceCollector } from "../AgentTraceCollector";
+import {
+	APP_DATA_PLACEHOLDER,
+	REDACTED_VALUE,
+} from "../../../privacy/redaction";
 
 const baseEvent = {
 	v: 1 as const,
@@ -12,6 +16,11 @@ const baseEvent = {
 	seq: 0,
 	runtime: "claude-sdk" as const,
 	timestamp: 0,
+};
+
+const privacyContext = {
+	homeDir: "/Users/mark",
+	appUserDataDir: "/Users/mark/Library/Application Support/Super Client",
 };
 
 function ev(
@@ -66,6 +75,61 @@ describe("AgentTraceCollector", () => {
 		expect(list[0].totals.toolCalls).toBe(1);
 		expect(list[0].promptPreview).toBe("hello");
 		expect(list[0].model).toBe("m");
+	});
+
+	it("redacts listed prompt preview and stored event diagnostics", () => {
+		const c = new AgentTraceCollector({ redactionContext: privacyContext });
+		c.begin({
+			requestId: "req-private",
+			conversationId: "conv-private",
+			runtimeId: "claude-sdk",
+			prompt: {
+				kind: "text",
+				text: [
+					"/Users/mark/Library/Application Support/Super Client/x",
+					"https://e.test/cb?token=secret",
+				].join(" "),
+			},
+			startedAt: 1000,
+		});
+		c.record("req-private", {
+			kind: "event",
+			payload: {
+				kind: "event",
+				event: ev({
+					type: "tool.call",
+					callId: "tool-1",
+					toolName: "remote__send",
+					input: {
+						cwd: "/Users/mark/code/app",
+						callback: "https://api.example.test/send?api_key=secret&name=ok",
+						remoteChatId: "chat_1234567890abcdef",
+					},
+				}),
+			},
+		});
+
+		const summary = c.list()[0];
+		expect(summary.promptPreview).toContain(APP_DATA_PLACEHOLDER);
+		expect(summary.promptPreview).toContain(`token=${REDACTED_VALUE}`);
+		expect(summary.promptPreview).not.toContain(privacyContext.appUserDataDir);
+		expect(summary.promptPreview).not.toContain("token=secret");
+
+		const got = c.get("req-private");
+		const record = got?.events[0];
+		if (!record || record.payload.kind !== "event") throw new Error("unexpected");
+		const event = record.payload.event;
+		if (event.type !== "tool.call") throw new Error("unexpected");
+		const input = event.input as {
+			cwd: string;
+			callback: string;
+			remoteChatId: string;
+		};
+		expect(input.cwd).toBe("~/code/app");
+		expect(input.callback).toBe(
+			`https://api.example.test/send?api_key=${REDACTED_VALUE}&name=ok`,
+		);
+		expect(input.remoteChatId).toBe("...cdef");
 	});
 
 	it("ring buffer evicts oldest when overflowing", () => {

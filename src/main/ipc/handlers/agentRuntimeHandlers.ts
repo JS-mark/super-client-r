@@ -30,6 +30,8 @@ import {
 	type SessionContextResolver,
 } from "../../services/agent/runtime/AgentRuntimeIpcBroker";
 import { getAgentRuntimeRegistry } from "../../services/agent/runtime/AgentRuntimeRegistry";
+import { SubagentEventBridge } from "../../services/agent/runtime/SubagentEventBridge";
+import { setSubagentEventBridge } from "../../services/agent/runtime/subagentBridgeRegistry";
 import { listBuiltinTools } from "../../services/agent/runtime/tools/BuiltinToolRegistry";
 import { getAgentTraceCollector } from "../../services/agent/trace/AgentTraceCollector";
 import { getSessionRuntimeResolver } from "../../services/runtime/SessionRuntimeResolver";
@@ -71,6 +73,7 @@ class MainSessionContextResolver implements SessionContextResolver {
 		});
 		return {
 			sessionMeta: {
+				projectId: meta?.projectId ?? null,
 				runtimeId: meta?.runtimeId,
 				interactionProfileOverride: meta?.interactionProfileOverride,
 			},
@@ -91,6 +94,7 @@ function getBroker(): AgentRuntimeIpcBroker {
 			registry: getAgentRuntimeRegistry(),
 			trace: getAgentTraceCollector(),
 			resolver: new MainSessionContextResolver(),
+			storage: getSessionStorage(),
 			onError: (err, ctx) => {
 				console.error(
 					`[AgentRuntimeIpcBroker] error for request ${ctx.requestId}:`,
@@ -98,6 +102,18 @@ function getBroker(): AgentRuntimeIpcBroker {
 				);
 			},
 		});
+		// Multi-Agent Round 6: register a SubagentEventBridge pointing at the
+		// new broker so the `Task` built-in tool can emit subagent lifecycle
+		// events out-of-band. Uses a module registry (subagentBridgeRegistry)
+		// because the agent-builtins MCP server is initialised at boot with
+		// no direct access to the broker.
+		const broker = brokerSingleton;
+		setSubagentEventBridge(
+			new SubagentEventBridge({
+				emitSubagentEvent: (event, ctx) =>
+					broker.emitSubagentEvent(event, ctx),
+			}),
+		);
 	}
 	return brokerSingleton;
 }
@@ -106,6 +122,7 @@ function getBroker(): AgentRuntimeIpcBroker {
 export function disposeAgentRuntimeBroker(): Promise<void> {
 	const b = brokerSingleton;
 	brokerSingleton = null;
+	setSubagentEventBridge(null);
 	return b ? b.dispose() : Promise.resolve();
 }
 

@@ -49,6 +49,14 @@ export interface AgentBuiltinsContext {
 	scpPort?: number;
 	scpApiKey?: string;
 	parentRequestId?: string;
+	/**
+	 * Multi-Agent Round 6: parent session (aka the outer chat's
+	 * conversationId). Passed to the `Task` tool so subagent lifecycle
+	 * events can be routed to the parent's JSONL / renderer via the
+	 * SubagentEventBridge module registry. Optional for backward
+	 * compatibility with callers that don't know the conversation.
+	 */
+	parentConversationId?: string;
 }
 
 /**
@@ -115,6 +123,8 @@ export function injectBuiltinArgs(
 			resolved._scpApiKey = agentBuiltinsCtx.scpApiKey;
 		if (agentBuiltinsCtx?.parentRequestId)
 			resolved._parentRequestId = agentBuiltinsCtx.parentRequestId;
+		if (agentBuiltinsCtx?.parentConversationId)
+			resolved._parentConversationId = agentBuiltinsCtx.parentConversationId;
 	}
 
 	return resolved;
@@ -160,6 +170,7 @@ export function buildToolExecutorFromRequest(
 		scpPort: extras?.scpPort,
 		scpApiKey: extras?.scpApiKey,
 		parentRequestId: request.requestId,
+		parentConversationId: request.conversationId,
 	};
 
 	return async (

@@ -23,12 +23,17 @@ import {
 	type AgentErrorEvent,
 	type AgentQueryRequest,
 	type AgentQueryRequestPayload,
+	type AgentPermissionResolvedEvent,
 	type AgentResultEvent,
 	type AgentRuntime,
 	type AgentRuntimeStreamEvent,
 	AgentRuntimeError,
 	type PermissionDecision,
 } from "@super-client/shared-types/agent-runtime";
+import {
+	type AgentProductEvent,
+	projectAgentRuntimeEvent,
+} from "@super-client/shared-types/agent-product-events";
 
 import type { AgentRuntimeRegistry } from "./AgentRuntimeRegistry";
 import type {
@@ -36,6 +41,8 @@ import type {
 	AgentTraceCollector,
 } from "../trace/AgentTraceCollector";
 import type { SessionMeta } from "@super-client/shared-types/project";
+import type { SessionStorageService } from "../../storage/SessionStorageService";
+import { materializeAgentProductEvent } from "./productEventMaterializer";
 
 // ─────────────────────────────────────────────────────────────────────
 // Sender 抽象（便于单测，不直接耦合 electron WebContents）
@@ -66,7 +73,10 @@ export function wrapWebContents(wc: WebContents): BrokerSender {
  */
 export interface SessionContextResolver {
 	resolve(conversationId: string): Promise<{
-		sessionMeta: Pick<SessionMeta, "runtimeId" | "interactionProfileOverride">;
+		sessionMeta: Pick<
+			SessionMeta,
+			"projectId" | "runtimeId" | "interactionProfileOverride"
+		>;
 		effective: AgentQueryRequest["runtime"];
 	}>;
 }
@@ -88,6 +98,8 @@ interface InflightEntry {
 	nextSeq: number;
 	/** Pump 是否已经 emit 过 result。 */
 	resultEmitted: boolean;
+	/** Session project marker used for product-event projection. */
+	projectId: string | null;
 }
 
 /**
@@ -105,14 +117,57 @@ export interface AgentRuntimeIpcBrokerDeps {
 	registry: AgentRuntimeRegistry;
 	trace: AgentTraceCollector;
 	resolver: SessionContextResolver;
+	storage?: Pick<SessionStorageService, "appendEvent">;
 	/** 用于 broker 内部 fatal 错误日志（非业务错） */
 	onError?: (err: unknown, ctx: { requestId: string }) => void;
 }
 
 export class AgentRuntimeIpcBroker {
 	private readonly inflight = new Map<string, InflightEntry>();
+	private readonly approvalContexts = new Map<string, InflightEntry>();
+	private readonly persistedApprovalResolutions = new Set<string>();
+	private readonly approvalRequestToolNames = new Map<string, string>();
+	/**
+	 * Multi-Agent Round 6: dedupe subagent product events by their
+	 * deterministic `eventId` so re-issuing a spawn/complete for the same
+	 * subagentRunId doesn't write the marker twice into JSONL.
+	 */
+	private readonly emittedSubagentEventIds = new Set<string>();
 
 	constructor(private readonly deps: AgentRuntimeIpcBrokerDeps) {}
+
+	/**
+	 * Multi-Agent Round 6: out-of-band product event emitter used by the
+	 * Task-tool → SubagentEventBridge path. Materializes the event through
+	 * the same `materializeAgentProductEvent` pipeline as the pump, so
+	 * storage sees a stable stream of session events regardless of whether
+	 * the source is a runtime stream or a subagent lifecycle emitter.
+	 *
+	 * Idempotent: repeated calls with the same `event.eventId` are ignored.
+	 * Not coupled to the pump — the caller manages the subagent lifecycle
+	 * externally (typically the Task tool handler).
+	 */
+	emitSubagentEvent(
+		event: AgentProductEvent,
+		_ctx: {
+			sessionId: string;
+			projectId?: string | null;
+			parentAssistantMessageId?: string;
+		},
+	): void {
+		if (this.emittedSubagentEventIds.has(event.eventId)) return;
+		this.emittedSubagentEventIds.add(event.eventId);
+		if (!this.deps.storage) return;
+		try {
+			for (const sessionEvent of materializeAgentProductEvent(event)) {
+				this.deps.storage.appendEvent(event.sessionId, sessionEvent);
+			}
+		} catch (err) {
+			this.deps.onError?.(err, {
+				requestId: event.requestId ?? event.eventId,
+			});
+		}
+	}
 
 	/**
 	 * 处理 `agent:create-query`。
@@ -155,6 +210,7 @@ export class AgentRuntimeIpcBroker {
 			req,
 			nextSeq: 0,
 			resultEmitted: false,
+			projectId: ctx.sessionMeta.projectId,
 		};
 		this.inflight.set(payload.requestId, entry);
 
@@ -189,6 +245,10 @@ export class AgentRuntimeIpcBroker {
 				}),
 			),
 		);
+		const entry = this.approvalContexts.get(approvalId);
+		if (entry) {
+			this.persistPermissionResolved(approvalId, decision, entry);
+		}
 	}
 
 	/** `agent:interrupt` */
@@ -227,6 +287,7 @@ export class AgentRuntimeIpcBroker {
 			kind: "event",
 			payload: { kind: "event", event: ev },
 		});
+		this.persistRuntimeEvent(ev, entry);
 		if (!entry.sender.isDestroyed()) {
 			entry.sender.send(AGENT_STREAM_CHANNEL, ev);
 		}
@@ -238,6 +299,10 @@ export class AgentRuntimeIpcBroker {
 			entry.controller.abort();
 		}
 		this.inflight.clear();
+		this.approvalContexts.clear();
+		this.persistedApprovalResolutions.clear();
+		this.approvalRequestToolNames.clear();
+		this.emittedSubagentEventIds.clear();
 	}
 
 	// ─────────────────────────── pump ───────────────────────────
@@ -271,6 +336,7 @@ export class AgentRuntimeIpcBroker {
 					approvalId: "approvalId" in ev ? ev.approvalId : undefined,
 					messageId: "messageId" in ev ? ev.messageId : undefined,
 				});
+				this.persistRuntimeEvent(ev, entry);
 				if (!sender.isDestroyed()) {
 					sender.send(AGENT_STREAM_CHANNEL, ev);
 				}
@@ -286,6 +352,7 @@ export class AgentRuntimeIpcBroker {
 					kind: "event",
 					payload: { kind: "event", event: errEv },
 				});
+				this.persistRuntimeEvent(errEv, entry);
 				if (!sender.isDestroyed()) sender.send(AGENT_STREAM_CHANNEL, errEv);
 				lastEvent = errEv;
 			}
@@ -295,6 +362,7 @@ export class AgentRuntimeIpcBroker {
 					kind: "event",
 					payload: { kind: "event", event: resEv },
 				});
+				this.persistRuntimeEvent(resEv, entry);
 				if (!sender.isDestroyed()) sender.send(AGENT_STREAM_CHANNEL, resEv);
 				entry.resultEmitted = true;
 				lastEvent = resEv;
@@ -314,14 +382,127 @@ export class AgentRuntimeIpcBroker {
 					kind: "event",
 					payload: { kind: "event", event: resEv },
 				});
+				this.persistRuntimeEvent(resEv, entry);
 				if (!sender.isDestroyed()) sender.send(AGENT_STREAM_CHANNEL, resEv);
 				entry.resultEmitted = true;
 				lastEvent = resEv;
 			}
 			this.inflight.delete(req.requestId);
+			this.dropApprovalContextsForEntry(entry);
 			const status = deriveTraceStatus(lastEvent, entry.resultEmitted);
 			this.deps.trace.finish(req.requestId, status);
 		}
+	}
+
+	private persistRuntimeEvent(
+		ev: AgentRuntimeStreamEvent,
+		entry: InflightEntry,
+	): void {
+		if (ev.type === "permission.request") {
+			this.approvalContexts.set(ev.approvalId, entry);
+			this.approvalRequestToolNames.set(
+				this.approvalResolutionKey(ev.requestId, ev.approvalId),
+				ev.toolName,
+			);
+		}
+		// Fast path: transient runtime events never materialize into persisted
+		// session events. Skip the projection/materialization pipeline entirely
+		// to keep the hot streaming loop cheap. The permission.request context
+		// bookkeeping above is intentionally kept so approval flows still work.
+		if (
+			ev.type === "text.delta" ||
+			ev.type === "reasoning.delta" ||
+			ev.type === "status"
+		) {
+			return;
+		}
+		if (!this.deps.storage) return;
+		if (
+			ev.type === "permission.resolved" &&
+			this.persistedApprovalResolutions.has(
+				this.approvalResolutionKey(ev.requestId, ev.approvalId),
+			)
+		) {
+			return;
+		}
+
+		try {
+			const productEvents = projectAgentRuntimeEvent(
+				this.withApprovalRequestContext(ev),
+				{
+					projectId: entry.projectId,
+				},
+			);
+			for (const productEvent of productEvents) {
+				for (const sessionEvent of materializeAgentProductEvent(productEvent)) {
+					this.deps.storage.appendEvent(productEvent.sessionId, sessionEvent);
+				}
+			}
+			if (ev.type === "permission.resolved") {
+				this.persistedApprovalResolutions.add(
+					this.approvalResolutionKey(ev.requestId, ev.approvalId),
+				);
+				this.approvalContexts.delete(ev.approvalId);
+				this.approvalRequestToolNames.delete(
+					this.approvalResolutionKey(ev.requestId, ev.approvalId),
+				);
+			}
+		} catch (err) {
+			this.deps.onError?.(err, { requestId: ev.requestId });
+		}
+	}
+
+	private persistPermissionResolved(
+		approvalId: string,
+		decision: PermissionDecision,
+		entry: InflightEntry,
+	): void {
+		const ev: AgentPermissionResolvedEvent = {
+			v: 1,
+			type: "permission.resolved",
+			approvalId,
+			toolName: this.approvalRequestToolNames.get(
+				this.approvalResolutionKey(entry.req.requestId, approvalId),
+			),
+			decision,
+			source: "user",
+			requestId: entry.req.requestId,
+			conversationId: entry.req.conversationId,
+			seq: entry.nextSeq++,
+			runtime: entry.runtime.descriptor.id,
+			timestamp: Date.now(),
+		};
+		this.deps.trace.record(entry.req.requestId, {
+			kind: "event",
+			payload: { kind: "event", event: ev },
+			approvalId,
+		});
+		this.persistRuntimeEvent(ev, entry);
+	}
+
+	private approvalResolutionKey(requestId: string, approvalId: string): string {
+		return `${requestId}:${approvalId}`;
+	}
+
+	private dropApprovalContextsForEntry(entry: InflightEntry): void {
+		for (const [approvalId, stored] of this.approvalContexts) {
+			if (stored === entry) {
+				this.approvalContexts.delete(approvalId);
+				this.approvalRequestToolNames.delete(
+					this.approvalResolutionKey(entry.req.requestId, approvalId),
+				);
+			}
+		}
+	}
+
+	private withApprovalRequestContext(
+		ev: AgentRuntimeStreamEvent,
+	): AgentRuntimeStreamEvent {
+		if (ev.type !== "permission.resolved" || ev.toolName) return ev;
+		const toolName = this.approvalRequestToolNames.get(
+			this.approvalResolutionKey(ev.requestId, ev.approvalId),
+		);
+		return toolName ? { ...ev, toolName } : ev;
 	}
 }
 

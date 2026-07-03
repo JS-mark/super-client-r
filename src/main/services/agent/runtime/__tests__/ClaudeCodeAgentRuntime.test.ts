@@ -10,7 +10,20 @@ const { localServerMock, getOrCreateApiKeyMock } = vi.hoisted(() => ({
 	getOrCreateApiKeyMock: vi.fn(() => "sk-self"),
 }));
 
+vi.mock("electron", () => ({
+	BrowserWindow: { getAllWindows: () => [] },
+	app: {
+		getPath: () => "/tmp/super-client-r-test",
+		isPackaged: false,
+	},
+}));
 vi.mock("../../../../server", () => ({
+	localServer: localServerMock,
+}));
+vi.mock("../../../../server/index", () => ({
+	localServer: localServerMock,
+}));
+vi.mock("../../../../server/app", () => ({
 	localServer: localServerMock,
 }));
 vi.mock("../../../../server/config", () => ({
@@ -38,6 +51,7 @@ vi.mock("../../../../store/StoreManager", () => ({
 }));
 
 import { ClaudeCodeAgentRuntime } from "../ClaudeCodeAgentRuntime";
+import { computeSubagentPolicy } from "../subagentPolicy";
 
 function sseBody(
 	events: Array<{ event: string; data: unknown }>,
@@ -133,7 +147,22 @@ describe("ClaudeCodeAgentRuntime", () => {
 
 	it("buildChatRequest emits scp-agent-builtins__X tool names + toolMapping", async () => {
 		const runtime = new ClaudeCodeAgentRuntime();
-		for await (const _ev of runtime.createQuery(makeReq())) {
+		for await (const _ev of runtime.createQuery(
+			makeReq({
+				tools: [
+					{
+						name: "github__search_repositories",
+						description: "Search GitHub repositories",
+						inputSchema: { type: "object" },
+						origin: {
+							kind: "mcp",
+							serverId: "github",
+							realName: "search_repositories",
+						},
+					},
+				],
+			}),
+		)) {
 			/* drain */
 		}
 		const body = JSON.parse(String(lastFetchInit?.body));
@@ -142,6 +171,7 @@ describe("ClaudeCodeAgentRuntime", () => {
 		);
 		expect(names).toContain("scp-agent-builtins__Read");
 		expect(names).toContain("scp-agent-builtins__Task");
+		expect(names).toContain("github__search_repositories");
 		expect(body.toolMapping["scp-agent-builtins__Read"]).toEqual({
 			serverId: "@scp/agent-builtins",
 			toolName: "Read",
@@ -149,6 +179,10 @@ describe("ClaudeCodeAgentRuntime", () => {
 		expect(body.toolMapping["scp-agent-builtins__Task"]).toEqual({
 			serverId: "@scp/agent-builtins",
 			toolName: "Task",
+		});
+		expect(body.toolMapping["github__search_repositories"]).toEqual({
+			serverId: "github",
+			toolName: "search_repositories",
 		});
 	});
 
@@ -211,5 +245,100 @@ describe("ClaudeCodeAgentRuntime", () => {
 		const runtime = new ClaudeCodeAgentRuntime();
 		expect(runtime.descriptor.id).toBe("llm-loop");
 		expect(runtime.descriptor.schemaVersion).toBe(1);
+	});
+
+	it("canUseTool denies destructive tools when planMode=plan-then-ask", () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		const decision = runtime.canUseTool(
+			"scp-agent-builtins__Write",
+			{ path: "/tmp/x", content: "y" },
+			{ planMode: "plan-then-ask", sessionId: "c1" },
+		);
+		expect(decision.approved).toBe(false);
+		if (!decision.approved) {
+			expect(decision.reason).toContain("planMode");
+			expect(decision.reason).toContain("plan-then-ask");
+			expect(decision.reason).toContain("Write");
+		}
+	});
+
+	it("canUseTool allows read-oriented tools when planMode=plan-then-ask", () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		const decision = runtime.canUseTool(
+			"scp-agent-builtins__Read",
+			{ path: "/tmp/x" },
+			{ planMode: "plan-then-ask", sessionId: "c1" },
+		);
+		expect(decision.approved).toBe(true);
+	});
+
+	it("canUseTool denies destructive tools when subagentPolicy caps them", () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		const subagentPolicy = computeSubagentPolicy(); // default read-only
+		const decision = runtime.canUseTool(
+			"scp-agent-builtins__Write",
+			{ path: "/tmp/x", content: "y" },
+			{ planMode: "chat", sessionId: "c1", subagentPolicy },
+		);
+		expect(decision.approved).toBe(false);
+		if (!decision.approved) {
+			expect(decision.reason).toContain("subagent-policy:tool-denied");
+			expect(decision.reason).toContain("Write");
+		}
+	});
+
+	it("canUseTool with no subagentPolicy keeps prior behavior (chat allows Write)", () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		expect(
+			runtime.canUseTool(
+				"scp-agent-builtins__Write",
+				{ path: "/tmp/x", content: "y" },
+				{ planMode: "chat", sessionId: "c1" },
+			),
+		).toEqual({ approved: true });
+	});
+
+	it("canUseTool subagent hard-cap fires BEFORE plan-mode gate", () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		const subagentPolicy = computeSubagentPolicy();
+		// Even in chat mode (would allow Write) a subagent's cap denies it.
+		const decision = runtime.canUseTool(
+			"scp-agent-builtins__Bash",
+			{ command: "ls" },
+			{ planMode: "chat", sessionId: "c1", subagentPolicy },
+		);
+		expect(decision.approved).toBe(false);
+		if (!decision.approved) {
+			expect(decision.reason).toMatch(/^subagent-policy:tool-denied/);
+		}
+	});
+
+	it("buildChatRequest strips destructive tools when planMode=plan-then-ask", async () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		for await (const _ev of runtime.createQuery(
+			makeReq({
+				runtime: {
+					model: { providerId: "prov-1", modelId: "test-model" },
+					planMode: "plan-then-ask",
+				} as never,
+			}),
+		)) {
+			/* drain */
+		}
+		const body = JSON.parse(String(lastFetchInit?.body));
+		const names: string[] = body.tools.map(
+			(t: { function: { name: string } }) => t.function.name,
+		);
+		// Read-oriented builtins survive
+		expect(names).toContain("scp-agent-builtins__Read");
+		expect(names).toContain("scp-agent-builtins__Grep");
+		// Destructive builtins are gated
+		expect(names).not.toContain("scp-agent-builtins__Write");
+		expect(names).not.toContain("scp-agent-builtins__Edit");
+		expect(names).not.toContain("scp-agent-builtins__Bash");
+		expect(names).not.toContain("scp-agent-builtins__Task");
+		// Mapping stays in lockstep
+		expect(body.toolMapping["scp-agent-builtins__Read"]).toBeDefined();
+		expect(body.toolMapping["scp-agent-builtins__Write"]).toBeUndefined();
 	});
 });

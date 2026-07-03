@@ -3,11 +3,45 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { McpServerConfig } from "../../../ipc/types";
+
+vi.mock("electron", () => ({
+	app: {
+		getPath: () => "/tmp/super-client-r-vitest-user-data",
+	},
+	BrowserWindow: {
+		getAllWindows: () => [],
+	},
+}));
+
+vi.mock("electron-store", () => ({
+	default: class MockStore {
+		private data: Record<string, unknown>;
+
+		constructor(options: { defaults?: Record<string, unknown> } = {}) {
+			this.data = { ...options.defaults };
+		}
+
+		get(key: string): unknown {
+			return this.data[key];
+		}
+
+		set(key: string, value: unknown): void {
+			this.data[key] = value;
+		}
+
+		delete(key: string): void {
+			delete this.data[key];
+		}
+	},
+}));
+
 import { getRuntimePolicyService } from "../../runtime/RuntimePolicyService";
 import { initializeProjectStorage } from "../../storage/ProjectStorageService";
 import { initializeSessionStorage } from "../../storage/SessionStorageService";
 import { McpService } from "../McpService";
+import { thirdPartyMcpService } from "../ThirdPartyMcpService";
 
 describe("McpService runtime policy gate", () => {
 	let baseDir: string;
@@ -24,6 +58,11 @@ describe("McpService runtime policy gate", () => {
 		rmSync(baseDir, { recursive: true, force: true });
 	});
 
+	afterEach(() => {
+		vi.restoreAllMocks();
+		thirdPartyMcpService.removeAllListeners();
+	});
+
 	function createSessionWithPolicy(
 		runtimePolicy: Parameters<typeof projects.saveSettings>[1]["runtimePolicy"],
 	) {
@@ -35,6 +74,37 @@ describe("McpService runtime policy gate", () => {
 			runtimePolicy,
 		});
 		return sessions.create({ projectId: project.id });
+	}
+
+	function registerServerInMemory(
+		service: McpService,
+		config: McpServerConfig,
+	): void {
+		(
+			service as unknown as {
+				servers: Map<string, McpServerConfig>;
+			}
+		).servers.set(config.id, config);
+	}
+
+	function builtinServer(id: string): McpServerConfig {
+		return {
+			id,
+			name: id,
+			type: "builtin",
+			transport: "stdio",
+			command: "mock-mcp",
+		};
+	}
+
+	function thirdPartyServer(id: string): McpServerConfig {
+		return {
+			id,
+			name: id,
+			type: "third-party",
+			transport: "http",
+			url: "https://mcp.example.test",
+		};
 	}
 
 	it("allows MCP tool execution without a session but records audit-only", () => {
@@ -293,5 +363,234 @@ describe("McpService runtime policy gate", () => {
 			decision: "denied",
 			reason: "workspace-policy:network-blocked",
 		});
+	});
+
+	it("callTool allows an approved stdio command and records allowed", async () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "system-access",
+			approvalMode: "full-access",
+		});
+		const service = new McpService();
+		registerServerInMemory(service, builtinServer("@scp/bash"));
+		const stdioCall = vi
+			.spyOn(
+				service as unknown as {
+					callStdioTool: (
+						serverId: string,
+						toolName: string,
+						args: Record<string, unknown>,
+					) => Promise<unknown>;
+				},
+				"callStdioTool",
+			)
+			.mockResolvedValue({ content: [{ type: "text", text: "ok" }] });
+
+		const result = await service.callTool(
+			"@scp/bash",
+			"execute_command",
+			{ command: "pwd" },
+			{ conversationId: session.id },
+		);
+
+		expect(result).toMatchObject({
+			success: true,
+			serverType: "builtin",
+			data: { content: [{ type: "text", text: "ok" }] },
+		});
+		expect(stdioCall).toHaveBeenCalledWith("@scp/bash", "execute_command", {
+			command: "pwd",
+		});
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			source: "mcp",
+			operation: "@scp/bash:execute_command",
+			kind: "command-exec",
+			target: "pwd",
+			decision: "allowed",
+		});
+	});
+
+	it("callTool allows audit-only stdio reads and does not skip auditing", async () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "read-only",
+			approvalMode: "request",
+		});
+		const service = new McpService();
+		registerServerInMemory(service, builtinServer("@scp/file-system"));
+		const stdioCall = vi
+			.spyOn(
+				service as unknown as {
+					callStdioTool: (
+						serverId: string,
+						toolName: string,
+						args: Record<string, unknown>,
+					) => Promise<unknown>;
+				},
+				"callStdioTool",
+			)
+			.mockResolvedValue({ content: [{ type: "text", text: "contents" }] });
+
+		const result = await service.callTool(
+			"@scp/file-system",
+			"read_file",
+			{ path: "/tmp/super-client-project/a.txt" },
+			{ conversationId: session.id },
+		);
+
+		expect(result.success).toBe(true);
+		expect(stdioCall).toHaveBeenCalledTimes(1);
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			source: "mcp",
+			operation: "@scp/file-system:read_file",
+			kind: "file-read",
+			target: "/tmp/super-client-project/a.txt",
+			decision: "audit-only",
+			reason: "audit-only:not-enforced",
+		});
+	});
+
+	it("callTool denies stdio writes before the server delegate is invoked", async () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			sandboxMode: "read-only",
+			approvalMode: "request",
+		});
+		const service = new McpService();
+		registerServerInMemory(service, builtinServer("@scp/file-system"));
+		const stdioCall = vi.spyOn(
+			service as unknown as {
+				callStdioTool: (
+					serverId: string,
+					toolName: string,
+					args: Record<string, unknown>,
+				) => Promise<unknown>;
+			},
+			"callStdioTool",
+		);
+
+		const result = await service.callTool(
+			"@scp/file-system",
+			"write_file",
+			{ path: "/tmp/super-client-project/a.txt" },
+			{ conversationId: session.id },
+		);
+
+		expect(result).toMatchObject({
+			success: false,
+			errorCode: "runtime.writeBlockedReadOnly",
+			serverType: "builtin",
+			error: "workspace-policy:read-only-sandbox",
+		});
+		expect(stdioCall).not.toHaveBeenCalled();
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			operation: "@scp/file-system:write_file",
+			decision: "denied",
+			reason: "workspace-policy:read-only-sandbox",
+		});
+	});
+
+	it("callTool denies third-party network requests before the third-party delegate is invoked", async () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			networkAccess: "blocked",
+		});
+		const service = new McpService();
+		registerServerInMemory(service, thirdPartyServer("third-party-fetch"));
+		const thirdPartyCall = vi.spyOn(thirdPartyMcpService, "callTool");
+
+		const result = await service.callTool(
+			"third-party-fetch",
+			"fetch_url",
+			{ url: "https://example.com" },
+			{ conversationId: session.id },
+		);
+
+		expect(result).toMatchObject({
+			success: false,
+			errorCode: "runtime.networkBlocked",
+			serverType: "third-party",
+			error: "workspace-policy:network-blocked",
+		});
+		expect(thirdPartyCall).not.toHaveBeenCalled();
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			source: "mcp",
+			operation: "third-party-fetch:fetch_url",
+			kind: "network-request",
+			target: "https://example.com",
+			decision: "denied",
+			reason: "workspace-policy:network-blocked",
+		});
+	});
+
+	it("callTool blocks third-party needs-approval until approvalGranted is passed", async () => {
+		const runtimePolicy = getRuntimePolicyService();
+		runtimePolicy.clearAuditLog();
+		const session = createSessionWithPolicy({
+			networkAccess: "approval-required",
+		});
+		const service = new McpService();
+		registerServerInMemory(service, thirdPartyServer("third-party-fetch"));
+		const thirdPartyCall = vi
+			.spyOn(thirdPartyMcpService, "callTool")
+			.mockResolvedValue({
+				success: true,
+				data: { content: [{ type: "text", text: "fetched" }] },
+				metadata: {
+					serverId: "third-party-fetch",
+					toolName: "fetch_url",
+					timestamp: Date.now(),
+					duration: 7,
+				},
+			});
+
+		const blocked = await service.callTool(
+			"third-party-fetch",
+			"fetch_url",
+			{ url: "https://example.com" },
+			{ conversationId: session.id },
+		);
+
+		expect(blocked).toMatchObject({
+			success: false,
+			errorCode: "runtime.needsApproval",
+			serverType: "third-party",
+			error: "workspace-policy:network-approval-required",
+		});
+		expect(thirdPartyCall).not.toHaveBeenCalled();
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			operation: "third-party-fetch:fetch_url",
+			decision: "denied",
+			reason: "workspace-policy:network-approval-required",
+		});
+
+		const allowed = await service.callTool(
+			"third-party-fetch",
+			"fetch_url",
+			{ url: "https://example.com" },
+			{ conversationId: session.id, approvalGranted: true },
+		);
+
+		expect(allowed).toMatchObject({
+			success: true,
+			serverType: "third-party",
+			data: { content: [{ type: "text", text: "fetched" }] },
+		});
+		expect(thirdPartyCall).toHaveBeenCalledWith(
+			"third-party-fetch",
+			"fetch_url",
+			{ url: "https://example.com" },
+		);
+		expect(runtimePolicy.getAuditLog().at(-1)).toMatchObject({
+			operation: "third-party-fetch:fetch_url",
+			decision: "allowed",
+		});
+		expect(runtimePolicy.getAuditLog().at(-1)?.reason).toBe(
+			"approval-granted:workspace-policy:network-approval-required",
+		);
 	});
 });

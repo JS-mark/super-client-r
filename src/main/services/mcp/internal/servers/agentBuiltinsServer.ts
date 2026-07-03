@@ -20,7 +20,9 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { parseSSEStream } from "../../../llm/sseClient";
+import { getSubagentEventBridge } from "../../../agent/runtime/subagentBridgeRegistry";
 import { mcpService } from "../../McpService";
 import type {
 	InternalMcpServer,
@@ -399,6 +401,19 @@ const webfetchHandler: InternalToolHandler = async (args) => {
 // Returns the accumulated assistant text as a single tool result.
 
 const taskHandler: InternalToolHandler = async (args) => {
+	// Multi-Agent Round 6: capture the bridge + parent identifiers up-front
+	// so both the happy path and any early throw can emit a `subagent.failed`
+	// event without duplicating branching. Bridge may be null (bootstrap
+	// disabled it or tests skipped registration) — every emit call becomes
+	// a no-op in that case, preserving backward compat.
+	const bridge = getSubagentEventBridge();
+	const parentRequestId = String(args._parentRequestId ?? "");
+	const parentConversationId = String(args._parentConversationId ?? "");
+	// Deterministic subagentRunId — includes crypto UUID so parallel Task
+	// calls in the same tick don't collide, and echoes parent request id
+	// for trace correlation.
+	const subagentRunId = `sub_${parentRequestId || "root"}_${randomUUID()}`;
+	let spawned = false;
 	try {
 		const description = String(args.description ?? "").trim();
 		const prompt = String(args.prompt ?? "").trim();
@@ -431,7 +446,20 @@ const taskHandler: InternalToolHandler = async (args) => {
 			throw new Error("_scpPort/_scpApiKey required for HTTP recursion");
 		}
 
-		const parentRequestId = String(args._parentRequestId ?? "");
+		// Emit spawn AFTER argument validation — a validation error should
+		// surface as a plain tool error, not a subagent.failed lifecycle. The
+		// bridge is only consulted when parentConversationId is known;
+		// otherwise the outer session id is unknown so we can't route.
+		if (bridge && parentConversationId) {
+			bridge.spawn({
+				parentRunId: parentRequestId,
+				subagentRunId,
+				sessionId: parentConversationId,
+				taskGoal: `${description}: ${prompt}`,
+			});
+			spawned = true;
+		}
+
 		const subRequestId = `${parentRequestId || "task"}_d${
 			depth + 1
 		}_${Date.now()}`;
@@ -496,8 +524,16 @@ const taskHandler: InternalToolHandler = async (args) => {
 			}
 		}
 
+		if (spawned && bridge) {
+			bridge.complete(subagentRunId, {
+				summary: accumulated || undefined,
+			});
+		}
 		return textOk(accumulated || "(subagent returned no text)");
 	} catch (err) {
+		if (spawned && bridge) {
+			bridge.fail(subagentRunId, (err as Error).message);
+		}
 		return textErr(`Task: ${(err as Error).message}`);
 	}
 };

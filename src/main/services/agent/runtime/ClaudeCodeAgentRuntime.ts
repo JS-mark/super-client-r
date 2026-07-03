@@ -40,6 +40,7 @@ import type {
 	AgentRuntimeStreamEvent,
 	PermissionDecision,
 } from "@super-client/shared-types/agent-runtime";
+import type { PlanMode } from "@super-client/shared-types/chat";
 import type {
 	ChatCompletionRequest,
 	ChatStreamEvent,
@@ -52,8 +53,14 @@ import {
 	AGENT_BUILTIN_TOOL_DEFS,
 	AGENT_BUILTIN_TOOL_NAMES,
 } from "../../mcp/internal/servers/agentBuiltinsServer";
+import { getRuntimePolicyService } from "../../runtime/RuntimePolicyService";
 import { storeManager } from "../../../store/StoreManager";
+import {
+	evaluateToolAgainstPlanMode,
+	planModeToPolicy,
+} from "./planModeToolGuard";
 import { ChatToRuntimeTranslator } from "./streamEventTranslator";
+import { evaluateSubagentTool, type SubagentPolicy } from "./subagentPolicy";
 import { buildSystemPrompt } from "./systemPrompt";
 
 const BUILTIN_PREFIX = "scp-agent-builtins__";
@@ -92,8 +99,8 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		const llmRequest = this.buildChatRequest(req);
 		const port = localServer.getPort();
 		const apiKey = getOrCreateApiKey();
+		const activeRequests = this.active;
 
-		const self = this;
 		return (async function* (): AsyncGenerator<
 			AgentRuntimeStreamEvent,
 			void,
@@ -170,12 +177,12 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 				if (!finished) {
 					for (const ev of translator.finalize()) yield ev;
 				}
-			} finally {
-				req.signal.removeEventListener("abort", onParentAbort);
-				self.active.delete(req.requestId);
-			}
-		})();
-	}
+				} finally {
+					req.signal.removeEventListener("abort", onParentAbort);
+					activeRequests.delete(req.requestId);
+				}
+			})();
+		}
 
 	async resolvePermission(
 		approvalId: string,
@@ -201,6 +208,83 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		}).catch(() => {
 			/* non-fatal */
 		});
+	}
+
+	/**
+	 * canUseTool — runtime-first plan-mode guard.
+	 *
+	 * The Agent SDK exposes a `canUseTool(name, input)` hook for gating tool
+	 * calls before they reach the model / executor. When the calling session
+	 * is in a plan-mode (`plan-only` or `plan-then-ask`), destructive tools
+	 * must be denied with a structured reason and an audit deny recorded.
+	 *
+	 * Non-plan modes (`chat` / `auto-execute-safe` / `full-agent`) are
+	 * approved unconditionally at this layer; downstream `toolPermission` and
+	 * RuntimePolicyService continue to handle their own gating.
+	 *
+	 * Exposed as a method (rather than baked into createQuery) so unit tests
+	 * can exercise the policy without spinning the SDK, and so future Agent-
+	 * SDK options wiring can pass this through as `{ canUseTool: this.canUseTool.bind(this) }`.
+	 */
+	canUseTool(
+		toolName: string,
+		_input: unknown,
+		context: {
+			planMode: PlanMode;
+			sessionId?: string;
+			/**
+			 * Multi-Agent Round 6: when the current runtime request is
+			 * running as a subagent, its resolved capability envelope is
+			 * passed here. The subagent hard-cap is enforced BEFORE the
+			 * parent's plan-mode gate so a subagent in a chat-mode session
+			 * still can't call destructive tools. Parents (no
+			 * subagentPolicy) get unchanged behaviour.
+			 */
+			subagentPolicy?: SubagentPolicy;
+		},
+	): { approved: true } | { approved: false; reason: string } {
+		if (context.subagentPolicy) {
+			const subEval = evaluateSubagentTool(context.subagentPolicy, toolName);
+			if (!subEval.approved) {
+				try {
+					getRuntimePolicyService().record(
+						{
+							workspaceId: "",
+							sessionId: context.sessionId ?? "",
+							source: "agent-sdk",
+							operation: "subagent-policy:canUseTool-deny",
+							kind: "tool-execute",
+							target: toolName,
+						},
+						"denied",
+						subEval.reason,
+					);
+				} catch {
+					/* audit failure is non-fatal */
+				}
+				return subEval;
+			}
+		}
+		const evaluation = evaluateToolAgainstPlanMode(context.planMode, toolName);
+		if (!evaluation.approved) {
+			try {
+				getRuntimePolicyService().record(
+					{
+						workspaceId: "",
+						sessionId: context.sessionId ?? "",
+						source: "agent-sdk",
+						operation: "plan-mode:canUseTool-deny",
+						kind: "tool-execute",
+						target: toolName,
+					},
+					"denied",
+					evaluation.reason,
+				);
+			} catch {
+				/* audit failure is non-fatal */
+			}
+		}
+		return evaluation;
 	}
 
 	async interrupt(requestId: string): Promise<void> {
@@ -285,7 +369,7 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		for (const t of req.tools) {
 			userMapping[t.name] = {
 				serverId: t.origin.serverId,
-				toolName: t.name,
+				toolName: t.origin.realName,
 			};
 		}
 
@@ -306,6 +390,25 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		}
 		messages.push({ role: "user", content: userText });
 
+		// Runtime-first plan-mode tool gate. When the session's planMode is
+		// `plan-only` or `plan-then-ask`, drop tool schemas we would otherwise
+		// deny at canUseTool time so the model never sees them. The LLMService
+		// planModeGate is still applied downstream as a second-line defence
+		// for the loopback HTTP path; the two layers agree on classification
+		// via `planModeToolGuard`.
+		const planMode: PlanMode =
+			((req.runtime as unknown as { planMode?: PlanMode })?.planMode) ??
+			"chat";
+		const rawTools = [...builtinTools, ...userTools];
+		const rawMapping: Record<string, { serverId: string; toolName: string }> =
+			{ ...builtinMapping, ...userMapping };
+		const { tools: gatedTools, mapping: gatedMapping } = this.gateToolsForPlanMode(
+			rawTools,
+			rawMapping,
+			planMode,
+			req.conversationId,
+		);
+
 		return {
 			requestId: req.requestId,
 			conversationId: req.conversationId,
@@ -315,8 +418,55 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 			providerPreset: provider?.preset,
 			apiFormat: provider?.apiFormat,
 			messages,
-			tools: [...builtinTools, ...userTools],
-			toolMapping: { ...builtinMapping, ...userMapping },
+			tools: gatedTools,
+			toolMapping: gatedMapping,
+		};
+	}
+
+	private gateToolsForPlanMode(
+		tools: Array<{
+			type: "function";
+			function: {
+				name: string;
+				description: string;
+				parameters: Record<string, unknown>;
+			};
+		}>,
+		mapping: Record<string, { serverId: string; toolName: string }>,
+		planMode: PlanMode,
+		sessionId: string | undefined,
+	): {
+		tools:
+			| Array<{
+					type: "function";
+					function: {
+						name: string;
+						description: string;
+						parameters: Record<string, unknown>;
+					};
+			  }>
+			| undefined;
+		mapping: Record<string, { serverId: string; toolName: string }> | undefined;
+	} {
+		const policy = planModeToPolicy(planMode);
+		if (policy === "allow") {
+			return { tools, mapping };
+		}
+		const keepers = tools.filter(
+			(t) => this.canUseTool(t.function.name, undefined, { planMode, sessionId }).approved,
+		);
+		const filteredMapping: Record<
+			string,
+			{ serverId: string; toolName: string }
+		> = {};
+		for (const t of keepers) {
+			if (mapping[t.function.name]) {
+				filteredMapping[t.function.name] = mapping[t.function.name];
+			}
+		}
+		return {
+			tools: keepers.length > 0 ? keepers : undefined,
+			mapping: keepers.length > 0 ? filteredMapping : undefined,
 		};
 	}
 }

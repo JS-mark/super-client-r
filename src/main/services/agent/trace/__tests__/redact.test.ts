@@ -8,6 +8,10 @@ import type {
 import type { AgentTraceRecord } from "@super-client/shared-types/agent-trace";
 
 import { maskApiKeysDeep, redactRecord, truncate } from "../redact";
+import {
+	APP_DATA_PLACEHOLDER,
+	REDACTED_VALUE,
+} from "../../../privacy/redaction";
 
 function makeEventRecord(ev: AgentRuntimeStreamEvent): AgentTraceRecord {
 	return {
@@ -26,6 +30,11 @@ const baseEvent = {
 	timestamp: 0,
 };
 
+const privacyContext = {
+	homeDir: "/Users/mark",
+	appUserDataDir: "/Users/mark/Library/Application Support/Super Client",
+};
+
 describe("redact", () => {
 	it("loose mode masks API keys but keeps prompt", () => {
 		const ev: AgentRuntimeStreamEvent = {
@@ -42,8 +51,51 @@ describe("redact", () => {
 			throw new Error("expected message.final");
 		}
 		expect(final.text).not.toContain("sk-proj-");
-		expect(final.text).toContain("***");
+		expect(final.text).toContain(REDACTED_VALUE);
 		expect(final.text.length).toBeGreaterThan(10); // not truncated
+	});
+
+	it("loose mode redacts diagnostic paths, URL query secrets, and remote ids", () => {
+		const ev: AgentToolCallEvent = {
+			...baseEvent,
+			type: "tool.call",
+			callId: "c1",
+			toolName: "remote__send",
+			input: {
+				cwd: "/Users/mark/code/app",
+				sessionDir:
+					"/Users/mark/Library/Application Support/Super Client/chats/default/session/s1",
+				callback: "https://example.com/oauth?token=secret&state=ok",
+				remoteChatId: "chat_1234567890abcdef",
+				nested: {
+					url: "GET https://api.example.test/items?api_key=secret&name=visible",
+				},
+			},
+		};
+
+		const out = redactRecord(makeEventRecord(ev), "loose", privacyContext);
+		if (out.payload.kind !== "event") throw new Error("unexpected");
+		const call = out.payload.event;
+		if (call.type !== "tool.call") throw new Error("unexpected");
+		const input = call.input as {
+			cwd: string;
+			sessionDir: string;
+			callback: string;
+			remoteChatId: string;
+			nested: { url: string };
+		};
+
+		expect(input.cwd).toBe("~/code/app");
+		expect(input.sessionDir).toBe(
+			`${APP_DATA_PLACEHOLDER}/chats/default/session/s1`,
+		);
+		expect(input.callback).toBe(
+			`https://example.com/oauth?token=${REDACTED_VALUE}&state=ok`,
+		);
+		expect(input.remoteChatId).toBe("...cdef");
+		expect(input.nested.url).toBe(
+			`GET https://api.example.test/items?api_key=${REDACTED_VALUE}&name=visible`,
+		);
 	});
 
 	it("strict mode truncates message.final text", () => {
@@ -60,21 +112,56 @@ describe("redact", () => {
 		expect(final.text).toMatch(/^x{200}…\(\d+ more\)$/);
 	});
 
+	it("strict mode applies privacy redaction before truncating text", () => {
+		const ev: AgentRuntimeStreamEvent = {
+			...baseEvent,
+			type: "message.final",
+			messageId: "m1",
+			text: [
+				"/Users/mark/Library/Application Support/Super Client/chats/default/session/s1",
+				"https://example.com/callback?code=secret&state=ok",
+				"x".repeat(500),
+			].join(" "),
+		};
+
+		const out = redactRecord(makeEventRecord(ev), "strict", privacyContext);
+		if (out.payload.kind !== "event") throw new Error("unexpected");
+		const final = out.payload.event;
+		if (final.type !== "message.final") throw new Error("unexpected");
+		expect(final.text).toContain(APP_DATA_PLACEHOLDER);
+		expect(final.text).toContain(`code=${REDACTED_VALUE}`);
+		expect(final.text).not.toContain(privacyContext.appUserDataDir);
+		expect(final.text).not.toContain("code=secret");
+		expect(final.text).toMatch(/…\(\d+ more\)$/);
+	});
+
 	it("off mode passes through", () => {
 		const ev: AgentToolCallEvent = {
 			...baseEvent,
 			type: "tool.call",
 			callId: "c1",
 			toolName: "fs__read",
-			input: { authorization: "Bearer abc-very-secret-token-1234567890" },
+			input: {
+				authorization: "Bearer abc-very-secret-token-1234567890",
+				cwd: "/Users/mark/code/app",
+				callback: "https://example.com/callback?token=secret",
+				remoteChatId: "chat_1234567890abcdef",
+			},
 		};
-		const out = redactRecord(makeEventRecord(ev), "off");
+		const out = redactRecord(makeEventRecord(ev), "off", privacyContext);
 		if (out.payload.kind !== "event") throw new Error("unexpected");
 		const c = out.payload.event;
 		if (c.type !== "tool.call") throw new Error("unexpected");
-		expect((c.input as { authorization: string }).authorization).toContain(
-			"Bearer abc-",
-		);
+		const input = c.input as {
+			authorization: string;
+			cwd: string;
+			callback: string;
+			remoteChatId: string;
+		};
+		expect(input.authorization).toContain("Bearer abc-");
+		expect(input.cwd).toBe("/Users/mark/code/app");
+		expect(input.callback).toContain("token=secret");
+		expect(input.remoteChatId).toBe("chat_1234567890abcdef");
 	});
 
 	it("masks sensitive keys deep in objects", () => {
