@@ -40,6 +40,8 @@
 
 | 文档 | 状态 | 结论 |
 | --- | --- | --- |
+| [design-doc.md](./design-doc.md) | **当前产品体验与架构设计** | Codex/Claude 参考体验、Agent-only 工作台、模型选择、Agent loop、approval、context/memory、多 Agent、Artifacts、Remote IM 的目标设计。改产品体验、架构边界、交互结构前必须先读。 |
+| [requirements-plan.md](./requirements-plan.md) | **当前需求与阶段计划** | 将 design-doc 转成需求、当前代码差距、阶段计划和验收标准。判断下一批实现范围、验收口径、阶段拆分时必须先读。 |
 | [project-session-redesign-plan.md](./project-session-redesign-plan.md) | **当前主计划** | 覆盖 project/session 数据模型、存储、迁移、UI、Phase A-G。作为实现时的主依据。 |
 | [workspace-session-ui-plan.md](./workspace-session-ui-plan.md) | 历史主计划 / 运行时参考 | UI shell、approval、sandbox、attachments、plan modes、extensions 的要求仍有价值；其中 `Workspace` 作为一等配置实体的章节已被新主计划 supersede。 |
 | [workspace-session-plan-review.md](./workspace-session-plan-review.md) | 历史评审 | 记录了早期 critical gap：双 workspace、model scope、approval grants、attachment pipeline、ElectronAPI contract。大部分已转化为后续 R/G 任务。 |
@@ -69,6 +71,13 @@
 
 主线来自 [project-session-redesign-plan.md](./project-session-redesign-plan.md)，本文只保留执行索引和优先级。
 
+当前有两条并行但不冲突的执行线：
+
+- **Project / Session A-G**：负责 project/session 数据模型、存储、迁移、UI shell 和旧 workspace cleanup。
+- **Agent Phase 0a/0b/0c**：负责 Agent runtime product events、`useChat` 状态机拆分、Plan/Execute 可回放交互。它来自 [requirements-plan](./requirements-plan.md)，优先级高于继续扩展 F/G 之外的新 UI。
+
+当前最近批次已完成 Phase 0a/0b/0c 的 runtime projection、main-process JSONL materializer、helper/hook split、`useAgentRunController`、runtime-first 发送入口、PlanCard 展示和 composer blocked decision 基础接线。剩余重点是 runtime fallback 语义、product-event replay、native structured events、Plan/Execute 持久化链接和真实 runtime smoke。
+
 | Phase | 范围 | 当前口径 |
 | --- | --- | --- |
 | A | 数据层并行实现 | 新 shared types、cwd hash、ProjectStorageService、JSONL utils、SessionStorageService、IPC。纯加法，不切 UI。 |
@@ -91,6 +100,8 @@
 
 | 功能 | Plan | 何时读 |
 | --- | --- | --- |
+| Agent 客户端产品体验与架构 | [design-doc.md](./design-doc.md) | 改 Agent 工作台、模型选择、Plan/Execute、approval、context/memory、多 Agent、Artifacts、Remote IM 体验或架构前 |
+| Agent 客户端需求与阶段计划 | [requirements-plan.md](./requirements-plan.md) | 拆批实现、判断验收标准、确认阶段边界和当前代码差距前 |
 | Project / Session 数据模型、存储、迁移、UI 主线 | [project-session-redesign-plan.md](./project-session-redesign-plan.md) | 做任何 project/session 主线改动前 |
 | 迁移失败 / 导入边界 | [project-session-migration-matrix.md](./project-session-migration-matrix.md) | 做旧 chats 导入、迁移、回滚、import wizard 前 |
 | JSONL 并发写 / 恢复 | [jsonl-concurrency-plan.md](./jsonl-concurrency-plan.md) | 改 session JSONL append、meta rewrite、remote/agent/UI 事件写入、repair/rebuild 前 |

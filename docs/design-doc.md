@@ -2,6 +2,8 @@
 
 > 日期：2026-06-27
 >
+> 最近复核：2026-06-29
+>
 > 状态：设计草案
 >
 > 配套规划：[requirements-plan.md](./requirements-plan.md)
@@ -65,7 +67,7 @@ Super Client R 是一个 **Agent-only** 桌面 AI 客户端。后续不再恢复
 
 | 领域 | 当前代码 |
 | --- | --- |
-| Agent-only 发送主路径 | `src/renderer/src/hooks/useChat.ts` |
+| Agent-only 发送主路径 | `src/renderer/src/hooks/useChat.ts`、`src/renderer/src/services/agent/agentRuntimeClient.ts` |
 | 输入框与审批替换区 | `src/renderer/src/components/chat/ChatInputArea.tsx` |
 | 统一审批卡片 | `src/renderer/src/components/chat/ApprovalDecisionCard.tsx` |
 | AskUserQuestion | `src/renderer/src/components/chat/AskUserQuestionCard.tsx` |
@@ -76,10 +78,31 @@ Super Client R 是一个 **Agent-only** 桌面 AI 客户端。后续不再恢复
 | 模型解析 | `src/main/services/runtime/SessionRuntimeResolver.ts` |
 | Plan mode gate | `src/main/services/llm/planModeGate.ts` |
 | Agent profiles/teams | `packages/shared-types/src/agent-sdk.ts`、`AgentTeamSelector.tsx` |
+| Agent runtime adapter | `packages/shared-types/src/agent-runtime.ts`、`src/main/services/agent/runtime/AgentRuntimeIpcBroker.ts` |
+| Agent product event contract | `packages/shared-types/src/agent-product-events.ts`、`src/main/services/agent/runtime/productEventMaterializer.ts` |
+| Agent run controller / reducer | `src/renderer/src/hooks/useAgentRunController.ts`、`src/renderer/src/hooks/useAgentEventReducer.ts` |
+| Plan/Execute shared contract | `packages/shared-types/src/plan-execute.ts`、`src/renderer/src/lib/planExecute.ts` |
+| JSONL 会话存储 | `src/main/services/storage/SessionStorageService.ts`、`jsonl.ts` |
+| 消息虚拟列表 | `src/renderer/src/components/chat/ChatMessageList.tsx`、`chatMessageListVirtualization.ts` |
+| 结构化输出渲染 | `src/renderer/src/components/chat/parts/StreamPartRenderer.tsx`、`src/renderer/src/components/markdown/StructuredCodeCard.tsx` |
+
+### 5.1 当前实现边界与落地约束
+
+2026-06-29 代码复核后，后续设计落地必须遵守以下约束：
+
+- **Agent-only 已是实现口径**：`useChat.ts` 的导出 `ChatMode` 已固定为 `"agent"`，`SessionStorageService.create/updateMeta` 也会强制写入 `chatMode: "agent"`。发送链路当前是 runtime-first：走 `agentRuntimeClient.createQuery()`；runtime 创建失败时 materialize structured error、恢复 idle 并清理 current request/watchdog，不再默认 fallback 到 Agent SDK。后续 UI 不再出现“对话模式 / Agent 模式”切换；类型中残留的 `chatMode`、`workspaceId` 只作为迁移兼容字段。
+- **项目会话数据不回写项目目录**：当前 `SessionStorageService.resolveSessionBucket()` 明确把项目会话写入 app userData 的 `projects/<projectId>/sessions/`，并用 `storageRoot: "project-app-data-fallback"`、`storageFallbackReason: "scr-data-disabled-by-policy"` 标记。不再把会话 JSONL、附件或工具输出迁入项目 cwd 的 `.scr-data`。
+- **runtime adapter 事件是底层事件，不等同于产品事件**：`AgentRuntimeStreamEvent` 已有 `text.delta`、`tool.call`、`permission.request`、`result` 等底层事件。当前已新增 `AgentProductEvent` projection/materializer，把可持久化 run/tool/approval/message 事件写入 JSONL；本文 9.4 的 `context.snapshot`、`subagent.*`、artifact/remote 等更完整产品事件仍是后续语义层，不应一次性替换 adapter。
+- **Plan/Execute 已有 shared contract 和基础持久化语义**：`PlanMessagePart`、`PlanDecisionRecord`、`PlanExecuteTurnLink` 和 `PlanCard` 基础 UI 已落地；execute/regenerate 当前通过现有 `sendMessage()` 创建新 Agent turn，并写入本地 message metadata。`plan.decision` / `execute.turn.created` product event、JSONL marker 和基础 replay 已接入；后续继续补历史摘要 UI 和 turn-level timeline UX。
+- **输入区审批替换已落地，应继续保留**：`ChatInputArea.tsx` 已在存在 pending approval/AskUserQuestion 时用审批区替换普通 composer。后续 Plan decision、paused/error recovery 也应接入同一阻塞区，避免新增分散弹窗。
+- **长会话性能已有基础，不应回退**：`ChatMessageList.tsx` 已使用 `react-window` 动态行高虚拟列表，并保留小会话 `Bubble.List` 路径；`chatInputStore` 已隔离输入内容，避免打字触发整页重渲染。后续改 UI 必须保留这些边界。
+- **结构化代码块已有性能优化路径**：`StructuredCodeCard` 流式阶段使用轻量 highlighter，完成后再挂载完整代码卡片，避免大量代码块滚动时创建重型 editor view。后续代码块视觉优化应在这个组件内收敛。
+- **右侧面板已有基础但不是完整 Context Inspector**：`CodexEnvironmentInspector` 目前覆盖 changes、runtime、branch、附件来源；还缺 token source breakdown、memory/rules、pin/unpin、compact 事件、tool timeline、subagent timeline、remote 状态。
+- **Agent team selector 不是完整多 Agent**：`AgentTeamSelector` 只是用户选择团队/profile 的入口。完整 subagent task model、独立上下文、权限归属和 timeline 仍需要后续阶段实现。
 
 ## 6. 信息架构
 
-### 5.1 主工作台
+### 6.1 主工作台
 
 ```text
 +-----------------------------------------------------------------------+
@@ -98,7 +121,7 @@ Super Client R 是一个 **Agent-only** 桌面 AI 客户端。后续不再恢复
 +--------------------+-------------------------------+------------------+
 ```
 
-### 5.2 Transcript
+### 6.2 Transcript
 
 Transcript 是用户可见执行历史的主线，包含：
 
@@ -114,7 +137,7 @@ Transcript 是用户可见执行历史的主线，包含：
 
 长输出不应作为一整段 Markdown 直接塞进对话，而应转成 typed parts。
 
-### 5.3 输入区 / 阻塞交互区
+### 6.3 输入区 / 阻塞交互区
 
 底部区域只有两种主状态：
 
@@ -205,6 +228,21 @@ Model pill 是当前工作流最快入口：
 - 选择后保留在当前输入区展示，发送后不自动恢复。
 - 提供清除/恢复默认入口。
 
+Model pill 的状态语义必须明确，避免“本次选择”和“会话覆盖”混用：
+
+| 操作 | 写入位置 | 生命周期 | UI 文案 |
+| --- | --- | --- | --- |
+| 临时选择本次模型 | `messageOverride.model` | 只对下一次 send 生效；发送成功、取消或切换会话后清除。 | `本次使用` |
+| 固定为当前会话模型 | `session.modelOverride` | 对当前会话后续 send 生效，直到用户清除。 | `会话覆盖` |
+| 清除会话覆盖 | 删除 `session.modelOverride` | 回到项目默认或全局默认。 | `恢复默认` |
+
+默认交互：
+
+- 点击 model pill 只做临时选择，不自动写会话覆盖。
+- 模型选择器提供二级动作“设为本会话默认”。
+- 发送后不自动恢复只适用于会话覆盖；临时选择必须随本次 send 消耗掉。
+- UI 必须展示 effective model source，并提供清除路径。
+
 ### 8.3 Provider 层
 
 Provider 管理负责连接配置：
@@ -288,6 +326,18 @@ Plan 输出为结构化卡片：
 
 点击执行后创建新的 execute turn，并关联 plan id。
 
+当前代码中已有 `PlanMode` 兼容枚举。产品 UI 只展示 Plan / Execute 两种主状态，但实现需要按下表兼容旧值：
+
+| 现有 `PlanMode` | 产品解释 | 运行策略 | 后续方向 |
+| --- | --- | --- | --- |
+| `chat` | 兼容值；不代表 direct/chat 产品模式。 | 作为 Execute 的默认轻量策略，允许正常 Agent 回复和安全工具路径。 | 逐步重命名为 `execute` 或通过 adapter 映射。 |
+| `plan-only` | Plan。 | 只读、搜索、分析、提问；禁止写入/删除/危险命令。 | 保留为 Plan 的内部策略。 |
+| `plan-then-ask` | Plan → 等待用户决策。 | 输出 Plan card，进入 `awaiting_plan_decision`。 | 映射到 Plan card flow。 |
+| `auto-execute-safe` | Execute with safe auto-run。 | 低风险操作可自动执行，高风险进入 approval。 | 作为 Execute policy，而不是第三种 UI 模式。 |
+| `full-agent` | Execute。 | 允许在 approval/sandbox 下完整执行。 | 作为 Execute policy，而不是单独 UI 模式。 |
+
+任何新增 UI 文案都不能把 `chat` 展示成“普通对话模式”。它只是兼容枚举值。
+
 ### 9.3 Execute 模式
 
 Execute 可以在 approval/sandbox policy 下运行工具。
@@ -336,7 +386,7 @@ Execute 可以在 approval/sandbox policy 下运行工具。
 
 ### 9.5 持久化
 
-事件必须可持久化、可回放。
+稳定 product/session events 必须可持久化、可回放；token delta、streaming buffer、未完成 reasoning 等热路径 transient events 不直接落 JSONL，只在形成稳定 message/part/run 事件后持久化。
 
 最小字段：
 
@@ -350,6 +400,31 @@ Execute 可以在 approval/sandbox policy 下运行工具。
 - `seq`
 - `payload`
 - `status`
+
+### 9.6 Current → Target 事件映射
+
+现有系统有三层事件/状态源，目标不是一次性替换，而是按 projection 收敛：
+
+| 当前来源 | 当前例子 | 目标语义事件 | 是否落 JSONL | 说明 |
+| --- | --- | --- | --- | --- |
+| Runtime adapter | `text.delta` | `message.delta` | 否，除非形成稳定 part。 | 运行时流式热路径；renderer 可增量显示，完成后写稳定事件。 |
+| Runtime adapter | `reasoning.delta` | `structured_part.delta` 或 `message.delta(reasoning)` | 否，默认 transient。 | 第一阶段只展示，不默认持久化完整 reasoning。 |
+| Runtime adapter | `tool.call` | `tool.call` | 是。 | 写成 session tool event，并驱动 tool card。 |
+| Runtime adapter | `tool.result` | `tool.result` | 是，长结果只写摘要 + `contentRef`。 | 大 stdout / artifact body 不常驻 renderer state。 |
+| Runtime adapter | `permission.request` | `approval.requested` | 是。 | 与输入区阻塞状态绑定。 |
+| Runtime adapter | `permission.resolved` | `approval.resolved` | 是。 | 记录用户决策、scope 和 reason。 |
+| Runtime adapter | `result` | `run.completed` / `run.stopped` / `run.error` | 是。 | 作为 run 终态。 |
+| JSONL session event | `user_message` | `turn.created(user)` | 是。 | replay 时还原 user turn。 |
+| JSONL session event | `assistant_message` | `turn.created(assistant)` + `message.delta/final` | 是。 | 兼容旧整段消息。 |
+| JSONL session event | `assistant.part_start/update/end` | `structured_part.started/delta/completed` | 是。 | 新 structured parts 主路径。 |
+| Renderer state | `pending approval` | `awaiting_approval` blocked state | 派生，不单独落盘。 | 来源是 approval/tool events，UI state 可从事件恢复。 |
+| Renderer state | `streamingContent` | in-flight `message.delta` | 否。 | 只做即时渲染，完成后归并为稳定消息/part。 |
+
+落盘原则：
+
+- 稳定事实落 JSONL：user turn、assistant final/part、tool call/result/error、approval request/resolution、plan、context compact、artifact metadata、run terminal event。
+- 热路径 transient 不直接落盘：每个 token delta、临时 streaming buffer、未完成 reasoning 全量内容。
+- replay 以 JSONL 为 source of truth；renderer store 只能作为当前窗口派生状态。
 
 ## 10. Tool Call 与审批
 

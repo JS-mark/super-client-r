@@ -58,9 +58,9 @@ Before JSONL storage is considered shippable:
 
 ## 6. Tests To Add
 
-- [ ] Redactor handles home path, app data path, URL query, headers.
-- [ ] Diagnostic export excludes chat content by default.
-- [ ] Session archive includes JSONL and manifest.
-- [ ] Project archive never copies user cwd.
+- [x] Redactor handles home path, app data path, URL query, headers.
+- [x] Diagnostic export excludes chat content by default.
+- [x] Session archive includes JSONL and manifest.
+- [x] Project archive never copies user cwd.
 - [ ] Legacy import report redacts old data dir.
 - [ ] Full path copy is explicit, not part of default list rows.
