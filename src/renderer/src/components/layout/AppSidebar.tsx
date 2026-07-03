@@ -312,7 +312,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 		},
 	});
 
-	// 顶部"新建对话"——目标省略，hook 内部从当前会话派生
+	// 顶部"新建任务"——目标省略，hook 内部从当前会话派生
 	const handleNewTask = useCallback(async () => {
 		await openOrCreateConversation();
 	}, [openOrCreateConversation]);
@@ -486,7 +486,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 				{chatMenuEnabled && (
 					<QuickAction
 						icon={<PlusOutlined style={{ fontSize: 13 }} />}
-						label="新建对话"
+						label="新建任务"
 						shortcut={`${modKey()}N`}
 						onClick={handleNewTask}
 					/>
@@ -991,7 +991,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 							<SettingOutlined style={{ fontSize: 11 }} />
 						</button>
 					</Tooltip>
-					<Tooltip title="在此项目下新建对话" placement="left">
+					<Tooltip title="在此项目下新建任务" placement="left">
 						<button
 							type="button"
 							onClick={(e) => {
@@ -1008,7 +1008,7 @@ const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 								e.currentTarget.style.background = "transparent";
 								e.currentTarget.style.color = TEXT_SECONDARY;
 							}}
-							aria-label="在此项目下新建对话"
+							aria-label="在此项目下新建任务"
 						>
 							<PlusOutlined style={{ fontSize: 11 }} />
 						</button>

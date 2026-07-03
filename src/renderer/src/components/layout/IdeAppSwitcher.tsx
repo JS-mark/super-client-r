@@ -141,8 +141,11 @@ export const IdeAppSwitcher: React.FC<IdeAppSwitcherProps> = ({
 	const [targets, setTargets] = React.useState<FileOpenTarget[]>([]);
 	const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
-	// 项目会话优先用 project.cwd（真实根目录），casual 会话才回落到 per-session 沙箱。
-	// 跟 ChatPage 的「工作目录」按钮保持同一心智，避免点开后看到的是沙箱。
+	// 「使用应用打开工作目录」永远指向 session 真实 cwd（`resolveSessionCwd`）：
+	//   - 项目会话：session 沙箱（AI 子进程实际 cwd）
+	//   - casual 会话：per-session 沙箱
+	// 跟 ChatPage 的「工作目录」按钮保持同一心智，均以 session 为准。
+	// project.cwd 仅在 session cwd 解析失败时兜底，避免按钮完全失效。
 	const projectId =
 		workspaceId && workspaceId !== "default" ? workspaceId : null;
 	const projectCwd = useProjectStore((s) =>
@@ -151,10 +154,10 @@ export const IdeAppSwitcher: React.FC<IdeAppSwitcherProps> = ({
 			: null,
 	);
 
-	// Resolve sandbox cwd as fallback (only consumed when there is no project root).
+	// 无论是否属于项目会话，都以 session 真实 cwd 为准。
 	React.useEffect(() => {
 		let cancelled = false;
-		if (!conversationId || projectCwd) {
+		if (!conversationId) {
 			setSandboxCwd(null);
 			return () => {
 				cancelled = true;
@@ -177,9 +180,9 @@ export const IdeAppSwitcher: React.FC<IdeAppSwitcherProps> = ({
 		return () => {
 			cancelled = true;
 		};
-	}, [conversationId, projectCwd]);
+	}, [conversationId]);
 
-	const cwd = projectCwd ?? sandboxCwd;
+	const cwd = sandboxCwd ?? projectCwd;
 
 	// Detect targets when cwd resolves.
 	React.useEffect(() => {

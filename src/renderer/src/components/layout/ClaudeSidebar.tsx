@@ -13,12 +13,11 @@ import {
 	StarOutlined,
 } from "@ant-design/icons";
 import { Input, type InputRef, Tooltip, message, theme } from "antd";
-import { ThemeToggleButton } from "./ThemeToggleButton";
+import { SidebarUserRow } from "./SidebarUserRow";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { cn } from "../../lib/utils";
 import {
 	PROJECT_MENU_IDS,
 	getEffectiveMenuItems,
@@ -42,11 +41,6 @@ import {
 	useShortcutStore,
 } from "../../stores/shortcutStore";
 import { useSidebarLayoutStore } from "../../stores/sidebarLayoutStore";
-import {
-	getAvatarColor,
-	getUserInitials,
-	useUserStore,
-} from "../../stores/userStore";
 import { useProjectStore, useSortedProjects } from "../../stores/projectStore";
 import { ProjectContextMenu } from "../project/ProjectContextMenu";
 import { ProjectSettingsModal } from "../project/ProjectSettingsModal";
@@ -270,7 +264,6 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	// D-3: 切到 useProjectStore（替代旧 workspaceConfigStore）
 	const sortedWorkspaces = useSortedProjects();
 	const currentWorkspaceId = useProjectStore((s) => s.currentProjectId);
-	const { user } = useUserStore();
 	const menuItems = useMenuStore((s) => s.items);
 	const unifiedNavigation = useFeatureFlagsStore((s) => s.unifiedNavigation);
 	const effectiveMenuItems = useMemo(
@@ -445,14 +438,14 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		},
 	});
 
-	// 顶部"+ 新建对话"——目标省略，hook 内部从当前会话派生
+	// 顶部"+ 新建任务"——目标省略，hook 内部从当前会话派生
 	const handleNewConversation = useCallback(async () => {
 		await openOrCreateConversation();
 	}, [openOrCreateConversation]);
 
-	// Recents 表头/空态 "+"——显式 target=null，强制创建 casual 会话。
-	// 修复：在项目会话中点顶部"+ 新建对话"会派生为"项目内新建"，导致
-	// Recents 永远填不进东西。这个入口绕过派生逻辑，直接落到 casual 桶。
+	// Recents 表头/空态 "+"——显式 target=null，强制创建无项目 Agent 任务。
+	// 修复：在项目会话中点顶部"+ 新建任务"会派生为"项目内新建"，导致
+	// Recents 永远填不进东西。这个入口绕过派生逻辑，直接落到无项目桶。
 	const handleNewCasualConversation = useCallback(async () => {
 		useProjectStore.getState().setCurrent(null);
 		await openOrCreateConversation(null);
@@ -536,11 +529,6 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 	const activeText = token.colorText;
 	const primaryBg = token.colorPrimary;
 
-	const initials = user?.name ? getUserInitials(user.name) : "C";
-	const avatarColor = user?.name
-		? getAvatarColor(user.name)
-		: "bg-linear-to-br from-blue-500 via-purple-500 to-pink-500";
-
 	// 折叠模式已移除（仅保留侧边拖拽）。
 	return (
 		<>
@@ -558,7 +546,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 
 				{/* Quick actions */}
 				<div
-					className="px-2 pb-2 flex flex-col gap-0.5 flex-none"
+					className="p-2 pb-2 flex flex-col gap-0.5 flex-none"
 					data-testid="quick-actions"
 				>
 					{quickMenuItems.map((item) => (
@@ -566,7 +554,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 							key={item.id}
 							icon={renderMenuIcon(item)}
 							label={
-								item.id === "chat" ? "新建对话" : t(item.label, { ns: "menu" })
+								item.id === "chat" ? "新建任务" : t(item.label, { ns: "menu" })
 							}
 							shortcut={item.id === "chat" ? newChatShortcut : undefined}
 							onClick={() => {
@@ -611,7 +599,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					{chatMenuEnabled && (
 						<div>
 							<SectionHeader
-								title="最近对话"
+								title="最近任务"
 								expanded={recentsOpen}
 								onToggle={() => setRecentsOpen((v) => !v)}
 								mutedColor={mutedColor}
@@ -619,7 +607,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 								action={{
 									icon: <PlusOutlined className="text-[10px]" />,
 									onClick: handleNewCasualConversation,
-									tooltip: "新建普通对话",
+									tooltip: "新建无项目任务",
 								}}
 							/>
 							{recentsOpen && (
@@ -638,7 +626,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 											}}
 										>
 											<PlusOutlined />
-											<span>新建普通对话</span>
+											<span>新建无项目任务</span>
 										</button>
 									) : (
 										recentConversations.map((conv) => (
@@ -775,48 +763,9 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					)}
 				</div>
 
-				{/* Bottom user/settings */}
-				<div
-					className="h-14 px-3 flex items-center justify-between flex-none"
-					data-testid="sidebar-user-row"
-				>
-					<div className="flex items-center gap-2.5 min-w-0">
-						<div
-							className={cn(
-								"w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-semibold flex-none shadow-sm",
-								avatarColor,
-							)}
-						>
-							{initials}
-						</div>
-						<span
-							className="text-[13px] font-medium truncate"
-							style={{ color: textColor }}
-						>
-							{user?.name || "访客"}
-						</span>
-					</div>
-						<div className="flex items-center gap-1">
-							<ThemeToggleButton color={mutedColor} hoverBg={hoverBg} />
-							<Tooltip title="设置" mouseEnterDelay={0.3}>
-								<button
-									type="button"
-									onClick={handleSettings}
-									className="w-8 h-8 flex items-center justify-center rounded-md transition-colors"
-									style={{ color: mutedColor }}
-									data-testid="sidebar-settings"
-									onMouseEnter={(e) => {
-										e.currentTarget.style.background = hoverBg;
-									}}
-									onMouseLeave={(e) => {
-										e.currentTarget.style.background = "transparent";
-									}}
-								>
-									<SettingOutlined className="text-[15px]" />
-								</button>
-							</Tooltip>
-						</div>
-					</div>
+				{/* Bottom user row — shared with SettingsRail so profile
+				    presentation stays consistent across sidebars. */}
+				<SidebarUserRow onOpenSettings={handleSettings} />
 
 				<SidebarResizeHandle currentWidth={width} onWidthChange={setWidth} />
 
@@ -966,7 +915,7 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 							<SettingOutlined className="text-[11px]" />
 						</button>
 					</Tooltip>
-					<Tooltip title="在此项目下新建对话" placement="top">
+					<Tooltip title="在此项目下新建任务" placement="top">
 						<button
 							type="button"
 							onClick={(e) => {
@@ -981,7 +930,7 @@ const ProjectRow: React.FC<ProjectRowProps> = ({
 							onMouseLeave={(e) => {
 								e.currentTarget.style.background = "transparent";
 							}}
-							aria-label="在此项目下新建对话"
+							aria-label="在此项目下新建任务"
 						>
 							<PlusOutlined className="text-[11px]" />
 						</button>

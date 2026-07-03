@@ -93,6 +93,9 @@ export const TitleBar: React.FC = () => {
 	const { token } = useToken();
 
 	const isChatRoute = location.pathname.startsWith("/chat");
+	// Settings shell owns its own left rail; no page title is published to
+	// the TitleBar left cluster so the header stays clean.
+	const isSettingsRoute = location.pathname.startsWith("/settings");
 
 	const conversations = useChatStore((s) => s.conversations);
 	const currentConversationId = useChatStore((s) => s.currentConversationId);
@@ -100,7 +103,7 @@ export const TitleBar: React.FC = () => {
 		() => conversations.find((c) => c.id === currentConversationId),
 		[conversations, currentConversationId],
 	);
-	const taskName = currentConversation?.name || "新建对话";
+	const taskName = currentConversation?.name || "新建任务";
 	const currentConversationWorkspaceId = currentConversation?.workspaceId;
 
 	// 路由标题用于非 Chat 页面
@@ -232,28 +235,28 @@ export const TitleBar: React.FC = () => {
 		});
 	}, [currentConversation, messageApi, modalApi, token.colorWarning]);
 
-	// 注：切换工作区/新建对话/切换分支已从此菜单移除——
+	// 注：切换工作区/新建任务/切换分支已从此菜单移除——
 	//   - 切换工作区：Project = cwd 的新模型里 conversation 的 projectId 在第一条
 	//     消息后锁定（plan §9.10 C1），不再支持运行时切；改项目要走"派生 fork"。
-	//   - 新建对话：sidebar 顶部 + 与项目行 + 已经是统一入口，且已是
+	//   - 新建任务：sidebar 顶部 + 与项目行 + 已经是统一入口，且已是
 	//     reuse-or-create 流；这里再放一份会跟 reuse 行为冲突。
 	//   - 切换分支：拆成 TitleBar 左侧的 BranchPill 独立胶囊按钮（带搜索、当前
 	//     分支 dirty 计数、创建分支、Git 图谱占位）。
 	const moreMenuItems: MenuProps["items"] = [
 		{
 			key: "rename",
-			label: "重命名对话",
+			label: "重命名会话",
 			onClick: openRename,
 		},
 		{ type: "divider" },
 		{
 			key: "export",
-			label: "导出对话",
+			label: "导出会话",
 			onClick: handleExport,
 		},
 		{
 			key: "delete",
-			label: "删除对话",
+			label: "删除会话",
 			danger: true,
 			onClick: handleDelete,
 		},
@@ -302,7 +305,7 @@ export const TitleBar: React.FC = () => {
 		>
 			{/* 左侧 */}
 			<div className="flex items-center gap-2 px-4 flex-1 min-w-0">
-				{isChatRoute ? (
+				{isSettingsRoute ? null : isChatRoute ? (
 					currentConversation ? (
 						leftCluster
 					) : null
@@ -318,7 +321,7 @@ export const TitleBar: React.FC = () => {
 				)}
 			</div>
 
-			{/* 右侧：IDE 应用切换 + 对话设置 + 窗口控制
+			{/* 右侧：IDE 应用切换 + 会话设置 + 窗口控制
 			    模型切换不在 TitleBar — 通过 ComposerStatusBar / Cmd+M / 大 composer 中切换 */}
 			<div className="flex items-center gap-1 pr-1" style={NO_DRAG}>
 				{isChatRoute && currentConversation && (
@@ -380,7 +383,7 @@ export const TitleBar: React.FC = () => {
 				)}
 
 				{isChatRoute && currentConversation && (
-					<Tooltip title="对话设置" placement="bottomRight">
+					<Tooltip title="会话设置" placement="bottomRight">
 						<button
 							type="button"
 							onClick={handleOpenSessionSettings}
@@ -390,7 +393,7 @@ export const TitleBar: React.FC = () => {
 								height: 28,
 								color: token.colorTextSecondary,
 							}}
-							aria-label="对话设置"
+							aria-label="会话设置"
 						>
 							<SettingOutlined style={{ fontSize: 16 }} />
 						</button>

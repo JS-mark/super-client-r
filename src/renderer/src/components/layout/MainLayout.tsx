@@ -11,6 +11,7 @@ import { useMenuStore } from "../../stores/menuStore";
 import { useModelStore } from "../../stores/modelStore";
 import { AboutModal } from "../AboutModal";
 import { NewConversationModal } from "../chat/NewConversationModal";
+import { SettingsRail } from "../settings/SettingsRail";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { AppSidebar } from "./AppSidebar";
 import { ClaudeSidebar } from "./ClaudeSidebar";
@@ -117,13 +118,22 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
     profileLayouts &&
     (interactionProfile === "claude-code" || interactionProfile === "hybrid");
 
+  // Settings shell provides its own left rail. Hide the app-level sidebar
+  // whenever we're inside `/settings/*` so SettingsRail can take that slot.
+  const isSettingsRoute = location.pathname.startsWith("/settings");
+
   return (
     <div
       className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10"
       data-interaction-profile={interactionProfile}
     >
-      {/* Sidebar — profile-driven routing */}
-      {useClaudeSidebar ? (
+      {/* Sidebar slot — Settings shell replaces the workspace sidebar with
+          SettingsRail so the settings navigation matches the workspace's
+          left-sidebar + right-column structure (rail spans full height,
+          TitleBar sits inside the right column only). */}
+      {isSettingsRoute ? (
+        <SettingsRail />
+      ) : useClaudeSidebar ? (
         <ClaudeSidebar onOpenAbout={() => setAboutModalOpen(true)} />
       ) : (
         <AppSidebar onOpenAbout={() => setAboutModalOpen(true)} />
@@ -140,12 +150,41 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
           style={{ background: token.colorBgContainer }}
         >
           <AnimatePresence mode="wait">
+            {/*
+              Settings shell shares a single transition key across all
+              `/settings/*` sub-routes so that switching between Rail tabs
+              re-renders only the Outlet, not the whole page. Entering
+              Settings from workspace slides up from bottom; leaving slides
+              back down. Other routes keep the original subtle fade.
+            */}
             <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
+              key={
+                isSettingsRoute ? "settings-shell" : location.pathname
+              }
+              initial={
+                isSettingsRoute
+                  ? { opacity: 0, y: "100%" }
+                  : { opacity: 0, y: 8 }
+              }
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={pageTransition}
+              exit={
+                isSettingsRoute
+                  ? { opacity: 0, y: "100%" }
+                  : { opacity: 0, y: -4 }
+              }
+              transition={
+                isSettingsRoute
+                  ? {
+                      duration: 0.28,
+                      ease: [0.4, 0, 0.2, 1] as [
+                        number,
+                        number,
+                        number,
+                        number,
+                      ],
+                    }
+                  : pageTransition
+              }
               className="h-full"
             >
               {children}
@@ -166,7 +205,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
         appInfo={appInfo}
       />
 
-      {/* §25.3 advanced "新建对话…" modal — listens for the
+      {/* §25.3 advanced "新建任务…" modal — listens for the
 			    `chat:open-new-conversation` window event dispatched by
 			    TitleBar More menu. */}
       <NewConversationModal />
