@@ -1,6 +1,5 @@
 import {
   BookOutlined,
-  CodeOutlined,
   CopyOutlined,
   PlayCircleOutlined,
   PoweroffOutlined,
@@ -150,7 +149,7 @@ export const ApiServiceSettings: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h3
-            className="text-lg font-semibold m-0"
+            className="text-xs font-semibold m-0"
             style={{ color: token.colorText }}
           >
             {t("apiServerTitle", "API Server", { ns: "settings" })}
@@ -168,17 +167,6 @@ export const ApiServiceSettings: React.FC = () => {
         </div>
         {isRunning && (
           <Space>
-            <Button
-              icon={<CodeOutlined />}
-              onClick={() => {
-                appService.openExternal(
-                  `http://localhost:${apiStatus.port}/plugin-dev`,
-                );
-              }}
-              className="rounded-lg!"
-            >
-              {t("pluginDevGuide", "应用插件开发", { ns: "settings" })}
-            </Button>
             <Button
               type="primary"
               icon={<BookOutlined />}

@@ -22,9 +22,9 @@ export const SettingSection: React.FC<{
 				borderColor: token.colorBorder,
 			}}
 		>
-			<div className="flex items-center justify-between mb-4">
+			<div className="flex items-center justify-between mb-3">
 				<h3
-					className="text-lg font-semibold flex items-center gap-2"
+					className="text-xs font-semibold flex items-center gap-2 m-0"
 					style={{ color: token.colorTextHeading }}
 				>
 					{icon}

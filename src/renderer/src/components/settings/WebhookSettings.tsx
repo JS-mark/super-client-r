@@ -176,7 +176,7 @@ export function WebhookSettings() {
 			{/* Webhook list */}
 			<div>
 				<div className="flex items-center justify-between mb-3">
-					<h3 className="text-base font-semibold flex items-center gap-2">
+					<h3 className="text-xs font-semibold flex items-center gap-2 m-0">
 						<BellOutlined />
 						{t("webhook.list")}
 					</h3>

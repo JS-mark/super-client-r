@@ -1,7 +1,5 @@
 import {
-	AppstoreOutlined,
 	BugOutlined,
-	CodeOutlined,
 	FileTextOutlined,
 	FormatPainterOutlined,
 	GithubOutlined,
@@ -10,7 +8,6 @@ import {
 	LayoutOutlined,
 	RocketOutlined,
 	SearchOutlined,
-	StarOutlined,
 	TeamOutlined,
 } from "@ant-design/icons";
 import { Button, Card, Tabs, Tag, Typography, theme } from "antd";
@@ -36,30 +33,15 @@ const OverviewTab: React.FC<{ appInfo: AppInfo | null }> = ({ appInfo }) => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 
+	// MCP / 技能 / 应用插件 / 上下文与记忆 相关入口不再进入设置页的功能网格；
+	// MCP、技能、应用插件保留独立市场页（/mcp、/skills、/plugins），
+	// 记忆能力落在 Agent / 项目相关设置组，避免在 Settings 里出现独立入口。
 	const features = [
 		{
 			icon: <RocketOutlined />,
 			titleKey: "about.features.aiChat.title",
 			descKey: "about.features.aiChat.desc",
 			color: "from-blue-500 to-cyan-500",
-		},
-		{
-			icon: <CodeOutlined />,
-			titleKey: "about.features.mcp.title",
-			descKey: "about.features.mcp.desc",
-			color: "from-purple-500 to-pink-500",
-		},
-		{
-			icon: <StarOutlined />,
-			titleKey: "about.features.skills.title",
-			descKey: "about.features.skills.desc",
-			color: "from-orange-500 to-red-500",
-		},
-		{
-			icon: <AppstoreOutlined />,
-			titleKey: "about.features.plugin.title",
-			descKey: "about.features.plugin.desc",
-			color: "from-indigo-500 to-violet-500",
 		},
 		{
 			icon: <SearchOutlined />,

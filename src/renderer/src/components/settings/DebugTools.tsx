@@ -31,7 +31,7 @@ import { type AppInfo, appService } from "../../services/appService";
 const { useToken } = theme;
 
 // 快速操作 Tab
-const QuickActionsTab: React.FC = () => {
+export const QuickActionsTab: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 
@@ -187,7 +187,7 @@ const QuickActionsTab: React.FC = () => {
 };
 
 // 系统信息 Tab
-const SystemInfoTab: React.FC = () => {
+export const SystemInfoTab: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(
@@ -372,7 +372,7 @@ interface ProcessMetrics {
 }
 
 // 性能监控 Tab
-const PerformanceMonitorTab: React.FC = () => {
+export const PerformanceMonitorTab: React.FC = () => {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const [metrics, setMetrics] = useState<ProcessMetrics | null>(null);
