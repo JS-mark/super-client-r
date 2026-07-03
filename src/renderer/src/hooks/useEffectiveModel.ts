@@ -2,9 +2,12 @@ import { useMemo } from "react";
 import { getProjectIdFromConversation, useChatStore } from "../stores/chatStore";
 import { useModelStore } from "../stores/modelStore";
 import { useProjectStore } from "../stores/projectStore";
+import { resolveRendererEffectiveModel } from "./useMessageModelResolution";
 import type { ActiveModelSelection } from "../types/models";
 
-export function useEffectiveModel() {
+export function useEffectiveModel(
+	messageModelOverride?: ActiveModelSelection | null,
+) {
 	const providers = useModelStore((s) => s.providers);
 	const activeSelection = useModelStore((s) => s.activeSelection);
 	const currentConversation = useChatStore((s) =>
@@ -17,17 +20,18 @@ export function useEffectiveModel() {
 	const sessionModelOverride = currentConversation?.session?.modelOverride;
 
 	return useMemo(() => {
-		const findProviderModel = (selection: ActiveModelSelection | undefined) => {
-			if (!selection) return undefined;
-			const provider = providers.find((p) => p.id === selection.providerId);
-			const model = provider?.models.find((m) => m.id === selection.modelId);
-			return provider && model ? { provider, model } : undefined;
-		};
-
-		return (
-			findProviderModel(sessionModelOverride) ||
-			findProviderModel(projectDefaultModel) ||
-			findProviderModel(activeSelection ?? undefined)
-		);
-	}, [activeSelection, projectDefaultModel, providers, sessionModelOverride]);
+		return resolveRendererEffectiveModel({
+			providers,
+			messageModelOverride,
+			sessionModelOverride,
+			projectDefaultModel,
+			activeSelection,
+		});
+	}, [
+		activeSelection,
+		messageModelOverride,
+		projectDefaultModel,
+		providers,
+		sessionModelOverride,
+	]);
 }
