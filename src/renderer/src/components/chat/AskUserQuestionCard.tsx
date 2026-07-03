@@ -239,6 +239,30 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 		setCurrentPage((p) => Math.min(totalPages - 1, p + 1));
 	}, [totalPages]);
 
+	// Card-level keyboard: Enter submits when every required question is
+	// answered; Escape is currently ignored (no dismiss action from parent).
+	// We skip when the event originates inside an editable target so the
+	// "Other" textarea keeps native Enter/Escape behaviour.
+	const handleKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLDivElement>) => {
+			if (event.nativeEvent.isComposing) return;
+			const target = event.target as HTMLElement | null;
+			const tag = target?.tagName?.toLowerCase();
+			const insideEditable =
+				tag === "textarea" ||
+				tag === "input" ||
+				target?.isContentEditable === true;
+			if (insideEditable) return;
+
+			if (event.key !== "Enter") return;
+			if (event.shiftKey) return;
+			if (!isInteractive || !canSubmit) return;
+			event.preventDefault();
+			handleSubmit();
+		},
+		[canSubmit, handleSubmit, isInteractive],
+	);
+
 	if (!questions) return null;
 
 	// Read-only summary for completed state. Resilient to any single field
@@ -363,6 +387,12 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 	};
 
 	return (
+		<div
+			role="group"
+			aria-label={t("askUserQuestion.title")}
+			tabIndex={-1}
+			onKeyDown={handleKeyDown}
+		>
 		<ApprovalDecisionCard
 			icon={<QuestionCircleOutlined style={{ fontSize: 13 }} />}
 			title={t("askUserQuestion.title")}
@@ -649,6 +679,7 @@ export const AskUserQuestionCard: React.FC<AskUserQuestionCardProps> = ({
 			) : (
 				renderSummary()
 			)}
-		</ApprovalDecisionCard>
+			</ApprovalDecisionCard>
+		</div>
 	);
-};
+	};

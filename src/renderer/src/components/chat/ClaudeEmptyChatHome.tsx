@@ -30,6 +30,7 @@ import { SlashCommandPanel } from "./SlashCommandPanel";
 import { MentionPanel } from "./MentionPanel";
 import { applyMentionToValue } from "../../hooks/useAtMentions";
 import type { WorkspaceFileEntry } from "../../services/workspaceService";
+import type { ActiveModelSelection } from "../../types/models";
 
 const { useToken } = theme;
 
@@ -70,6 +71,7 @@ export interface ClaudeEmptyChatHomeProps {
 	setMentionSelectHandler?: (
 		fn: ((item: WorkspaceFileEntry) => void) | null,
 	) => void;
+	messageModelOverride?: ActiveModelSelection | null;
 }
 
 /**
@@ -106,6 +108,7 @@ export function ClaudeEmptyChatHome({
 	onMentionInputChange,
 	registerMentionKeydownHandler,
 	setMentionSelectHandler,
+	messageModelOverride,
 }: ClaudeEmptyChatHomeProps) {
 	const { token } = useToken();
 	const { t } = useTranslation();
@@ -177,10 +180,15 @@ export function ClaudeEmptyChatHome({
 	const remoteBinding = conversation?.remote;
 	const workspaceName = project?.name ?? "未指定工作区";
 
-	const effective = useEffectiveModel();
+	const effective = useEffectiveModel(messageModelOverride);
 	const modelLabel = effective
-		? `${effective.provider.name} · ${effective.model.name || effective.model.id}`
+		? `${effective.sourceLabel} · ${effective.provider.name} · ${
+				effective.model.name || effective.model.id
+			}`
 		: null;
+	const modelTooltip = effective
+		? `${effective.provider.name} · ${effective.model.name || effective.model.id} (${effective.sourceLabel})`
+		: undefined;
 
 	const handleOpenModelSwitcher = useCallback(() => {
 		window.dispatchEvent(new Event("chat:open-model-switcher"));
@@ -464,7 +472,9 @@ export function ClaudeEmptyChatHome({
 						<ChatComposerInfoBar
 							workspaceName={workspaceName}
 							remoteBinding={remoteBinding}
-							trailing={<ComposerStatusBar />}
+							trailing={
+								<ComposerStatusBar messageModelOverride={messageModelOverride} />
+							}
 						/>
 					}
 					renderFooter={(_footerNode, opts) => {
@@ -504,6 +514,7 @@ export function ClaudeEmptyChatHome({
 								<Flex align="center" gap={8} style={{ flexShrink: 0 }}>
 									<ModelPill
 										label={modelLabel}
+										tooltip={modelTooltip}
 										onClick={handleOpenModelSwitcher}
 									/>
 									<SendButton type="primary" shape="circle" />

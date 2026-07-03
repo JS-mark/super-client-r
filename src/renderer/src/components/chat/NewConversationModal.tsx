@@ -1,7 +1,7 @@
 /**
  * NewConversationModal — plan §25.3 advanced creation surface.
  *
- * Triggered by TitleBar More menu (`新建对话…`) via the `chat:open-new-conversation`
+ * Triggered by TitleBar More menu (`新建任务…`) via the `chat:open-new-conversation`
  * window event. Single self-contained component: it owns its open-state and the
  * event listener, so callers only need to mount it once in MainLayout.
  *
@@ -46,8 +46,8 @@ interface FormState {
 }
 
 /**
- * D-3: workspaceId === "" 表示"普通对话"（projectId=null），
- * workspaceId === <projectId> 表示项目对话。
+ * D-3: workspaceId === "" 表示无项目 Agent 任务（projectId=null），
+ * workspaceId === <projectId> 表示项目 Agent 任务。
  */
 function defaultState(currentProjectId: string | null): FormState {
 	return {
@@ -193,7 +193,7 @@ export function NewConversationModal() {
 
 	return (
 		<Modal
-			title="新建对话"
+			title="新建 Agent 任务"
 			open={open}
 			onCancel={() => setOpen(false)}
 			onOk={handleSubmit}
@@ -208,8 +208,8 @@ export function NewConversationModal() {
 					label="项目"
 					help={
 						state.workspaceId === ""
-							? "普通对话不绑定项目；工具 / Agent 在用户家目录运行"
-							: "项目对话：工具 / Agent / 文件操作在该项目目录下运行"
+							? "无项目任务不绑定项目；工具 / Agent 在用户家目录运行"
+							: "项目任务：工具 / Agent / 文件操作在该项目目录下运行"
 					}
 				>
 					<Select
@@ -224,7 +224,7 @@ export function NewConversationModal() {
 							}))
 						}
 						options={[
-							{ value: "", label: "普通对话（无项目）" },
+							{ value: "", label: "无项目 Agent 任务" },
 							...sortedWorkspaces.map((w) => ({
 								value: w.id,
 								label: w.name,

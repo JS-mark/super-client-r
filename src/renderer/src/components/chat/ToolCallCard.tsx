@@ -11,7 +11,7 @@ import {
 	RightOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
-import { App, Tooltip, theme } from "antd";
+import { App, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -108,6 +108,10 @@ const ENV_COLORS: Record<
 function ensureObject(value: unknown): unknown {
 	if (value === null || value === undefined) return {};
 	if (typeof value === "string") {
+		const trimmed = value.trimStart();
+		if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+			return { value };
+		}
 		try {
 			return JSON.parse(value);
 		} catch {
@@ -115,6 +119,53 @@ function ensureObject(value: unknown): unknown {
 		}
 	}
 	return value;
+}
+
+const COLLAPSED_PREVIEW_LIMIT = 600;
+const COLLAPSED_PREVIEW_KEYS = 8;
+
+function scalarPreview(value: unknown): string {
+	if (typeof value === "string") {
+		return JSON.stringify(
+			value.length > COLLAPSED_PREVIEW_LIMIT
+				? `${value.slice(0, COLLAPSED_PREVIEW_LIMIT)}...`
+				: value,
+		);
+	}
+	if (
+		value === null ||
+		typeof value === "number" ||
+		typeof value === "boolean"
+	) {
+		return JSON.stringify(value);
+	}
+	if (value === undefined) return "undefined";
+	return String(value);
+}
+
+function previewJsonValue(value: unknown): string {
+	if (Array.isArray(value)) {
+		const items = value
+			.slice(0, COLLAPSED_PREVIEW_KEYS)
+			.map((item) => scalarPreview(item));
+		const suffix =
+			value.length > COLLAPSED_PREVIEW_KEYS
+				? `, ... ${value.length - COLLAPSED_PREVIEW_KEYS} more`
+				: "";
+		return `[${items.join(", ")}${suffix}]`;
+	}
+	if (value && typeof value === "object") {
+		const entries = Object.entries(value as Record<string, unknown>);
+		const items = entries
+			.slice(0, COLLAPSED_PREVIEW_KEYS)
+			.map(([key, item]) => `${JSON.stringify(key)}: ${scalarPreview(item)}`);
+		const suffix =
+			entries.length > COLLAPSED_PREVIEW_KEYS
+				? `, ... ${entries.length - COLLAPSED_PREVIEW_KEYS} more`
+				: "";
+		return `{${items.join(", ")}${suffix}}`;
+	}
+	return scalarPreview(value);
 }
 
 /**
@@ -135,7 +186,7 @@ const JsonSection: React.FC<{
 		parsed === null ||
 		parsed === undefined ||
 		(typeof parsed === "object" && Object.keys(parsed as object).length === 0);
-	const preview = JSON.stringify(parsed);
+	const preview = useMemo(() => previewJsonValue(parsed), [parsed]);
 
 	const handleToggle = useCallback(() => setExpanded((v) => !v), []);
 
@@ -157,23 +208,23 @@ const JsonSection: React.FC<{
 					<RightOutlined style={{ fontSize: 9 }} />
 				)}
 				<span style={{ fontSize: 11, fontWeight: 500 }}>{label}</span>
-					{!expanded && (
-						<Tooltip title={preview} mouseEnterDelay={0.35}>
-							<span
-								className="truncate"
-								style={{
-									color: token.colorTextTertiary,
-									fontSize: 11,
-									fontFamily:
-										'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-									maxWidth: 420,
-									minWidth: 0,
-								}}
-							>
-								{preview}
-							</span>
-						</Tooltip>
-					)}
+				{!expanded && (
+					<Tooltip title={preview} mouseEnterDelay={0.35}>
+						<span
+							className="truncate"
+							style={{
+								color: token.colorTextTertiary,
+								fontSize: 11,
+								fontFamily:
+									'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+								maxWidth: 420,
+								minWidth: 0,
+							}}
+						>
+							{preview}
+						</span>
+					</Tooltip>
+				)}
 			</div>
 			{expanded && (
 				<div
@@ -230,7 +281,25 @@ export const ToolCallCard: React.FC<{
 		updatedInput?: Record<string, unknown>,
 		updatedPermissions?: Array<Record<string, unknown>>,
 	) => void;
-}> = ({ toolCall, compact = false, onApproval }) => {
+	/**
+	 * Optional metadata signalling that this tool call was requested by a
+	 * subagent (via the built-in `Task` tool). Rendered as a small muted
+	 * badge above the approval prompt and — when the card is in its
+	 * post-approval "collapsed" form — above the tool header.
+	 *
+	 * Phase 4 Round 7 MVP: the parent decides how to compute this. Once
+	 * `Message.toolCall.subagentRunId` propagation lands, callers can
+	 * derive it directly from the tool_call event; today the intended
+	 * source is the message's parent-assistant `SubagentMessagePart`
+	 * context (see the transcript-side wiring — deferred to a follow-up
+	 * batch; ToolCallCard just makes the prop reachable end-to-end).
+	 */
+	subagentSource?: {
+		profileName?: string;
+		taskGoal?: string;
+		subagentRunId: string;
+	};
+}> = ({ toolCall, compact = false, onApproval, subagentSource }) => {
 	const { token } = useToken();
 	const { t } = useTranslation("chat");
 	const { message } = App.useApp();
@@ -289,81 +358,82 @@ export const ToolCallCard: React.FC<{
 	const envColors = ENV_COLORS[envType];
 	const approvalOptions = useMemo(
 		() => [
-				{
-					value: "allow_once",
-					label: t("approval.allowOnce", t("approval.approve")),
-					description: t("approval.allowOnceDesc"),
-				},
-				{
-					value: "allow_session",
-					label: t("approval.allowSession"),
-					description: t("approval.allowSessionDesc"),
-					disabled: !conversationId,
-				},
-			],
-			[conversationId, t],
-		);
-		const approvalDescription = useMemo(() => {
-			if (toolCall.approval?.title || toolCall.approval?.description) {
-				return (
-					<div>
-						{toolCall.approval?.title && (
-							<div style={{ fontWeight: 600, color: token.colorText }}>
-								{toolCall.approval.title}
-							</div>
-						)}
-						{toolCall.approval?.description && (
-							<div style={{ marginTop: toolCall.approval.title ? 2 : 0 }}>
-								{toolCall.approval.description}
-							</div>
-						)}
-					</div>
-				);
-			}
-			return t("approval.description");
-		}, [
-			t,
-			token.colorText,
-			toolCall.approval?.description,
-			toolCall.approval?.title,
-		]);
+			{
+				value: "allow_once",
+				label: t("approval.allowOnce", t("approval.approve")),
+				description: t("approval.allowOnceDesc"),
+			},
+			{
+				value: "allow_session",
+				label: t("approval.allowSession"),
+				description: t("approval.allowSessionDesc"),
+				disabled: !conversationId,
+			},
+		],
+		[conversationId, t],
+	);
+	const approvalDescription = useMemo(() => {
+		if (toolCall.approval?.title || toolCall.approval?.description) {
+			return (
+				<div>
+					{toolCall.approval?.title && (
+						<div style={{ fontWeight: 600, color: token.colorText }}>
+							{toolCall.approval.title}
+						</div>
+					)}
+					{toolCall.approval?.description && (
+						<div style={{ marginTop: toolCall.approval.title ? 2 : 0 }}>
+							{toolCall.approval.description}
+						</div>
+					)}
+				</div>
+			);
+		}
+		return t("approval.description");
+	}, [
+		t,
+		token.colorText,
+		toolCall.approval?.description,
+		toolCall.approval?.title,
+	]);
 
 	if (toolCall.status === "awaiting_approval" && onApproval) {
 		return (
-				<ApprovalDecisionCard
-					icon={<ExclamationCircleOutlined />}
-					title={toolCall.approval?.displayName || tool}
-					description={approvalDescription}
-					options={approvalOptions}
-					value={approvalChoice}
-					onChange={(value) =>
-						setApprovalChoice(value as "allow_once" | "allow_session")
-					}
-					rejectLabel={t("approval.reject")}
-					rejectIcon={<CloseOutlined />}
-					onReject={handleApprovalReject}
-					confirmLabel={t("approval.confirm")}
-					confirmIcon={
-						approvalChoice === "allow_session" ? (
-							<KeyOutlined />
-						) : (
-							<CheckOutlined />
+			<ApprovalDecisionCard
+				icon={<ExclamationCircleOutlined />}
+				title={toolCall.approval?.displayName || tool}
+				description={approvalDescription}
+				options={approvalOptions}
+				value={approvalChoice}
+				onChange={(value) =>
+					setApprovalChoice(value as "allow_once" | "allow_session")
+				}
+				rejectLabel={t("approval.reject")}
+				rejectIcon={<CloseOutlined />}
+				onReject={handleApprovalReject}
+				confirmLabel={t("approval.confirm")}
+				confirmIcon={
+					approvalChoice === "allow_session" ? (
+						<KeyOutlined />
+					) : (
+						<CheckOutlined />
 					)
-					}
-					onConfirm={handleApprovalConfirm}
-					tone="warning"
-					density={compact ? "compact" : "default"}
-					maxWidth={compact ? 520 : undefined}
-					// Non-compact tool approvals span the chat bubble so the
-					// prompt feels like a deliberate interrupt; compact mode
-					// (e.g. nested popovers) keeps the historical 520 cap.
-					fullWidth={!compact}
-					// Default 20s auto-reject. Hovering the card pauses the
-					// countdown — see ApprovalDecisionCard. We route auto-reject
-					// through the same handler as the manual button so the
-					// upstream state machine sees one and only one decision.
-					autoRejectAfterMs={20000}
-					onAutoReject={handleApprovalReject}
+				}
+				onConfirm={handleApprovalConfirm}
+				tone="warning"
+				density={compact ? "compact" : "default"}
+				maxWidth={compact ? 520 : undefined}
+				// Non-compact tool approvals span the chat bubble so the
+				// prompt feels like a deliberate interrupt; compact mode
+				// (e.g. nested popovers) keeps the historical 520 cap.
+				fullWidth={!compact}
+				// Default 20s auto-reject. Hovering the card pauses the
+				// countdown — see ApprovalDecisionCard. We route auto-reject
+				// through the same handler as the manual button so the
+				// upstream state machine sees one and only one decision.
+				autoRejectAfterMs={20000}
+				onAutoReject={handleApprovalReject}
+				subagentSource={subagentSource}
 			>
 				<div className="flex items-center gap-2">
 					{server && (
@@ -479,6 +549,18 @@ export const ToolCallCard: React.FC<{
 
 			{/* Body */}
 			<div className="px-3 py-2 flex flex-col gap-1.5">
+				{subagentSource && (
+					<div data-testid="approval-subagent-source">
+						<Tag color="default" style={{ fontSize: 11, margin: 0 }}>
+							{t("subagentSource.badge", "▲ From subagent: {{name}}", {
+								name:
+									subagentSource.profileName ||
+									subagentSource.taskGoal ||
+									subagentSource.subagentRunId,
+							})}
+						</Tag>
+					</div>
+				)}
 				{(toolCall.approval?.title || toolCall.approval?.description) && (
 					<div
 						className="rounded-md px-3 py-2"

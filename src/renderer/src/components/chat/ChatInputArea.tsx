@@ -34,6 +34,7 @@ import { useChatInputStore } from "../../stores/chatInputStore";
 import { useProjectSettings, useProjectStore } from "../../stores/projectStore";
 import type { ActionsComponents } from "@ant-design/x/lib/sender/interface";
 import { useEffectiveModel } from "../../hooks/useEffectiveModel";
+import type { ActiveModelSelection } from "../../types/models";
 import {
 	type Message,
 	useChatMessageStore,
@@ -50,8 +51,21 @@ import { QuotePanel } from "./toolbar/QuotePanel";
 import { ToolsPanel } from "./toolbar/ToolsPanel";
 import type { ToolItem } from "./toolbar/ToolsPanel";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
+import {
+	type ComposerPausedErrorState,
+	derivePausedErrorState,
+} from "./composerBlockedState";
+import {
+	getPlanCardFromPart,
+	isPendingPlanDecisionPart,
+	PlanCard,
+	type PlanDecisionHandler,
+} from "./PlanCard";
 import { ToolCallCard } from "./ToolCallCard";
-import { isAskUserQuestionToolCall } from "./messagePartsAdapter";
+import {
+	isAskUserQuestionToolCall,
+	messageToParts,
+} from "./messagePartsAdapter";
 
 const { useToken } = theme;
 
@@ -103,12 +117,14 @@ interface ChatInputAreaProps {
 	) => void;
 	hideToolbar?: boolean;
 	placeholder?: string;
+	messageModelOverride?: ActiveModelSelection | null;
 	respondToApproval?: (
 		toolCallId: string,
 		approved: boolean,
 		updatedInput?: Record<string, unknown>,
 		updatedPermissions?: Array<Record<string, unknown>>,
 	) => void;
+	onPlanDecision?: PlanDecisionHandler;
 }
 
 export function ChatInputArea({
@@ -141,7 +157,9 @@ export function ChatInputArea({
 	setMentionSelectHandler,
 	hideToolbar,
 	placeholder: placeholderProp,
+	messageModelOverride,
 	respondToApproval,
+	onPlanDecision,
 }: ChatInputAreaProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
@@ -170,6 +188,64 @@ export function ChatInputArea({
 		}
 		return undefined;
 	}, [chatMessages]);
+	const pendingPlanDecision = useMemo(() => {
+		for (let i = chatMessages.length - 1; i >= 0; i -= 1) {
+			const msg = chatMessages[i];
+			if (msg.role !== "assistant") continue;
+			for (const part of messageToParts(msg)) {
+				if (!isPendingPlanDecisionPart(part)) continue;
+				const plan = getPlanCardFromPart(part);
+				if (plan) return plan;
+			}
+		}
+		return undefined;
+	}, [chatMessages]);
+
+	// Paused-error composer branch (see composerBlockedState.ts). Local
+	// dismissal state is derived from the source message id so a fresh error
+	// re-opens the affordance even after a prior dismiss.
+	const derivedPausedError = useMemo<ComposerPausedErrorState | undefined>(
+		() => derivePausedErrorState(chatMessages as Message[]),
+		[chatMessages],
+	);
+	const [dismissedPausedErrorId, setDismissedPausedErrorId] = useState<
+		string | null
+	>(null);
+	const pausedError =
+		derivedPausedError &&
+		derivedPausedError.messageId !== dismissedPausedErrorId
+			? derivedPausedError
+			: undefined;
+	const handlePausedRecover = useCallback(() => {
+		if (derivedPausedError) {
+			setDismissedPausedErrorId(derivedPausedError.messageId);
+		}
+		setInput("");
+		requestAnimationFrame(() => {
+			const ta = composerWrapperRef.current?.querySelector(
+				"textarea",
+			) as HTMLTextAreaElement | null;
+			ta?.focus();
+		});
+	}, [derivedPausedError, setInput]);
+	const handlePausedDismiss = useCallback(() => {
+		if (derivedPausedError) {
+			setDismissedPausedErrorId(derivedPausedError.messageId);
+		}
+		requestAnimationFrame(() => {
+			const ta = composerWrapperRef.current?.querySelector(
+				"textarea",
+			) as HTMLTextAreaElement | null;
+			ta?.focus();
+		});
+	}, [derivedPausedError]);
+
+	const handlePlanDecision = useCallback<PlanDecisionHandler>(
+		(decision) => {
+			onPlanDecision?.(decision);
+		},
+		[onPlanDecision],
+	);
 
 	const closeAllToolPanels = useCallback(() => {
 		setPromptPanelOpen(false);
@@ -458,10 +534,15 @@ export function ChatInputArea({
 	const projectSettings = useProjectSettings(projectId);
 	const approvalMode = projectSettings?.runtimePolicy?.approvalMode;
 
-	const effective = useEffectiveModel();
+	const effective = useEffectiveModel(messageModelOverride);
 	const modelLabel = effective
-		? `${effective.provider.name} · ${effective.model.name || effective.model.id}`
+		? `${effective.sourceLabel} · ${effective.provider.name} · ${
+				effective.model.name || effective.model.id
+			}`
 		: null;
+	const modelTooltip = effective
+		? `${effective.provider.name} · ${effective.model.name || effective.model.id} (${effective.sourceLabel})`
+		: undefined;
 
 	const handleOpenModelSwitcher = useCallback(() => {
 		window.dispatchEvent(new Event("chat:open-model-switcher"));
@@ -574,7 +655,11 @@ export function ChatInputArea({
 					    its own max-width. */}
 					<Flex align="center" gap={8} style={{ flexShrink: 0 }}>
 						<ContextUsagePill />
-						<ModelPill label={modelLabel} onClick={handleOpenModelSwitcher} />
+						<ModelPill
+							label={modelLabel}
+							tooltip={modelTooltip}
+							onClick={handleOpenModelSwitcher}
+						/>
 						{isStreaming ? (
 							<Tooltip title={t("actions.stop", "终止", { ns: "chat" })}>
 								<Button
@@ -646,6 +731,69 @@ export function ChatInputArea({
 						/>
 					)}
 				</div>
+			) : pendingPlanDecision ? (
+				<div className="chat-composer relative w-full mx-auto">
+					<PlanCard
+						plan={pendingPlanDecision}
+						compact
+						disabled={!onPlanDecision}
+						onExecute={handlePlanDecision}
+						onCancel={handlePlanDecision}
+						onRegenerate={handlePlanDecision}
+					/>
+				</div>
+			) : pausedError ? (
+				<div
+					className="chat-composer relative w-full mx-auto"
+					data-testid="paused-error-composer"
+				>
+					<div
+						className="my-2 flex flex-col gap-2 rounded-lg border px-4 py-3"
+						style={{
+							borderColor: token.colorErrorBorder ?? token.colorBorder,
+							backgroundColor: token.colorErrorBg ?? token.colorBgContainer,
+						}}
+					>
+						<div
+							className="text-sm font-semibold"
+							style={{ color: token.colorError ?? token.colorText }}
+						>
+							{t("composer.pausedError.title", "Agent paused", {
+								ns: "chat",
+								defaultValue: "Agent paused",
+							})}
+						</div>
+						<div
+							className="text-xs"
+							style={{ color: token.colorTextSecondary }}
+						>
+							{pausedError.summary ||
+								pausedError.providerErrorMessage ||
+								t("composer.pausedError.fallback", "Recover to try again.", {
+									ns: "chat",
+									defaultValue: "Recover to try again.",
+								})}
+						</div>
+						<div className="flex items-center justify-end gap-2">
+							<Button size="small" onClick={handlePausedDismiss}>
+								{t("composer.pausedError.dismiss", "Dismiss", {
+									ns: "chat",
+									defaultValue: "Dismiss",
+								})}
+							</Button>
+							<Button
+								size="small"
+								type="primary"
+								onClick={handlePausedRecover}
+							>
+								{t("composer.pausedError.recover", "Recover", {
+									ns: "chat",
+									defaultValue: "Recover",
+								})}
+							</Button>
+						</div>
+					</div>
+				</div>
 			) : (
 				<ChatComposer
 					value={input}
@@ -663,7 +811,11 @@ export function ChatInputArea({
 							<ChatComposerInfoBar
 								workspaceName={workspaceName}
 								remoteBinding={remoteBinding}
-								trailing={<ComposerStatusBar />}
+								trailing={
+									<ComposerStatusBar
+										messageModelOverride={messageModelOverride}
+									/>
+								}
 							/>
 						)
 					}

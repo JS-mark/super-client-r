@@ -48,6 +48,19 @@ describe("AskUserQuestionCard helpers", () => {
 		expect(isAskUserQuestionComplete(questions, answers)).toBe(true);
 	});
 
+	it("Enter-submit gate: card should submit only when all required answers are present", () => {
+		// Mirrors the guard inside AskUserQuestionCard.handleKeyDown, which
+		// short-circuits Enter unless `isAskUserQuestionComplete` is true.
+		const answers = new Map<number, QuestionAnswer>();
+		expect(isAskUserQuestionComplete(questions, answers)).toBe(false);
+
+		answers.set(0, { selected: [0], otherText: "" });
+		expect(isAskUserQuestionComplete(questions, answers)).toBe(false);
+
+		answers.set(1, { selected: [0], otherText: "" });
+		expect(isAskUserQuestionComplete(questions, answers)).toBe(true);
+	});
+
 	it("builds SDK-compatible output with questions and answers", () => {
 		const answers = new Map<number, QuestionAnswer>([
 			[0, { selected: [1], otherText: "" }],

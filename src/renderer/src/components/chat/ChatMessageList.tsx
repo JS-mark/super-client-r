@@ -34,6 +34,11 @@ import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ErrorCard } from "./ErrorCard";
+import {
+	getPlanCardFromPart,
+	PlanCard,
+	type PlanDecisionHandler,
+} from "./PlanCard";
 import { ToolCallCard } from "./ToolCallCard";
 import {
 	shouldVirtualizeMessageList,
@@ -235,6 +240,7 @@ interface ChatMessageListProps {
 		updatedInput?: Record<string, unknown>,
 		updatedPermissions?: Array<Record<string, unknown>>,
 	) => void;
+	onPlanDecision?: PlanDecisionHandler;
 }
 
 interface ScrollToBottomFabProps {
@@ -276,6 +282,7 @@ export function ChatMessageList({
 	editMessage,
 	deleteMessage,
 	respondToApproval,
+	onPlanDecision,
 }: ChatMessageListProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
@@ -406,6 +413,13 @@ export function ChatMessageList({
 			messageApi,
 			t,
 		],
+	);
+
+	const handlePlanDecision = useCallback<PlanDecisionHandler>(
+		(decision) => {
+			onPlanDecision?.(decision);
+		},
+		[onPlanDecision],
 	);
 
 	// ── Stable styles for Bubble.List (avoids inline object triggering re-renders) ──
@@ -644,7 +658,9 @@ export function ChatMessageList({
 					// via StreamingMarkdown (not from props), so check m.content for non-streaming
 					// and always include the last message in a streaming turn
 					const hasContent =
-						(isStreamingTurn && isLastInTurn) || m.content?.trim();
+						(isStreamingTurn && isLastInTurn) ||
+						m.content?.trim() ||
+						messageToParts(m).some((part) => part.type !== "tool");
 					if (hasContent) {
 						precomputedParts.push({ msg: m, idx: i });
 					}
@@ -682,6 +698,7 @@ export function ChatMessageList({
 			);
 			const modelName = meta?.model;
 			const providerName = meta?.providerName;
+			const modelSourceLabel = meta?.modelSourceLabel;
 
 			// Mirror the user-side header layout but anchored left: avatar on the
 			// left, two stacked lines on the right — model + provider on top,
@@ -711,6 +728,17 @@ export function ChatMessageList({
 									>
 										{" "}
 										| {providerName}
+									</span>
+								)}
+								{modelSourceLabel && (
+									<span
+										style={{
+											fontWeight: 400,
+											color: token.colorTextQuaternary,
+										}}
+									>
+										{" "}
+										| {modelSourceLabel}
 									</span>
 								)}
 							</span>
@@ -752,69 +780,90 @@ export function ChatMessageList({
 							// parts so the failure reason, model, endpoint, and
 							// triggering query stay first-class.
 							if (m.type === "error") {
-							parts.push(
-								<ErrorCard
-									key={`${m.id}:error`}
-									message={m}
-									onRetry={retryMessage}
-								/>,
+								parts.push(
+									<ErrorCard
+										key={`${m.id}:error`}
+										message={m}
+										onRetry={retryMessage}
+									/>,
+								);
+								continue;
+							}
+							const isLastInTurn = i === aiMessages.length - 1;
+							const assistantParts = messageToParts(m).filter(
+								(part) => part.type !== "tool",
 							);
-							continue;
-						}
-						const isLastInTurn = i === aiMessages.length - 1;
-						const assistantParts = messageToParts(m).filter(
-							(part) => part.type !== "tool",
-						);
-						const textPart = assistantParts.find(
-							(part) => part.type === "text",
-						);
-						if (isStreamingTurn && isLastInTurn) {
-							// StreamingMarkdown reads streamingContent from Zustand store directly,
-							// so this component re-renders in isolation without rebuilding all bubbleItems.
-							parts.push(
-								<StreamPartRenderer
-									key={textPart?.id ?? `${m.id}:streaming-text`}
-									part={
-										textPart ?? {
-											id: `${m.id}:streaming-text`,
-											type: "text",
-											state: "streaming",
-											createdAt: m.timestamp || Date.now(),
-											updatedAt: m.timestamp || Date.now(),
-											content: m.content || "",
+							const textPart = assistantParts.find(
+								(part) => part.type === "text",
+							);
+							if (isStreamingTurn && isLastInTurn) {
+								// StreamingMarkdown reads streamingContent from Zustand store directly,
+								// so this component re-renders in isolation without rebuilding all bubbleItems.
+								parts.push(
+									<StreamPartRenderer
+										key={textPart?.id ?? `${m.id}:streaming-text`}
+										sessionId={conversationId}
+										part={
+											textPart ?? {
+												id: `${m.id}:streaming-text`,
+												type: "text",
+												state: "streaming",
+												createdAt: m.timestamp || Date.now(),
+												updatedAt: m.timestamp || Date.now(),
+												content: m.content || "",
+											}
 										}
+										streaming
+									/>,
+								);
+							} else {
+								for (const part of assistantParts) {
+									const plan = getPlanCardFromPart(part);
+									if (plan) {
+										parts.push(
+											<PlanCard
+												key={part.id}
+												plan={plan}
+												disabled={!onPlanDecision}
+												onExecute={handlePlanDecision}
+												onCancel={handlePlanDecision}
+												onRegenerate={handlePlanDecision}
+											/>,
+										);
+									} else {
+										parts.push(
+											<StreamPartRenderer
+												key={part.id}
+												part={part}
+												sessionId={conversationId}
+											/>,
+										);
 									}
-									streaming
-								/>,
-							);
-						} else {
-							for (const part of assistantParts) {
-								parts.push(<StreamPartRenderer key={part.id} part={part} />);
+								}
+							}
+						} else if (m.role === "tool" && m.toolCall) {
+							if (m.toolCall.status === "awaiting_approval") {
+								continue;
+							}
+							if (isAskUserQuestionToolCall(m.toolCall)) {
+								parts.push(
+									<AskUserQuestionCard
+										key={m.id}
+										toolCall={m.toolCall}
+										onSubmit={respondToApproval}
+									/>,
+								);
+							} else {
+								parts.push(
+									<ToolCallCard
+										key={m.id}
+										toolCall={m.toolCall}
+										onApproval={respondToApproval}
+									/>,
+								);
 							}
 						}
-					} else if (m.role === "tool" && m.toolCall) {
-						if (m.toolCall.status === "awaiting_approval") {
-							continue;
-						}
-						if (isAskUserQuestionToolCall(m.toolCall)) {
-							parts.push(
-								<AskUserQuestionCard
-									key={m.id}
-									toolCall={m.toolCall}
-									onSubmit={respondToApproval}
-								/>,
-							);
-						} else {
-							parts.push(
-								<ToolCallCard
-									key={m.id}
-									toolCall={m.toolCall}
-									onApproval={respondToApproval}
-								/>,
-							);
-						}
 					}
-				}
 				if (parts.length === 0 && !isStreamingTurn) return null;
 
 				const representative =
@@ -1060,7 +1109,16 @@ export function ChatMessageList({
 		handleToggleBookmark,
 		handleExportMessage,
 		respondToApproval,
+		onPlanDecision,
+		handlePlanDecision,
 	]);
+
+	const handleLoadOlderMessages = useCallback(() => {
+		// Stable action — read from store at click time so the callback's
+		// dep array stays empty. Aborts internally if the user has already
+		// switched conversations mid-fetch.
+		useChatStore.getState().loadOlderMessages();
+	}, []);
 
 	// ── Loading state ──
 	// Show a centered spinner while a conversation's history is being read
@@ -1079,13 +1137,6 @@ export function ChatMessageList({
 			</div>
 		);
 	}
-
-	const handleLoadOlderMessages = useCallback(() => {
-		// Stable action — read from store at click time so the callback's
-		// dep array stays empty. Aborts internally if the user has already
-		// switched conversations mid-fetch.
-		useChatStore.getState().loadOlderMessages();
-	}, []);
 
 	const list = shouldVirtualizeMessageList(bubbleItems.length) ? (
 		<VirtualBubbleList

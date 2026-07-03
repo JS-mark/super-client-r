@@ -12,6 +12,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Collapse, Empty, Skeleton, Tag, theme } from "antd";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useChatStore } from "../../stores/chatStore";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import { useFileArtifactStore } from "../../stores/fileArtifactStore";
@@ -19,6 +20,8 @@ import { useAttachmentStore } from "../../stores/attachmentStore";
 import { fileActionService } from "../../services/fileActionService";
 import { runtimeService } from "../../services/runtimeService";
 import { useCodexBranchSection } from "./CodexBranchSection";
+import { ContextInspectorSection } from "./inspector/ContextInspectorSection";
+import { SubagentsInspectorSection } from "./inspector/SubagentsInspectorSection";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
 
 export interface CodexEnvironmentInspectorProps {
@@ -81,6 +84,7 @@ function formatBytes(n?: number): string {
 
 export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 	const { token } = useToken();
+	const { t } = useTranslation("chat");
 	const currentConversationId = useChatStore((s) => s.currentConversationId);
 	const messages = useChatMessageStore((s) => s.messages);
 
@@ -371,7 +375,14 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 			<div className="flex-1 overflow-auto px-2 py-1">
 				<Collapse
 					ghost
-					defaultActiveKey={["changes", "runtime", "branch", "sources"]}
+					defaultActiveKey={[
+						"changes",
+						"runtime",
+						"branch",
+						"context",
+						"subagents",
+						"sources",
+					]}
 					items={[
 						{
 							key: "changes",
@@ -387,6 +398,24 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 							key: "branch",
 							label: branchHeader,
 							children: branchSection.content,
+						},
+						{
+							key: "context",
+							label: <span style={sectionHeaderStyle}>Context / 上下文</span>,
+							children: <ContextInspectorSection />,
+						},
+						{
+							key: "subagents",
+							label: (
+								<span style={sectionHeaderStyle}>
+									{t("subagentsInspector.sectionTitle", "Subagents")}
+								</span>
+							),
+							children: (
+								<SubagentsInspectorSection
+									conversationId={currentConversationId ?? undefined}
+								/>
+							),
 						},
 						{
 							key: "sources",

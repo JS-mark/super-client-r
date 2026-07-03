@@ -14,14 +14,23 @@
  *   - 顶部增加"清除选择"按钮，恢复到全局默认
  */
 
-import { CheckOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+	BulbOutlined,
+	CheckOutlined,
+	EyeOutlined,
+	GlobalOutlined,
+	SearchOutlined,
+	ToolOutlined,
+} from "@ant-design/icons";
 import {
 	Badge,
+	Button,
 	Collapse,
 	Empty,
 	Input,
 	Modal,
 	Tabs,
+	Tag,
 	Typography,
 	theme,
 } from "antd";
@@ -35,7 +44,6 @@ import type {
 	ModelProvider,
 	ProviderModel,
 } from "../../types/models";
-import { CapabilityIcons } from "../models/CapabilityIcons";
 import { ProviderIcon } from "../models/ProviderIcon";
 
 const { Text } = Typography;
@@ -61,20 +69,129 @@ const FILTER_TO_CAPABILITY: Record<FilterTab, ModelCapability | null> = {
 	tool_use: "tool_use",
 };
 
+/**
+ * Format a raw context-window token count for the `Ctx: …` chip.
+ *
+ * - `>=1_000_000` -> `1M` / `1.2M`
+ * - `>=1000` -> `128K` / `4.5K`
+ * - `<1000` -> raw number
+ * - `<=0` / undefined -> `null` (caller skips the chip)
+ */
+export function formatContextChipValue(tokens?: number): string | null {
+	if (!tokens || tokens <= 0) return null;
+	if (tokens >= 1_000_000) {
+		const value = tokens / 1_000_000;
+		return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}M`;
+	}
+	if (tokens >= 1000) {
+		const value = tokens / 1000;
+		return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}K`;
+	}
+	return `${tokens}`;
+}
+
+const CHIP_CAPABILITIES: Array<{
+	cap: ModelCapability;
+	icon: React.ReactNode;
+	labelKey: string;
+}> = [
+	{
+		cap: "vision",
+		icon: <EyeOutlined />,
+		labelKey: "modelPicker.chipVision",
+	},
+	{
+		cap: "reasoning",
+		icon: <BulbOutlined />,
+		labelKey: "modelPicker.chipReasoning",
+	},
+	{
+		cap: "tool_use",
+		icon: <ToolOutlined />,
+		labelKey: "modelPicker.chipToolUse",
+	},
+	{
+		cap: "web_search",
+		icon: <GlobalOutlined />,
+		labelKey: "modelPicker.chipWebSearch",
+	},
+];
+
+interface CapabilityChipsProps {
+	capabilities: ModelCapability[];
+	contextWindow?: number;
+	className?: string;
+}
+
+/**
+ * Small `AntD Tag` chips shown next to each model entry in the picker.
+ * Only renders chips for capabilities the model actually supports plus an
+ * optional `Ctx: {size}` chip when `contextWindow` is provided.
+ */
+export function CapabilityChips({
+	capabilities,
+	contextWindow,
+	className,
+}: CapabilityChipsProps) {
+	const { t } = useTranslation();
+	const contextLabel = formatContextChipValue(contextWindow);
+	const chipCaps = CHIP_CAPABILITIES.filter((entry) =>
+		capabilities.includes(entry.cap),
+	);
+	if (chipCaps.length === 0 && !contextLabel) return null;
+	return (
+		<div
+			className={cn("flex flex-wrap items-center gap-1", className)}
+			data-testid="capability-chips"
+		>
+			{chipCaps.map(({ cap, icon, labelKey }) => (
+				<Tag
+					key={cap}
+					bordered={false}
+					icon={icon}
+					style={{ marginInlineEnd: 0, fontSize: 11, lineHeight: "18px" }}
+				>
+					{t(labelKey, { ns: "models" })}
+				</Tag>
+			))}
+			{contextLabel && (
+				<Tag
+					key="__ctx"
+					bordered={false}
+					style={{ marginInlineEnd: 0, fontSize: 11, lineHeight: "18px" }}
+				>
+					{t("modelPicker.chipContext", {
+						ns: "models",
+						value: contextLabel,
+					})}
+				</Tag>
+			)}
+		</div>
+	);
+}
+
 interface ChatModelPickerProps {
 	open: boolean;
 	onClose: () => void;
 	currentSelection: ActiveModelSelection | null;
+	messageSelection?: ActiveModelSelection | null;
+	sessionSelection?: ActiveModelSelection | null;
 	onSelect: (selection: ActiveModelSelection) => void;
+	onSelectSession: (selection: ActiveModelSelection) => void;
 	onClear: () => void;
+	onClearSession?: () => void;
 }
 
 export function ChatModelPicker({
 	open,
 	onClose,
 	currentSelection,
+	messageSelection,
+	sessionSelection,
 	onSelect,
+	onSelectSession,
 	onClear,
+	onClearSession,
 }: ChatModelPickerProps) {
 	const { t } = useTranslation();
 	const { token } = theme.useToken();
@@ -204,7 +321,7 @@ export function ChatModelPicker({
 					className="flex-1"
 					autoFocus
 				/>
-				{currentSelection && (
+				{messageSelection && (
 					<button
 						type="button"
 						onClick={() => {
@@ -221,7 +338,31 @@ export function ChatModelPicker({
 							borderRadius: token.borderRadius,
 						}}
 					>
-						{t("modelPicker.clear", "清除选择", { ns: "chat" })}
+						{t("modelPicker.clearMessageOverride", "清除本次", {
+							ns: "chat",
+						})}
+					</button>
+				)}
+				{sessionSelection && onClearSession && (
+					<button
+						type="button"
+						onClick={() => {
+							onClearSession();
+							onClose();
+						}}
+						style={{
+							border: "none",
+							background: "transparent",
+							color: token.colorTextSecondary,
+							fontSize: 12,
+							cursor: "pointer",
+							padding: "4px 10px",
+							borderRadius: token.borderRadius,
+						}}
+					>
+						{t("modelPicker.clearSessionOverride", "恢复默认", {
+							ns: "chat",
+						})}
 					</button>
 				)}
 			</div>
@@ -286,10 +427,17 @@ export function ChatModelPicker({
 											currentSelection?.providerId === provider.id &&
 											currentSelection?.modelId === model.id;
 										return (
-											<button
+											<div
 												key={model.id}
-												type="button"
+												role="button"
+												tabIndex={0}
 												onClick={() => handlePick(provider, model)}
+												onKeyDown={(e) => {
+													if (e.key === "Enter" || e.key === " ") {
+														e.preventDefault();
+														handlePick(provider, model);
+													}
+												}}
 												className={cn(
 													"flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
 													isSelected && "bg-blue-50 dark:bg-blue-900/20",
@@ -355,10 +503,27 @@ export function ChatModelPicker({
 															</Text>
 														)}
 												</div>
-												<CapabilityIcons
+												<CapabilityChips
 													capabilities={model.capabilities}
-													size="small"
+													contextWindow={model.contextWindow}
 												/>
+												<Button
+													size="small"
+													type="text"
+													onClick={(e) => {
+														e.stopPropagation();
+														onSelectSession({
+															providerId: provider.id,
+															modelId: model.id,
+														});
+														onClose();
+													}}
+													onKeyDown={(e) => e.stopPropagation()}
+												>
+													{t("modelPicker.setSessionDefault", "设为会话默认", {
+														ns: "chat",
+													})}
+												</Button>
 												{isSelected && (
 													<CheckOutlined
 														style={{
@@ -367,7 +532,7 @@ export function ChatModelPicker({
 														}}
 													/>
 												)}
-											</button>
+											</div>
 										);
 									})}
 								</div>

@@ -1,6 +1,7 @@
 import type * as React from "react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Button, Radio, Tooltip, theme } from "antd";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Button, Radio, Tag, Tooltip, theme } from "antd";
+import { useTranslation } from "react-i18next";
 
 const { useToken } = theme;
 
@@ -50,6 +51,12 @@ interface ApprovalDecisionCardProps {
 	 */
 	fullWidth?: boolean;
 	/**
+	 * Optional dismiss handler invoked when the user presses Escape on the
+	 * card while nothing editable is focused. When undefined the card ignores
+	 * Escape, matching prior behaviour.
+	 */
+	onDismiss?: () => void;
+	/**
 	 * Optional auto-reject countdown in milliseconds. The reject button shows
 	 * a `(Ns)` suffix and a thin progress bar slides across the card's bottom.
 	 * On expiry we invoke `onAutoReject` (or fall back to `onReject`). Hovering
@@ -58,6 +65,23 @@ interface ApprovalDecisionCardProps {
 	 */
 	autoRejectAfterMs?: number;
 	onAutoReject?: () => void;
+	/**
+	 * Optional badge shown above the primary content indicating the approval
+	 * request originated from a subagent (via the internal `Task` tool). Uses
+	 * the muted "default" AntD Tag colour so it reads as auxiliary metadata,
+	 * not as another action.
+	 *
+	 * Phase 4 Round 7 MVP: the prop plumbing lives here so tests can pin
+	 * behaviour with a fixture, but end-to-end wiring from the transcript
+	 * (i.e. mapping `Message.toolCall.subagentRunId` → this prop) is a
+	 * follow-up batch; today's `ToolCallCard` passes `undefined` unless the
+	 * caller explicitly threads it through.
+	 */
+	subagentSource?: {
+		profileName?: string;
+		taskGoal?: string;
+		subagentRunId: string;
+	};
 }
 
 export function ApprovalDecisionCard({
@@ -79,13 +103,20 @@ export function ApprovalDecisionCard({
 	rejectDisabled,
 	onReject,
 	tone = "default",
-	maxWidth,
+	// Accepted for backwards compat with call sites (ToolCallCard, AskUserQuestionCard)
+	// but no longer used internally — the card now flexes via `fullWidth` and the
+	// scoped `:has()` style override below. Prefixed with `_` so lint stops
+	// warning while keeping the public prop in place until all callers are updated.
+	maxWidth: _maxWidth,
 	density = "default",
 	fullWidth = true,
+	onDismiss,
 	autoRejectAfterMs,
 	onAutoReject,
+	subagentSource,
 }: ApprovalDecisionCardProps) {
 	const { token } = useToken();
+	const { t } = useTranslation("chat");
 	const compact = density === "compact";
 	// ── Auto-reject countdown ──────────────────────────────────────────────
 	const countdownEnabled =
@@ -143,6 +174,53 @@ export function ApprovalDecisionCard({
 		firedRef.current = true;
 		(onAutoRejectRef.current ?? onRejectRef.current)?.();
 	}, [countdownEnabled, remainingMs]);
+
+	// Card-level keyboard: Enter → confirm (approve once), Shift+Enter → reject,
+	// Escape → optional dismiss. We skip when the event originates inside an
+	// editable target so text fields within the card retain their native
+	// behaviour.
+	const handleCardKeyDown = useCallback(
+		(event: React.KeyboardEvent<HTMLDivElement>) => {
+			if (event.nativeEvent.isComposing) return;
+			const target = event.target as HTMLElement | null;
+			const tag = target?.tagName?.toLowerCase();
+			const insideEditable =
+				tag === "textarea" ||
+				tag === "input" ||
+				target?.isContentEditable === true;
+			if (insideEditable) return;
+
+			if (event.key === "Escape") {
+				if (onDismiss) {
+					event.preventDefault();
+					onDismiss();
+				}
+				return;
+			}
+
+			if (event.key !== "Enter") return;
+
+			if (event.shiftKey) {
+				if (onReject && !rejectDisabled) {
+					event.preventDefault();
+					onReject();
+				}
+				return;
+			}
+
+			if (onConfirm && !confirmDisabled) {
+				event.preventDefault();
+				onConfirm();
+			}
+		},
+		[
+			confirmDisabled,
+			onConfirm,
+			onDismiss,
+			onReject,
+			rejectDisabled,
+		],
+	);
 
 	const totalMs = autoRejectAfterMs ?? 0;
 	const remainingSec =
@@ -227,6 +305,8 @@ export function ApprovalDecisionCard({
 			<div
 				data-approval-card-id={fullWidth ? escapeId : undefined}
 				className="my-2 overflow-hidden relative"
+				tabIndex={-1}
+				onKeyDown={handleCardKeyDown}
 				onMouseEnter={countdownEnabled ? () => setPaused(true) : undefined}
 				onMouseLeave={countdownEnabled ? () => setPaused(false) : undefined}
 				style={{
@@ -299,6 +379,21 @@ export function ApprovalDecisionCard({
 					gap: compact ? 10 : 12,
 				}}
 			>
+				{subagentSource && (
+					<div data-testid="approval-subagent-source">
+						<Tag
+							color="default"
+							style={{ fontSize: 11, margin: 0 }}
+						>
+							{t("subagentSource.badge", "▲ From subagent: {{name}}", {
+								name:
+									subagentSource.profileName ||
+									subagentSource.taskGoal ||
+									subagentSource.subagentRunId,
+							})}
+						</Tag>
+					</div>
+				)}
 				{description && (
 					<div
 						className="rounded-md"

@@ -1,11 +1,20 @@
-import { Popover, Radio, Space, Tag, Tooltip } from "antd";
+import { Popover, Segmented, Space, Tag, Tooltip } from "antd";
+import { useEffectiveModel } from "../../hooks/useEffectiveModel";
 import { useEffectiveInteractionProfile } from "../../hooks/useEffectiveInteractionProfile";
+import {
+	AGENT_COMPOSER_MODE_DESCRIPTION,
+	AGENT_COMPOSER_MODE_LABEL,
+	type AgentComposerMode,
+	toAgentComposerMode,
+	toPlanModeFromAgentComposerMode,
+} from "../../lib/planModePresentation";
 import {
 	getProjectIdFromConversation,
 	useChatStore,
 } from "../../stores/chatStore";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import { useProjectSettings } from "../../stores/projectStore";
+import type { ActiveModelSelection } from "../../types/models";
 import type {
 	InteractionProfile,
 	PlanMode,
@@ -30,30 +39,6 @@ const INTERACTION_PROFILE_COLOR: Record<InteractionProfile, string> = {
 	codex: "green",
 	hybrid: "blue",
 };
-
-const PLAN_MODE_LABEL: Record<PlanMode, string> = {
-	chat: "对话",
-	"plan-only": "仅计划",
-	"plan-then-ask": "计划后确认",
-	"auto-execute-safe": "自动执行安全步",
-	"full-agent": "完全代理",
-};
-
-const PLAN_MODE_TOOLTIP: Record<PlanMode, string> = {
-	chat: "正常对话，不产生计划。",
-	"plan-only": "生成计划但不执行任何步骤。",
-	"plan-then-ask": "生成计划后，请求确认再执行。",
-	"auto-execute-safe": "自动执行低风险步骤，对高风险步骤请求审批。",
-	"full-agent": "按当前审批与沙箱策略推进执行。",
-};
-
-const PLAN_MODE_OPTIONS: PlanMode[] = [
-	"chat",
-	"plan-only",
-	"plan-then-ask",
-	"auto-execute-safe",
-	"full-agent",
-];
 
 const SANDBOX_MODE_LABEL: Record<SandboxMode, string> = {
 	"read-only": "只读",
@@ -86,7 +71,13 @@ const ATTACHMENT_MODE_LABEL: Record<
  * a `chat:open-model-switcher` window event which `Chat.tsx` listens for to
  * open `ChatModelPicker`.
  */
-export function ComposerStatusBar() {
+interface ComposerStatusBarProps {
+	messageModelOverride?: ActiveModelSelection | null;
+}
+
+export function ComposerStatusBar({
+	messageModelOverride,
+}: ComposerStatusBarProps = {}) {
 	const currentConversation = useChatStore((s) =>
 		s.conversations.find((c) => c.id === s.currentConversationId),
 	);
@@ -100,45 +91,56 @@ export function ComposerStatusBar() {
 	);
 	const interactionProfile: InteractionProfile =
 		useEffectiveInteractionProfile();
+	const effectiveModel = useEffectiveModel(messageModelOverride);
 
 	if (!currentConversation) {
 		return null;
 	}
 
 	const planMode: PlanMode = currentConversation.session?.planMode ?? "chat";
+	const composerMode = toAgentComposerMode(planMode);
 	const planModeDisabled = isStreaming || !currentConversationId;
 
-	const handlePlanModeChange = (next: PlanMode) => {
-		if (planModeDisabled || next === planMode || !currentConversationId) {
+	const handlePlanModeChange = (next: AgentComposerMode) => {
+		const nextPlanMode = toPlanModeFromAgentComposerMode(next);
+		if (
+			planModeDisabled ||
+			next === composerMode ||
+			nextPlanMode === planMode ||
+			!currentConversationId
+		) {
 			return;
 		}
 		void updateConversationMetadata(currentConversationId, {
-			session: { planMode: next },
+			session: { planMode: nextPlanMode },
 		});
 	};
 
 	const planModePopoverContent = (
-		<Radio.Group
-			value={planMode}
-			onChange={(e) => handlePlanModeChange(e.target.value as PlanMode)}
-			disabled={planModeDisabled}
-		>
-			<Space direction="vertical" size={4}>
-				{PLAN_MODE_OPTIONS.map((mode) => (
-					<Radio key={mode} value={mode} className="!items-start">
-						<div className="flex flex-col leading-tight">
-							<span className="text-xs">
-								<code className="text-[11px] opacity-70">{mode}</code>
-								<span className="ml-2">{PLAN_MODE_LABEL[mode]}</span>
-							</span>
-							<span className="text-[11px] opacity-60">
-								{PLAN_MODE_TOOLTIP[mode]}
-							</span>
-						</div>
-					</Radio>
-				))}
-			</Space>
-		</Radio.Group>
+		<div className="flex w-[260px] flex-col gap-3">
+			<Segmented
+				block
+				value={composerMode}
+				onChange={(value) => handlePlanModeChange(value as AgentComposerMode)}
+				options={[
+					{ label: AGENT_COMPOSER_MODE_LABEL.plan, value: "plan" },
+					{ label: AGENT_COMPOSER_MODE_LABEL.execute, value: "execute" },
+				]}
+				disabled={planModeDisabled}
+			/>
+			<div className="space-y-2 text-xs text-gray-500">
+				<div>
+					<span className="font-medium text-gray-700">Plan</span>
+					<span className="ml-2">{AGENT_COMPOSER_MODE_DESCRIPTION.plan}</span>
+				</div>
+				<div>
+					<span className="font-medium text-gray-700">Execute</span>
+					<span className="ml-2">
+						{AGENT_COMPOSER_MODE_DESCRIPTION.execute}
+					</span>
+				</div>
+			</div>
+		</div>
 	);
 	const sandboxMode = projectSettings?.runtimePolicy?.sandboxMode;
 	const attachmentMode = projectSettings?.contextPolicy?.defaultAttachmentMode;
@@ -158,7 +160,7 @@ export function ComposerStatusBar() {
 
 			<Popover
 				content={planModePopoverContent}
-				title="Plan 模式"
+				title="Agent Mode"
 				trigger="click"
 				placement="top"
 			>
@@ -167,7 +169,7 @@ export function ComposerStatusBar() {
 						planModeDisabled ? "opacity-60" : "cursor-pointer"
 					}`}
 				>
-					Plan: {PLAN_MODE_LABEL[planMode]}
+					Mode: {AGENT_COMPOSER_MODE_LABEL[composerMode]}
 				</Tag>
 			</Popover>
 
@@ -184,6 +186,20 @@ export function ComposerStatusBar() {
 				<Tag className="m-0 text-xs">
 					Context:{" "}
 					{attachmentMode ? ATTACHMENT_MODE_LABEL[attachmentMode] : "—"}
+				</Tag>
+			</Tooltip>
+
+			<Tooltip
+				title={
+					effectiveModel
+						? `${effectiveModel.provider.name} · ${
+								effectiveModel.model.name || effectiveModel.model.id
+							}`
+						: "未解析模型"
+				}
+			>
+				<Tag className="m-0 text-xs">
+					Model: {effectiveModel?.sourceLabel ?? "—"}
 				</Tag>
 			</Tooltip>
 		</Space>
