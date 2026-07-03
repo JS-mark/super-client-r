@@ -41,6 +41,11 @@ export const PTY_CHANNELS = {
 	EXIT: "pty:exit",
 } as const;
 
+// 诊断导出通道（无 renderer-provided output path）
+export const DIAGNOSTICS_CHANNELS = {
+	EXPORT: "diagnostics:export",
+} as const;
+
 // 插件事件通道（PluginManager 服务直接发送，保留 camelCase）
 export const PLUGIN_EVENT_CHANNELS = {
 	SHOW_MESSAGE: "plugin:showMessage",

@@ -17,6 +17,25 @@
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 
+interface StructuredIPCError {
+	code: string;
+	details?: Record<string, unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStructuredIPCError(error: unknown): StructuredIPCError | null {
+	if (!isRecord(error)) return null;
+	if (error.code !== "remote.botOffline") return null;
+	if (error.details !== undefined && !isRecord(error.details)) return null;
+	return {
+		code: error.code,
+		details: error.details,
+	};
+}
+
 /**
  * camelCase → kebab-case
  * 'agentSDK' → 'agent-sdk'
@@ -80,8 +99,11 @@ export function registerAPI(
 				} catch (error) {
 					const message =
 						error instanceof Error ? error.message : String(error);
+					const structuredError = getStructuredIPCError(error);
 					logger.error(`[IPC] ${channel} failed: ${message}`);
-					return { success: false, error: message };
+					return structuredError
+						? { success: false, error: message, ...structuredError }
+						: { success: false, error: message };
 				}
 			});
 

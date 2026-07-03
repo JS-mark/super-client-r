@@ -12,6 +12,7 @@ import { registerModelHandlers } from "./handlers/modelHandlers";
 import { registerPtyHandlers } from "./handlers/ptyHandlers";
 import { registerAgentRuntimeHandlers } from "./handlers/agentRuntimeHandlers";
 import { registerAgentTraceHandlers } from "./handlers/agentTraceHandlers";
+import { registerDiagnosticsHandlers } from "./handlers/diagnosticsHandlers";
 
 /**
  * 注册所有 IPC 处理器
@@ -34,6 +35,9 @@ export function registerIpcHandlers(): void {
 
 	// AgentTrace 调试通道
 	registerAgentTraceHandlers();
+
+	// Diagnostic export（默认不包含聊天内容）
+	registerDiagnosticsHandlers();
 }
 
 export * from "./channels";

@@ -561,7 +561,7 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 		sendMessage: (
 			conversationId: string,
 			content: string,
-		) => Promise<IPCResponse<void>>;
+		) => Promise<RemoteChatSendMessageResponse>;
 		getRemoteMessages: (
 			conversationId: string,
 		) => Promise<IPCResponse<RemoteChatMessage[]>>;
@@ -646,6 +646,11 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 		>;
 	};
 
+	// Diagnostic export API（no renderer-provided output path）
+	diagnostics: {
+		export: () => Promise<IPCResponse<DiagnosticExportResult>>;
+	};
+
 	// 通用 IPC
 	ipc: {
 		on: (channel: string, listener: (...args: unknown[]) => void) => void;
@@ -694,6 +699,25 @@ export interface AgentStreamEvent {
 	type: "text" | "tool_use" | "tool_result" | "error" | "done";
 	sessionId: string;
 	data: unknown;
+}
+
+export interface DiagnosticExportResult {
+	exportDir: string;
+	manifestPath: string;
+	diagnosticPath: string;
+	manifest: {
+		schemaVersion: 1;
+		createdAt: string;
+		appVersion: string;
+		redactionMode: "home-and-app-data";
+		exportDir: string;
+		files: Array<{
+			path: string;
+			kind: "manifest" | "diagnostic-json";
+			byteLength?: number;
+			sha256?: string;
+		}>;
+	};
 }
 
 // ============ Agent SDK 类型 ============
@@ -1229,6 +1253,18 @@ export interface IPCResponse<T = unknown> {
 	data?: T;
 	error?: string;
 }
+
+export interface RemoteBotOfflineDetails {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: string;
+}
+
+export type RemoteChatSendMessageResponse = IPCResponse<void> & {
+	code?: "remote.botOffline";
+	details?: RemoteBotOfflineDetails;
+};
 
 // ─── PTY (terminal) ─────────────────────────────────────
 export interface PtyCreateRequest {
@@ -1770,6 +1806,8 @@ const electronAPI: ElectronAPI = {
 		"reassignProject",
 		"appendEvent",
 		"readMessages",
+		"readContentRef",
+		"exportArchive",
 		"fork",
 	]),
 	cwd: createBridge<ElectronAPI["cwd"]>("cwd", [
@@ -1896,6 +1934,9 @@ const electronAPI: ElectronAPI = {
 				ipcRenderer.off("debug:agent-traces:updated", listener);
 			};
 		},
+	},
+	diagnostics: {
+		export: () => ipcRenderer.invoke("diagnostics:export"),
 	},
 	imbot: createBridge<ElectronAPI["imbot"]>("imbot", [
 		"listBots",

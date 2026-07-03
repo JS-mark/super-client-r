@@ -36,6 +36,7 @@ import { glob } from "tinyglobby";
 
 import { registerAPI } from "./register";
 import { broadcastEvent } from "./events";
+import { toSessionContentRefReadResult } from "./sessionContentRef";
 
 // ─── Services ──────────────────────────────
 import { storeManager } from "../store/StoreManager";
@@ -1581,6 +1582,18 @@ module.exports = {
 				ReturnType<typeof getSessionStorage>["readMessages"]
 			>[1],
 		) => getSessionStorage().readMessages(sessionId, range),
+		readContentRef: (
+			sessionId: string,
+			contentRef: string,
+			options?: Parameters<
+				ReturnType<typeof getSessionStorage>["readContentRef"]
+			>[2],
+		) =>
+			toSessionContentRefReadResult(
+				getSessionStorage().readContentRef(sessionId, contentRef, options),
+			),
+		exportArchive: (sessionId: string) =>
+			getSessionStorage().exportSessionArchive(sessionId),
 		fork: (
 			sourceId: string,
 			opts: Parameters<ReturnType<typeof getSessionStorage>["fork"]>[1],

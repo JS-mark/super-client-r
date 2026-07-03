@@ -111,6 +111,30 @@ export type {
 } from "@super-client/shared-types/ipc";
 
 export type {
+  SessionArchiveExportResult,
+  SessionArchiveFileEntry,
+  SessionArchiveManifest,
+  SessionArchiveReferencedAttachment,
+  SessionArchiveReferencedContentRef,
+  SessionArchiveRedactionMode,
+  SessionContentRefReadOptions,
+  SessionContentRefReadResult,
+  SessionContentRefSource,
+} from "@super-client/shared-types/electron-api";
+
+export interface RemoteBotOfflineDetails {
+  conversationId: string;
+  botId: string;
+  chatId: string;
+  platform: string;
+}
+
+export type RemoteChatSendMessageResponse = IPCResponse<void> & {
+  code?: "remote.botOffline";
+  details?: RemoteBotOfflineDetails;
+};
+
+export type {
   // Remote Protocol
   RemoteDevice,
   CommandResult,
@@ -1149,7 +1173,7 @@ export interface ElectronAPI extends ElectronAPIMigrated {
     sendMessage: (
       conversationId: string,
       content: string,
-    ) => Promise<IPCResponse<void>>;
+    ) => Promise<RemoteChatSendMessageResponse>;
     getRemoteMessages: (
       conversationId: string,
     ) => Promise<IPCResponse<RemoteChatMessage[]>>;
