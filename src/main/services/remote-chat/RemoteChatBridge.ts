@@ -18,6 +18,12 @@ import type { IMBotService } from "../imbot/IMBotService";
 import type { IMMessage } from "../imbot/types";
 import { getSessionStorage } from "../storage/SessionStorageService";
 import { logger } from "../../utils/logger";
+import {
+	computeRemoteLifecycle,
+	resolveTransition,
+	type RemoteLifecycleInput,
+	type RemoteLifecycleState,
+} from "./RemoteSessionLifecycle";
 
 /** Platform message length limits */
 const PLATFORM_LIMITS: Record<string, number> = {
@@ -25,6 +31,79 @@ const PLATFORM_LIMITS: Record<string, number> = {
 	dingtalk: 20000,
 	lark: 30000,
 };
+
+export interface RemoteBotOfflinePayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: RemoteBinding["platform"];
+}
+
+export type RemoteInactiveReceiveReason =
+	| "deleted"
+	| "archived"
+	| "missing-session";
+
+export interface RemoteInactiveReceivedPayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: RemoteBinding["platform"];
+	reason: RemoteInactiveReceiveReason;
+}
+
+export class RemoteBotOfflineError extends Error {
+	readonly code = "remote.botOffline";
+	readonly details: RemoteBotOfflinePayload;
+
+	constructor(details: RemoteBotOfflinePayload) {
+		super("Remote bot is offline");
+		this.name = "RemoteBotOfflineError";
+		this.details = details;
+	}
+}
+
+export interface RemoteOutboundRejectedPayload {
+	conversationId: string;
+	code: string;
+	reason?: string;
+	state: RemoteLifecycleState;
+	botId?: string;
+	chatId?: string;
+	platform?: RemoteBinding["platform"];
+}
+
+/**
+ * Thrown for outbound rejections that are NOT bot-offline (archived /
+ * tombstoned / fatal). Bot-offline still throws `RemoteBotOfflineError` for
+ * API surface compatibility. Unbound still throws a plain `Error` with the
+ * pre-existing message so callers that string-match on it keep working.
+ */
+export class RemoteOutboundRejectedError extends Error {
+	readonly code: string;
+	readonly details: RemoteOutboundRejectedPayload;
+
+	constructor(details: RemoteOutboundRejectedPayload) {
+		super(`Remote outbound rejected: ${details.code}`);
+		this.name = "RemoteOutboundRejectedError";
+		this.code = details.code;
+		this.details = details;
+	}
+}
+
+interface SendCapableBot {
+	sendMessage(chatId: string, content: string): Promise<void>;
+}
+
+interface RuntimeBotRegistry {
+	bots?: Map<string, SendCapableBot>;
+}
+
+interface RemoteSessionLifecycleMeta {
+	deletedAt?: number;
+	tombstone?: unknown;
+	archived?: boolean;
+}
 
 export class RemoteChatBridge extends EventEmitter {
 	/** conversationId -> RemoteBinding */
@@ -118,13 +197,39 @@ export class RemoteChatBridge extends EventEmitter {
 	 */
 	async sendMessage(conversationId: string, content: string): Promise<void> {
 		const binding = this.bindings.get(conversationId);
-		if (!binding) {
-			throw new Error(`No remote binding for conversation ${conversationId}`);
+		const bot = binding
+			? (this.imbotService as unknown as RuntimeBotRegistry).bots?.get(
+					binding.botId,
+				)
+			: undefined;
+		const state = this.classifyLifecycle(conversationId, binding, bot);
+		const transition = resolveTransition(state, "outbound");
+
+		if (transition.action !== "allow-outbound") {
+			this.reportOutboundRejected(conversationId, binding, state, transition);
+			if (transition.code === "remote.botOffline" && binding) {
+				throw this.reportBotOffline(conversationId, binding);
+			}
+			if (!binding) {
+				// Preserve pre-existing plain-Error contract for the unbound case.
+				throw new Error(
+					`No remote binding for conversation ${conversationId}`,
+				);
+			}
+			throw new RemoteOutboundRejectedError({
+				conversationId,
+				code: transition.code ?? "remote.unknown",
+				reason: transition.reason,
+				state,
+				botId: binding.botId,
+				chatId: binding.chatId,
+				platform: binding.platform,
+			});
 		}
 
-		const bot = (this.imbotService as any).bots?.get(binding.botId);
-		if (!bot) {
-			throw new Error(`Bot ${binding.botId} is not running`);
+		// After a healthy transition we always have both a binding and a bot.
+		if (!binding || !bot) {
+			throw this.reportBotOffline(conversationId, binding as RemoteBinding);
 		}
 
 		const limit = PLATFORM_LIMITS[binding.platform] || 4096;
@@ -170,6 +275,11 @@ export class RemoteChatBridge extends EventEmitter {
 	appendRemoteMessage(conversationId: string, msg: RemoteChatMessage): void {
 		const filePath = this.getRemoteMessagesPath(conversationId);
 		const messages = this.getRemoteMessages(conversationId);
+		if (messages.some((existing) => existing.id === msg.id)) {
+			this.reportDuplicateDrop(conversationId, msg);
+			return;
+		}
+
 		messages.push(msg);
 		try {
 			const dir = getSessionStorage().getSessionDir(conversationId);
@@ -200,6 +310,38 @@ export class RemoteChatBridge extends EventEmitter {
 			const binding = this.bindings.get(conversationId);
 			if (!binding) return;
 
+			const bot = (
+				this.imbotService as unknown as RuntimeBotRegistry
+			).bots?.get(binding.botId);
+			const state = this.classifyLifecycle(conversationId, binding, bot);
+			const transition = resolveTransition(state, "inbound");
+
+			if (transition.action === "drop-inbound-with-log") {
+				const inactiveReason =
+					this.getInactiveReceiveReason(conversationId) ?? "missing-session";
+				this.reportInactiveReceived(conversationId, binding, inactiveReason);
+				return;
+			}
+			if (transition.action === "drop-inbound") {
+				// error-fatal / unbound classifications: silently drop, matching the
+				// pre-existing behavior for unbound inbound messages.
+				return;
+			}
+
+			const inMsg: RemoteChatMessage = {
+				id: this.getIncomingRemoteMessageId(message),
+				direction: "incoming",
+				content: message.content,
+				sender: message.sender,
+				platform: binding.platform,
+				timestamp: message.timestamp,
+			};
+
+			if (this.hasRemoteMessage(conversationId, inMsg.id)) {
+				this.reportDuplicateDrop(conversationId, inMsg);
+				return;
+			}
+
 			const imMessage: RemoteIMMessage = {
 				conversationId,
 				content: message.content,
@@ -213,14 +355,6 @@ export class RemoteChatBridge extends EventEmitter {
 			broadcastEvent("remote-chat:im-message", imMessage);
 
 			// Persist as incoming message
-			const inMsg: RemoteChatMessage = {
-				id: `in_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-				direction: "incoming",
-				content: message.content,
-				sender: message.sender,
-				platform: binding.platform,
-				timestamp: message.timestamp,
-			};
 			this.appendRemoteMessage(conversationId, inMsg);
 
 			logger.info(
@@ -280,6 +414,135 @@ export class RemoteChatBridge extends EventEmitter {
 			getSessionStorage().getSessionDir(conversationId),
 			"remote-messages.json",
 		);
+	}
+
+	private getIncomingRemoteMessageId(message: IMMessage): string {
+		return `in_${message.id}`;
+	}
+
+	private hasRemoteMessage(conversationId: string, messageId: string): boolean {
+		return this.getRemoteMessages(conversationId).some(
+			(message) => message.id === messageId,
+		);
+	}
+
+	private getInactiveReceiveReason(
+		conversationId: string,
+	): RemoteInactiveReceiveReason | undefined {
+		try {
+			const meta = getSessionStorage().getMeta(
+				conversationId,
+			) as RemoteSessionLifecycleMeta;
+			if (meta.deletedAt || meta.tombstone) return "deleted";
+			if (meta.archived) return "archived";
+			return undefined;
+		} catch {
+			return "missing-session";
+		}
+	}
+
+	private readSessionLifecycleFacts(
+		conversationId: string,
+	): { exists: boolean; tombstoned: boolean; archived: boolean } {
+		try {
+			const meta = getSessionStorage().getMeta(
+				conversationId,
+			) as RemoteSessionLifecycleMeta;
+			return {
+				exists: true,
+				tombstoned: !!(meta.deletedAt || meta.tombstone),
+				archived: !!meta.archived,
+			};
+		} catch {
+			return { exists: false, tombstoned: false, archived: false };
+		}
+	}
+
+	private classifyLifecycle(
+		conversationId: string,
+		binding: RemoteBinding | undefined,
+		bot: SendCapableBot | undefined,
+	): RemoteLifecycleState {
+		const facts = this.readSessionLifecycleFacts(conversationId);
+		const botConfigured = binding
+			? !!this.imbotService.getBotConfig(binding.botId)
+			: false;
+		const botRunning = binding
+			? this.checkBotOnline(binding.botId) && !!bot
+			: false;
+		const input: RemoteLifecycleInput = {
+			hasBinding: !!binding,
+			sessionExists: facts.exists,
+			sessionTombstoned: facts.tombstoned,
+			sessionArchived: facts.archived,
+			botConfigured,
+			botRunning,
+		};
+		return computeRemoteLifecycle(input);
+	}
+
+	private reportOutboundRejected(
+		conversationId: string,
+		binding: RemoteBinding | undefined,
+		state: RemoteLifecycleState,
+		transition: { code?: string; reason?: string },
+	): void {
+		const payload: RemoteOutboundRejectedPayload = {
+			conversationId,
+			code: transition.code ?? "remote.unknown",
+			reason: transition.reason,
+			state,
+			botId: binding?.botId,
+			chatId: binding?.chatId,
+			platform: binding?.platform,
+		};
+		this.emit("remote.outbound-rejected", payload);
+		logger.warn("[RemoteChatBridge] remote.outbound-rejected", payload);
+	}
+
+	private reportDuplicateDrop(
+		conversationId: string,
+		msg: RemoteChatMessage,
+	): void {
+		const payload = {
+			conversationId,
+			messageId: msg.id,
+			direction: msg.direction,
+			platform: msg.platform,
+		};
+		this.emit("remote.duplicate-dropped", payload);
+		logger.warn("[RemoteChatBridge] remote.duplicate-dropped", payload);
+	}
+
+	private reportInactiveReceived(
+		conversationId: string,
+		binding: RemoteBinding,
+		reason: RemoteInactiveReceiveReason,
+	): void {
+		const payload: RemoteInactiveReceivedPayload = {
+			conversationId,
+			botId: binding.botId,
+			chatId: binding.chatId,
+			platform: binding.platform,
+			reason,
+		};
+		this.emit("remote.inactive-received", payload);
+		logger.warn("[RemoteChatBridge] remote.inactive-received", payload);
+	}
+
+	private reportBotOffline(
+		conversationId: string,
+		binding: RemoteBinding,
+	): RemoteBotOfflineError {
+		const payload: RemoteBotOfflinePayload = {
+			conversationId,
+			botId: binding.botId,
+			chatId: binding.chatId,
+			platform: binding.platform,
+		};
+		this.emit("remote.bot-offline", payload);
+		logger.warn("[RemoteChatBridge] remote.bot-offline", payload);
+		return new RemoteBotOfflineError(payload);
 	}
 }
 
