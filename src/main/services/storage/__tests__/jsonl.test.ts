@@ -303,15 +303,9 @@ describe("eventsToMessages", () => {
 		}
 	});
 
-	it("excludes approval / file_artifact / session_marker from messages", () => {
+	it("excludes file_artifact and unrelated session_marker from messages", () => {
 		const events: SessionEvent[] = [
 			{ type: "user_message", id: "u1", ts: 1, content: "hi" },
-			{
-				type: "approval",
-				ts: 2,
-				toolCallId: "tc1",
-				decision: "allow_once",
-			},
 			{
 				type: "file_artifact",
 				ts: 3,
@@ -329,6 +323,481 @@ describe("eventsToMessages", () => {
 		const msgs = eventsToMessages(events);
 		expect(msgs).toHaveLength(1);
 		expect(msgs[0].role).toBe("user");
+	});
+
+	it("replays approval requested and resolved markers as a resolved tool message", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "session_marker",
+				ts: 10,
+				key: "approval.requested",
+				value: {
+					approvalId: "approval-1",
+					toolName: "execute_command",
+					input: { command: "pwd" },
+				},
+			},
+			{
+				type: "approval",
+				ts: 11,
+				toolCallId: "approval-1",
+				decision: "allow_session",
+				reason: "trusted workspace",
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0]).toMatchObject({
+			id: "tool_msg_approval-1",
+			role: "tool",
+			type: "tool_use",
+			toolCall: {
+				id: "approval-1",
+				name: "execute_command",
+				input: { command: "pwd" },
+				status: "success",
+				result: {
+					decision: "allow_session",
+					reason: "trusted workspace",
+				},
+				approval: {
+					kind: "permission",
+					decisionReason: "trusted workspace",
+				},
+			},
+		});
+	});
+
+	it("replays denied approval as an errored tool message", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "session_marker",
+				ts: 10,
+				key: "approval.requested",
+				value: {
+					approvalId: "approval-2",
+					toolName: "write_file",
+					input: { path: "/tmp/a.txt" },
+				},
+			},
+			{
+				type: "approval",
+				ts: 11,
+				toolCallId: "approval-2",
+				decision: "deny",
+				reason: "too broad",
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs[0].toolCall).toMatchObject({
+			id: "approval-2",
+			name: "write_file",
+			status: "error",
+			error: "too broad",
+			approval: {
+				kind: "permission",
+				decisionReason: "too broad",
+			},
+		});
+	});
+
+	it("replays ask requested and answered markers as a completed ask card message", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "session_marker",
+				ts: 10,
+				key: "ask.requested",
+				value: {
+					askId: "ask-1",
+					toolName: "scp-agent-builtins__AskUserQuestion",
+					input: {
+						questions: [
+							{
+								header: "Scope",
+								question: "Which scope?",
+								options: [{ label: "Small", description: "Focused" }],
+							},
+						],
+					},
+				},
+			},
+			{
+				type: "session_marker",
+				ts: 11,
+				key: "ask.answered",
+				value: {
+					askId: "ask-1",
+					decision: "allow_once",
+					reason: "user",
+					payload: {
+						answers: { "Which scope?": "Small" },
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0].toolCall).toMatchObject({
+			id: "ask-1",
+			name: "scp-agent-builtins__AskUserQuestion",
+			status: "success",
+			result: {
+				answers: { "Which scope?": "Small" },
+			},
+			approval: {
+				kind: "ask-user-question",
+				userAnswers: { "Which scope?": "Small" },
+				decisionReason: "user",
+			},
+		});
+	});
+
+	it("replays structured plan parts and resolved decision state", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant.part_start",
+				messageId: "assistant-plan",
+				ts: 20,
+				part: {
+					id: "plan-part",
+					type: "plan",
+					state: "streaming",
+					createdAt: 20,
+					updatedAt: 20,
+					pendingDecision: true,
+					requiresDecision: true,
+					status: "pending-decision",
+					plan: {
+						id: "plan-1",
+						version: 1,
+						sourceTurnId: "turn-1",
+						goal: "Update replay",
+						steps: [{ id: "step-1", title: "Patch reducer" }],
+					},
+				},
+			},
+			{
+				type: "assistant.part_done",
+				messageId: "assistant-plan",
+				partId: "plan-part",
+				ts: 21,
+				patch: {
+					pendingDecision: false,
+					requiresDecision: false,
+					status: "decision-execute",
+					decision: {
+						action: "execute",
+						sourcePlanId: "plan-1",
+						sourcePlanVersion: 1,
+						sourcePlanTurnId: "turn-1",
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0].parts?.[0]).toMatchObject({
+			id: "plan-part",
+			type: "plan",
+			state: "complete",
+			pendingDecision: false,
+			requiresDecision: false,
+			status: "decision-execute",
+			decision: {
+				action: "execute",
+				sourcePlanId: "plan-1",
+			},
+			plan: {
+				id: "plan-1",
+				version: 1,
+			},
+		});
+	});
+
+	it("replays run.completed marker as a status part on the final assistant message", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant_message",
+				id: "assistant-final",
+				ts: 10,
+				content: "Done",
+			},
+			{
+				type: "session_marker",
+				eventId: "event-run-completed",
+				ts: 11,
+				key: "run.completed",
+				value: {
+					runId: "run-1",
+					requestId: "req-1",
+					runtime: "llm-loop",
+					status: "completed",
+					payload: {
+						finalMessageId: "assistant-final",
+						reason: "completed",
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0]).toMatchObject({
+			id: "assistant-final",
+			role: "assistant",
+			content: "Done",
+			parts: [
+				{
+					id: "run_status_part_event-run-completed",
+					type: "status",
+					state: "complete",
+					label: "Run completed",
+					detail: "completed · llm-loop · req-1",
+				},
+			],
+		});
+	});
+
+	it("replays run.stopped marker onto the latest assistant message without adding a new bubble", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant_message",
+				id: "assistant-last",
+				ts: 10,
+				content: "Partial output",
+			},
+			{
+				type: "session_marker",
+				eventId: "event-run-stopped",
+				ts: 11,
+				key: "run.stopped",
+				value: {
+					requestId: "req-stop",
+					status: "stopped",
+					payload: { reason: "cancelled" },
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0].parts?.[0]).toMatchObject({
+			id: "run_status_part_event-run-stopped",
+			type: "status",
+			state: "complete",
+			label: "Run stopped",
+			detail: "cancelled · req-stop",
+		});
+	});
+
+	it("replays run.error marker as a fallback assistant status message when no assistant exists", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "session_marker",
+				eventId: "event-run-error",
+				ts: 11,
+				key: "run.error",
+				value: {
+					requestId: "req-error",
+					status: "error",
+					payload: {
+						code: "AUTH_403",
+						message: "not available",
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0]).toMatchObject({
+			id: "run_status_event-run-error",
+			role: "assistant",
+			type: "text",
+			content: "",
+			parts: [
+				{
+					id: "run_status_part_event-run-error",
+					type: "status",
+					state: "error",
+					label: "Run failed",
+					detail: "not available · AUTH_403 · req-error",
+				},
+			],
+		});
+	});
+
+	it("plan.decision marker alone mutates the source PlanMessagePart", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant.part_start",
+				messageId: "asst-1",
+				ts: 20,
+				part: {
+					id: "plan-1",
+					type: "plan",
+					state: "streaming",
+					createdAt: 20,
+					updatedAt: 20,
+					pendingDecision: true,
+					requiresDecision: true,
+					status: "pending-decision",
+					plan: {
+						id: "plan-1",
+						version: 1,
+						sourceTurnId: "turn-1",
+						goal: "cancel me",
+						steps: [{ id: "step-1", title: "irrelevant" }],
+					},
+				},
+			},
+			{
+				type: "session_marker",
+				ts: 25,
+				key: "plan.decision",
+				value: {
+					action: "cancel",
+					sourcePlanId: "plan-1",
+					sourcePlanVersion: 1,
+					sourcePlanTurnId: "turn-1",
+					decision: {
+						action: "cancel",
+						sourcePlanId: "plan-1",
+						sourcePlanVersion: 1,
+						sourcePlanTurnId: "turn-1",
+					},
+					record: {
+						sourcePlanId: "plan-1",
+						action: "cancel",
+						at: 25,
+						decision: {
+							action: "cancel",
+							sourcePlanId: "plan-1",
+							sourcePlanVersion: 1,
+							sourcePlanTurnId: "turn-1",
+						},
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		expect(msgs).toHaveLength(1);
+		const planPart = msgs[0].parts?.[0];
+		expect(planPart).toMatchObject({
+			id: "plan-1",
+			type: "plan",
+			pendingDecision: false,
+			status: "decision-cancel",
+			decision: {
+				action: "cancel",
+				sourcePlanId: "plan-1",
+				sourcePlanVersion: 1,
+				sourcePlanTurnId: "turn-1",
+			},
+		});
+	});
+
+	it("execute.turn.created marker attaches a Plan executed status part to the linked assistant message", () => {
+		const events: SessionEvent[] = [
+			{ type: "user_message", id: "user-2", ts: 30, content: "run it" },
+			{
+				type: "assistant_message",
+				id: "asst-2",
+				ts: 31,
+				content: "on it",
+			},
+			{
+				type: "session_marker",
+				ts: 32,
+				key: "execute.turn.created",
+				value: {
+					sourcePlanId: "plan-1",
+					sourcePlanVersion: 1,
+					sourcePlanTurnId: "turn-1",
+					userMessageId: "user-2",
+					assistantMessageId: "asst-2",
+					link: {
+						sourcePlanId: "plan-1",
+						sourcePlanVersion: 1,
+						sourcePlanTurnId: "turn-1",
+						userMessageId: "user-2",
+						assistantMessageId: "asst-2",
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		const assistant = msgs.find((m) => m.id === "asst-2");
+		expect(assistant).toBeDefined();
+		const statusPart = assistant?.parts?.find(
+			(p): p is Extract<typeof p, { type: "status" }> =>
+				p.type === "status" && p.id.startsWith("plan_exec_link_plan-1"),
+		);
+		expect(statusPart).toMatchObject({
+			id: "plan_exec_link_plan-1",
+			type: "status",
+			state: "complete",
+			label: "Plan executed",
+		});
+		expect(statusPart?.detail).toContain("plan plan-1#1");
+		expect(statusPart?.detail).toContain("turn user-2");
+	});
+
+	it("run.rate_limit marker replays as an error-state status part with retry hint", () => {
+		const events: SessionEvent[] = [
+			{
+				type: "assistant_message",
+				id: "asst-3",
+				ts: 40,
+				content: "partial",
+			},
+			{
+				type: "session_marker",
+				ts: 41,
+				key: "run.rate_limit",
+				value: {
+					runId: "req-3",
+					requestId: "req-3",
+					runtime: "llm-loop",
+					status: "streaming",
+					payload: {
+						message: "429 rate limited",
+						retryAfterMs: 30000,
+					},
+				},
+			},
+		];
+
+		const msgs = eventsToMessages(events);
+
+		const assistant = msgs.find((m) => m.id === "asst-3");
+		expect(assistant).toBeDefined();
+		const statusPart = assistant?.parts?.find(
+			(p): p is Extract<typeof p, { type: "status" }> =>
+				p.type === "status" && p.label === "Rate limited",
+		);
+		expect(statusPart).toMatchObject({
+			type: "status",
+			state: "error",
+			label: "Rate limited",
+		});
+		expect(statusPart?.detail).toContain("429 rate limited");
+		expect(statusPart?.detail).toContain("retry in 30s");
 	});
 
 	it("preserves attachmentIds on user_message via metadata", () => {
@@ -411,5 +880,244 @@ describe("eventsToMessages", () => {
 		const msgs = eventsToMessages(events);
 		expect(msgs).toHaveLength(1);
 		expect(msgs[0].content).toBe("edited");
+	});
+
+	// ─────────────────────────────────────────────────────────────
+	// Multi-Agent Round 6 — SubagentMessagePart reduction.
+	// ─────────────────────────────────────────────────────────────
+	describe("SubagentMessagePart reduction (Multi-Agent Round 6)", () => {
+		it("collapses a subagent's tool calls into the parent's SubagentMessagePart (toolCallCount)", () => {
+			const run = {
+				subagentRunId: "sub-1",
+				parentRunId: "req-1",
+				parentAssistantMessageId: "assistant-1",
+				profileId: "reviewer",
+				profileName: "Reviewer",
+				taskGoal: "Review the diff",
+				status: "spawned" as const,
+				startedAt: 100,
+			};
+			const events: SessionEvent[] = [
+				{ type: "user_message", id: "u1", ts: 1, content: "review the diff" },
+				{
+					type: "assistant.part_start",
+					messageId: "assistant-1",
+					ts: 10,
+					part: {
+						id: "text-1",
+						type: "text",
+						state: "streaming",
+						createdAt: 10,
+						updatedAt: 10,
+						content: "Delegating to reviewer…",
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 11,
+					key: "subagent.spawned",
+					value: {
+						subagentRunId: "sub-1",
+						parentRunId: "req-1",
+						parentAssistantMessageId: "assistant-1",
+						run,
+					},
+				},
+				{
+					type: "tool_call",
+					id: "tc-child-1",
+					ts: 12,
+					name: "read_file",
+					input: { path: "/a.ts" },
+					subagentRunId: "sub-1",
+				},
+				{
+					type: "tool_result",
+					toolCallId: "tc-child-1",
+					ts: 13,
+					output: "content",
+					subagentRunId: "sub-1",
+				},
+				{
+					type: "session_marker",
+					ts: 20,
+					key: "subagent.completed",
+					value: {
+						subagentRunId: "sub-1",
+						parentRunId: "req-1",
+						summary: "Looked good",
+						tokenUsage: { input: 50, output: 20 },
+						endedAt: 20,
+					},
+				},
+			];
+
+			const msgs = eventsToMessages(events);
+			expect(msgs.map((m) => m.role)).toEqual(["user", "assistant"]);
+			const assistant = msgs[1];
+			const partTypes = (assistant.parts ?? []).map((p) => p.type);
+			expect(partTypes).toEqual(["text", "subagent"]);
+			const subPart = (assistant.parts ?? []).find(
+				(p) => p.type === "subagent",
+			);
+			expect(subPart).toBeDefined();
+			if (subPart && subPart.type === "subagent") {
+				expect(subPart.id).toBe("subagent_part_sub-1");
+				expect(subPart.state).toBe("complete");
+				expect(subPart.run.status).toBe("completed");
+				expect(subPart.run.toolCallCount).toBe(1);
+				expect(subPart.run.summary).toBe("Looked good");
+				expect(subPart.run.tokenUsage).toEqual({ input: 50, output: 20 });
+				expect(subPart.run.endedAt).toBe(20);
+			}
+		});
+
+		it("falls back to a top-level tool message when a subagent tool_call has no matching spawned marker (BC)", () => {
+			const events: SessionEvent[] = [
+				{ type: "user_message", id: "u1", ts: 1, content: "hello" },
+				{
+					type: "tool_call",
+					id: "tc-orphan",
+					ts: 2,
+					name: "read_file",
+					input: { path: "/x" },
+					subagentRunId: "sub-x",
+				},
+				{
+					type: "tool_result",
+					toolCallId: "tc-orphan",
+					ts: 3,
+					output: "ok",
+					subagentRunId: "sub-x",
+				},
+			];
+			const msgs = eventsToMessages(events);
+			expect(msgs.map((m) => ({ role: m.role, type: m.type }))).toEqual([
+				{ role: "user", type: "text" },
+				{ role: "tool", type: "tool_use" },
+			]);
+			expect(msgs[1].toolCall).toMatchObject({
+				id: "tc-orphan",
+				name: "read_file",
+				status: "success",
+				result: "ok",
+			});
+		});
+
+		it("subagent.failed marker flips the SubagentMessagePart to error state", () => {
+			const run = {
+				subagentRunId: "sub-2",
+				parentRunId: "req-2",
+				parentAssistantMessageId: "assistant-2",
+				taskGoal: "flake test",
+				status: "spawned" as const,
+				startedAt: 100,
+			};
+			const events: SessionEvent[] = [
+				{
+					type: "assistant.part_start",
+					messageId: "assistant-2",
+					ts: 5,
+					part: {
+						id: "text-2",
+						type: "text",
+						state: "streaming",
+						createdAt: 5,
+						updatedAt: 5,
+						content: "Delegating…",
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 6,
+					key: "subagent.spawned",
+					value: {
+						subagentRunId: "sub-2",
+						parentRunId: "req-2",
+						parentAssistantMessageId: "assistant-2",
+						run,
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 7,
+					key: "subagent.failed",
+					value: {
+						subagentRunId: "sub-2",
+						parentRunId: "req-2",
+						errorMessage: "crashed",
+						endedAt: 7,
+					},
+				},
+			];
+			const msgs = eventsToMessages(events);
+			const assistant = msgs.find((m) => m.id === "assistant-2");
+			expect(assistant).toBeDefined();
+			const subPart = assistant?.parts?.find((p) => p.type === "subagent");
+			expect(subPart).toBeDefined();
+			if (subPart && subPart.type === "subagent") {
+				expect(subPart.state).toBe("error");
+				expect(subPart.run.status).toBe("failed");
+				expect(subPart.run.errorMessage).toBe("crashed");
+				expect(subPart.run.endedAt).toBe(7);
+			}
+		});
+
+		it("subagent.updated marker merges patch onto part.run and preserves untouched fields", () => {
+			const run = {
+				subagentRunId: "sub-3",
+				parentRunId: "req-3",
+				parentAssistantMessageId: "assistant-3",
+				taskGoal: "check",
+				status: "spawned" as const,
+				startedAt: 100,
+			};
+			const events: SessionEvent[] = [
+				{
+					type: "assistant.part_start",
+					messageId: "assistant-3",
+					ts: 5,
+					part: {
+						id: "text-3",
+						type: "text",
+						state: "streaming",
+						createdAt: 5,
+						updatedAt: 5,
+						content: "…",
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 6,
+					key: "subagent.spawned",
+					value: {
+						subagentRunId: "sub-3",
+						parentRunId: "req-3",
+						parentAssistantMessageId: "assistant-3",
+						run,
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 7,
+					key: "subagent.updated",
+					value: {
+						subagentRunId: "sub-3",
+						patch: { status: "running", toolCallCount: 5 },
+					},
+				},
+			];
+			const msgs = eventsToMessages(events);
+			const assistant = msgs.find((m) => m.id === "assistant-3");
+			const subPart = assistant?.parts?.find((p) => p.type === "subagent");
+			expect(subPart).toBeDefined();
+			if (subPart && subPart.type === "subagent") {
+				expect(subPart.state).toBe("streaming");
+				expect(subPart.run.status).toBe("running");
+				expect(subPart.run.toolCallCount).toBe(5);
+				expect(subPart.run.taskGoal).toBe("check");
+				expect(subPart.run.subagentRunId).toBe("sub-3");
+			}
+		});
 	});
 });

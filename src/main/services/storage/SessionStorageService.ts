@@ -21,13 +21,22 @@ import {
 	readFileSync,
 	renameSync,
 	rmSync,
+	statSync,
 	writeFileSync,
 	appendFileSync,
+	openSync,
+	readSync,
+	closeSync,
 } from "node:fs";
-import { join } from "node:path";
-import type { Message } from "@super-client/shared-types/chat";
+import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { extname, join } from "node:path";
+import type { Message, MessagePart } from "@super-client/shared-types/chat";
 import type {
 	ChatMode,
+	Project,
+	ProjectSettings,
 	SessionEvent,
 	SessionMeta,
 	SessionTombstone,
@@ -39,10 +48,18 @@ import {
 	serializeEvent,
 } from "./jsonl";
 import type { ProjectStorageService } from "./ProjectStorageService";
+import { redactPath, type PrivacyRedactionContext } from "../privacy/redaction";
 
 const CASUAL_DIR = "casual-sessions";
 const PROJECTS_DIR = "projects";
 const PROJECT_SESSIONS_DIR = "sessions";
+const CONTENT_REF_DIR = "content-refs";
+const CONTENT_REF_PREFIX = "session-content://v1/tool-outputs/content-refs/";
+const CONTENT_REF_ID_RE = /^[a-f0-9]{64}$/;
+// Keep JSONL readable for normal responses and only externalize payloads that
+// are large enough to affect replay and renderer memory. This intentionally
+// targets complete/patch payload fields, not streaming deltas.
+const ASSISTANT_PART_CONTENT_REF_THRESHOLD_BYTES = 64 * 1024;
 
 interface SessionBucket {
 	dir: string;
@@ -71,11 +88,142 @@ export interface ForkOptions {
 	name?: string;
 }
 
+export type ContentRefPayload = string | Buffer | Uint8Array | ArrayBuffer;
+
+export interface WriteContentRefInput {
+	payload: ContentRefPayload;
+	mediaType?: string;
+	source?: "assistant" | "tool" | "artifact";
+}
+
+export interface StoredContentRef {
+	contentRef: string;
+	byteLength: number;
+	sha256: string;
+	mediaType?: string;
+	source?: "assistant" | "tool" | "artifact";
+}
+
+export interface ReadContentRefOptions {
+	offset?: number;
+	maxBytes?: number;
+}
+
+export interface ReadContentRefResult extends StoredContentRef {
+	data: Buffer;
+	offset: number;
+	bytesRead: number;
+	totalByteLength: number;
+	truncated: boolean;
+	nextOffset?: number;
+}
+
+export type SessionArchiveRedactionMode = "home-and-app-data";
+
+export interface ExportSessionArchiveOptions {
+	appVersion?: string;
+}
+
+export interface SessionArchiveFileEntry {
+	path: string;
+	kind:
+		| "manifest"
+		| "project-metadata"
+		| "project-settings"
+		| "session-meta"
+		| "session-jsonl";
+	byteLength?: number;
+	sha256?: string;
+	sourcePath?: string;
+}
+
+export interface SessionArchiveReferencedAttachment {
+	id: string;
+	name?: string;
+	sourcePath?: string;
+	byteLength?: number;
+	missing?: boolean;
+}
+
+export interface SessionArchiveReferencedContentRef {
+	contentRef: string;
+	sha256?: string;
+	sourcePath?: string;
+	byteLength?: number;
+	mediaType?: string;
+	source?: StoredContentRef["source"];
+	missing?: boolean;
+}
+
+export interface SessionArchiveManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion?: string;
+	sessionId: string;
+	projectId: string | null;
+	redactionMode: SessionArchiveRedactionMode;
+	exportDir: string;
+	files: SessionArchiveFileEntry[];
+	referencedPayloads: {
+		copied: false;
+		attachments: SessionArchiveReferencedAttachment[];
+		contentRefs: SessionArchiveReferencedContentRef[];
+	};
+}
+
+export interface SessionArchiveExportResult {
+	exportDir: string;
+	manifestPath: string;
+	manifest: SessionArchiveManifest;
+}
+
+export type ProjectArchiveMetadata = Omit<Project, "cwd"> & {
+	cwd: string;
+};
+
+export interface ProjectArchiveSessionEntry {
+	sessionId: string;
+	metaPath: string;
+	jsonlPath: string;
+}
+
+export interface ProjectArchiveReferencedPayloadSession {
+	sessionId: string;
+	attachments: SessionArchiveReferencedAttachment[];
+	contentRefs: SessionArchiveReferencedContentRef[];
+}
+
+export interface ProjectArchiveManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion?: string;
+	projectId: string;
+	redactionMode: SessionArchiveRedactionMode;
+	exportDir: string;
+	sessionCount: number;
+	files: SessionArchiveFileEntry[];
+	project?: {
+		metadataPath?: string;
+		settingsPath?: string;
+	};
+	sessions: ProjectArchiveSessionEntry[];
+	referencedPayloads: {
+		copied: false;
+		sessions: ProjectArchiveReferencedPayloadSession[];
+	};
+}
+
+export interface ProjectArchiveExportResult {
+	exportDir: string;
+	manifestPath: string;
+	manifest: ProjectArchiveManifest;
+}
+
 export class SessionStorageService {
 	private readonly userRoot: string;
 
 	constructor(
-		baseDir: string,
+		private readonly baseDir: string,
 		userId: string,
 		// 只用于校验 projectId 存在；不持有强引用
 		private readonly projectStorage?: ProjectStorageService,
@@ -289,8 +437,11 @@ export class SessionStorageService {
 			throw new Error(`cannot append to deleted session: ${sessionId}`);
 		}
 		const jsonlPath = this.sessionFile(meta, ".jsonl");
-		const normalized = this.normalizeEvent(meta, event);
-		if (this.hasEventId(jsonlPath, normalized.eventId)) return;
+		const normalizedBase = this.normalizeEvent(meta, event);
+		if (this.hasEventId(jsonlPath, normalizedBase.eventId)) return;
+		const normalized = this.normalizeEvent(meta, event, normalizedBase.seq, {
+			externalizeAssistantPartPayloads: true,
+		});
 
 		// 写入前先判定是不是同 id 的"消息更新"（assistant placeholder 落空 content，
 		// 流式结束后再以最终 content + metadata 重发同 id 事件做覆盖）。
@@ -379,14 +530,14 @@ export class SessionStorageService {
 		if (orphans.length === 0) return 0;
 
 		const now = Date.now();
-			for (const toolCallId of orphans) {
-				this.appendEvent(sessionId, {
-					type: "tool_error",
-					toolCallId,
-					ts: now,
-					error: reason,
-				});
-			}
+		for (const toolCallId of orphans) {
+			this.appendEvent(sessionId, {
+				type: "tool_error",
+				toolCallId,
+				ts: now,
+				error: reason,
+			});
+		}
 		return orphans.length;
 	}
 
@@ -539,6 +690,315 @@ export class SessionStorageService {
 		return dir;
 	}
 
+	/**
+	 * Writes a large assistant/tool payload outside JSONL and returns a stable,
+	 * session-relative reference that renderer message parts can carry as
+	 * `contentRef`.
+	 *
+	 * The ref intentionally does not include the session id. `fork()` copies the
+	 * per-session directory, so existing JSONL part refs remain readable in the
+	 * forked session without rewriting historical events.
+	 */
+	writeContentRef(
+		sessionId: string,
+		input: WriteContentRefInput,
+	): StoredContentRef {
+		const meta = this.getMeta(sessionId);
+		if (meta.deletedAt) {
+			throw new Error(
+				`cannot write contentRef for deleted session: ${sessionId}`,
+			);
+		}
+
+		const data = toBuffer(input.payload);
+		const sha256 = createHash("sha256").update(data).digest("hex");
+		const dir = this.ensureContentRefsDir(sessionId);
+		const payloadPath = join(dir, `${sha256}.bin`);
+		const metaPath = join(dir, `${sha256}.meta.json`);
+		writeFileSync(payloadPath, data);
+		this.writeContentRefMeta(metaPath, {
+			contentRef: `${CONTENT_REF_PREFIX}${sha256}`,
+			byteLength: data.byteLength,
+			sha256,
+			...(input.mediaType ? { mediaType: input.mediaType } : {}),
+			...(input.source ? { source: input.source } : {}),
+		});
+		return {
+			contentRef: `${CONTENT_REF_PREFIX}${sha256}`,
+			byteLength: data.byteLength,
+			sha256,
+			...(input.mediaType ? { mediaType: input.mediaType } : {}),
+			...(input.source ? { source: input.source } : {}),
+		};
+	}
+
+	/**
+	 * Reads a previously externalized payload. The caller provides the owning
+	 * session id, keeping refs portable across forks while preventing path-based
+	 * reads outside this session's `tool-outputs/content-refs` directory.
+	 */
+	readContentRef(
+		sessionId: string,
+		contentRef: string,
+		options: ReadContentRefOptions = {},
+	): ReadContentRefResult {
+		const refId = parseContentRefId(contentRef);
+		const dir = this.contentRefsDir(sessionId);
+		const payloadPath = join(dir, `${refId}.bin`);
+		if (!existsSync(payloadPath)) {
+			throw new Error(`contentRef not found: ${contentRef}`);
+		}
+		const totalByteLength = statSync(payloadPath).size;
+		const offset = normalizeContentRefOffset(options.offset, totalByteLength);
+		const maxBytes = normalizeContentRefMaxBytes(options.maxBytes);
+		const bytesToRead = Math.min(
+			maxBytes ?? totalByteLength - offset,
+			totalByteLength - offset,
+		);
+		const data = readContentRefRange(payloadPath, offset, bytesToRead);
+		const nextOffset = offset + data.byteLength;
+		const truncated = nextOffset < totalByteLength;
+		const stored = this.tryReadContentRefMeta(join(dir, `${refId}.meta.json`));
+		return {
+			contentRef,
+			byteLength: totalByteLength,
+			sha256: refId,
+			...(stored?.mediaType ? { mediaType: stored.mediaType } : {}),
+			...(stored?.source ? { source: stored.source } : {}),
+			data,
+			offset,
+			bytesRead: data.byteLength,
+			totalByteLength,
+			truncated,
+			...(truncated ? { nextOffset } : {}),
+		};
+	}
+
+	exportSessionArchive(
+		sessionId: string,
+		options: ExportSessionArchiveOptions = {},
+	): SessionArchiveExportResult {
+		const meta = this.getMeta(sessionId);
+		const createdAt = new Date().toISOString();
+		const archiveDir = join(
+			this.userRoot,
+			"exports",
+			"session-archives",
+			`${sessionId}-${createdAt.replace(/[:.]/g, "-")}`,
+		);
+		mkdirSync(archiveDir, { recursive: true });
+
+		const metaFileName = `${sessionId}.meta.json`;
+		const jsonlFileName = `${sessionId}.jsonl`;
+		const metaPath = join(archiveDir, metaFileName);
+		const jsonlPath = join(archiveDir, jsonlFileName);
+		const manifestPath = join(archiveDir, "manifest.json");
+		const sourceMetaPath = this.sessionFile(meta, ".meta.json");
+		const sourceJsonlPath = this.sessionFile(meta, ".jsonl");
+		const redactionContext = this.privacyRedactionContext();
+
+		writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+		if (existsSync(sourceJsonlPath)) {
+			cpSync(sourceJsonlPath, jsonlPath);
+		} else {
+			writeFileSync(jsonlPath, "", "utf-8");
+		}
+
+		const jsonlContent = readFileSync(jsonlPath, "utf-8");
+		const files: SessionArchiveFileEntry[] = [
+			{ path: "manifest.json", kind: "manifest" },
+			this.buildArchiveFileEntry(
+				metaPath,
+				metaFileName,
+				"session-meta",
+				existsSync(sourceMetaPath) ? sourceMetaPath : undefined,
+				redactionContext,
+			),
+			this.buildArchiveFileEntry(
+				jsonlPath,
+				jsonlFileName,
+				"session-jsonl",
+				existsSync(sourceJsonlPath) ? sourceJsonlPath : undefined,
+				redactionContext,
+			),
+		];
+		const manifest: SessionArchiveManifest = {
+			schemaVersion: 1,
+			createdAt,
+			...(options.appVersion ? { appVersion: options.appVersion } : {}),
+			sessionId: meta.id,
+			projectId: meta.projectId,
+			redactionMode: "home-and-app-data",
+			exportDir: redactPath(archiveDir, redactionContext),
+			files,
+			referencedPayloads: {
+				copied: false,
+				attachments: this.listArchiveAttachments(
+					sessionId,
+					jsonlContent,
+					redactionContext,
+				),
+				contentRefs: this.listArchiveContentRefs(
+					sessionId,
+					jsonlContent,
+					redactionContext,
+				),
+			},
+		};
+		writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+		return { exportDir: archiveDir, manifestPath, manifest };
+	}
+
+	exportProjectArchive(
+		projectId: string,
+		options: ExportSessionArchiveOptions = {},
+	): ProjectArchiveExportResult {
+		this.assertProjectExists(projectId);
+		const createdAt = new Date().toISOString();
+		const archiveDir = join(
+			this.userRoot,
+			"exports",
+			"project-archives",
+			`${projectId}-${createdAt.replace(/[:.]/g, "-")}`,
+		);
+		const sessionsDir = join(archiveDir, "sessions");
+		mkdirSync(sessionsDir, { recursive: true });
+
+		const manifestPath = join(archiveDir, "manifest.json");
+		const redactionContext = this.privacyRedactionContext();
+		const files: SessionArchiveFileEntry[] = [
+			{ path: "manifest.json", kind: "manifest" },
+		];
+		const projectManifest: ProjectArchiveManifest["project"] = {};
+
+		const project = this.projectStorage?.get(projectId) ?? null;
+		if (project) {
+			const metadataPath = "project.json";
+			const metadataFilePath = join(archiveDir, metadataPath);
+			writeFileSync(
+				metadataFilePath,
+				JSON.stringify(
+					this.redactProjectMetadata(project, redactionContext),
+					null,
+					2,
+				),
+				"utf-8",
+			);
+			files.push(
+				this.buildArchiveFileEntry(
+					metadataFilePath,
+					metadataPath,
+					"project-metadata",
+					undefined,
+					redactionContext,
+				),
+			);
+			projectManifest.metadataPath = metadataPath;
+		}
+
+		if (this.projectStorage) {
+			const settingsPath = "project-settings.json";
+			const settingsFilePath = join(archiveDir, settingsPath);
+			const settings = this.projectStorage.getSettings(projectId);
+			writeFileSync(
+				settingsFilePath,
+				JSON.stringify(
+					redactArchiveValue(settings, redactionContext),
+					null,
+					2,
+				),
+				"utf-8",
+			);
+			files.push(
+				this.buildArchiveFileEntry(
+					settingsFilePath,
+					settingsPath,
+					"project-settings",
+					undefined,
+					redactionContext,
+				),
+			);
+			projectManifest.settingsPath = settingsPath;
+		}
+
+		const sessionEntries: ProjectArchiveSessionEntry[] = [];
+		const referencedPayloadSessions: ProjectArchiveReferencedPayloadSession[] =
+			[];
+		for (const meta of this.list(projectId)) {
+			const metaArchivePath = `sessions/${meta.id}.meta.json`;
+			const jsonlArchivePath = `sessions/${meta.id}.jsonl`;
+			const metaPath = join(archiveDir, metaArchivePath);
+			const jsonlPath = join(archiveDir, jsonlArchivePath);
+			const sourceMetaPath = this.sessionFile(meta, ".meta.json");
+			const sourceJsonlPath = this.sessionFile(meta, ".jsonl");
+
+			writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
+			if (existsSync(sourceJsonlPath)) {
+				cpSync(sourceJsonlPath, jsonlPath);
+			} else {
+				writeFileSync(jsonlPath, "", "utf-8");
+			}
+
+			files.push(
+				this.buildArchiveFileEntry(
+					metaPath,
+					metaArchivePath,
+					"session-meta",
+					existsSync(sourceMetaPath) ? sourceMetaPath : undefined,
+					redactionContext,
+				),
+				this.buildArchiveFileEntry(
+					jsonlPath,
+					jsonlArchivePath,
+					"session-jsonl",
+					existsSync(sourceJsonlPath) ? sourceJsonlPath : undefined,
+					redactionContext,
+				),
+			);
+			sessionEntries.push({
+				sessionId: meta.id,
+				metaPath: metaArchivePath,
+				jsonlPath: jsonlArchivePath,
+			});
+
+			const jsonlContent = readFileSync(jsonlPath, "utf-8");
+			referencedPayloadSessions.push({
+				sessionId: meta.id,
+				attachments: this.listArchiveAttachments(
+					meta.id,
+					jsonlContent,
+					redactionContext,
+				),
+				contentRefs: this.listArchiveContentRefs(
+					meta.id,
+					jsonlContent,
+					redactionContext,
+				),
+			});
+		}
+
+		const manifest: ProjectArchiveManifest = {
+			schemaVersion: 1,
+			createdAt,
+			...(options.appVersion ? { appVersion: options.appVersion } : {}),
+			projectId,
+			redactionMode: "home-and-app-data",
+			exportDir: redactPath(archiveDir, redactionContext),
+			sessionCount: sessionEntries.length,
+			files,
+			...(Object.keys(projectManifest).length > 0
+				? { project: projectManifest }
+				: {}),
+			sessions: sessionEntries,
+			referencedPayloads: {
+				copied: false,
+				sessions: referencedPayloadSessions,
+			},
+		};
+		writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+		return { exportDir: archiveDir, manifestPath, manifest };
+	}
+
 	// ─── helpers ─────────────────────────────────────────────────
 
 	private appDataSessionsDir(projectId: string | null): string {
@@ -589,6 +1049,138 @@ export class SessionStorageService {
 		);
 		writeFileSync(tmp, JSON.stringify(marked, null, 2), "utf-8");
 		renameSync(tmp, target);
+	}
+
+	private contentRefsDir(sessionId: string): string {
+		return join(this.getSessionDir(sessionId), "tool-outputs", CONTENT_REF_DIR);
+	}
+
+	private ensureContentRefsDir(sessionId: string): string {
+		const dir = this.contentRefsDir(sessionId);
+		mkdirSync(dir, { recursive: true });
+		return dir;
+	}
+
+	private writeContentRefMeta(path: string, meta: StoredContentRef): void {
+		const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+		writeFileSync(tmp, JSON.stringify(meta, null, 2), "utf-8");
+		renameSync(tmp, path);
+	}
+
+	private tryReadContentRefMeta(path: string): StoredContentRef | null {
+		if (!existsSync(path)) return null;
+		try {
+			const parsed = JSON.parse(readFileSync(path, "utf-8")) as unknown;
+			if (!isStoredContentRef(parsed)) return null;
+			return parsed;
+		} catch {
+			return null;
+		}
+	}
+
+	private privacyRedactionContext(): PrivacyRedactionContext {
+		return {
+			appUserDataDir: this.baseDir,
+			homeDir: homedir(),
+		};
+	}
+
+	private redactProjectMetadata(
+		project: Project,
+		redactionContext: PrivacyRedactionContext,
+	): ProjectArchiveMetadata {
+		return {
+			...project,
+			cwd: redactArchivePath(project.cwd, redactionContext),
+		};
+	}
+
+	private buildArchiveFileEntry(
+		filePath: string,
+		archivePath: string,
+		kind: SessionArchiveFileEntry["kind"],
+		sourcePath: string | undefined,
+		redactionContext: PrivacyRedactionContext,
+	): SessionArchiveFileEntry {
+		const data = readFileSync(filePath);
+		return {
+			path: archivePath,
+			kind,
+			byteLength: data.byteLength,
+			sha256: createHash("sha256").update(data).digest("hex"),
+			...(sourcePath
+				? { sourcePath: redactPath(sourcePath, redactionContext) }
+				: {}),
+		};
+	}
+
+	private listArchiveAttachments(
+		sessionId: string,
+		jsonlContent: string,
+		redactionContext: PrivacyRedactionContext,
+	): SessionArchiveReferencedAttachment[] {
+		const byId = new Map<string, SessionArchiveReferencedAttachment>();
+		const attachmentsDir = join(this.getSessionDir(sessionId), "attachments");
+		if (existsSync(attachmentsDir)) {
+			for (const name of readdirSync(attachmentsDir)) {
+				const sourcePath = join(attachmentsDir, name);
+				try {
+					const stat = statSync(sourcePath);
+					if (!stat.isFile()) continue;
+					const id = name.replace(extname(name), "");
+					byId.set(id, {
+						id,
+						name,
+						sourcePath: redactPath(sourcePath, redactionContext),
+						byteLength: stat.size,
+					});
+				} catch {
+					// best-effort manifest listing
+				}
+			}
+		}
+
+		for (const id of collectAttachmentIds(jsonlContent)) {
+			if (!byId.has(id)) byId.set(id, { id, missing: true });
+		}
+
+		return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+	}
+
+	private listArchiveContentRefs(
+		sessionId: string,
+		jsonlContent: string,
+		redactionContext: PrivacyRedactionContext,
+	): SessionArchiveReferencedContentRef[] {
+		const byRef = new Map<string, SessionArchiveReferencedContentRef>();
+		const contentRefsDir = this.contentRefsDir(sessionId);
+		if (existsSync(contentRefsDir)) {
+			for (const name of readdirSync(contentRefsDir)) {
+				if (!name.endsWith(".meta.json")) continue;
+				const metaPath = join(contentRefsDir, name);
+				const stored = this.tryReadContentRefMeta(metaPath);
+				if (!stored) continue;
+				const payloadPath = join(contentRefsDir, `${stored.sha256}.bin`);
+				byRef.set(stored.contentRef, {
+					contentRef: stored.contentRef,
+					sha256: stored.sha256,
+					sourcePath: redactPath(payloadPath, redactionContext),
+					byteLength: stored.byteLength,
+					...(stored.mediaType ? { mediaType: stored.mediaType } : {}),
+					...(stored.source ? { source: stored.source } : {}),
+					...(existsSync(payloadPath) ? {} : { missing: true }),
+				});
+			}
+		}
+
+		for (const contentRef of collectContentRefs(jsonlContent)) {
+			if (!byRef.has(contentRef))
+				byRef.set(contentRef, { contentRef, missing: true });
+		}
+
+		return [...byRef.values()].sort((a, b) =>
+			a.contentRef.localeCompare(b.contentRef),
+		);
 	}
 
 	private safeWriteMetaAfterAppend(
@@ -650,18 +1242,83 @@ export class SessionStorageService {
 		meta: SessionMeta,
 		event: SessionEvent,
 		forcedSeq?: number,
+		options: { externalizeAssistantPartPayloads?: boolean } = {},
 	): SessionEvent & { eventId: string; seq: number; writtenAt: number } {
 		const now = Date.now();
 		const seq = forcedSeq ?? this.nextSeq(meta);
 		const eventId =
 			event.eventId ??
 			`${meta.id}:${event.type}:${"id" in event ? String(event.id) : seq}:${seq}`;
+		const normalizedEvent = options.externalizeAssistantPartPayloads
+			? this.externalizeAssistantPartPayloads(meta, event)
+			: event;
 		return {
-			...event,
+			...normalizedEvent,
 			eventId,
 			seq,
 			writtenAt: event.writtenAt ?? now,
 		};
+	}
+
+	private externalizeAssistantPartPayloads(
+		meta: SessionMeta,
+		event: SessionEvent,
+	): SessionEvent {
+		if (event.type === "assistant.part_start") {
+			const part = this.externalizeAssistantPart(meta.id, event.part);
+			return part === event.part ? event : { ...event, part };
+		}
+		if (event.type === "assistant.part_update") {
+			const patch = this.externalizeAssistantPartPatch(meta.id, event.patch);
+			return patch === event.patch ? event : { ...event, patch };
+		}
+		return event;
+	}
+
+	private externalizeAssistantPart(
+		sessionId: string,
+		part: MessagePart,
+	): MessagePart {
+		if (part.contentRef) return part;
+		const candidate = externalizablePartPayload(part);
+		if (!candidate) return part;
+		const ref = this.writeContentRef(sessionId, {
+			payload: candidate.payload,
+			mediaType: candidate.mediaType,
+			source: candidate.source,
+		});
+		return clearExternalizedPayloadField(
+			{
+				...part,
+				contentRef: ref.contentRef,
+				byteLength: ref.byteLength,
+				truncated: true,
+			},
+			candidate.field,
+		) as unknown as MessagePart;
+	}
+
+	private externalizeAssistantPartPatch(
+		sessionId: string,
+		patch: Partial<MessagePart>,
+	): Partial<MessagePart> {
+		if (patch.contentRef) return patch;
+		const candidate = externalizablePatchPayload(patch);
+		if (!candidate) return patch;
+		const ref = this.writeContentRef(sessionId, {
+			payload: candidate.payload,
+			mediaType: candidate.mediaType,
+			source: candidate.source,
+		});
+		return clearExternalizedPayloadField(
+			{
+				...patch,
+				contentRef: ref.contentRef,
+				byteLength: ref.byteLength,
+				truncated: true,
+			},
+			candidate.field,
+		) as Partial<MessagePart>;
 	}
 
 	private nextSeq(meta: SessionMeta): number {
@@ -840,6 +1497,362 @@ function isValidMeta(m: unknown): m is SessionMeta {
 		typeof r.createdAt === "number" &&
 		typeof r.updatedAt === "number" &&
 		typeof r.messageCount === "number"
+	);
+}
+
+function redactArchiveValue(
+	value: ProjectSettings,
+	redactionContext: PrivacyRedactionContext,
+): ProjectSettings {
+	return redactArchiveUnknown(value, redactionContext) as ProjectSettings;
+}
+
+function redactArchiveUnknown(
+	value: unknown,
+	redactionContext: PrivacyRedactionContext,
+): unknown {
+	if (typeof value === "string") {
+		return redactArchiveString(value, redactionContext);
+	}
+	if (Array.isArray(value)) {
+		return value.map((item) => redactArchiveUnknown(item, redactionContext));
+	}
+	if (!value || typeof value !== "object") {
+		return value;
+	}
+
+	const out: Record<string, unknown> = {};
+	for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+		out[key] = redactArchiveUnknown(nested, redactionContext);
+	}
+	return out;
+}
+
+function redactArchiveString(
+	value: string,
+	redactionContext: PrivacyRedactionContext,
+): string {
+	return looksLikeAbsolutePath(value)
+		? redactArchivePath(value, redactionContext)
+		: redactPath(value, redactionContext);
+}
+
+function redactArchivePath(
+	value: string,
+	redactionContext: PrivacyRedactionContext,
+): string {
+	const redacted = redactPath(value, redactionContext);
+	return redacted === value ? "<redacted-path>" : redacted;
+}
+
+function looksLikeAbsolutePath(value: string): boolean {
+	return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
+}
+
+function collectAttachmentIds(jsonlContent: string): Set<string> {
+	const ids = new Set<string>();
+	for (const event of parseEvents(jsonlContent)) {
+		if (event.type === "user_message") {
+			for (const id of event.attachmentIds ?? []) ids.add(id);
+		}
+	}
+	return ids;
+}
+
+function collectContentRefs(jsonlContent: string): Set<string> {
+	const refs = new Set<string>();
+	for (const event of parseEvents(jsonlContent)) {
+		collectContentRefsFromValue(event, refs);
+	}
+	return refs;
+}
+
+function collectContentRefsFromValue(value: unknown, refs: Set<string>): void {
+	if (!value || typeof value !== "object") return;
+	if (Array.isArray(value)) {
+		for (const item of value) collectContentRefsFromValue(item, refs);
+		return;
+	}
+
+	const record = value as Record<string, unknown>;
+	if (typeof record.contentRef === "string") {
+		refs.add(record.contentRef);
+	}
+	for (const nested of Object.values(record)) {
+		collectContentRefsFromValue(nested, refs);
+	}
+}
+
+type ExternalizedPayloadField =
+	| "content"
+	| "input"
+	| "output"
+	| "value"
+	| "preview";
+
+interface ExternalizedPayloadCandidate {
+	field: ExternalizedPayloadField;
+	payload: ContentRefPayload;
+	mediaType: string;
+	source: NonNullable<WriteContentRefInput["source"]>;
+}
+
+function externalizablePartPayload(
+	part: MessagePart,
+): ExternalizedPayloadCandidate | null {
+	switch (part.type) {
+		case "text":
+			return externalizableValue("content", part.content, {
+				mediaType: "text/plain",
+				source: "assistant",
+			});
+		case "code_block":
+			return externalizableValue("content", part.content, {
+				mediaType: "text/plain",
+				source: "assistant",
+			});
+		case "tool":
+			return (
+				externalizableValue("output", part.output, {
+					source: "tool",
+				}) ??
+				externalizableValue("input", part.input, {
+					source: "tool",
+				})
+			);
+		case "data":
+			return externalizableValue("value", part.value, {
+				source: "assistant",
+			});
+		case "artifact":
+			return externalizableValue("preview", part.preview, {
+				mediaType: mediaTypeForArtifactPreview(part.artifactType),
+				source: "artifact",
+			});
+		default:
+			return null;
+	}
+}
+
+function externalizablePatchPayload(
+	patch: Partial<MessagePart>,
+): ExternalizedPayloadCandidate | null {
+	const record = patch as Record<string, unknown>;
+	const type = record.type;
+	if (
+		type === "text" ||
+		type === "code_block" ||
+		record.content !== undefined
+	) {
+		const candidate = externalizableValue("content", record.content, {
+			mediaType: "text/plain",
+			source: "assistant",
+		});
+		if (candidate) return candidate;
+	}
+	if (
+		type === "tool" ||
+		record.output !== undefined ||
+		record.input !== undefined
+	) {
+		const output = externalizableValue("output", record.output, {
+			source: "tool",
+		});
+		if (output) return output;
+		const input = externalizableValue("input", record.input, {
+			source: "tool",
+		});
+		if (input) return input;
+	}
+	if (type === "data" || record.value !== undefined) {
+		const candidate = externalizableValue("value", record.value, {
+			source: "assistant",
+		});
+		if (candidate) return candidate;
+	}
+	if (type === "artifact" || record.preview !== undefined) {
+		const candidate = externalizableValue("preview", record.preview, {
+			mediaType:
+				type === "artifact" && typeof record.artifactType === "string"
+					? mediaTypeForArtifactPreview(record.artifactType)
+					: "text/plain",
+			source: "artifact",
+		});
+		if (candidate) return candidate;
+	}
+	return null;
+}
+
+function externalizableValue(
+	field: ExternalizedPayloadField,
+	value: unknown,
+	defaults: {
+		mediaType?: string;
+		source: NonNullable<WriteContentRefInput["source"]>;
+	},
+): ExternalizedPayloadCandidate | null {
+	const encoded = encodeContentRefPayload(value, defaults.mediaType);
+	if (
+		!encoded ||
+		encoded.byteLength <= ASSISTANT_PART_CONTENT_REF_THRESHOLD_BYTES
+	) {
+		return null;
+	}
+	return {
+		field,
+		payload: encoded.payload,
+		mediaType: encoded.mediaType,
+		source: defaults.source,
+	};
+}
+
+function encodeContentRefPayload(
+	value: unknown,
+	mediaType?: string,
+): {
+	payload: ContentRefPayload;
+	byteLength: number;
+	mediaType: string;
+} | null {
+	if (typeof value === "string") {
+		return {
+			payload: value,
+			byteLength: Buffer.byteLength(value, "utf-8"),
+			mediaType: mediaType ?? "text/plain",
+		};
+	}
+	if (Buffer.isBuffer(value)) {
+		return {
+			payload: value,
+			byteLength: value.byteLength,
+			mediaType: mediaType ?? "application/octet-stream",
+		};
+	}
+	if (value instanceof Uint8Array) {
+		return {
+			payload: value,
+			byteLength: value.byteLength,
+			mediaType: mediaType ?? "application/octet-stream",
+		};
+	}
+	if (value === undefined) return null;
+	try {
+		const payload = JSON.stringify(value);
+		if (typeof payload !== "string") return null;
+		return {
+			payload,
+			byteLength: Buffer.byteLength(payload, "utf-8"),
+			mediaType: mediaType ?? "application/json",
+		};
+	} catch {
+		return null;
+	}
+}
+
+function clearExternalizedPayloadField(
+	part: Record<string, unknown>,
+	field: ExternalizedPayloadField,
+): Record<string, unknown> {
+	const next = { ...part };
+	switch (field) {
+		case "content":
+		case "preview":
+			next[field] = "";
+			break;
+		case "input":
+			next.input = {};
+			break;
+		case "output":
+		case "value":
+			next[field] = null;
+			break;
+	}
+	return next;
+}
+
+function mediaTypeForArtifactPreview(artifactType: string): string {
+	switch (artifactType) {
+		case "html":
+			return "text/html";
+		case "markdown":
+			return "text/markdown";
+		default:
+			return "text/plain";
+	}
+}
+
+function toBuffer(payload: ContentRefPayload): Buffer {
+	if (typeof payload === "string") return Buffer.from(payload, "utf-8");
+	if (Buffer.isBuffer(payload)) return payload;
+	if (payload instanceof ArrayBuffer) return Buffer.from(payload);
+	return Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength);
+}
+
+function normalizeContentRefOffset(
+	offset: number | undefined,
+	totalByteLength: number,
+): number {
+	if (offset === undefined) return 0;
+	if (!Number.isSafeInteger(offset) || offset < 0) {
+		throw new Error(`invalid contentRef offset: ${offset}`);
+	}
+	if (offset > totalByteLength) {
+		throw new Error(`contentRef offset outside payload: ${offset}`);
+	}
+	return offset;
+}
+
+function normalizeContentRefMaxBytes(
+	maxBytes: number | undefined,
+): number | undefined {
+	if (maxBytes === undefined) return undefined;
+	if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
+		throw new Error(`invalid contentRef maxBytes: ${maxBytes}`);
+	}
+	return maxBytes;
+}
+
+function readContentRefRange(
+	payloadPath: string,
+	offset: number,
+	bytesToRead: number,
+): Buffer {
+	if (bytesToRead === 0) return Buffer.alloc(0);
+
+	const buffer = Buffer.allocUnsafe(bytesToRead);
+	const fd = openSync(payloadPath, "r");
+	try {
+		const bytesRead = readSync(fd, buffer, 0, bytesToRead, offset);
+		return bytesRead === bytesToRead ? buffer : buffer.subarray(0, bytesRead);
+	} finally {
+		closeSync(fd);
+	}
+}
+
+function parseContentRefId(contentRef: string): string {
+	if (!contentRef.startsWith(CONTENT_REF_PREFIX)) {
+		throw new Error(`invalid contentRef: ${contentRef}`);
+	}
+	const id = contentRef.slice(CONTENT_REF_PREFIX.length);
+	if (!CONTENT_REF_ID_RE.test(id)) {
+		throw new Error(`invalid contentRef: ${contentRef}`);
+	}
+	return id;
+}
+
+function isStoredContentRef(value: unknown): value is StoredContentRef {
+	if (!value || typeof value !== "object") return false;
+	const record = value as Record<string, unknown>;
+	return (
+		typeof record.contentRef === "string" &&
+		typeof record.byteLength === "number" &&
+		typeof record.sha256 === "string" &&
+		CONTENT_REF_ID_RE.test(record.sha256) &&
+		(record.mediaType === undefined || typeof record.mediaType === "string") &&
+		(record.source === undefined ||
+			record.source === "assistant" ||
+			record.source === "tool" ||
+			record.source === "artifact")
 	);
 }
 
