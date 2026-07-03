@@ -210,7 +210,7 @@ export function useChatPageState({
 	}, [pendingInput, pendingAutoSend, setPendingInput, setPendingAutoSend]);
 
 	// Auto-send after input has been seeded (float widget flow).
-	// D-3: float-widget 自动建普通对话（无 projectId），跟 sidebar 顶部 + 新建对话
+	// D-3: float-widget 自动建无项目 Agent 会话，跟 sidebar 顶部 + 新建任务
 	// 行为一致。
 	// 复用规则：默认新建一个对话；唯一例外是「当前焦点会话已经是个新建但尚未发言
 	// 的空壳」（messages.length === 0）——此时复用它，避免重复堆出空对话。
@@ -254,9 +254,12 @@ export function useChatPageState({
 	}, [currentConversationId, setSessionSettings]);
 
 	// ── Workspace directory ──
-	// 「工作目录」按钮优先打开项目真实根路径（project.cwd）；
-	// casual 会话（无 projectId）回落到 per-session 沙箱目录，
-	// 避免 G-2 重写后用户点击只能看到沙箱、看不到项目本体。
+	// 「工作目录」按钮永远打开 session 真实工作目录（`resolveSessionCwd`）：
+	//   - 项目会话：session 沙箱目录（即 AI 子进程实际 cwd）
+	//   - casual 会话：per-session 沙箱目录
+	// 之前的实现会优先跳到 project.cwd（项目根），但这与 session 环境不一致；
+	// 用户期望「工作目录」等同于 AI 看到的 cwd，因此这里回归到 session 目录。
+	// 若 session cwd 解析失败才回退到 project.cwd，避免按钮完全失效。
 	const currentConversation = useChatStore((s) =>
 		s.conversations.find((c) => c.id === currentConversationId),
 	);
@@ -280,7 +283,7 @@ export function useChatPageState({
 		});
 	}, [currentConversationId]);
 
-	const workspaceDir = projectCwd ?? sessionSandboxDir;
+	const workspaceDir = sessionSandboxDir ?? projectCwd;
 
 	const handleOpenWorkspace = useCallback(() => {
 		if (workspaceDir) {
@@ -335,7 +338,7 @@ export function useChatPageState({
 	// handleNewConversation reuse-or-create logic were only consumed by the now
 	// unmounted ChatInlineSidebar.tsx. They are removed. New session creation
 	// surfaces are listed in plan §25.2 (sidebar default · sidebar project · TitleBar
-	// 新建对话…). The mode-switch in-place reuse logic, if needed again, should be
+	// 新建任务…). The mode-switch in-place reuse logic, if needed again, should be
 	// re-added inside chatStore so all 4 surfaces share one branch.
 
 	const handleUnbindRemote = useCallback(async () => {

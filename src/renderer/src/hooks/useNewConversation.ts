@@ -1,5 +1,5 @@
 /**
- * useNewConversation — 共享的"新建对话"入口逻辑。
+ * useNewConversation — 共享的"新建任务"入口逻辑。
  *
  * Reuse-or-create 策略，统一在 ClaudeSidebar / AppSidebar / 快捷键场景使用：
  *   1. 当前会话恰好就是目标上下文里的空会话 → stay（不创建、不切换）

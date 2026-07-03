@@ -407,8 +407,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 	// Plan §25.4: deletion link.
 	//   1. Resolve "next current" BEFORE physical delete (only when deleting
 	//      the currently focused conversation).
-	//   2. Auto-unbind remote (so the IM bot side does not retain orphans).
-	//   3. Physical delete via main.
+	//   2. Physical delete via main, so storage can tombstone existing metadata.
+	//   3. Auto-unbind remote (so the IM bot side does not retain orphans).
 	//   4. Local cleanup: chatStore.conversations + file artifacts.
 	deleteConversation: async (conversationId) => {
 		const state = get();
@@ -430,19 +430,20 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 
 		try {
-			if (target?.remote) {
+			// D-1: useSessionListStore.delete 同时调 IPC + 清理 store 状态
+			const deleted = await useSessionListStore
+				.getState()
+				.delete(conversationId);
+			if (target?.remote && deleted) {
 				try {
 					await remoteSessionService.unbind(conversationId);
 				} catch (err) {
 					console.warn(
-						"[chatStore] remote unbind failed; continuing delete:",
+						"[chatStore] remote unbind failed; continuing local cleanup:",
 						err,
 					);
 				}
 			}
-
-			// D-1: useSessionListStore.delete 同时调 IPC + 清理 store 状态
-			await useSessionListStore.getState().delete(conversationId);
 			useFileArtifactStore.getState().clearForConversation(conversationId);
 
 			set((s) => ({

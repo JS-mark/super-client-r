@@ -28,14 +28,22 @@ function unwrap<T>(r: { success: boolean; data?: T; error?: string }): T {
 	return r.data as T;
 }
 
+export type AgentRuntimeCreateQueryPayload = Omit<
+	AgentQueryRequestPayload,
+	"runtime"
+> &
+	Partial<Pick<AgentQueryRequestPayload, "runtime">>;
+
 /**
  * 启动一次查询。事件流通过 `onStreamEvent` 推送；调用方需提前订阅。
  * 返回值仅给出 broker 选定的 runtimeId，便于 UI 标记。
  */
 export async function createQuery(
-	payload: AgentQueryRequestPayload,
+	payload: AgentRuntimeCreateQueryPayload,
 ): Promise<{ runtimeId: string }> {
-	const r = await window.electron.agentRuntime.createQuery(payload);
+	const r = await window.electron.agentRuntime.createQuery(
+		payload as AgentQueryRequestPayload,
+	);
 	return unwrap(r);
 }
 
@@ -49,6 +57,37 @@ export async function resolvePermission(
 		decision,
 	});
 	unwrap(r);
+}
+
+function permissionScopeFromUpdatedPermissions(
+	updatedPermissions?: Array<Record<string, unknown>>,
+): PermissionDecision["scope"] {
+	const scope = updatedPermissions
+		?.map((p) => p.scope)
+		.find(
+			(value): value is PermissionDecision["scope"] =>
+				value === "session" || value === "workspace" || value === "global",
+		);
+	return scope ?? "once";
+}
+
+/**
+ * Compatibility wrapper for the existing renderer approval flow, whose
+ * callback shape is still the legacy SDK `(toolCallId, approved, payload)`.
+ */
+export async function resolveToolApproval(
+	approvalId: string,
+	approved: boolean,
+	updatedInput?: Record<string, unknown>,
+	updatedPermissions?: Array<Record<string, unknown>>,
+): Promise<boolean> {
+	await resolvePermission(approvalId, {
+		approved,
+		scope: permissionScopeFromUpdatedPermissions(updatedPermissions),
+		...(approved ? {} : { reason: "Tool call rejected by user" }),
+		...(updatedInput ? { payload: updatedInput } : {}),
+	});
+	return true;
 }
 
 /** 终止某次请求。 */
@@ -119,6 +158,7 @@ export async function forkNativeSession(
 export const agentRuntimeClient = {
 	createQuery,
 	resolvePermission,
+	resolveToolApproval,
 	interrupt,
 	onStreamEvent,
 	listRuntimes,

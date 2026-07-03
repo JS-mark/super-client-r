@@ -62,9 +62,9 @@ export const DEFAULT_SHORTCUTS: Omit<Shortcut, "currentKey">[] = [
 	// 全局快捷键
 	{
 		id: "new-chat",
-		name: "新建对话",
+		name: "新建任务",
 		nameKey: "newChat",
-		description: "创建一个新的对话",
+		description: "创建一个新的 Agent 任务",
 		descriptionKey: "newChatDesc",
 		scope: "global",
 		defaultKey: "mod+n",

@@ -369,7 +369,7 @@ const Home = () => {
 								</div>
 								<div>
 									<div className="font-medium">
-										{t("featured.chat", "Multi-Mode Chat", { ns: "home" })}
+										{t("featured.chat", "Agent Workspace", { ns: "home" })}
 									</div>
 									<div
 										style={{ color: token.colorTextSecondary }}
@@ -377,7 +377,7 @@ const Home = () => {
 									>
 										{t(
 											"featured.chatDesc",
-											"Direct, Agent, Skill & MCP modes",
+											"Agent tasks with project, Skill and MCP context",
 											{ ns: "home" },
 										)}
 									</div>

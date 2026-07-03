@@ -113,7 +113,7 @@ export function LegacyImportPrompt() {
 				type="info"
 				showIcon
 				message="新版本启用了新的会话存储格式。这些历史对话来自旧版本，需要导入后才能继续访问。"
-				description="导入会保留消息内容、附件与时间戳；项目绑定不会自动恢复，导入后会作为「普通对话」出现，可以手动绑定到项目。原始老数据保留不删除。"
+				description="导入会保留消息内容、附件与时间戳；项目绑定不会自动恢复，导入后会作为「无项目 Agent 会话」出现，可以手动绑定到项目。原始老数据保留不删除。"
 				className="mb-3"
 			/>
 			{info.preview.length > 0 && (

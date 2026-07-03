@@ -5,7 +5,7 @@ import {
 	getVisibleMenuItems,
 	isMenuItemEnabled,
 } from "../menuConfig";
-import type { MenuItemConfig } from "../../types/menu";
+import { DEFAULT_MENU_CONFIG, type MenuItemConfig } from "../../types/menu";
 
 function item(id: string, enabled = true): MenuItemConfig {
 	return {
@@ -28,6 +28,12 @@ describe("menuConfig", () => {
 		]);
 
 		expect(visible.map((i) => i.id)).toEqual(["chat", "bookmarks"]);
+	});
+
+	it("does not ship extensions as a default menu entry", () => {
+		expect(DEFAULT_MENU_CONFIG.items.map((i) => i.id)).not.toContain(
+			"extensions",
+		);
 	});
 
 	it("supports legacy workspace ids when checking project menu visibility", () => {

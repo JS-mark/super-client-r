@@ -1,6 +1,7 @@
 import {
 	AppstoreOutlined,
 	CheckCircleOutlined,
+	CodeOutlined,
 	CopyOutlined,
 	DeleteOutlined,
 	DownloadOutlined,
@@ -37,6 +38,8 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { MainLayout } from "../components/layout/MainLayout";
 import { useTitle } from "../hooks/useTitle";
+import { type ApiStatus, apiService } from "../services/apiService";
+import { appService } from "../services/appService";
 import { pluginService } from "../services/pluginService";
 import { useChatStore } from "../stores/chatStore";
 import { useSkinStore } from "../stores/skinStore";
@@ -86,6 +89,13 @@ export default function Plugins({ embedded = false }: PluginsProps) {
 	// 状态
 	const [activeTab, setActiveTab] = useState("market");
 	const [loading, setLoading] = useState(false);
+
+	// 本地 API 服务状态（用于打开插件开发文档）
+	const [apiStatus, setApiStatus] = useState<ApiStatus>({
+		status: "stopped",
+		port: 0,
+	});
+	const [pluginDevLoading, setPluginDevLoading] = useState(false);
 
 	// 已安装插件
 	const [installedPlugins, setInstalledPlugins] = useState<PluginInfo[]>([]);
@@ -539,6 +549,56 @@ export default function Plugins({ embedded = false }: PluginsProps) {
 			loadPluginCommands(installedPlugins);
 		}
 	}, [installedPlugins, loadPluginCommands]);
+
+	// 订阅本地 API 服务状态：插件开发文档由本地 API 服务提供
+	useEffect(() => {
+		let cancelled = false;
+		apiService
+			.getStatus()
+			.then((status) => {
+				if (!cancelled) setApiStatus(status);
+			})
+			.catch(() => {
+				// 忽略状态获取失败，按未运行处理
+			});
+
+		const handleStatusUpdate = (_event: unknown, ...args: unknown[]) => {
+			const status = args[0] as ApiStatus;
+			setApiStatus(status);
+		};
+		window.electron.ipc.on("server-status-update", handleStatusUpdate);
+		return () => {
+			cancelled = true;
+			window.electron.ipc.off("server-status-update", handleStatusUpdate);
+		};
+	}, []);
+
+	// 打开插件开发文档：如果本地 API 服务未启动则先启动再打开
+	const handleOpenPluginDev = useCallback(async () => {
+		setPluginDevLoading(true);
+		try {
+			let status = apiStatus;
+			if (status.status !== "running" || !status.port) {
+				status = await apiService.start();
+				setApiStatus(status);
+			}
+			if (status.port) {
+				await appService.openExternal(
+					`http://localhost:${status.port}/plugin-dev`,
+				);
+			} else {
+				message.error(
+					t("plugins.pluginDevServerUnavailable", "无法启动本地 API 服务", {
+						ns: "plugins",
+					}),
+				);
+			}
+		} catch (error) {
+			message.error(String(error));
+		} finally {
+			setPluginDevLoading(false);
+		}
+	}, [apiStatus, t]);
 
 	// 已安装插件卡片
 	const renderInstalledPlugin = useCallback(
@@ -1125,6 +1185,16 @@ export default function Plugins({ embedded = false }: PluginsProps) {
 							</p>
 						</div>
 						<Space>
+							<Button
+								size="small"
+								icon={<CodeOutlined />}
+								onClick={handleOpenPluginDev}
+								loading={pluginDevLoading}
+							>
+								{t("plugins.pluginDevGuide", "应用插件开发", {
+									ns: "plugins",
+								})}
+							</Button>
 							<Button
 								size="small"
 								icon={<ReloadOutlined />}

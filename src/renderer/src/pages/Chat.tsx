@@ -7,6 +7,7 @@ import { ChatInputArea } from "../components/chat/ChatInputArea";
 import { ChatMessageList } from "../components/chat/ChatMessageList";
 import { ChatModals } from "../components/chat/ChatModals";
 import { CodexEnvironmentInspector } from "../components/chat/CodexEnvironmentInspector";
+import { getPlanCardFromPart } from "../components/chat/PlanCard";
 import { ChatModelPicker } from "../components/chat/ChatModelPicker";
 import { ChatNewSession } from "../components/chat/ChatNewSession";
 import { ChatWelcomeScreen } from "../components/chat/ChatWelcomeScreen";
@@ -24,13 +25,96 @@ import { useAtMentions } from "../hooks/useAtMentions";
 import { useModelStore } from "../stores/modelStore";
 import { useChatStore } from "../stores/chatStore";
 import { useChatInputStore } from "../stores/chatInputStore";
-import { useChatMessageStore } from "../stores/chatMessageStore";
+import { type Message, useChatMessageStore } from "../stores/chatMessageStore";
 import { useFeatureFlagsStore } from "../stores/featureFlagsStore";
 import { useInspectorPanelStore } from "../stores/inspectorPanelStore";
 import { useFileArtifactStore } from "../stores/fileArtifactStore";
 import { useProjectStore } from "../stores/projectStore";
+import type {
+	PlanCard as PlanCardData,
+	PlanDecision,
+	PlanDecisionRecord,
+	PlanExecuteTurnLink,
+} from "@super-client/shared-types/plan-execute";
+import {
+	createExecuteTurnPrompt,
+	createPlanDecisionRecord,
+	createPlanExecuteTurnLink,
+	createRegeneratePlanPrompt,
+	findPlanExecuteTurnMessageIds,
+} from "../lib/planExecute";
+import { createPlanDecisionSessionEvents } from "../lib/planEventPersistence";
 
 const { useToken } = theme;
+
+function resolvePlanDecisionInMessages(
+	messages: Message[],
+	decision: PlanDecision,
+): {
+	messages: Message[];
+	plan: PlanCardData | null;
+	sourceMessageId?: string;
+	changed: boolean;
+} {
+	let matchedPlan: PlanCardData | null = null;
+	let sourceMessageId: string | undefined;
+	let changed = false;
+
+	const nextMessages = messages.map((msg) => {
+		if (!msg.parts?.length) return msg;
+
+		let messageChanged = false;
+		const nextParts = msg.parts.map((part) => {
+			const plan = getPlanCardFromPart(part);
+			if (!plan || plan.id !== decision.sourcePlanId) return part;
+
+			matchedPlan = plan;
+			sourceMessageId = msg.id;
+			changed = true;
+			messageChanged = true;
+			const partRecord = part as unknown as Record<string, unknown>;
+			return {
+				...partRecord,
+				state: "complete",
+				status: `decision-${decision.action}`,
+				pendingDecision: false,
+				requiresDecision: false,
+				decision,
+				updatedAt: Date.now(),
+			} as unknown as typeof part;
+		});
+
+		return messageChanged ? { ...msg, parts: nextParts } : msg;
+	});
+
+	return {
+		messages: nextMessages,
+		plan: matchedPlan,
+		...(sourceMessageId ? { sourceMessageId } : {}),
+		changed,
+	};
+}
+
+function persistPlanDecisionEvents(
+	sessionId: string | null | undefined,
+	decisionRecord: PlanDecisionRecord,
+	planExecute?: PlanExecuteTurnLink,
+): void {
+	if (!sessionId) return;
+	const events = createPlanDecisionSessionEvents(
+		decisionRecord,
+		{
+			sessionId,
+			eventIdPrefix: decisionRecord.decision.id ?? decisionRecord.createdAt,
+		},
+		planExecute,
+	);
+	for (const event of events) {
+		window.electron.sessions.appendEvent(sessionId, event).catch((err) => {
+			console.warn("[Chat] Failed to persist plan decision event:", err);
+		});
+	}
+}
 
 const Chat: React.FC = () => {
 	const { t } = useTranslation();
@@ -51,6 +135,8 @@ const Chat: React.FC = () => {
 		setSelectedCommandName,
 		sessionModelOverride,
 		setSessionModelOverride,
+		messageModelOverride,
+		setMessageModelOverride,
 		sessionSettings,
 		setSessionSettings,
 		respondToApproval,
@@ -219,6 +305,111 @@ const Chat: React.FC = () => {
 		],
 	);
 
+	const handlePlanDecision = useCallback(
+		(decision: PlanDecision) => {
+			if (isStreaming) {
+				message.warning(
+					t("plan.waitForCurrentRun", "Wait for the current run to finish", {
+						ns: "chat",
+					}),
+				);
+				return;
+			}
+
+			const store = useChatMessageStore.getState();
+			const resolved = resolvePlanDecisionInMessages(store.messages, decision);
+			if (!resolved.plan) {
+				message.warning(
+					t("plan.notFound", "This plan is no longer available", {
+						ns: "chat",
+					}),
+				);
+				return;
+			}
+
+			const decisionRecord = createPlanDecisionRecord(resolved.plan, decision);
+
+			if (resolved.changed) {
+				store.setMessages(resolved.messages);
+			}
+			if (resolved.sourceMessageId) {
+				store.updateMessageMetadata(resolved.sourceMessageId, {
+					planDecision: decisionRecord,
+				});
+			}
+
+			if (decision.action === "cancel") {
+				persistPlanDecisionEvents(
+					pageState.currentConversationId,
+					decisionRecord,
+				);
+				message.info(t("plan.cancelled", "Plan cancelled", { ns: "chat" }));
+				return;
+			}
+
+			const prompt =
+				decision.action === "execute"
+					? createExecuteTurnPrompt(resolved.plan, decision)
+					: createRegeneratePlanPrompt(resolved.plan, decision);
+
+			useChatInputStore.getState().setValue(prompt);
+			const beforeSendMessages = useChatMessageStore.getState().messages;
+			void sendMessage({
+				mode: "agent",
+				content: prompt,
+				skillId: selectedSkillId ?? undefined,
+				commandName: selectedCommandName ?? undefined,
+				searchEngine: selectedEngine || undefined,
+				searchConfigs,
+			});
+			const afterSendStore = useChatMessageStore.getState();
+			const turnMessageIds = findPlanExecuteTurnMessageIds(
+				beforeSendMessages,
+				afterSendStore.messages,
+			);
+			const planExecute =
+				decision.action === "execute"
+					? createPlanExecuteTurnLink(resolved.plan, decision, {
+							prompt,
+							...turnMessageIds,
+							createdAt: decisionRecord.createdAt,
+						})
+					: undefined;
+			const turnMetadata = {
+				planDecision: decisionRecord,
+				...(planExecute ? { planExecute } : {}),
+			};
+			persistPlanDecisionEvents(
+				pageState.currentConversationId,
+				decisionRecord,
+				planExecute,
+			);
+			if (turnMessageIds.userMessageId) {
+				afterSendStore.updateMessageMetadata(
+					turnMessageIds.userMessageId,
+					turnMetadata,
+				);
+			}
+			if (turnMessageIds.assistantMessageId) {
+				afterSendStore.updateMessageMetadata(
+					turnMessageIds.assistantMessageId,
+					turnMetadata,
+				);
+			}
+		},
+		[
+			isStreaming,
+			message,
+			t,
+			sendMessage,
+			selectedSkillId,
+			selectedCommandName,
+			selectedEngine,
+			searchConfigs,
+			pageState.currentConversationId,
+		],
+	);
+
 	// ── Send handler (remote IM — routes to sendRemoteMessage) ──
 	const handleRemoteSend = useCallback(
 		(value: string) => {
@@ -239,7 +430,7 @@ const Chat: React.FC = () => {
 
 	// ── Remote bind handler ──
 	// R-7 / §25.3: remote conversations are now created via NewConversationModal
-	// (TitleBar 新建对话…) which calls chatStore.createConversationAdvanced and
+	// (TitleBar 新建任务…) which calls chatStore.createConversationAdvanced and
 	// binds the remote in one step. The local-then-bind flow this comment used to
 	// describe is no longer reachable from any live UI surface.
 	const handleRemoteBind = useCallback(
@@ -420,6 +611,7 @@ const Chat: React.FC = () => {
 													mention.registerKeydownHandler
 												}
 												setMentionSelectHandler={mention.setSelectHandler}
+												messageModelOverride={messageModelOverride}
 											/>
 										) : (
 											<ChatWelcomeScreen
@@ -438,6 +630,7 @@ const Chat: React.FC = () => {
 											editMessage={editMessage}
 											deleteMessage={deleteMessage}
 											respondToApproval={respondToApproval}
+											onPlanDecision={handlePlanDecision}
 										/>
 									)}
 								</div>
@@ -482,7 +675,9 @@ const Chat: React.FC = () => {
 												mention.registerKeydownHandler
 											}
 											setMentionSelectHandler={mention.setSelectHandler}
+											messageModelOverride={messageModelOverride}
 											respondToApproval={respondToApproval}
+											onPlanDecision={handlePlanDecision}
 										/>
 									)}
 							</>
@@ -564,9 +759,13 @@ const Chat: React.FC = () => {
 			<ChatModelPicker
 				open={modelSwitcherOpen}
 				onClose={() => setModelSwitcherOpen(false)}
-				currentSelection={sessionModelOverride}
-				onSelect={(sel) => setSessionModelOverride(sel)}
-				onClear={() => setSessionModelOverride(null)}
+				currentSelection={messageModelOverride ?? sessionModelOverride}
+				messageSelection={messageModelOverride}
+				sessionSelection={sessionModelOverride}
+				onSelect={(sel) => setMessageModelOverride(sel)}
+				onSelectSession={(sel) => setSessionModelOverride(sel)}
+				onClear={() => setMessageModelOverride(null)}
+				onClearSession={() => setSessionModelOverride(null)}
 			/>
 		</MainLayout>
 	);

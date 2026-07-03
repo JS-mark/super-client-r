@@ -30,7 +30,7 @@ interface SessionListState {
 		chatMode?: ChatMode;
 	}) => Promise<SessionMeta | null>;
 
-	delete: (sessionId: string) => Promise<void>;
+	delete: (sessionId: string) => Promise<boolean>;
 	rename: (sessionId: string, name: string) => Promise<void>;
 	updateMeta: (sessionId: string, patch: Partial<SessionMeta>) => Promise<void>;
 
@@ -97,16 +97,18 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 
 	delete: async (sessionId) => {
 		const target = get().getById(sessionId);
-		if (!target) return;
+		if (!target) return false;
 		try {
 			const res = await window.electron.sessions.delete(sessionId);
-			if (!res.success) return;
+			if (!res.success) return false;
 			removeFromBucket(target);
 			if (get().currentSessionId === sessionId) {
 				set({ currentSessionId: null });
 			}
+			return true;
 		} catch (err) {
 			console.warn("[sessionListStore] delete failed:", err);
+			return false;
 		}
 	},
 
