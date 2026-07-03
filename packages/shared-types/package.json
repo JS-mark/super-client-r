@@ -1,27 +1,31 @@
 {
-	"name": "@super-client/shared-types",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"main": "./src/index.ts",
-	"types": "./src/index.ts",
-	"exports": {
-		".": "./src/index.ts",
-		"./agent": "./src/agent.ts",
-		"./skill": "./src/skill.ts",
-		"./mcp": "./src/mcp.ts",
-		"./chat": "./src/chat.ts",
-		"./ipc": "./src/ipc.ts",
-		"./remote-protocol": "./src/remote-protocol.ts",
-		"./extensions": "./src/extensions.ts",
-		"./git": "./src/git.ts",
-		"./project": "./src/project.ts",
-		"./messageConverter": "./src/messageConverter.ts",
-		"./electron-api": "./src/electron-api.ts",
-		"./agent-runtime": "./src/agent-runtime.ts",
-		"./agent-trace": "./src/agent-trace.ts"
-	},
-	"files": [
-		"src"
-	]
+  "name": "@super-client/shared-types",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent": "./src/agent.ts",
+    "./skill": "./src/skill.ts",
+    "./mcp": "./src/mcp.ts",
+    "./chat": "./src/chat.ts",
+    "./ipc": "./src/ipc.ts",
+    "./remote-protocol": "./src/remote-protocol.ts",
+    "./extensions": "./src/extensions.ts",
+    "./git": "./src/git.ts",
+    "./project": "./src/project.ts",
+    "./messageConverter": "./src/messageConverter.ts",
+    "./electron-api": "./src/electron-api.ts",
+    "./agent-runtime": "./src/agent-runtime.ts",
+    "./agent-sdk": "./src/agent-sdk.ts",
+    "./agent-product-events": "./src/agent-product-events.ts",
+    "./agent-trace": "./src/agent-trace.ts",
+    "./plan-execute": "./src/plan-execute.ts",
+    "./subagent": "./src/subagent.ts"
+  },
+  "files": [
+    "src"
+  ]
 }

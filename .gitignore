@@ -12,6 +12,7 @@ dist
 dist-ssr
 dist-electron
 out
+output
 release
 *.local
 
@@ -25,6 +26,7 @@ release
 *.njsproj
 *.sln
 *.sw?
+.pnpm-store/*
 .userdata/*
 **/.vitepress/cache
 tsconfig.*.tsbuildinfo
