@@ -21,6 +21,8 @@ import {
 	SETTINGS_NAVIGATION_GROUPS,
 	type SettingsNavigationKey,
 } from "../../lib/settingsNavigation";
+import { useSidebarLayoutStore } from "../../stores/sidebarLayoutStore";
+import { SidebarResizeHandle } from "../layout/SidebarResizeHandle";
 import { SidebarUserRow } from "../layout/SidebarUserRow";
 
 const { useToken } = theme;
@@ -98,6 +100,12 @@ export const SettingsRail: React.FC<SettingsRailProps> = ({ onBack }) => {
 
 	const activeKey = getActiveSettingsKey(location.pathname);
 
+	// Share the workspace sidebar's persisted width so entering / leaving
+	// Settings doesn't visually "jump" (workspace sidebars default to 280px
+	// and are user-resizable; the rail must track the same value).
+	const width = useSidebarLayoutStore((s) => s.width);
+	const setWidth = useSidebarLayoutStore((s) => s.setWidth);
+
 	const handleBack = useCallback(() => {
 		if (onBack) {
 			onBack();
@@ -119,8 +127,9 @@ export const SettingsRail: React.FC<SettingsRailProps> = ({ onBack }) => {
 
 	return (
 		<aside
-			className="flex flex-col flex-none border-r w-[64px] md:w-[240px]"
+			className="flex flex-col flex-none border-r relative"
 			style={{
+				width,
 				borderColor: token.colorBorderSecondary,
 				background: token.colorBgLayout,
 			}}
@@ -152,7 +161,7 @@ export const SettingsRail: React.FC<SettingsRailProps> = ({ onBack }) => {
 					}}
 				>
 					<LeftOutlined />
-					<span className="hidden md:inline">
+					<span>
 						{t("settingsShell.backToWorkspace", "返回工作区", {
 							ns: "settings",
 						})}
@@ -208,7 +217,7 @@ export const SettingsRail: React.FC<SettingsRailProps> = ({ onBack }) => {
 									<span className="text-sm flex-none">
 										{getSettingsNavigationIcon(group.key)}
 									</span>
-									<span className="hidden md:inline truncate">{label}</span>
+									<span className="truncate">{label}</span>
 								</button>
 							</li>
 						);
@@ -218,6 +227,12 @@ export const SettingsRail: React.FC<SettingsRailProps> = ({ onBack }) => {
 
 			{/* Shared bottom user row — same treatment as workspace sidebar. */}
 			<SidebarUserRow />
+
+			{/* Right-edge resize handle. Uses the same shared store as the
+			    workspace sidebars, so dragging here also affects them
+			    (and vice-versa) — that's the whole point: one persisted
+			    sidebar width across workspace and settings. */}
+			<SidebarResizeHandle currentWidth={width} onWidthChange={setWidth} />
 		</aside>
 	);
 };
