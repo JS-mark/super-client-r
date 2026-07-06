@@ -486,15 +486,28 @@ Remote session 使用同一 Agent event model。
 
 ### Phase 0a-c 当前接入状态
 
-截至 2026-06-30，Phase 0a-c 已完成 shared contract、runtime projection/materializer、main process JSONL 写入、approval/ask closed-loop、model/prompt/approval/event/run-controller helper、SDK/runtime event reducer、runtime-first 发送入口、Plan/Execute prompt helper、PlanCard 基础组件、聊天流展示和 composer blocked decision 基础接线。剩余接入点如下：
+截至 2026-07-04 代码复核，Phase 0a-c 已完成 shared contract、runtime projection/materializer、main process JSONL 写入、approval/ask closed-loop、model/prompt/approval/event/run-controller helper、SDK/runtime event reducer、runtime-first 发送入口、Plan/Execute prompt helper、PlanCard 基础组件、聊天流展示、composer blocked decision 基础接线和消息虚拟列表。它们后续不再作为“从零实现”任务，改为验收、回归和边界补齐。剩余接入点如下：
 
 | 接入点 | 当前状态 | 下一步 |
 | --- | --- | --- |
-| Phase 0a production projection | 已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`：调用 `projectAgentRuntimeEvent()`，只把可持久化 product events 经 `materializeAgentProductEvent()` 写入 `SessionStorageService.appendEvent()`；`text.delta` 等 transient event 不落盘。`ask.requested` / `ask.answered` 已补进 product/materializer 路径。`plan.decision` / `execute.turn.created` 契约、materializer 和 renderer appendEvent 调用点已接入。 | 继续补 unknown/debug summary、native code/diff/data 专用事件和 delta batching。 |
+| Phase 0a production projection | 已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`：调用 `projectAgentRuntimeEvent()`，只把可持久化 product events 经 `materializeAgentProductEvent()` 写入 `SessionStorageService.appendEvent()`；`text.delta` / `reasoning.delta` / `run.usage` 等 transient event 不落盘。`ask.requested` / `ask.answered` / `plan.decision` / `execute.turn.created` / subagent events 已补进 product/materializer 路径。 | 只补验收缺口：unknown/debug summary 防御、native code/diff/data 专用事件和 delta batching。Native structured events 本阶段不阻塞。 |
 | Approval / Ask closed-loop | 已接入：`resolvePermission()` 会生成 `permission.resolved` trace/product/session audit，并按 `requestId + approvalId` 去重 runtime 后续 resolution；broker 会从前置 `permission.request` 补 `toolName`，用于区分普通 approval 与 `AskUserQuestion` answer。 | 补 UI replay/历史 transcript 对 approval resolved / ask answered 的明确展示；防御孤立 `permission.resolved` 且无 request context 的 runtime。 |
-| Renderer replay / run controller | 已接入 reducer helper：`useAgentEventReducer` 覆盖 Agent SDK 与 AgentRuntime 的 text/tool/permission/result/error/status/rate_limit 映射；`agentRuntimeStreamAdapter` 只是薄包装；`useAgentRunController` 已承接 request id、request type、native session id、approval pause、watchdog 和 interrupt snapshot。`eventsToMessages()` 已能 replay approval requested/resolved、ask requested/answered、tool terminal states、run terminal status 和 plan parts；Plan decision / execute turn marker 已可持久化；`ChatMessageList` 已修正 loading early return 的 hook 顺序风险。 | 继续瘦身 `useChat` orchestration，并补 stop / error recovery 证据；marker-only 历史会生成最小 assistant status bubble，后续可做 turn-level timeline UX。 |
+| Renderer replay / run controller | 已接入 reducer helper：`useAgentEventReducer` 覆盖 Agent SDK 与 AgentRuntime 的 text/tool/permission/result/error/status/rate_limit 映射；`agentRuntimeStreamAdapter` 只是薄包装；`useAgentRunController` 已承接 request id、request type、native session id、approval pause、watchdog 和 interrupt snapshot。`eventsToMessages()` 已能 replay approval requested/resolved、ask requested/answered、tool terminal states、run terminal status、plan parts 和 subagent parts；Plan decision / execute turn marker 已可持久化；`ChatMessageList` 已有 `VirtualBubbleList` + dynamic row height + pending interaction scroll。 | 不再重复拆 `useChat`；后续补 stop / error recovery 证据、marker-only 历史 timeline UX、虚拟列表体验回归。 |
 | 发送链路迁移 | 已按最终 Agent runtime 口径收口：`useChat` 发送入口调用 `agentRuntimeClient.createQuery()`；create failure 会 materialize structured error、恢复 idle、清理 current request/watchdog，不再默认 fallback 到 Agent SDK；stop 会按 request type 调 `agentRuntimeClient.interrupt()` 或兼容 SDK interrupt。 | 继续补 runtime create failure 的更完整 UI recovery / replay 证据；不恢复 direct/chat，不新增 SDK fallback projection 桥接。 |
-| Plan/Execute UI | 部分完成：Plan/Execute shared contract、execute turn prompt helper、PlanCard 基础组件、聊天流展示和 composer blocked decision 基础路径已有 focused tests；execute/regenerate 通过现有 `sendMessage()` 创建新 Agent turn，并在本地 message metadata 写入 `planDecision` / `planExecute`。`PlanCard` 已在 plan id/version/source turn 变化时重置 editable draft；`Chat.tsx` 已追加 `plan.decision` / `execute.turn.created` JSONL marker。 | 补 Plan decision 历史摘要 UI 和更完整 replay UX。 |
+| Plan/Execute UI | 已完成：Plan/Execute shared contract、execute turn prompt helper、PlanCard 基础组件、聊天流展示、composer blocked decision、execute/regenerate Agent turn、`plan.decision` / `execute.turn.created` JSONL marker，以及历史已决 plan 的只读 replay summary。 | 继续补 stop/error recovery、regenerate version 约束和真实 runtime smoke；不要让历史已决 PlanCard 再暴露可执行按钮。 |
+
+### 当前后续工作安排（代码复核后）
+
+Phase 0a-c 之后的下一批按数据正确性优先，不再继续扩展旧 Extensions 聚合页，也不把项目会话迁入项目 cwd `.scr-data`。
+
+| 优先级 | 工作项 | 验收标准 |
+| --- | --- | --- |
+| P0 | Project delete renderer regression | Main 端 `projects.remove(projectId, { keepFiles:false })` 删除 app userData project sessions 已有 focused tests；下一步验收删除当前/运行中会话后 renderer 状态回 idle、current session fallback、message/file artifact 清理；`keepFiles:true` 保留可恢复数据。 |
+| P0 done | `.scr-data` policy cleanup follow-up | 正式代码路径和测试不再期望项目 cwd `.scr-data`；`canUseProjectScrData()` / `migrateLegacyProjectBucket()` 已删除；历史 cleanup helper 已命名为 `getLegacyProjectScrSessionsDir()`，测试 helper 已命名为 `legacyProjectScrSessionPath`。仅保留历史 `.scr-data/sessions` 删除 cleanup，不作为正式 storage target。 |
+| P1 | Project archive / diagnostic export UI | 不重写底层 export service；补 Settings 入口、成功/失败反馈、i18n、focused tests。`ProjectArchiveManager` 的恢复列表职责与 archive export 职责要拆清楚。 |
+| P1 | Recovery / legacy import privacy | 列表默认不展示完整路径；完整路径只通过 explicit copy/detail；legacy import report redacts old data dir。 |
+| P2 | Context/Memory deepening | `ProjectRulesReader` 读到的 AGENTS.md/CLAUDE.md 接入 Agent prompt；Context Inspector 显示注入源并支持 pin/unpin；补 compact/summarize 触发策略。 |
+| P2 | Multi-agent follow-up | `Message.toolCall.subagentRunId` renderer threading、recursive toolCallCount、nested Task 顶层化有 focused tests。 |
 
 ### Phase 1：模型选择与模型配置
 

@@ -4,13 +4,101 @@
 > 覆盖矩阵：[refactor-traceability-matrix](./refactor-traceability-matrix.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
-> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-03（UX 小修：i18n missingKey + 插件开发入口迁移 + 工作目录语义回归）。
+> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-05（Phase 0a-c 复核与 P0 renderer 删除项目回归批次）。
 
 ## Current Status
 
-**In progress.** 当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 13 个 hook helper：`useAssistantStreamBuffer`、`agentRunError`（pure）、`useAgentRunStopper`、`useAvailableToolsCatalog`、`useAgentEventDispatcher`、`useLegacyLLMStreamHandler`、`useAgentRuntimeStreamHandler`、`useAgentSDKStreamHandler`、`useAgentSendPipeline`、`useSendMessage`、`useMessageRetry`、`useComposerSelectionState`、`useCurrentModelInfoRef`，全部有 focused tests；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card（含 `suggestedSubagents`、reason/instructions 输入、Enter/Esc 键盘）、聊天流展示、composer blocked decision + `paused-error` recovery、以及 ApprovalDecisionCard/AskUserQuestionCard 键盘支持；同时补齐 R3 强制要求：`planModeGate` 扩展到 `plan-then-ask`，runtime 路径通过 `ClaudeCodeAgentRuntime.canUseTool()` + `buildChatRequest` 侧的 `planModeToolGuard` 拒绝写/删/危险命令，读工具仍放行。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理，加 `ModelCapabilityEditor` + `ChatModelPicker` 能力元数据 chip；Phase 2 已完成 Settings IA 二次重构 + 交互 v2 迭代：11 项顶级 nav（`general / models / agent / tools-permissions / projects / project-recovery / keyboard / api-service / webhook / advanced / about`），`API 服务` / `Webhook` / `关于` 从 `advanced` 拆出，`advanced` 内部改为 4 个同级 Tab（实验性功能 / 快速操作 / 系统信息 / 性能监控），`AboutSection` 概览网格删掉 MCP/Skills/Plugin 三张 marketing 卡片；`Settings` 壳升级为 App MainLayout 内的嵌套路由（每项独立子 route `/settings/<key>`），`SettingsRail` 顶天立地取代 workspace sidebar，TitleBar 在 `/settings/*` 下不再展示面包屑，进入 Settings 从下向上滑入（`y:100% → 0`, 0.28s），Rail 切 tab 只换 Outlet 不整页 unmount，"返回工作区" 总是 `navigate("/chat")` 不走 `history.back()`；全部 Settings chrome 字号对齐工作区 `text-xs` (12px)，Rail 选中样式回归极简 `bg + color` 双 token；抽出共享组件 `SidebarUserRow`（含内置上方分割线），Rail 底部 & Chat sidebar 底部用户信息卡片共用一份实现；引导占位卡片已删除。BC：`?tab=<key>` legacy URL 与 IPC `navigate-to tab=about|debug` 挂载时 replace 到 `/settings/<key>`。MCP/Skills/Plugins 独立市场页保留，Composer Codex v2 pills（ProjectPill/LaunchModePill/BranchPill 只读骨架）也已就位。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 `planReplayView.describePlanDecisionSummary()` 供 replay 展示 Plan/Execute 结果，加 Context Inspector MVP（token budget + 注入源 chips + 项目规则占位）+ `ProjectRulesReader`（AGENTS.md/CLAUDE.md 只读读取，尚未接入 Agent prompt）。Phase 4 Multi-Agent MVP 已在 Round 6/7 落地：`SubagentMessagePart` 类型 + `subagent.spawned/updated/completed/failed` 产品事件 + JSONL reducer 分支 + `planModeToolGuard` 复用的 subagent read-only 默认策略 + `SubagentEventBridge` 从 Task tool 发事件 + `SubagentPartCard` 折叠卡 + `SubagentsInspectorSection` 右侧面板 + `ApprovalDecisionCard.subagentSource` 徽标 prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化 8 种状态 × 2 方向的 16 格转移矩阵，`RemoteChatBridge` 已消费；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。仍待收口：native structured stream events (code/diff/data/table/tree/sources/artifact) runtime producer（用户已明确本阶段不做）、Phase 3 Context/Memory 深水区（pin/unpin、compact 触发、artifact library）、Composer pills 编辑态与 git worktree preflight、MCP/Skill 独立市场重设计、完整分页读取、project archive UI、diagnostic export 深水区、Recovery wizard 深水区、Phase 4 3 个 follow-up（`Message.toolCall.subagentRunId` renderer threading、`run.toolCallCount` 递归 SSE 实时递增、nested-of-nested Task 顶层化）。
+**In progress.** 当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP 和 `ProjectRulesReader`（AGENTS.md/CLAUDE.md 只读读取，尚未接入 Agent prompt）。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。
+
+2026-07-05 代码复核结论：Phase 0a/0b/0c、消息虚拟列表、Agent-only 主发送链路、独立 MCP/Skills/Plugins 入口已经不是“待从零实现”项，后续应转入验收、回归和边界补齐。本批复核后确认 `ProjectStorageService.remove(projectId, { keepFiles:false })` 删除的是 app userData 下 `projects/<projectId>/`，其中包含 `sessions/`、JSONL/meta、attachments、tool-outputs/content-refs；已补 focused tests 锁定默认删除和 `keepFiles:true` 保留语义。旧 `.scr-data` 写入/迁移 helper 已删除，项目 cwd 下 `.scr-data/sessions` 只作为历史清理对象，不再作为写入或迁移目标。renderer 删除当前/运行中项目后的状态机回归已补 focused tests：删除入口先 stop stream，再 remove project，成功后才清理本地项目会话；当前项目会话删除后 fallback 到最新非 archived 会话，message/file artifact/loading/streaming 状态归位。仍待收口：project archive UI、diagnostic export UI/深水区、Recovery wizard 深水区、legacy import / recovery 默认路径脱敏、Phase 3 Context/Memory 深水区（prompt 注入、pin/unpin、compact 触发、artifact library）、Composer pills 编辑态与 git worktree preflight、MCP/Skill 独立市场重设计、完整分页读取、Phase 4 3 个 follow-up（`Message.toolCall.subagentRunId` renderer threading、`run.toolCallCount` 递归 SSE 实时递增、nested-of-nested Task 顶层化）、native structured stream events runtime producer（本阶段暂不做）。
+
+## Next Work Order (Code-Based, 2026-07-04)
+
+按当前代码事实，下一批不再重跑 Phase 0a/0b/0c，而按以下顺序推进：
+
+1. **P0 done: Project delete renderer regression**
+   - Main 端 app userData project session 物理清理已由 `ProjectStorageService.remove()` 覆盖，并有 focused tests；renderer 端删除入口和 store fallback 回归已补。
+   - `deleteProjectWithCleanup()` 先广播 `chat:stop-current-stream`，再调用 `projects.remove()`；只有 `removed:true` 才调用 `chatStore.deleteProjectConversationsLocally(projectId)`。
+   - `chatStore.deleteProjectConversationsLocally(projectId)` 已覆盖当前项目、无 fallback、非当前项目三类路径；当前项目删除后会清 artifact/changeSets，切到最新非 archived fallback，会话运行/loading/streaming 状态归 idle/empty。
+
+2. **P0 done: `.scr-data` policy cleanup follow-up**
+   - 正式口径：项目会话只写 app userData，项目 cwd 不写 `.scr-data`。
+   - `canUseProjectScrData()` / `migrateLegacyProjectBucket()` 已删除；当前只保留 `getLegacyProjectScrSessionsDir()` 给项目删除时清理历史 `.scr-data/sessions`。
+   - 测试 helper 已改为 `legacyProjectScrSessionPath`；代码/测试命名不再把 `.scr-data` 表达为正式 session storage target。
+
+3. **P1: Export / recovery product entry**
+   - 底层已有 `exportSessionArchive()`、`exportProjectArchive()`、`DiagnosticExportService.export()`；下一步补 Settings 入口和 UX，而不是重写底层。
+   - `ProjectArchiveManager` 当前只是 archived project restore list，命名和功能容易误导；需要拆成 restore manager 与 project export entry，或改名。
+   - Diagnostic export 增加用户入口、成功路径展示、失败结构化错误和 i18n。
+
+4. **P1: Privacy display cleanup**
+   - Recovery / legacy import / orphan UI 默认不直接显示完整路径；列表显示短名或 redacted path，完整路径只通过 explicit copy/detail 操作暴露。
+   - legacy import report 里的 old data dir 要 redacted；默认 diagnostic/session/project export 不包含 chat content，除非显式选择。
+
+5. **P2: Context/Memory deepening**
+   - `ProjectRulesReader` 已只读 `AGENTS.md` / `CLAUDE.md`；下一步接入 Agent prompt context，并在 Context Inspector 中展示注入状态。
+   - 补 pin/unpin context、自动 compact/summarize、artifact library。
+
+6. **P2: Multi-agent and structured output follow-up**
+   - 接上 `Message.toolCall.subagentRunId` renderer threading、递归 tool call count、nested Task 顶层化。
+   - Native structured events 暂按用户口径延后；当前 code/diff/data/table/tree/sources/artifact 继续作为计划，不作为本批阻塞项。
 
 ## Latest Verified Commands
+
+2026-07-05 Phase 0a-c 复核后 P0 renderer 删除项目回归批次
+
+- **Subagent 复核结论**：A/B/C/D 四个只读 subagent 均确认 Phase 0a/0b/0c 主链路已落地，不应从零重写。当前最明确缺口是 renderer 删除当前/运行中项目后的状态机回归测试；其它缺口进入后续 P1/P2。
+- **改动 A：删除项目入口顺序测试**
+  - 新增 `src/renderer/src/services/__tests__/projectDeletionService.test.ts`。
+  - 覆盖 `deleteProjectWithCleanup()` 调用顺序：先 `chat:stop-current-stream`，再 `projectStore.remove()`，成功 `removed:true` 后才清理本地项目会话。
+  - 覆盖 `keepFiles` option 透传，以及 `removed:false` / `null` 时不清理 renderer 会话。
+  - 测试文件内局部安装 `EventTarget` shim，因为仓库当前 `vitest.setup.ts` 会把 jsdom `window` 替换成普通对象，缺少 `addEventListener/dispatchEvent`。
+- **改动 B：项目会话删除 store 回归**
+  - 扩展 `src/renderer/src/stores/__tests__/chatStore.test.ts`。
+  - 覆盖删除当前项目会话时 fallback 到最新非 archived 会话、更新 `useSessionListStore.currentSessionId/byProject`、清理被删项目所有 artifacts/changeSets、读取 fallback tail messages。
+  - 覆盖无 fallback 时清空 messages/currentConversationId，并把 `sessionStatus/isStreaming/streamingContent/isLoadingMessages` 归位。
+  - 覆盖删除非当前项目时不重置当前消息和 streaming 状态。
+- **改动 C：运行/loading 状态清理补强**
+  - `src/renderer/src/stores/chatStore.ts`：`deleteProjectConversationsLocally()` 删除当前项目会话时，除 `idle` / 清 streaming / 清 hasOlder 外，额外清 `isLoadingMessages` 和 `isLoadingOlderMessages`，避免删除发生在读盘/加载中时 UI 残留 loading。
+- **改动 D：`.scr-data` cleanup 命名收口**
+  - `ProjectStorageService.getProjectScrDataDir()` / `getProjectScrSessionsDir()` 重命名为 `getLegacyProjectScrDataDir()` / `getLegacyProjectScrSessionsDir()`，明确只服务历史 `.scr-data/sessions` 删除 cleanup。
+  - `SessionStorageService.test.ts` 中 `projectScrSessionPath` 重命名为 `legacyProjectScrSessionPath`，避免把 `.scr-data` 表达为正式 project session storage target。
+- **Verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/services/__tests__/projectDeletionService.test.ts src/renderer/src/stores/__tests__/chatStore.test.ts` → 2 files / 9 tests passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/storage/__tests__/ProjectStorageService.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts` → 2 files / 85 tests passed。
+  - `CI=true ./node_modules/.bin/tsc -b --noEmit --pretty false` → passed。
+  - `CI=true ./node_modules/.bin/oxlint src/renderer/src/services/projectDeletionService.ts src/renderer/src/services/__tests__/projectDeletionService.test.ts src/renderer/src/stores/chatStore.ts src/renderer/src/stores/__tests__/chatStore.test.ts` → passed，0 warnings / 0 errors。
+  - `CI=true ./node_modules/.bin/oxlint src/main/services/storage/ProjectStorageService.ts src/main/services/storage/__tests__/ProjectStorageService.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts` → passed，0 warnings / 0 errors。
+- **Not run**：`pnpm build` / `pnpm test:run` / `pnpm dev`。
+- **剩余风险 / follow-up**：
+  - 当前测试证明 renderer 本地状态会收敛；真实 dev smoke 仍需手动删除一个运行中项目会话观察 UI，但不需要打包。
+  - project archive/diagnostic export UI、privacy display、Context/Memory 深水区仍按 Next Work Order 推进。
+
+2026-07-04 Phase 0a-c 复核后 P0 收敛批次：项目删除数据语义 + `.scr-data` 策略清理 + Plan replay 只读摘要
+
+- **Subagent 复核结论**：A/B/C/D 四个只读 subagent 均确认 Phase 0a/0b/0c 主线已落地，不应从零重写。Phase 0a 已有 runtime → product event projection/materializer/JSONL replay；Phase 0b 已有 `useAgentRunController`、message model/prompt/approval/event reducer helper、runtime-first 发送；Phase 0c 已有 PlanCard、composer blocked decision、execute/regenerate turn 和虚拟列表。后续进入验收、边界补齐和产品入口阶段。
+- **改动 A：项目删除与 app userData session 语义固定**
+  - `src/main/services/storage/__tests__/ProjectStorageService.test.ts`：新增默认删除 app-managed project `sessions/` 子树测试，覆盖 JSONL/meta、per-session attachments、tool-outputs/content-refs；新增 `keepFiles:true` 保留 session 数据测试，固定 orphan recovery 语义。
+  - 新增历史 cwd `.scr-data/sessions` 清理测试：`keepFiles:false` 只删除历史 `.scr-data/sessions`，不删除用户项目 cwd 中普通文件；`keepFiles:true` 保留历史 `.scr-data/sessions`。
+- **改动 B：`.scr-data` 旧写入/迁移路径清理**
+  - `src/main/services/storage/ProjectStorageService.ts`：删除无调用的 `canUseProjectScrData()`，避免后续误接入后主动在 project cwd 创建 `.scr-data/sessions`。
+  - `src/main/services/storage/SessionStorageService.ts`：删除无调用的 `migrateLegacyProjectBucket()`；`withStorageMarker()` 写 meta 时清空 `storageMigratedAt`，正式路径只保留 app userData storage marker。
+  - 当前 `.scr-data` 只剩项目删除时的历史 cleanup 读取路径，不再作为 session storage target。
+- **改动 C：Plan/Execute replay 历史只读化**
+  - `src/renderer/src/components/chat/ChatMessageList.tsx`：assistant plan part 若带 replay decision，则用 `describePlanDecisionSummary()` 渲染只读摘要，不再显示可编辑 PlanCard / Execute 按钮；pending plan 仍渲染可操作 PlanCard。
+  - `src/renderer/src/components/chat/__tests__/ChatMessageList.plan.test.tsx`：更新 cancel/execute replay 断言，要求历史 plan 显示 `plan-decision-summary`，且 cancel replay 不出现 Execute 按钮。
+- **改动 D：dev 验证配置修复**
+  - `tsconfig.web.json`：`ignoreDeprecations` 从 `"6.0"` 改为 TypeScript 5.8.3 可接受的 `"5.0"`；否则 `tsc -b --noEmit` 在读配置阶段即失败。
+- **Verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/storage/__tests__/ProjectStorageService.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts src/renderer/src/components/chat/__tests__/ChatMessageList.plan.test.tsx` → 3 files / 90 tests passed。
+  - `CI=true ./node_modules/.bin/tsc -b --noEmit` → passed。
+  - `CI=true ./node_modules/.bin/oxlint .` → passed，只有既有 warnings，无 errors。
+  - `CI=true ./node_modules/.bin/tsx scripts/i18n/check.ts` → 沙箱内因 `/var/.../tsx-*.pipe` `EPERM` 失败；提升权限重跑通过。
+  - `pnpm check` 未作为最终验证使用：当前 pnpm wrapper 会先触发依赖状态检查并因 `packageExtensionsChecksum` mismatch 退出，还会重建 `node_modules`；本批用本地 `tsc` binary 完成等价类型检查。
+- **Not run**：`pnpm build` / `pnpm test:run` / `pnpm dev`。
+- **剩余风险 / follow-up**：
+  - Renderer 侧删除当前/运行中项目后的状态机仍需 focused tests：`deleteProjectWithCleanup()`、`chatStore.deleteProjectConversationsLocally()`、current session fallback、stream stop/idle。
+  - `ProjectStorageService.getLegacyProjectScrSessionsDir()` 仅保留给历史 cleanup；不要把它重新接入正式 `.scr-data` storage。
 
 2026-07-03 UX 小修：i18n missingKey 兜底 + 「应用插件开发」入口迁移 + 「工作目录」语义修正
 

@@ -20,7 +20,7 @@
 
 ## 2. Implementation Readiness
 
-**当前判定：已进入分批实现阶段，但还不能声明整体重构完成。** Project/session 主线、Agent-only 发送/storage 写入、Agent prompt 附件/搜索上下文注入、composer pending approval、消息虚拟列表、Agent SDK text stream → `assistant_part`、JSONL structured part 基础协议、legacy fenced code/diff 展示、MCP unified runtime gate 已有实现与测试覆盖；per-server runtime 回归、导出/备份、native code/diff/data 专用事件流仍是后续收口项。
+**当前判定：已进入分批实现阶段，但还不能声明整体重构完成。** Project/session 主线、Agent-only 发送/storage 写入、Agent prompt 附件/搜索上下文注入、composer pending approval、消息虚拟列表、Agent SDK text stream → `assistant_part`、JSONL structured part 基础协议、legacy fenced code/diff 展示、MCP unified runtime gate 已有实现与测试覆盖。2026-07-04 代码复核后，Phase 0a/0b/0c 和虚拟列表不再作为“从零实现”任务；项目删除的 app userData session 物理清理语义已由 `ProjectStorageService.remove()` 和 focused tests 固定，`.scr-data` 写入/迁移 helper 已删除。后续重点改为：删除当前/运行中项目的 renderer 状态回归、project archive / diagnostic export 产品入口、路径隐私展示、Context/Memory 深化、multi-agent follow-up。per-server runtime 回归、导出/备份深水区、native code/diff/data 专用事件流仍是后续收口项。
 
 开工前硬门槛：
 
@@ -52,6 +52,7 @@
 | [refactor-execution-gates.md](./refactor-execution-gates.md) | 执行门禁 | 定义 ready / implemented / verified / shippable 的证据要求；开始实现或声称完成前必须读。 |
 | [refactor-traceability-matrix.md](./refactor-traceability-matrix.md) | 覆盖矩阵 | 把用户需求、GAP-1~GAP-16、负责文档、No-Go gate 和剩余证据串起来。 |
 | [refactor-progress.md](./refactor-progress.md) | 进度记录 | 独立记录当前实现进度、最近验证命令、已完成证据和剩余 gap；不要把功能细节塞回总计划。 |
+| [tauri-migration-v2-plan.md](./tauri-migration-v2-plan.md) | **v2 后续计划 / 暂不执行** | v1 `shippable` 后再启动的 Electron → Tauri 2.x 迁移计划。首发 macOS，保留全部能力，不使用 Node sidecar，采用 Tauri + Rust-native backend 的阶段化迁移。 |
 | [workspace-session-index.md](./workspace-session-index.md) | 兼容入口 | 保留给旧链接；实际入口应跳转到本文。 |
 | [superpowers/plans/2026-06-20-chat-composer-redesign.md](./superpowers/plans/2026-06-20-chat-composer-redesign.md) | 功能级 plan | Composer 视觉与交互改造，不属于数据模型主线。 |
 | [superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md](./superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md) | 功能级 plan | Sidebar quick actions / global search 计划，不属于数据模型主线。 |
@@ -70,6 +71,14 @@
 ## 4. 当前主线 Roadmap
 
 主线来自 [project-session-redesign-plan.md](./project-session-redesign-plan.md)，本文只保留执行索引和优先级。
+
+### V2 后续计划：Tauri 迁移
+
+[tauri-migration-v2-plan](./tauri-migration-v2-plan.md) 是 v1 完成后的下一代重构计划，
+当前只作为设计与风险记录，不进入本轮实现。v2 的启动条件是 v1 按
+[refactor-execution-gates](./refactor-execution-gates.md) 达到 `shippable`。迁移目标是最新稳定
+Tauri 2.x，首发 macOS，并保留 Agent、MCP、PTY、本地 API、插件、Remote IM、更新等全部现有能力。
+v2 不使用 Node sidecar，生产 Tauri 构建不打包 Node runtime；后端能力按 Rust-native service 分阶段重写。
 
 当前有两条并行但不冲突的执行线：
 
@@ -90,11 +99,13 @@
 
 ### 当前优先级
 
-1. **先复核 G-1 / G-2 / G-4 的代码与测试状态**：这些会影响新 storage 下 Agent SDK、approval、remote、attachments、runtime settings 是否真实生效；文档标记完成不等于可跳过验证。
-2. **再复核 / 补齐 G-3**：避免老用户升级后历史会话不可见；迁移失败矩阵见 [project-session-migration-matrix.md](./project-session-migration-matrix.md)。
-3. **G-5 已按 Agent-only 收口**：renderer 发送路径不再 fallback direct；skill prompt、附件解析结果、可选搜索结果作为 Agent context 注入；storage `create/updateMeta` 强制写 `chatMode: "agent"`。后续继续复核 G-6 / G-7：`default` 魔法值收口、项目首页。
-4. **F 阶段和 UI 增量必须等 P0/P1 关闭后再继续扩展**；删除保留语义见 [deletion-retention-matrix.md](./deletion-retention-matrix.md)。
-5. **项目会话存储不再迁入项目 cwd `.scr-data`**；任何涉及 project session path、删除清理、备份恢复的计划都应以 app-managed userData 为准。
+1. **P0 删除项目 renderer 回归已补**：main 端 app userData project session 物理清理已验证；renderer 端已覆盖 `deleteProjectWithCleanup()` stop/remove/cleanup 顺序、当前项目会话 fallback、message/file artifact/loading/streaming 状态归位。
+2. **P0 `.scr-data` policy cleanup 已补**：正式口径是项目会话只写 app userData；旧 `.scr-data` 写入/迁移 helper 已删除，剩余 `.scr-data` 代码只用于删除项目时清理历史残留，命名已改为 `LegacyProjectScr*` / `legacyProjectScrSessionPath`，不新增写入路径。
+3. **下一批补产品入口而不是重复底层能力**：`exportSessionArchive`、`exportProjectArchive`、`DiagnosticExportService` 底层已存在；Settings 里 session export 有入口，但 project archive UI、diagnostic export UI、Recovery wizard 深水区仍不足。下一批应补入口、文案和验收，不再重复写底层 storage export。
+4. **补隐私展示与 legacy import report**：默认列表不直接展示完整路径；完整路径只能通过显式 copy/detail 操作；legacy import / orphan / recovery 相关 UI 要按 [data-privacy-export-plan](./data-privacy-export-plan.md) 收口。
+5. **Context/Memory 深化排在删除/导出之后**：`ProjectRulesReader` 已能只读 `AGENTS.md` / `CLAUDE.md`，但 prompt 注入、pin/unpin、compact/summarize、artifact library 仍未完整落地。
+6. **Phase 0a/0b/0c 已进入验收与回归阶段**：projection、`useChat` helper split、Plan/Execute 基础交互、消息虚拟列表已经在代码里存在；本批已把历史已决 PlanCard 改为只读 replay summary，后续只补 stop/error recovery、native structured events 和真实 runtime smoke。
+7. **项目会话存储不再迁入项目 cwd `.scr-data`**；任何涉及 project session path、删除清理、备份恢复的计划都应以 app-managed userData 为准。
 
 ## 5. 功能 Plan 索引
 
