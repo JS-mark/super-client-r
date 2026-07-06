@@ -38,7 +38,7 @@ const projectSessionPath = (
 	sid: string,
 	ext: ".jsonl" | ".meta.json",
 ) => join(userRoot(), "projects", pid, "sessions", `${sid}${ext}`);
-const projectScrSessionPath = (
+const legacyProjectScrSessionPath = (
 	cwd: string,
 	sid: string,
 	ext: ".jsonl" | ".meta.json",
@@ -81,7 +81,7 @@ describe("create — lazy 落盘", () => {
 		// G-2 关键回归：即便项目 cwd 可写，也**不**应该往 project.cwd/.scr-data 里写
 		expect(s.storageRoot).toBe("project-app-data-fallback");
 		expect(s.storageFallbackReason).toBe("scr-data-disabled-by-policy");
-		expect(existsSync(projectScrSessionPath(cwd, s.id, ".meta.json"))).toBe(
+		expect(existsSync(legacyProjectScrSessionPath(cwd, s.id, ".meta.json"))).toBe(
 			false,
 		);
 		expect(existsSync(projectSessionPath(p.id, s.id, ".meta.json"))).toBe(true);
@@ -517,7 +517,7 @@ describe("appendEvent + readMessages", () => {
 		expect(meta.storageRoot).toBe("project-app-data-fallback");
 		expect(meta.storageMigratedAt).toBeUndefined();
 		// 关键回归：不应该把数据复制到 project.cwd/.scr-data
-		expect(existsSync(projectScrSessionPath(cwd, "legacy-1", ".jsonl"))).toBe(
+		expect(existsSync(legacyProjectScrSessionPath(cwd, "legacy-1", ".jsonl"))).toBe(
 			false,
 		);
 		expect(existsSync(join(cwd, ".scr-data"))).toBe(false);
@@ -932,7 +932,7 @@ describe("fork", () => {
 		expect(f.projectId).toBe(p.id);
 		// G-2: 项目会话数据落 userData，而不是 project.cwd/.scr-data
 		expect(f.storageRoot).toBe("project-app-data-fallback");
-		expect(existsSync(projectScrSessionPath(cwd, f.id, ".jsonl"))).toBe(false);
+		expect(existsSync(legacyProjectScrSessionPath(cwd, f.id, ".jsonl"))).toBe(false);
 		expect(existsSync(projectSessionPath(p.id, f.id, ".jsonl"))).toBe(true);
 		expect(f.lineage?.forkOriginId).toBe(src.id);
 		rmSync(cwd, { recursive: true, force: true });

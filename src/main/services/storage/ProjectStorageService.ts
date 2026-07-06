@@ -21,7 +21,6 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
-	statSync,
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
@@ -89,38 +88,15 @@ export class ProjectStorageService {
 		return join(this.projectDir(id), PROJECT_SESSIONS_DIR);
 	}
 
-	getProjectScrDataDir(id: string): string | null {
+	getLegacyProjectScrDataDir(id: string): string | null {
 		const project = this.get(id);
 		if (!project) return null;
 		return join(project.cwd, SCR_DATA_DIR);
 	}
 
-	getProjectScrSessionsDir(id: string): string | null {
-		const scrDataDir = this.getProjectScrDataDir(id);
+	getLegacyProjectScrSessionsDir(id: string): string | null {
+		const scrDataDir = this.getLegacyProjectScrDataDir(id);
 		return scrDataDir ? join(scrDataDir, PROJECT_SESSIONS_DIR) : null;
-	}
-
-	canUseProjectScrData(
-		id: string,
-	): { ok: true } | { ok: false; reason: string } {
-		const project = this.get(id);
-		if (!project) return { ok: false, reason: "project-not-found" };
-		if (!existsSync(project.cwd)) return { ok: false, reason: "cwd-missing" };
-		try {
-			const stat = statSync(project.cwd);
-			if (!stat.isDirectory())
-				return { ok: false, reason: "cwd-not-directory" };
-		} catch {
-			return { ok: false, reason: "cwd-unreadable" };
-		}
-		try {
-			const scrDataDir = join(project.cwd, SCR_DATA_DIR);
-			const sessionsDir = join(scrDataDir, PROJECT_SESSIONS_DIR);
-			mkdirSync(sessionsDir, { recursive: true });
-			return { ok: true };
-		} catch {
-			return { ok: false, reason: "scr-data-not-writable" };
-		}
 	}
 
 	/**
@@ -275,15 +251,15 @@ export class ProjectStorageService {
 		if (!list.some((p) => p.id === id)) {
 			return { removed: false, orphan: false };
 		}
-		const scrSessionsDir = this.getProjectScrSessionsDir(id);
+		const legacyScrSessionsDir = this.getLegacyProjectScrSessionsDir(id);
 		this.writeRegistry(list.filter((p) => p.id !== id));
 		if (!opts.keepFiles) {
 			const dir = this.projectDir(id);
 			if (existsSync(dir)) {
 				rmSync(dir, { recursive: true, force: true });
 			}
-			if (scrSessionsDir && existsSync(scrSessionsDir)) {
-				rmSync(scrSessionsDir, { recursive: true, force: true });
+			if (legacyScrSessionsDir && existsSync(legacyScrSessionsDir)) {
+				rmSync(legacyScrSessionsDir, { recursive: true, force: true });
 			}
 			return { removed: true, orphan: false };
 		}

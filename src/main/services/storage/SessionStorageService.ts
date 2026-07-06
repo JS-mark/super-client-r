@@ -1416,48 +1416,6 @@ export class SessionStorageService {
 		return [...ids];
 	}
 
-	private migrateLegacyProjectBucket(
-		projectId: string,
-		legacyDir: string,
-		targetDir: string,
-	): void {
-		if (!existsSync(legacyDir)) return;
-		mkdirSync(targetDir, { recursive: true });
-		for (const entry of readdirSync(legacyDir)) {
-			const source = join(legacyDir, entry);
-			const target = join(targetDir, entry);
-			if (existsSync(target)) continue;
-			cpSync(source, target, { recursive: true });
-		}
-		const now = Date.now();
-		for (const entry of readdirSync(targetDir)) {
-			if (!entry.endsWith(".meta.json")) continue;
-			const path = join(targetDir, entry);
-			try {
-				const meta = JSON.parse(readFileSync(path, "utf-8")) as SessionMeta;
-				if (!isValidMeta(meta) || meta.projectId !== projectId) continue;
-				if (meta.storageRoot === "project-scr-data" && meta.storageMigratedAt) {
-					continue;
-				}
-				writeFileSync(
-					path,
-					JSON.stringify(
-						{
-							...meta,
-							storageRoot: "project-scr-data",
-							storageMigratedAt: meta.storageMigratedAt ?? now,
-						},
-						null,
-						2,
-					),
-					"utf-8",
-				);
-			} catch {
-				// Damaged meta will be skipped by normal readers.
-			}
-		}
-	}
-
 	private withStorageMarker(
 		meta: SessionMeta,
 		bucket: SessionBucket,
@@ -1468,9 +1426,7 @@ export class SessionStorageService {
 			...(bucket.fallbackReason
 				? { storageFallbackReason: bucket.fallbackReason }
 				: { storageFallbackReason: undefined }),
-			...(bucket.storageRoot === "project-scr-data" && meta.storageMigratedAt
-				? { storageMigratedAt: meta.storageMigratedAt }
-				: {}),
+			storageMigratedAt: undefined,
 		};
 	}
 

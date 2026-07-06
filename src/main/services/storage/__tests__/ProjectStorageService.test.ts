@@ -2,7 +2,13 @@
 //
 // A-3 ProjectStorageService 测试。所有用例用 tmp dir，避免污染真实 userData。
 
-import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -149,6 +155,86 @@ describe("remove", () => {
 		expect(readFileSync(join(projectDir(p.id), "path.txt"), "utf-8")).toBe(
 			"/a/b",
 		);
+	});
+
+	it("keepFiles=false deletes app-managed project session data", () => {
+		const p = svc.add("/a/b");
+		const sessionsDir = join(projectDir(p.id), "sessions");
+		const sessionDir = join(sessionsDir, "session-1");
+		mkdirSync(join(sessionDir, "attachments"), { recursive: true });
+		mkdirSync(join(sessionDir, "tool-outputs", "content-refs"), {
+			recursive: true,
+		});
+		writeFileSync(join(sessionsDir, "session-1.jsonl"), "{}\n", "utf-8");
+		writeFileSync(join(sessionsDir, "session-1.meta.json"), "{}", "utf-8");
+		writeFileSync(
+			join(sessionDir, "attachments", "file.txt"),
+			"payload",
+			"utf-8",
+		);
+		writeFileSync(
+			join(sessionDir, "tool-outputs", "content-refs", "ref.txt"),
+			"output",
+			"utf-8",
+		);
+
+		const result = svc.remove(p.id);
+
+		expect(result).toEqual({ removed: true, orphan: false });
+		expect(existsSync(sessionsDir)).toBe(false);
+		expect(existsSync(projectDir(p.id))).toBe(false);
+	});
+
+	it("keepFiles=true preserves app-managed project session data for orphan recovery", () => {
+		const p = svc.add("/a/b");
+		const sessionsDir = join(projectDir(p.id), "sessions");
+		mkdirSync(sessionsDir, { recursive: true });
+		writeFileSync(join(sessionsDir, "session-1.jsonl"), "{}\n", "utf-8");
+		writeFileSync(join(sessionsDir, "session-1.meta.json"), "{}", "utf-8");
+
+		const result = svc.remove(p.id, { keepFiles: true });
+
+		expect(result).toEqual({ removed: true, orphan: true });
+		expect(existsSync(join(sessionsDir, "session-1.jsonl"))).toBe(true);
+		expect(existsSync(join(sessionsDir, "session-1.meta.json"))).toBe(true);
+	});
+
+	it("keepFiles=false deletes historical cwd .scr-data sessions without deleting cwd files", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "super-client-project-cwd-"));
+		try {
+			const p = svc.add(cwd);
+			const scrSessionsDir = join(cwd, ".scr-data", "sessions");
+			mkdirSync(scrSessionsDir, { recursive: true });
+			writeFileSync(join(scrSessionsDir, "legacy.jsonl"), "{}\n", "utf-8");
+			writeFileSync(join(cwd, "source.txt"), "user file", "utf-8");
+
+			const result = svc.remove(p.id);
+
+			expect(result).toEqual({ removed: true, orphan: false });
+			expect(existsSync(scrSessionsDir)).toBe(false);
+			expect(readFileSync(join(cwd, "source.txt"), "utf-8")).toBe(
+				"user file",
+			);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
+	});
+
+	it("keepFiles=true preserves historical cwd .scr-data sessions", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "super-client-project-cwd-"));
+		try {
+			const p = svc.add(cwd);
+			const scrSessionsDir = join(cwd, ".scr-data", "sessions");
+			mkdirSync(scrSessionsDir, { recursive: true });
+			writeFileSync(join(scrSessionsDir, "legacy.jsonl"), "{}\n", "utf-8");
+
+			const result = svc.remove(p.id, { keepFiles: true });
+
+			expect(result).toEqual({ removed: true, orphan: true });
+			expect(existsSync(join(scrSessionsDir, "legacy.jsonl"))).toBe(true);
+		} finally {
+			rmSync(cwd, { recursive: true, force: true });
+		}
 	});
 });
 
