@@ -486,13 +486,14 @@ describe("ChatMessageList plan parts", () => {
 			/>,
 		);
 
-		// Plan card body still renders after replay (goal + first step title).
+		// Historical decisions render as read-only replay summaries, not a
+		// second actionable PlanCard.
 		expect(container?.textContent).toContain("Ship plan decision flow");
+		expect(container?.textContent).toContain("Plan cancelled");
 		expect(
-			Array.from(container?.querySelectorAll("input") ?? []).some(
-				(input) => input.value === "Render plan card",
-			),
-		).toBe(true);
+			container?.querySelector("[data-testid='plan-decision-summary']"),
+		).not.toBeNull();
+		expect(container?.textContent).not.toContain("Execute");
 		// No `plan_exec_link_*` status bubble should appear for a cancelled plan.
 		expect(
 			container?.querySelector("[data-testid='part-status']"),
@@ -578,6 +579,10 @@ describe("ChatMessageList plan parts", () => {
 			/>,
 		);
 
+		expect(container?.textContent).toContain("Plan executed");
+		expect(
+			container?.querySelector("[data-testid='plan-decision-summary']"),
+		).not.toBeNull();
 		const statusBubble = container?.querySelector(
 			"[data-testid='part-status']",
 		);

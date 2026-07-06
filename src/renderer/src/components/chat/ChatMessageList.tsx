@@ -23,6 +23,7 @@ import { useTranslation } from "react-i18next";
 import { List, useDynamicRowHeight, useListRef } from "react-window";
 import { formatSmartTime } from "../../lib/formatTime";
 import { formatTokenCount } from "../../lib/formatTokens";
+import { describePlanDecisionSummary } from "../../lib/planReplayView";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
 import type { Message } from "../../stores/chatMessageStore";
 import { useChatStore } from "../../stores/chatStore";
@@ -36,6 +37,7 @@ import { AskUserQuestionCard } from "./AskUserQuestionCard";
 import { ErrorCard } from "./ErrorCard";
 import {
 	getPlanCardFromPart,
+	isPendingPlanDecisionPart,
 	PlanCard,
 	type PlanDecisionHandler,
 } from "./PlanCard";
@@ -49,6 +51,44 @@ import { buildMessageTurns } from "./messageTurns";
 import { StreamPartRenderer } from "./parts/StreamPartRenderer";
 
 const { useToken } = theme;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+function readPlanDecisionSummaryFromPart(
+	part: unknown,
+): { label: string; detail?: string } | null {
+	if (!isRecord(part)) return null;
+	if (!isRecord(part.decision)) return null;
+	const decision = part.decision;
+	const action =
+		decision?.action === "execute" ||
+		decision?.action === "cancel" ||
+		decision?.action === "regenerate"
+			? decision.action
+			: null;
+	if (!action) return null;
+	const sourcePlanId =
+		typeof decision.sourcePlanId === "string"
+			? decision.sourcePlanId
+			: undefined;
+	if (!sourcePlanId) return null;
+	const sourcePlanVersion =
+		typeof decision.sourcePlanVersion === "number"
+			? decision.sourcePlanVersion
+			: undefined;
+	const executeTurnUserMessageId =
+		typeof decision.executeTurnUserMessageId === "string"
+			? decision.executeTurnUserMessageId
+			: undefined;
+	return describePlanDecisionSummary({
+		action,
+		sourcePlanId,
+		sourcePlanVersion,
+		executeTurnUserMessageId,
+	});
+}
 
 interface VirtualBubbleRowProps {
 	items: BubbleItemType[];
@@ -820,16 +860,67 @@ export function ChatMessageList({
 								for (const part of assistantParts) {
 									const plan = getPlanCardFromPart(part);
 									if (plan) {
-										parts.push(
-											<PlanCard
-												key={part.id}
-												plan={plan}
-												disabled={!onPlanDecision}
-												onExecute={handlePlanDecision}
-												onCancel={handlePlanDecision}
-												onRegenerate={handlePlanDecision}
-											/>,
-										);
+										const decisionSummary =
+											readPlanDecisionSummaryFromPart(part);
+										if (decisionSummary) {
+											parts.push(
+												<div
+													key={part.id}
+													data-testid="plan-decision-summary"
+													style={{
+														border: `1px solid ${token.colorBorderSecondary}`,
+														borderRadius: token.borderRadiusLG,
+														background: token.colorFillQuaternary,
+														padding: "12px 14px",
+														marginBottom: 12,
+													}}
+												>
+													<div
+														style={{
+															fontSize: 14,
+															fontWeight: 600,
+															color: token.colorText,
+														}}
+													>
+														{decisionSummary.label}
+													</div>
+													{decisionSummary.detail ? (
+														<div
+															style={{
+																marginTop: 4,
+																fontSize: 12,
+																color: token.colorTextSecondary,
+															}}
+														>
+															{decisionSummary.detail}
+														</div>
+													) : null}
+													<div
+														style={{
+															marginTop: 8,
+															fontSize: 13,
+															color: token.colorTextSecondary,
+														}}
+													>
+														{plan.goal}
+													</div>
+												</div>,
+											);
+										} else {
+											parts.push(
+												<PlanCard
+													key={part.id}
+													plan={plan}
+													disabled={
+														!onPlanDecision ||
+														!isPendingPlanDecisionPart(part)
+													}
+													onExecute={handlePlanDecision}
+													onCancel={handlePlanDecision}
+													onRegenerate={handlePlanDecision}
+												/>,
+											);
+										}
 									} else {
 										parts.push(
 											<StreamPartRenderer

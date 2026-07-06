@@ -521,6 +521,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		messageStore.setSessionStatus("idle");
 		messageStore.setStreamingContent("");
 		messageStore.setHasOlderMessages(false);
+		messageStore.setLoadingMessages(false);
+		messageStore.setLoadingOlderMessages(false);
 		if (!nextId) {
 			messageStore.setMessages([]);
 			return;
