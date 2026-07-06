@@ -11,7 +11,8 @@
 	"packageManager": "pnpm@10.24.0",
 	"main": "out/main/main.js",
 	"scripts": {
-		"postinstall": "electron-builder install-app-deps",
+		"postinstall": "node scripts/ensure-electron.cjs",
+		"predev": "node scripts/ensure-electron.cjs && node scripts/ensure-electron-native.cjs",
 		"dev": "tsc -b && electron-vite dev",
 		"build": "tsc -b && electron-vite build && electron-builder",
 		"build:mac": "tsc -b && electron-vite build && electron-builder --mac",
@@ -242,29 +243,5 @@
 			"createStartMenuShortcut": true,
 			"shortcutName": "Super Client"
 		}
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"@scarf/scarf",
-			"better-sqlite3",
-			"bun",
-			"msw",
-			"node-pty",
-			"protobufjs"
-		],
-		"packageExtensions": {
-			"langium": {
-				"dependencies": {
-					"@chevrotain/regexp-to-ast": "*"
-				}
-			}
-		},
-		"ignoredBuiltDependencies": [
-			"@google/genai",
-			"electron",
-			"electron-winstaller",
-			"esbuild",
-			"sharp"
-		]
 	}
 }

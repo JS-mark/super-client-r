@@ -1,11 +1,35 @@
 packages:
   - "packages/*"
 
+packageExtensions:
+  langium:
+    dependencies:
+      "@chevrotain/regexp-to-ast": "*"
+
 ignoredBuiltDependencies:
-  - electron
+  - "@google/genai"
   - electron-winstaller
   - esbuild
+  - sharp
 
 onlyBuiltDependencies:
+  - "@scarf/scarf"
   - better-sqlite3
   - bun
+  - electron
+  - msw
+  - node-pty
+  - protobufjs
+
+allowBuilds:
+  "@google/genai": false
+  "@scarf/scarf": true
+  better-sqlite3: true
+  bun: true
+  electron: true
+  electron-winstaller: false
+  esbuild: false
+  msw: true
+  node-pty: true
+  protobufjs: true
+  sharp: false
