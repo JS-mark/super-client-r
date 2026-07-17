@@ -2,7 +2,7 @@
 
 > 日期：2026-06-27
 >
-> 最近复核：2026-06-30
+> 最近复核：2026-07-08
 >
 > 状态：规划草案
 >
@@ -32,6 +32,7 @@ Remote IM 纳入完整设计，在每个相关阶段同步考虑。
 4. **内存占用要小**：renderer 不长期持有大体积 stdout、文件内容、artifact 内容和历史 transcript 全量对象。优先使用摘要、引用、分页、懒加载、虚拟列表。
 5. **默认摘要，按需展开**：工具结果、命令输出、子 Agent 细节、context 详情默认展示摘要，用户需要时再展开。
 6. **可观测和可恢复**：所有关键状态变化必须落到事件或可回放状态中，包括 approval、compact、plan execution、subagent、remote delivery。
+7. **模型调用方式按生态默认，允许对话覆盖**：OpenAI、Gemini、Claude/Anthropic 默认使用原生 Function Calling；开源模型和 OpenAI-compatible/local provider 默认使用 LangChain + MCP 协议适配工具调用。对话设置必须提供“调用方式”覆盖入口，覆盖值只影响当前对话，除非用户显式保存为更高层默认。
 
 ## 3. 当前代码差距
 
@@ -41,17 +42,17 @@ Remote IM 纳入完整设计，在每个相关阶段同步考虑。
 | 输入区审批替换 | `ChatInputArea.tsx`、`ApprovalDecisionCard.tsx`、`AskUserQuestionCard.tsx` 已存在。 | 需要正式定义输入区/审批区/Ask/Plan 决策区的状态契约。 |
 | Tool call 展示 | `ToolCallCard`、`ApprovalDecisionCard` 已有基础。 | 需要统一事件分类和按工具类型展示策略。 |
 | Plan mode | `PlanMode` 类型和 `planModeGate.ts` 已存在。 | 需要完整 Plan card、可编辑步骤、execute turn、Plan 限制 enforcement。 |
-| 模型选择 | `SessionRuntimeResolver` 和 `useChat` 已有全局/项目/会话解析；当前批次已完成 one-shot model override、会话默认、`source` / `sourceLabel` 生效来源展示和发送后清理。 | 需要继续补模型能力元数据、Provider/Model 配置体验和子 Agent 运行时模型选择。 |
-| 模型管理 | `ModelManageModal`、`ModelConfigPanel` 已存在。 | 需要重做 Provider / Model 两层设置。 |
+| 模型选择 | `SessionRuntimeResolver` 和 `useChat` 已有全局/项目/会话解析；当前批次已完成 one-shot model override、会话默认、`source` / `sourceLabel` 生效来源展示和发送后清理。 | 需要继续补模型能力元数据、Provider/Model 配置体验、对话级调用方式覆盖和子 Agent 运行时模型选择。 |
+| 模型管理 | `ModelManageModal`、`ModelConfigPanel` 已存在。 | 需要重做 Provider / Model 两层设置，并把默认调用方式建模为 provider/model capability，而不是散落在发送链路里。 |
 | 设置页 | `Settings.tsx` 已有独立路由；当前批次已完成 Settings 分组、URL tab sync、无 `/extensions` 用户路由、MCP/Skills/Plugins 独立入口、Agent-only 文案和 Project Recovery 安全入口。 | 需要继续补完整 recovery wizard、backup/export 等设置深水区和 inspector 联动。 |
 | 右侧环境面板 | `CodexEnvironmentInspector.tsx` 和 `inspectorPanelStore` 已存在。 | 需要补齐 changes、git/runtime、context、tool timeline、subagents、remote、artifacts。 |
 | Context budget | `ContextUsagePill` 已有基础。 | 需要完整 context inspector、注入源列表、pin/unpin、compact event。 |
 | Memory/rules | 仓库已有 `AGENTS.md`。 | 需要定义 memory 作用域和只读项目规则注入。 |
-| 结构化输出 | `StreamPartRenderer`、`StructuredCodeCard` 已覆盖 text/code/diff/data/table/tree/source/artifact/status 的基础渲染；当前批次已补 typed tool part summary、大 tool result 折叠态 capped preview，以及带 `contentRef` part 的轻量引用摘要视图。 | 需要继续补 command/artifact 专用展示、contentRef 生产/读取 API、分页加载和 native structured event coverage。 |
+| 结构化输出 | `StreamPartRenderer`、`StructuredCodeCard` 已覆盖 text/code/diff/data/table/tree/source/artifact/status 的基础渲染；当前批次已补 typed tool part summary、大 tool result 折叠态 capped preview、带 `contentRef` part 的轻量引用摘要视图，以及 llm-loop fenced code/json/diff → `assistant.part` native runtime producer。 | 需要继续补 command/artifact 专用展示、分页加载、table/tree/sources/artifact native producer 和 delta batching。 |
 | 长会话性能 | `ChatMessageList` 已接入 `react-window` 动态行高虚拟列表，`chatInputStore` 已隔离输入状态；当前批次已有 500 user/assistant turns + 多代码块虚拟列表测试。 | 需要继续拆分 `useChat`，并补真实运行长会话输入延迟/滚动 smoke。 |
 | 存储与会话 | `SessionStorageService` 已正式使用 JSONL，创建/更新强制 `chatMode: "agent"`，项目会话写 app userData。 | 需要把项目删除、导出/备份、replay、repair、large output 引用化继续收口；不要恢复 `.scr-data` 写入方案。 |
 | Agent runtime adapter | `AgentRuntimeIpcBroker` 和 shared `AgentRuntimeStreamEvent` 已有底层流事件。 | 需要增加产品语义事件 projection：run/turn/plan/context/memory/subagent/artifact/remote。 |
-| 多 Agent | 已有 Agent profiles/teams 和 `AgentTeamSelector`。 | 需要主 Agent 委派语义、subagent task model、timeline、子线程展开、权限归属。 |
+| 多 Agent | 已有 Agent profiles/teams 和 `AgentTeamSelector`；`SubagentMessagePart`、subagent product events、JSONL reducer、Subagents Inspector、`Message.toolCall.subagentRunId` renderer threading 与 live tool count 已有实现；Task HTTP recursion 已根据子代理 SSE tool-call 帧递增 `run.toolCallCount` 并通过 `subagent.updated` 持久化；nested Task recursion 已通过 host-only `agentBuiltins` 保留父 conversation 和 depth。 | 仍需子线程展开和更完整权限归属 UX。 |
 | Remote IM | 已有 remote 服务。 | 需要纳入同一 Agent event model，处理 approval/ask、投递错误、unbind 生命周期。 |
 
 ### 3.1 2026-06-29 代码复核结论
@@ -490,7 +491,7 @@ Remote session 使用同一 Agent event model。
 
 | 接入点 | 当前状态 | 下一步 |
 | --- | --- | --- |
-| Phase 0a production projection | 已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`：调用 `projectAgentRuntimeEvent()`，只把可持久化 product events 经 `materializeAgentProductEvent()` 写入 `SessionStorageService.appendEvent()`；`text.delta` / `reasoning.delta` / `run.usage` 等 transient event 不落盘。`ask.requested` / `ask.answered` / `plan.decision` / `execute.turn.created` / subagent events 已补进 product/materializer 路径。 | 只补验收缺口：unknown/debug summary 防御、native code/diff/data 专用事件和 delta batching。Native structured events 本阶段不阻塞。 |
+| Phase 0a production projection | 已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`：调用 `projectAgentRuntimeEvent()`，只把可持久化 product events 经 `materializeAgentProductEvent()` 写入 `SessionStorageService.appendEvent()`；`text.delta` / `reasoning.delta` / `run.usage` 等 transient event 不落盘。`ask.requested` / `ask.answered` / `plan.decision` / `execute.turn.created` / subagent events 已补进 product/materializer 路径；`assistant.part` runtime wrapper 直接把 existing `AssistantPartEvent` 写入 session storage。 | 只补后续深化：unknown/debug summary 防御、delta batching、更细粒度 table/tree/sources/artifact native producer；当前 focused tests、`pnpm check`、`pnpm lint`、`pnpm i18n:check` 已通过，full test 仅剩本地端口监听类 server e2e 被当前沙箱阻塞。 |
 | Approval / Ask closed-loop | 已接入：`resolvePermission()` 会生成 `permission.resolved` trace/product/session audit，并按 `requestId + approvalId` 去重 runtime 后续 resolution；broker 会从前置 `permission.request` 补 `toolName`，用于区分普通 approval 与 `AskUserQuestion` answer。 | 补 UI replay/历史 transcript 对 approval resolved / ask answered 的明确展示；防御孤立 `permission.resolved` 且无 request context 的 runtime。 |
 | Renderer replay / run controller | 已接入 reducer helper：`useAgentEventReducer` 覆盖 Agent SDK 与 AgentRuntime 的 text/tool/permission/result/error/status/rate_limit 映射；`agentRuntimeStreamAdapter` 只是薄包装；`useAgentRunController` 已承接 request id、request type、native session id、approval pause、watchdog 和 interrupt snapshot。`eventsToMessages()` 已能 replay approval requested/resolved、ask requested/answered、tool terminal states、run terminal status、plan parts 和 subagent parts；Plan decision / execute turn marker 已可持久化；`ChatMessageList` 已有 `VirtualBubbleList` + dynamic row height + pending interaction scroll。 | 不再重复拆 `useChat`；后续补 stop / error recovery 证据、marker-only 历史 timeline UX、虚拟列表体验回归。 |
 | 发送链路迁移 | 已按最终 Agent runtime 口径收口：`useChat` 发送入口调用 `agentRuntimeClient.createQuery()`；create failure 会 materialize structured error、恢复 idle、清理 current request/watchdog，不再默认 fallback 到 Agent SDK；stop 会按 request type 调 `agentRuntimeClient.interrupt()` 或兼容 SDK interrupt。 | 继续补 runtime create failure 的更完整 UI recovery / replay 证据；不恢复 direct/chat，不新增 SDK fallback projection 桥接。 |

@@ -9,15 +9,17 @@
 
 当前 `GitInfoService.createWorktree()`：
 
-- 直接执行 `git -C <cwd> worktree add -b <branchName> <worktreePath>`。
-- 返回 `{ ok, error?, worktreePath? }`，错误归一化。
+- 会先调用 `preflightCreateWorktree(cwd, worktreePath, branchName)`。
+- preflight 会阻断非 Git 仓库、已存在/不可访问目标路径、非法分支名和同名本地分支；dirty/submodule/LFS/upstream 作为 warn/info 返回。
+- preflight 通过后执行 `git -C <cwd> worktree add -b <branchName> <worktreePath>`。
+- 返回 `{ ok, error?, worktreePath?, preflight? }`，错误归一化。
 - 有 `removeWorktree()` 作为 best-effort rollback。
 
 缺口：
 
-- 没有目标路径、分支名、dirty/submodule/LFS/upstream、已有 worktree 的 preflight。
 - `command-exec` runtime policy 尚未统一 gate。
 - rollback 成功/失败没有 audit shape。
+- Composer `LaunchModePill` / `BranchPill` 仍是 read-only，尚未接 preflight 结果展示和编辑态。
 
 ## 2. Preflight Matrix
 
@@ -66,10 +68,10 @@ The stored/exported form must redact `sourceCwd` and `worktreePath` unless the u
 
 ## 5. Tests To Add
 
-- [ ] Non-git cwd blocks before command execution.
-- [ ] Existing target path blocks.
-- [ ] Invalid branch name blocks.
-- [ ] Dirty source returns warning but can proceed after confirmation.
+- [x] Non-git cwd blocks before `git worktree add`.
+- [x] Existing target path blocks.
+- [x] Invalid branch name blocks.
+- [x] Dirty source returns warning and can proceed.
 - [ ] Runtime command-exec policy is consulted.
 - [ ] Project registration failure triggers worktree rollback.
 - [ ] Rollback failure is reported without deleting user cwd.
