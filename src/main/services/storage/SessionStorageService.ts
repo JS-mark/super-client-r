@@ -34,6 +34,9 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import type { Message, MessagePart } from "@super-client/shared-types/chat";
 import type {
+	SessionMessagesPageResult,
+} from "@super-client/shared-types/electron-api";
+import type {
 	ChatMode,
 	Project,
 	ProjectSettings,
@@ -88,14 +91,12 @@ export interface ReadMessagesPageOptions {
 	limit?: number;
 }
 
-export interface ReadMessagesPageResult {
-	messages: Message[];
-	total: number;
-	offset: number;
-	limit: number;
-	hasMore: boolean;
-	nextOffset?: number;
-}
+/**
+ * Re-exported from `@super-client/shared-types/electron-api` so the IPC
+ * contract and the storage-service return type stay in lockstep. The local
+ * name is kept for backward compatibility with existing imports.
+ */
+export type ReadMessagesPageResult = SessionMessagesPageResult;
 
 export interface ForkOptions {
 	/** 目标 projectId；null = casual。可与源不同（跨桶）。 */
