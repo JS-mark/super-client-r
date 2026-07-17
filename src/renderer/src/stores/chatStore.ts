@@ -136,6 +136,42 @@ async function readSessionMessages(
 	return [];
 }
 
+async function readSessionMessagesPage(
+	conversationId: string,
+	options: { offset?: number; limit?: number },
+): Promise<{
+	messages: Message[];
+	hasMore: boolean;
+	nextOffset?: number;
+	total: number;
+}> {
+	try {
+		const readPage = window.electron.sessions.readMessagesPage;
+		if (readPage) {
+			const res = await readPage(conversationId, options);
+			if (res.success && res.data) {
+				return {
+					messages: res.data.messages,
+					hasMore: res.data.hasMore,
+					nextOffset: res.data.nextOffset,
+					total: res.data.total,
+				};
+			}
+		}
+		const fallback = await readSessionMessages(conversationId, {
+			tail: options.limit,
+		});
+		return {
+			messages: fallback,
+			hasMore: fallback.length >= (options.limit ?? INITIAL_TAIL_MESSAGE_COUNT),
+			total: fallback.length,
+		};
+	} catch (err) {
+		console.error("[chatStore] sessions.readMessagesPage failed:", err);
+	}
+	return { messages: [], hasMore: false, total: 0 };
+}
+
 /**
  * Tail size for the initial "fast first paint" read in `switchConversation`.
  * Tuned so that `buildMessageTurns` + bubbleItems O(N) work stays under a
@@ -359,20 +395,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			// Tail-first read: keeps first-paint cost bounded for huge sessions.
 			// Buildup of turns / bubbleItems is O(N) over loaded messages so
 			// capping at INITIAL_TAIL_MESSAGE_COUNT keeps that pass cheap.
-			const messages = await readSessionMessages(conversationId, {
-				tail: INITIAL_TAIL_MESSAGE_COUNT,
+			const page = await readSessionMessagesPage(conversationId, {
+				offset: 0,
+				limit: INITIAL_TAIL_MESSAGE_COUNT,
 			});
 			// Guard against the user switching conversations again while we
 			// were reading — only commit if we're still on the same target.
 			if (get().currentConversationId !== conversationId) return;
-			useChatMessageStore.getState().setMessages(messages);
-			// If we got exactly the tail size, assume there might be more
-			// older history on disk. (False positives are harmless — the user
-			// just sees an unnecessary button; clicking it is a no-op when
-			// the full read returns the same set.)
-			useChatMessageStore
-				.getState()
-				.setHasOlderMessages(messages.length >= INITIAL_TAIL_MESSAGE_COUNT);
+			useChatMessageStore.getState().setMessages(page.messages);
+			useChatMessageStore.getState().setHasOlderMessages(page.hasMore);
 		} catch (error) {
 			console.error("[chatStore] Failed to load messages:", error);
 		} finally {
@@ -389,14 +420,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 		messageStore.setLoadingOlderMessages(true);
 		try {
-			// Full read — no `tail`. The IPC payload + buildTurns pass will be
-			// expensive on long sessions, but the user explicitly asked for it.
-			const all = await readSessionMessages(currentConversationId);
+			const current = messageStore.messages;
+			const page = await readSessionMessagesPage(currentConversationId, {
+				offset: current.length,
+				limit: INITIAL_TAIL_MESSAGE_COUNT,
+			});
 			// Guard against the user switching conversations mid-fetch.
 			if (get().currentConversationId !== currentConversationId) return;
 			const store = useChatMessageStore.getState();
-			store.setMessages(all);
-			store.setHasOlderMessages(false);
+			store.setMessages([...page.messages, ...store.messages]);
+			store.setHasOlderMessages(page.hasMore);
 		} catch (error) {
 			console.error("[chatStore] Failed to load older messages:", error);
 		} finally {
@@ -459,14 +492,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 				ms.setHasOlderMessages(false);
 				ms.setLoadingMessages(true);
 				try {
-					// Tail-first read — same rationale as switchConversation.
-					const messages = await readSessionMessages(nextId, {
-						tail: INITIAL_TAIL_MESSAGE_COUNT,
+					const page = await readSessionMessagesPage(nextId, {
+						offset: 0,
+						limit: INITIAL_TAIL_MESSAGE_COUNT,
 					});
-					useChatMessageStore.getState().setMessages(messages);
-					useChatMessageStore
-						.getState()
-						.setHasOlderMessages(messages.length >= INITIAL_TAIL_MESSAGE_COUNT);
+					useChatMessageStore.getState().setMessages(page.messages);
+					useChatMessageStore.getState().setHasOlderMessages(page.hasMore);
 				} catch (err) {
 					console.error("[chatStore] failed to load next messages:", err);
 				} finally {
@@ -529,13 +560,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 		}
 		messageStore.setLoadingMessages(true);
 		try {
-			const tail = await readSessionMessages(nextId, {
-				tail: INITIAL_TAIL_MESSAGE_COUNT,
+			const page = await readSessionMessagesPage(nextId, {
+				offset: 0,
+				limit: INITIAL_TAIL_MESSAGE_COUNT,
 			});
-			messageStore.setMessages(tail);
-			messageStore.setHasOlderMessages(
-				tail.length >= INITIAL_TAIL_MESSAGE_COUNT,
-			);
+			messageStore.setMessages(page.messages);
+			messageStore.setHasOlderMessages(page.hasMore);
 		} catch (err) {
 			console.error("[chatStore] failed to load fallback messages:", err);
 			messageStore.setMessages([]);

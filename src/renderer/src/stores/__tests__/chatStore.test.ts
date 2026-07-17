@@ -45,6 +45,7 @@ const mockConversation = (
 function setupElectronMock() {
 	const sessionsDelete = vi.fn();
 	const readMessages = vi.fn();
+	const readMessagesPage = vi.fn();
 	const unbind = vi.fn();
 	(window as any).electron = {
 		...(window as any).electron,
@@ -52,13 +53,14 @@ function setupElectronMock() {
 			...(window as any).electron?.sessions,
 			delete: sessionsDelete,
 			readMessages,
+			readMessagesPage,
 		},
 		remoteChat: {
 			...(window as any).electron?.remoteChat,
 			unbind,
 		},
 	};
-	return { sessionsDelete, readMessages, unbind };
+	return { sessionsDelete, readMessages, readMessagesPage, unbind };
 }
 
 beforeEach(() => {
@@ -174,16 +176,22 @@ describe("deleteConversation", () => {
 
 describe("deleteProjectConversationsLocally", () => {
 	it("removes project conversations, clears their artifacts, and falls back from the current session", async () => {
-		const { readMessages } = setupElectronMock();
+		const { readMessagesPage } = setupElectronMock();
 		const fallbackMessage = {
 			id: "fallback-msg",
 			role: "assistant" as const,
 			content: "fallback history",
 			timestamp: 42,
 		};
-		readMessages.mockResolvedValueOnce({
+		readMessagesPage.mockResolvedValueOnce({
 			success: true,
-			data: [fallbackMessage],
+			data: {
+				messages: [fallbackMessage],
+				total: 1,
+				offset: 0,
+				limit: 100,
+				hasMore: false,
+			},
 		});
 
 		useChatStore.setState({
@@ -339,7 +347,10 @@ describe("deleteProjectConversationsLocally", () => {
 		expect(useChatStore.getState().currentConversationId).toBe("fallback");
 		expect(useSessionListStore.getState().currentSessionId).toBe("fallback");
 		expect(useSessionListStore.getState().byProject["project-1"]).toBeUndefined();
-		expect(readMessages).toHaveBeenCalledWith("fallback", { tail: 100 });
+		expect(readMessagesPage).toHaveBeenCalledWith("fallback", {
+			offset: 0,
+			limit: 100,
+		});
 		expect(useChatMessageStore.getState().messages).toEqual([fallbackMessage]);
 		expect(useChatMessageStore.getState().sessionStatus).toBe("idle");
 		expect(useChatMessageStore.getState().isStreaming).toBe(false);
@@ -461,5 +472,49 @@ describe("deleteProjectConversationsLocally", () => {
 		expect(useChatMessageStore.getState().messages).toEqual([currentMessage]);
 		expect(useChatMessageStore.getState().sessionStatus).toBe("streaming");
 		expect(useChatMessageStore.getState().streamingContent).toBe("live");
+	});
+});
+
+describe("loadOlderMessages", () => {
+	it("loads the next older page and prepends it to current messages", async () => {
+		const { readMessagesPage } = setupElectronMock();
+		const olderMessage = {
+			id: "older-msg",
+			role: "user" as const,
+			content: "older",
+			timestamp: 1,
+		};
+		const loadedMessage = {
+			id: "loaded-msg",
+			role: "assistant" as const,
+			content: "loaded",
+			timestamp: 2,
+		};
+		readMessagesPage.mockResolvedValueOnce({
+			success: true,
+			data: {
+				messages: [olderMessage],
+				total: 2,
+				offset: 1,
+				limit: 100,
+				hasMore: false,
+			},
+		});
+		useChatStore.setState({ currentConversationId: "conv-1" });
+		useChatMessageStore.getState().setMessages([loadedMessage]);
+		useChatMessageStore.getState().setHasOlderMessages(true);
+
+		await useChatStore.getState().loadOlderMessages();
+
+		expect(readMessagesPage).toHaveBeenCalledWith("conv-1", {
+			offset: 1,
+			limit: 100,
+		});
+		expect(useChatMessageStore.getState().messages).toEqual([
+			olderMessage,
+			loadedMessage,
+		]);
+		expect(useChatMessageStore.getState().hasOlderMessages).toBe(false);
+		expect(useChatMessageStore.getState().isLoadingOlderMessages).toBe(false);
 	});
 });
