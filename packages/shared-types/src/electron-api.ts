@@ -188,6 +188,24 @@ export interface ProjectArchiveExportResult {
 	manifest: ProjectArchiveManifest;
 }
 
+export type DiagnosticExportRedactionMode = "home-and-app-data";
+
+export interface DiagnosticExportFileEntry {
+	path: string;
+	kind: "manifest" | "diagnostic-json";
+	byteLength?: number;
+	sha256?: string;
+}
+
+export interface DiagnosticExportManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion: string;
+	redactionMode: DiagnosticExportRedactionMode;
+	exportDir: string;
+	files: DiagnosticExportFileEntry[];
+}
+
 export interface DiagnosticExportResult {
 	exportDir: string;
 	manifestPath: string;
