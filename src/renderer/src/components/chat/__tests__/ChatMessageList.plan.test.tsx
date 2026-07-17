@@ -328,6 +328,65 @@ afterEach(() => {
 });
 
 describe("ChatMessageList plan parts", () => {
+	it("skips awaiting approval tool messages so the composer owns the blocking UI", () => {
+		const messages: Message[] = [
+			{
+				id: "assistant-before-tool",
+				role: "assistant",
+				content: "I need to run a command.",
+				timestamp: 1000,
+			},
+			{
+				id: "tool-awaiting-approval",
+				role: "tool",
+				content: "Permission required: execute_command",
+				timestamp: 1001,
+				type: "tool_use",
+				toolCall: {
+					id: "approval-1",
+					name: "execute_command",
+					input: { command: "pwd" },
+					status: "awaiting_approval",
+					approval: { kind: "permission" },
+				},
+			} as Message,
+			{
+				id: "tool-completed",
+				role: "tool",
+				content: "Tool call: read_file",
+				timestamp: 1002,
+				type: "tool_use",
+				toolCall: {
+					id: "tool-1",
+					name: "read_file",
+					input: { path: "README.md" },
+					status: "success",
+					result: "ok",
+				},
+			} as Message,
+		];
+
+		render(
+			<ChatMessageList
+				messages={messages}
+				isStreaming={false}
+				conversationId="conversation-1"
+				bubbleListRef={{ current: null }}
+				retryMessage={() => {}}
+				editMessage={() => {}}
+				deleteMessage={() => {}}
+				respondToApproval={() => {}}
+				onPlanDecision={() => {}}
+			/>,
+		);
+
+		expect(container?.textContent).toContain("I need to run a command.");
+		expect(container?.textContent).toContain("Tool call");
+		expect(container?.textContent).not.toContain(
+			"Permission required: execute_command",
+		);
+	});
+
 	it("renders PlanCard inside the assistant message flow", () => {
 		const messages: Message[] = [
 			{

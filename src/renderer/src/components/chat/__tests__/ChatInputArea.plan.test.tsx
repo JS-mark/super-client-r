@@ -98,6 +98,11 @@ vi.mock("react-i18next", () => ({
 
 let chatMessages: Message[] = [];
 let composerValue = "";
+let mockConversations: Array<{
+	id: string;
+	name: string;
+	session?: { planMode?: string };
+}> = [{ id: "conversation-1", name: "Conversation" }];
 
 vi.mock("../../../stores/chatMessageStore", () => ({
 	useChatMessageStore: (selector: (state: { messages: Message[] }) => unknown) =>
@@ -123,12 +128,13 @@ vi.mock("../../../stores/chatStore", () => ({
 	getProjectIdFromConversation: () => undefined,
 	useChatStore: (
 		selector: (state: {
-			conversations: Array<{ id: string; name: string }>;
+			conversations: Array<{
+				id: string;
+				name: string;
+				session?: { planMode?: string };
+			}>;
 		}) => unknown,
-	) =>
-		selector({
-			conversations: [{ id: "conversation-1", name: "Conversation" }],
-		}),
+	) => selector({ conversations: mockConversations }),
 }));
 
 vi.mock("../../../stores/projectStore", () => ({
@@ -177,11 +183,18 @@ vi.mock("../composer/ApprovalModePill", () => ({
 }));
 
 vi.mock("../composer/ChatComposer", () => ({
-	ChatComposer: () => <textarea data-testid="ordinary-composer" />,
+	ChatComposer: ({ infoBar }: { infoBar?: React.ReactNode }) => (
+		<div>
+			{infoBar}
+			<textarea data-testid="ordinary-composer" />
+		</div>
+	),
 }));
 
 vi.mock("../composer/ChatComposerInfoBar", () => ({
-	ChatComposerInfoBar: () => <div>Info</div>,
+	ChatComposerInfoBar: ({ planMode }: { planMode?: string | null }) => (
+		<div data-testid="composer-info-plan-mode">{planMode ?? "missing"}</div>
+	),
 }));
 
 vi.mock("../composer/ChatToolsMenu", () => ({
@@ -225,11 +238,43 @@ vi.mock("../toolbar/ToolsPanel", () => ({
 }));
 
 vi.mock("../AskUserQuestionCard", () => ({
-	AskUserQuestionCard: () => <div>Question</div>,
+	AskUserQuestionCard: ({
+		toolCall,
+		onSubmit,
+	}: {
+		toolCall: { id: string };
+		onSubmit?: (toolCallId: string, approved: boolean) => void;
+	}) => (
+		<div>
+			Question
+			<button
+				type="button"
+				onClick={() => onSubmit?.(toolCall.id, true)}
+			>
+				Submit answer
+			</button>
+		</div>
+	),
 }));
 
 vi.mock("../ToolCallCard", () => ({
-	ToolCallCard: () => <div>Tool approval</div>,
+	ToolCallCard: ({
+		toolCall,
+		onApproval,
+	}: {
+		toolCall: { id: string };
+		onApproval?: (toolCallId: string, approved: boolean) => void;
+	}) => (
+		<div>
+			Tool approval
+			<button
+				type="button"
+				onClick={() => onApproval?.(toolCall.id, true)}
+			>
+				Approve tool
+			</button>
+		</div>
+	),
 }));
 
 const plan: PlanCardData = {
@@ -264,9 +309,56 @@ afterEach(() => {
 	container = undefined;
 	chatMessages = [];
 	composerValue = "";
+	mockConversations = [{ id: "conversation-1", name: "Conversation" }];
 });
 
 describe("ChatInputArea plan decision composer", () => {
+	it("replaces the ordinary composer with a tool approval card and submits approvals", () => {
+		const respondToApproval = vi.fn();
+		chatMessages = [createPendingApprovalToolMessage()];
+
+		render(
+			<ChatInputArea
+				{...defaultProps()}
+				respondToApproval={respondToApproval}
+			/>,
+		);
+
+		expect(
+			container?.querySelector('[data-testid="ordinary-composer"]'),
+		).toBeNull();
+		expect(container?.textContent).toContain("Tool approval");
+
+		act(() => {
+			getButton("Approve tool").click();
+		});
+
+		expect(respondToApproval).toHaveBeenCalledWith("approval-1", true);
+	});
+
+	it("replaces the ordinary composer with AskUserQuestion and submits answers", () => {
+		const respondToApproval = vi.fn();
+		chatMessages = [createPendingAskToolMessage()];
+
+		render(
+			<ChatInputArea
+				{...defaultProps()}
+				respondToApproval={respondToApproval}
+			/>,
+		);
+
+		expect(
+			container?.querySelector('[data-testid="ordinary-composer"]'),
+		).toBeNull();
+		expect(container?.textContent).toContain("Question");
+
+		act(() => {
+			getButton("Submit answer").click();
+		});
+
+		expect(respondToApproval).toHaveBeenCalledWith("ask-1", true);
+	});
+
 	it("replaces the ordinary composer with a disabled PlanCard without wiring", () => {
 		chatMessages = [createPendingPlanMessage()];
 
@@ -325,6 +417,23 @@ describe("ChatInputArea plan decision composer", () => {
 			container?.querySelector('[data-testid="ordinary-composer"]'),
 		).not.toBeNull();
 	});
+
+	it("passes the current session planMode to the composer info bar", () => {
+		mockConversations = [
+			{
+				id: "conversation-1",
+				name: "Conversation",
+				session: { planMode: "plan-then-ask" },
+			},
+		];
+
+		render(<ChatInputArea {...defaultProps()} />);
+
+		expect(
+			container?.querySelector('[data-testid="composer-info-plan-mode"]')
+				?.textContent,
+		).toBe("plan-then-ask");
+	});
 });
 
 function createPausedErrorMessage(): Message {
@@ -367,6 +476,48 @@ function createPendingPlanMessage(): Message {
 			},
 		] as unknown as Message["parts"],
 	};
+}
+
+function createPendingApprovalToolMessage(): Message {
+	return {
+		id: "tool-approval-1",
+		role: "tool",
+		content: "Permission required: execute_command",
+		timestamp: 900,
+		type: "tool_use",
+		toolCall: {
+			id: "approval-1",
+			name: "execute_command",
+			input: { command: "pwd" },
+			status: "awaiting_approval",
+			approval: { kind: "permission" },
+		},
+	} as Message;
+}
+
+function createPendingAskToolMessage(): Message {
+	return {
+		id: "tool-ask-1",
+		role: "tool",
+		content: "Question",
+		timestamp: 910,
+		type: "tool_use",
+		toolCall: {
+			id: "ask-1",
+			name: "scp-agent-builtins__AskUserQuestion",
+			input: {
+				questions: [
+					{
+						header: "Scope",
+						question: "Which scope?",
+						options: [{ label: "Small", description: "Focused" }],
+					},
+				],
+			},
+			status: "awaiting_approval",
+			approval: { kind: "ask-user-question" },
+		},
+	} as Message;
 }
 
 function defaultProps(): React.ComponentProps<typeof ChatInputArea> {

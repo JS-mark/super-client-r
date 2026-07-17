@@ -22,7 +22,12 @@ import { runtimeService } from "../../services/runtimeService";
 import { useCodexBranchSection } from "./CodexBranchSection";
 import { ContextInspectorSection } from "./inspector/ContextInspectorSection";
 import { SubagentsInspectorSection } from "./inspector/SubagentsInspectorSection";
+import { buildArtifactLibraryItems } from "../../lib/artifactLibrary";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
+import {
+	AGENT_COMPOSER_MODE_LABEL,
+	toAgentComposerMode,
+} from "../../lib/planModePresentation";
 
 export interface CodexEnvironmentInspectorProps {
 	collapsed?: boolean;
@@ -154,18 +159,29 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 	const totals = useMemo(() => {
 		let additions = 0;
 		let deletions = 0;
-		let fileCount = 0;
 		for (const cs of changeSets) {
 			additions += cs.additions;
 			deletions += cs.deletions;
-			fileCount += cs.files.length;
 		}
-		if (fileCount === 0) fileCount = artifacts.length;
-		return { additions, deletions, fileCount };
-	}, [changeSets, artifacts.length]);
+		return { additions, deletions };
+	}, [changeSets]);
+
+	const artifactLibraryItems = useMemo(
+		() =>
+			buildArtifactLibraryItems({
+				conversationId: currentConversationId,
+				artifacts,
+				changeSets,
+			}),
+		[currentConversationId, artifacts, changeSets],
+	);
 
 	const handleReveal = (path: string) => {
 		fileActionService.reveal(path).catch(() => {});
+	};
+
+	const handleCopyPath = (path: string) => {
+		fileActionService.copyPath(path).catch(() => {});
 	};
 
 	const sectionHeaderStyle: React.CSSProperties = {
@@ -185,10 +201,10 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 
 	// Section: Changes
 	const changesContent =
-		artifacts.length === 0 && changeSets.length === 0 ? (
+		artifactLibraryItems.length === 0 ? (
 			<Empty
 				image={Empty.PRESENTED_IMAGE_SIMPLE}
-				description={<span style={{ fontSize: 12 }}>暂无变更</span>}
+				description={<span style={{ fontSize: 12 }}>暂无工件</span>}
 				style={{ margin: "8px 0" }}
 			/>
 		) : (
@@ -201,8 +217,8 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 					}}
 				>
 					{totals.additions === 0 && totals.deletions === 0
-						? `${totals.fileCount} 个文件`
-						: `${totals.fileCount} 个文件 · `}
+						? `${artifactLibraryItems.length} 个文件`
+						: `${artifactLibraryItems.length} 个文件 · `}
 					{(totals.additions !== 0 || totals.deletions !== 0) && (
 						<>
 							<span style={{ color: token.colorSuccess }}>
@@ -214,61 +230,55 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 						</>
 					)}
 				</div>
-				{artifacts.map((a) => {
-					const display = a.relativePath ?? a.path;
-					return (
-						<div key={a.id} style={rowStyle}>
-							<span style={{ flexShrink: 0 }}>
-								{pickFileIcon(a.extension ?? extOf(a.name))}
-							</span>
-							<span
-								className="truncate"
-								title={display}
-								style={{ flex: 1, minWidth: 0 }}
-							>
-								{display}
-							</span>
-							<Button
-								type="link"
-								size="small"
-								style={{ padding: 0, fontSize: 12 }}
-								onClick={() => handleReveal(a.path)}
-							>
-								定位
-							</Button>
-						</div>
-					);
-				})}
-				{changeSets.map((cs) =>
-					cs.files.map((f, idx) => (
-						<div key={`${cs.id}-${idx}`} style={rowStyle}>
-							<span style={{ flexShrink: 0 }}>
-								{pickFileIcon(extOf(f.path))}
-							</span>
-							<span
-								className="truncate"
-								title={f.path}
-								style={{ flex: 1, minWidth: 0 }}
-							>
-								{f.path}
-							</span>
-							<span
-								style={{ color: token.colorSuccess, fontSize: 11 }}
-							>{`+${f.additions}`}</span>
-							<span
-								style={{ color: token.colorError, fontSize: 11 }}
-							>{`-${f.deletions}`}</span>
-							<Button
-								type="link"
-								size="small"
-								style={{ padding: 0, fontSize: 12 }}
-								onClick={() => handleReveal(f.path)}
-							>
-								定位
-							</Button>
-						</div>
-					)),
-				)}
+				{artifactLibraryItems.map((item) => (
+					<div
+						key={item.id}
+						style={rowStyle}
+						data-testid="artifact-library-row"
+						data-kind={item.kind}
+						data-source={item.source}
+					>
+						<span style={{ flexShrink: 0 }}>
+							{pickFileIcon(item.extension ?? extOf(item.name))}
+						</span>
+						<span
+							className="truncate"
+							title={item.displayPath}
+							style={{ flex: 1, minWidth: 0 }}
+						>
+							{item.displayPath}
+						</span>
+						<Tag style={{ fontSize: 11 }}>{item.kind}</Tag>
+						<Tag style={{ fontSize: 11 }}>{item.source}</Tag>
+						{item.additions !== undefined && item.deletions !== undefined && (
+							<>
+								<span
+									style={{ color: token.colorSuccess, fontSize: 11 }}
+								>{`+${item.additions}`}</span>
+								<span
+									style={{ color: token.colorError, fontSize: 11 }}
+								>{`-${item.deletions}`}</span>
+							</>
+						)}
+						<Button
+							type="link"
+							size="small"
+							disabled={!item.canReveal}
+							style={{ padding: 0, fontSize: 12 }}
+							onClick={() => handleReveal(item.fullPath)}
+						>
+							定位
+						</Button>
+						<Button
+							type="link"
+							size="small"
+							style={{ padding: 0, fontSize: 12 }}
+							onClick={() => handleCopyPath(item.fullPath)}
+						>
+							复制
+						</Button>
+					</div>
+				))}
 			</div>
 		);
 
@@ -297,7 +307,10 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 		<div className="flex flex-col">
 			{runtimeRow("沙盒模式", runtime.runtimePolicy.sandboxMode)}
 			{runtimeRow("审批模式", runtime.runtimePolicy.approvalMode)}
-			{runtimeRow("Plan 模式", runtime.planMode)}
+			{runtimeRow(
+				"Plan 模式",
+				AGENT_COMPOSER_MODE_LABEL[toAgentComposerMode(runtime.planMode)],
+			)}
 			{runtimeRow("交互画像", runtime.interactionProfile)}
 		</div>
 	) : (
@@ -386,7 +399,7 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 					items={[
 						{
 							key: "changes",
-							label: <span style={sectionHeaderStyle}>变更</span>,
+							label: <span style={sectionHeaderStyle}>Artifacts / 工件</span>,
 							children: changesContent,
 						},
 						{
