@@ -40,6 +40,8 @@ export interface ChatMessagePersist {
 		name: string;
 		input: Record<string, unknown>;
 		status: "pending" | "awaiting_approval" | "success" | "error";
+		/** Subagent run that owns this tool call, when emitted by a child agent. */
+		subagentRunId?: string;
 		result?: unknown;
 		error?: string;
 		duration?: number;
@@ -173,6 +175,47 @@ export interface WorkspaceContextPolicy {
 	includeWorkspaceKnowledge: boolean;
 	maxAttachmentBytes?: number;
 	ignoreRules?: string[];
+}
+
+export type ContextSourceKind =
+	| "systemPrompt"
+	| "projectRules"
+	| "attachment"
+	| "search"
+	| "history"
+	| "other";
+
+export interface MessageContextSource {
+	id: string;
+	kind: ContextSourceKind;
+	label: string;
+	detail?: string;
+	bytes?: number;
+	pinned?: boolean;
+	injected?: boolean;
+}
+
+export interface ProjectRulesSnapshotFile {
+	filename: "AGENTS.md" | "CLAUDE.md";
+	byteLength: number;
+	sha256: string;
+	truncated: boolean;
+	injected: boolean;
+}
+
+export interface ProjectRulesSnapshotDto {
+	readAt: number;
+	files: ProjectRulesSnapshotFile[];
+}
+
+export interface MessageContextStrategy {
+	mode: "auto" | "compact" | "full";
+	strategy: "full" | "sliding" | "compact" | "summarized";
+	historyCount: number;
+	omittedCount: number;
+	estimatedTokens: number;
+	availableForMessages: number | null;
+	compacted: boolean;
 }
 
 /** 启用的能力 */
@@ -546,6 +589,8 @@ export interface ToolCall {
 	name: string;
 	input: Record<string, unknown>;
 	status: "pending" | "awaiting_approval" | "success" | "error";
+	/** Subagent run that owns this tool call, when the call came from a child agent. */
+	subagentRunId?: string;
 	result?: unknown;
 	error?: string;
 	duration?: number;
@@ -811,6 +856,15 @@ export interface Message {
 		duration?: number;
 		firstTokenMs?: number;
 		tokensPerSecond?: number;
+		contextCompacted?: {
+			compacted: true;
+			summary: string;
+			originalCount: number;
+			compactedAt: number;
+		};
+		contextSources?: MessageContextSource[];
+		contextStrategy?: MessageContextStrategy;
+		projectRulesSnapshot?: ProjectRulesSnapshotDto;
 		source?: "local" | "remote";
 		remoteSender?: { id: string; name: string };
 		remotePlatform?: string;

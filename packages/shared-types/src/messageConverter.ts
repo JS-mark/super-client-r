@@ -51,6 +51,9 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 				ts,
 				name: msg.toolCall.name,
 				input: msg.toolCall.input ?? {},
+				...(msg.toolCall.subagentRunId
+					? { subagentRunId: msg.toolCall.subagentRunId }
+					: {}),
 			},
 		];
 		if (msg.toolCall.status === "success" || msg.toolCall.status === "error") {
@@ -65,6 +68,9 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 					...(typeof msg.toolCall.duration === "number"
 						? { duration: msg.toolCall.duration }
 						: {}),
+					...(msg.toolCall.subagentRunId
+						? { subagentRunId: msg.toolCall.subagentRunId }
+						: {}),
 				});
 			} else {
 				events.push({
@@ -74,6 +80,9 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 					output: msg.toolCall.result ?? "",
 					...(typeof msg.toolCall.duration === "number"
 						? { duration: msg.toolCall.duration }
+						: {}),
+					...(msg.toolCall.subagentRunId
+						? { subagentRunId: msg.toolCall.subagentRunId }
 						: {}),
 				});
 			}
@@ -96,6 +105,9 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 					toolCallId: msg.toolCall.id,
 					ts,
 					error: msg.toolCall.error ?? msg.toolCall.result ?? msg.content,
+					...(msg.toolCall.subagentRunId
+						? { subagentRunId: msg.toolCall.subagentRunId }
+						: {}),
 				},
 			];
 		}
@@ -105,6 +117,9 @@ export function messageToEvents(msg: MessageLike): SessionEvent[] {
 				toolCallId: msg.toolCall.id,
 				ts,
 				output: msg.content,
+				...(msg.toolCall.subagentRunId
+					? { subagentRunId: msg.toolCall.subagentRunId }
+					: {}),
 			},
 		];
 	}

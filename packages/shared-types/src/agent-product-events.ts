@@ -5,7 +5,11 @@ import type {
 	PermissionDecision,
 	ToolResultContent,
 } from "./agent-runtime";
-import type { LLMErrorContext } from "./chat";
+import type {
+	LLMErrorContext,
+	MessageContextStrategy,
+	ProjectRulesSnapshotDto,
+} from "./chat";
 import type {
 	PlanDecisionRecord,
 	PlanExecuteTurnLink,
@@ -30,6 +34,7 @@ export type AgentProductEventType =
 	| "approval.resolved"
 	| "ask.requested"
 	| "ask.answered"
+	| "context.compacted"
 	| "plan.decision"
 	| "execute.turn.created"
 	| "subagent.spawned"
@@ -91,7 +96,11 @@ export interface AgentProductEventBase<
 export type AgentProductEvent =
 	| AgentProductEventBase<
 			"run.started",
-			{ nativeSessionId?: string; model?: string }
+			{
+				nativeSessionId?: string;
+				model?: string;
+				projectRulesSnapshot?: ProjectRulesSnapshotDto;
+			}
 	  >
 	| AgentProductEventBase<"run.status", { status: string }>
 	| AgentProductEventBase<
@@ -164,6 +173,20 @@ export type AgentProductEvent =
 				payload?: Record<string, unknown>;
 			}
 	  >
+	| AgentProductEventBase<
+			"context.compacted",
+			{
+				summaryMessageId: string;
+				summary: string;
+				originalCount: number;
+				compactedAt: number;
+				strategy: MessageContextStrategy;
+				originalMessageIds?: string[];
+				estimatedTokens?: number;
+				summarySource?: "llm" | "fallback";
+				model?: string;
+			}
+	  >
 	| AgentProductEventBase<"plan.decision", { record: PlanDecisionRecord }>
 	| AgentProductEventBase<
 			"execute.turn.created",
@@ -209,6 +232,55 @@ export interface PlanProductEventContext {
 	runtimeSeq?: number;
 	ts?: number;
 	eventIdPrefix?: string;
+}
+
+export interface ContextCompactedProductEventContext {
+	sessionId: string;
+	projectId?: string | null;
+	runId?: string;
+	turnId?: string;
+	requestId?: string;
+	runtime?: AgentRuntimeId | CustomAgentRuntimeId;
+	runtimeSeq?: number;
+	ts?: number;
+	eventIdPrefix?: string;
+}
+
+export interface ContextCompactedProductEventInput {
+	summaryMessageId: string;
+	summary: string;
+	originalCount: number;
+	compactedAt: number;
+	strategy: MessageContextStrategy;
+	originalMessageIds?: string[];
+	estimatedTokens?: number;
+	summarySource?: "llm" | "fallback";
+	model?: string;
+}
+
+export function createContextCompactedProductEvent(
+	input: ContextCompactedProductEventInput,
+	context: ContextCompactedProductEventContext,
+): AgentProductEvent {
+	const eventId = buildContextProductEventId(context, input);
+	return {
+		v: 1,
+		type: "context.compacted",
+		eventId,
+		sourceEventId: eventId,
+		sessionId: context.sessionId,
+		projectId: context.projectId,
+		runId: context.runId,
+		turnId: context.turnId,
+		requestId: context.requestId,
+		runtime: context.runtime,
+		runtimeSeq: context.runtimeSeq,
+		ts: context.ts ?? input.compactedAt,
+		status: "completed",
+		source: "product",
+		persist: true,
+		payload: input,
+	};
 }
 
 export function createPlanDecisionProductEvent(
@@ -337,7 +409,11 @@ export function projectAgentRuntimeEvent(
 			return [
 				build(
 					"run.started",
-					{ nativeSessionId: event.nativeSessionId, model: event.model },
+					{
+						nativeSessionId: event.nativeSessionId,
+						model: event.model,
+						projectRulesSnapshot: event.projectRulesSnapshot,
+					},
 					{ status: "streaming" },
 				),
 			];
@@ -788,6 +864,22 @@ function buildPlanProductEventId(
 ): string {
 	const prefix = context.eventIdPrefix ?? context.requestId ?? context.sessionId;
 	return [prefix, type, ...parts].filter(Boolean).join(":");
+}
+
+function buildContextProductEventId(
+	context: ContextCompactedProductEventContext,
+	input: ContextCompactedProductEventInput,
+): string {
+	const prefix = context.eventIdPrefix ?? context.requestId ?? context.sessionId;
+	return [
+		prefix,
+		"context.compacted",
+		input.summaryMessageId,
+		String(input.compactedAt),
+		String(input.originalCount),
+	]
+		.filter(Boolean)
+		.join(":");
 }
 
 function bareToolName(name: string): string {

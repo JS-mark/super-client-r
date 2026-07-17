@@ -46,3 +46,34 @@ export interface GitCommit {
 	 */
 	refs: string[];
 }
+
+export type WorktreePreflightLevel = "block" | "warn" | "info";
+
+export interface WorktreePreflightIssue {
+	check:
+		| "git-repo"
+		| "target-path"
+		| "branch-name"
+		| "branch-exists"
+		| "dirty"
+		| "submodules"
+		| "lfs"
+		| "upstream";
+	level: WorktreePreflightLevel;
+	message: string;
+}
+
+export interface WorktreePreflightResult {
+	ok: boolean;
+	cwd: string;
+	worktreePath: string;
+	branchName: string;
+	issues: WorktreePreflightIssue[];
+}
+
+export interface CreateWorktreeResult {
+	ok: boolean;
+	error?: string;
+	worktreePath?: string;
+	preflight?: WorktreePreflightResult;
+}
