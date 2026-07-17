@@ -34,7 +34,12 @@ import type {
 	SessionApprovalGrant,
 } from "./chat";
 import type { ExtensionDescriptor } from "./extensions";
-import type { GitBranchInfo, GitCommit } from "./git";
+import type {
+	CreateWorktreeResult,
+	GitBranchInfo,
+	GitCommit,
+	WorktreePreflightResult,
+} from "./git";
 import type {
 	ChatMode,
 	Project,
@@ -74,7 +79,20 @@ export interface SessionContentRefReadResult {
 	text?: string;
 }
 
+export interface SessionMessagesPageResult {
+	messages: Message[];
+	total: number;
+	offset: number;
+	limit: number;
+	hasMore: boolean;
+	nextOffset?: number;
+}
+
 export type SessionArchiveRedactionMode = "home-and-app-data";
+
+export interface SessionArchiveExportOptions {
+	includeChatContent?: boolean;
+}
 
 export interface SessionArchiveFileEntry {
 	path: string;
@@ -109,6 +127,7 @@ export interface SessionArchiveManifest {
 	sessionId: string;
 	projectId: string | null;
 	redactionMode: SessionArchiveRedactionMode;
+	includeChatContent: boolean;
 	/** Redacted export directory recorded inside the manifest. */
 	exportDir: string;
 	files: SessionArchiveFileEntry[];
@@ -125,6 +144,54 @@ export interface SessionArchiveExportResult {
 	/** App-managed absolute manifest path inside exportDir. */
 	manifestPath: string;
 	manifest: SessionArchiveManifest;
+}
+
+export interface ProjectArchiveSessionEntry {
+	sessionId: string;
+	metaPath: string;
+	jsonlPath: string;
+}
+
+export interface ProjectArchiveReferencedPayloadSession {
+	sessionId: string;
+	attachments: SessionArchiveReferencedAttachment[];
+	contentRefs: SessionArchiveReferencedContentRef[];
+}
+
+export interface ProjectArchiveManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion?: string;
+	projectId: string;
+	redactionMode: SessionArchiveRedactionMode;
+	includeChatContent: boolean;
+	/** Redacted export directory recorded inside the manifest. */
+	exportDir: string;
+	sessionCount: number;
+	files: SessionArchiveFileEntry[];
+	project?: {
+		metadataPath?: string;
+		settingsPath?: string;
+	};
+	sessions: ProjectArchiveSessionEntry[];
+	referencedPayloads: {
+		copied: false;
+		sessions: ProjectArchiveReferencedPayloadSession[];
+	};
+}
+
+export interface ProjectArchiveExportResult {
+	/** App-managed absolute export directory for explicit copy/reveal actions. */
+	exportDir: string;
+	/** App-managed absolute manifest path inside exportDir. */
+	manifestPath: string;
+	manifest: ProjectArchiveManifest;
+}
+
+export interface DiagnosticExportResult {
+	exportDir: string;
+	manifestPath: string;
+	diagnosticPath: string;
 }
 
 /** 已迁移到 shared-types 的 ElectronAPI namespace 子集。 */
@@ -218,9 +285,12 @@ export interface ElectronAPIMigrated {
 			cwd: string,
 			worktreePath: string,
 			branchName?: string,
-		) => Promise<
-			IPCResponse<{ ok: boolean; error?: string; worktreePath?: string }>
-		>;
+		) => Promise<IPCResponse<CreateWorktreeResult>>;
+		preflightCreateWorktree: (
+			cwd: string,
+			worktreePath: string,
+			branchName?: string,
+		) => Promise<IPCResponse<WorktreePreflightResult>>;
 		/** List local branches with the currently checked-out one flagged. */
 		listBranches: (
 			cwd: string,
@@ -278,6 +348,10 @@ export interface ElectronAPIMigrated {
 			id: string,
 			patch: Partial<ProjectSettings>,
 		) => Promise<IPCResponse<ProjectSettings>>;
+		exportArchive: (
+			projectId: string,
+			options?: SessionArchiveExportOptions,
+		) => Promise<IPCResponse<ProjectArchiveExportResult>>;
 		listOrphans: () => Promise<
 			IPCResponse<
 				Array<{ projectId: string; cwd: string; sessionCount: number }>
@@ -328,6 +402,10 @@ export interface ElectronAPIMigrated {
 			sessionId: string,
 			range?: { tail?: number },
 		) => Promise<IPCResponse<Message[]>>;
+		readMessagesPage: (
+			sessionId: string,
+			options?: { offset?: number; limit?: number },
+		) => Promise<IPCResponse<SessionMessagesPageResult>>;
 		readContentRef: (
 			sessionId: string,
 			contentRef: string,
@@ -335,6 +413,7 @@ export interface ElectronAPIMigrated {
 		) => Promise<IPCResponse<SessionContentRefReadResult>>;
 		exportArchive: (
 			sessionId: string,
+			options?: SessionArchiveExportOptions,
 		) => Promise<IPCResponse<SessionArchiveExportResult>>;
 		fork: (
 			sourceId: string,
@@ -344,6 +423,11 @@ export interface ElectronAPIMigrated {
 				name?: string;
 			},
 		) => Promise<IPCResponse<SessionMeta>>;
+	};
+
+	/** Diagnostic export API. Renderer cannot provide output paths. */
+	diagnostics: {
+		export: () => Promise<IPCResponse<DiagnosticExportResult>>;
 	};
 
 	/**

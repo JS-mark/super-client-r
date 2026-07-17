@@ -18,7 +18,9 @@
 
 import type {
 	EffectiveSessionRuntime,
+	AssistantPartEvent,
 	LLMErrorContext,
+	ProjectRulesSnapshotDto,
 	SessionApprovalGrant,
 } from "./chat";
 
@@ -217,6 +219,7 @@ export type AgentRuntimeStreamEvent =
 	| AgentTextDeltaEvent
 	| AgentReasoningDeltaEvent
 	| AgentMessageFinalEvent
+	| AgentAssistantPartRuntimeEvent
 	| AgentToolCallEvent
 	| AgentToolResultEvent
 	| AgentPermissionRequestEvent
@@ -256,6 +259,7 @@ export interface AgentInitEvent extends AgentEventBase {
 	/** Adapter 拿到的原生 session id；renderer 应回写到 `SessionMeta.nativeSessionId` */
 	nativeSessionId?: string;
 	model?: string;
+	projectRulesSnapshot?: ProjectRulesSnapshotDto;
 }
 
 export interface AgentTextDeltaEvent extends AgentEventBase {
@@ -277,6 +281,11 @@ export interface AgentMessageFinalEvent extends AgentEventBase {
 	messageId: string;
 	text: string;
 	reasoning?: string;
+}
+
+export interface AgentAssistantPartRuntimeEvent extends AgentEventBase {
+	type: "assistant.part";
+	partEvent: AssistantPartEvent;
 }
 
 export interface AgentToolCallEvent extends AgentEventBase {

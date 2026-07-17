@@ -80,6 +80,8 @@ export interface AgentSDKStreamEvent {
 	type: AgentSDKStreamEventType;
 	/** session ID（Agent SDK 分配的） */
 	sessionId?: string;
+	/** 子代理运行 id；子代理内部 tool events 透传到父 transcript 时使用。 */
+	subagentRunId?: string;
 	/** 文本内容（chunk / result） */
 	content?: string;
 	/** 错误信息 */
