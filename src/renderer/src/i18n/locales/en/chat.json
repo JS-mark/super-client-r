@@ -214,7 +214,17 @@
 			"unknown": "Model context window unknown"
 		},
 		"sources": {
-			"header": "Injected sources"
+			"header": "Injected sources",
+			"pin": "Pin source",
+			"unpin": "Unpin source"
+		},
+		"strategy": {
+			"label": "History strategy",
+			"detail": "{{historyCount}} sent · {{omittedCount}} omitted",
+			"full": "full",
+			"sliding": "sliding",
+			"compact": "compact",
+			"summarized": "summarized"
 		},
 		"chips": {
 			"systemPrompt": "System prompt",
@@ -321,6 +331,16 @@
 		"contextCount": "Context Messages",
 		"contextCountDesc": "Number of previous messages to include as context. More context enables better continuity but uses more tokens.",
 		"contextUnlimited": "No limit",
+		"contextMode": "Context Mode",
+		"contextModeDesc": "Choose how conversation history is sent to the agent.",
+		"contextModeAuto": "Auto",
+		"contextModeCompact": "Compact",
+		"contextModeFull": "Full",
+		"contextModeHint": {
+			"auto": "Auto keeps recent history and compacts older messages when the token budget is tight.",
+			"compact": "Compact summarizes older messages first to reduce token use.",
+			"full": "Full sends all selected history without compaction."
+		},
 		"streaming": "Streaming Output",
 		"streamingDesc": "Stream response tokens in real-time. Disable to receive the full response at once.",
 		"systemPrompt": "System Prompt",

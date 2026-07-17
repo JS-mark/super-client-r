@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+	buildContextMetadataForRuntime,
+	getPinnedContextSources,
 	loadRuntimeToolsForRequest,
+	persistContextCompactedEventForRuntime,
+	prepareHistoryForRuntime,
+	prepareHistoryForRuntimeWithSummary,
 	resolveModelForRequest,
 	runtimeCreateFailureHandler,
 } from "../useAgentSendPipeline";
+import type { Message } from "../../stores/chatMessageStore";
 import type { EffectiveProviderModelResolution } from "../useMessageModelResolution";
 
 function makeResolution(
@@ -140,6 +146,360 @@ describe("loadRuntimeToolsForRequest", () => {
 			skillToolsLoader: async () => [],
 		});
 		expect(bindings.map((b) => b.name)).toEqual(["srv1__a"]);
+	});
+});
+
+describe("prepareHistoryForRuntime", () => {
+	function message(id: string, role: Message["role"], content: string): Message {
+		return { id, role, content, timestamp: Number(id.slice(1)) || 1 };
+	}
+
+	it("excludes the current user turn and assistant placeholder", () => {
+		const result = prepareHistoryForRuntime({
+			messages: [
+				message("m1", "user", "first"),
+				message("m2", "assistant", "second"),
+				message("m3", "user", "current"),
+				message("m4", "assistant", ""),
+			],
+			contextCount: -1,
+			contextMode: "full",
+			contextWindow: null,
+			systemPromptText: "",
+			runtimeTools: [],
+		});
+		expect(result.history).toEqual([
+			{ role: "user", content: [{ type: "text", text: "first" }] },
+			{ role: "assistant", content: [{ type: "text", text: "second" }] },
+		]);
+	});
+
+	it("honors contextCount as a hard sliding window", () => {
+		const result = prepareHistoryForRuntime({
+			messages: [
+				message("m1", "user", "one"),
+				message("m2", "assistant", "two"),
+				message("m3", "user", "three"),
+				message("m4", "assistant", "four"),
+				message("m5", "user", "current"),
+				message("m6", "assistant", ""),
+			],
+			contextCount: 2,
+			contextMode: "full",
+			contextWindow: null,
+			systemPromptText: "",
+			runtimeTools: [],
+		});
+		expect(result.metadata.strategy).toBe("sliding");
+		expect(result.metadata.historyCount).toBe(2);
+		expect(result.history.map((item) => item.content[0])).toEqual([
+			{ type: "text", text: "three" },
+			{ type: "text", text: "four" },
+		]);
+	});
+
+	it("returns contextCompacted marker when compact mode summarizes history", () => {
+		const result = prepareHistoryForRuntime({
+			messages: [
+				message("m1", "user", "one"),
+				message("m2", "assistant", "two"),
+				message("m3", "user", "three"),
+				message("m4", "assistant", "four"),
+				message("m5", "user", "current"),
+				message("m6", "assistant", ""),
+			],
+			contextCount: -1,
+			contextMode: "compact",
+			contextWindow: null,
+			systemPromptText: "",
+			runtimeTools: [],
+		});
+		expect(result.metadata.strategy).toBe("compact");
+		expect(result.metadata.compacted).toBe(true);
+		expect(result.contextCompacted?.compacted).toBe(true);
+		expect(result.contextCompacted?.originalCount).toBe(2);
+		expect(result.contextCompactedEvent).toMatchObject({
+			summaryMessageId: expect.stringContaining("context_summary_"),
+			originalCount: 2,
+			summarySource: "fallback",
+			strategy: {
+				strategy: "compact",
+				compacted: true,
+			},
+		});
+	});
+
+	it("uses injected LLM summarizer when compacting context", async () => {
+		const summarizeContext = vi.fn(async () => "LLM summary of prior context");
+		const result = await prepareHistoryForRuntimeWithSummary({
+			messages: [
+				message("m1", "user", "one"),
+				message("m2", "assistant", "two"),
+				message("m3", "user", "three"),
+				message("m4", "assistant", "four"),
+				message("m5", "user", "current"),
+				message("m6", "assistant", ""),
+			],
+			contextCount: -1,
+			contextMode: "compact",
+			contextWindow: null,
+			systemPromptText: "",
+			runtimeTools: [],
+			summarizeContext,
+		});
+
+		expect(summarizeContext).toHaveBeenCalledWith({
+			text: expect.stringContaining("user: one"),
+			originalCount: 2,
+			strategy: "compact",
+		});
+		expect(result.contextCompacted?.summary).toBe(
+			"LLM summary of prior context",
+		);
+		expect(result.contextCompactedEvent).toMatchObject({
+			summary: "LLM summary of prior context",
+			summarySource: "llm",
+		});
+		expect(result.history[0].content[0]).toEqual({
+			type: "text",
+			text: "LLM summary of prior context",
+		});
+	});
+});
+
+describe("buildContextMetadataForRuntime", () => {
+	it("builds source chips and strategy metadata from the send context", () => {
+		const metadata = buildContextMetadataForRuntime({
+			promptContext: {
+				cwd: "/repo",
+				mcpServerNames: ["filesystem"],
+				customSystemPrompt: "system",
+				prompt: "prompt",
+				attachmentCount: 2,
+				searchResultCount: 3,
+				warnings: [],
+			},
+			historyMetadata: {
+				mode: "auto",
+				strategy: "summarized",
+				historyCount: 4,
+				omittedCount: 2,
+				estimatedTokens: 900,
+				availableForMessages: 800,
+				compacted: true,
+			},
+			runtimeToolCount: 1,
+		});
+		expect(metadata.contextSources.map((source) => source.kind)).toEqual([
+			"systemPrompt",
+			"projectRules",
+			"attachment",
+			"search",
+			"history",
+			"other",
+		]);
+		expect(metadata.contextStrategy).toEqual({
+			mode: "auto",
+			strategy: "summarized",
+			historyCount: 4,
+			omittedCount: 2,
+			estimatedTokens: 900,
+			availableForMessages: 800,
+			compacted: true,
+		});
+	});
+
+	it("preserves pinned source state across regenerated metadata", () => {
+		const metadata = buildContextMetadataForRuntime({
+			promptContext: {
+				cwd: "/repo",
+				mcpServerNames: [],
+				customSystemPrompt: "",
+				prompt: "prompt",
+				attachmentCount: 0,
+				searchResultCount: 0,
+				warnings: [],
+			},
+			historyMetadata: {
+				mode: "auto",
+				strategy: "full",
+				historyCount: 0,
+				omittedCount: 0,
+				estimatedTokens: 100,
+				availableForMessages: 1000,
+				compacted: false,
+			},
+			runtimeToolCount: 0,
+			pinnedSources: [
+				{
+					id: "project-rules",
+					kind: "projectRules",
+					label: "Project rules",
+					pinned: true,
+					injected: false,
+				},
+				{
+					id: "search-results",
+					kind: "search",
+					label: "Previous search",
+					pinned: true,
+					injected: true,
+				},
+			],
+		});
+		expect(
+			metadata.contextSources.find((source) => source.id === "project-rules")
+				?.pinned,
+		).toBe(true);
+		expect(
+			metadata.contextSources.some((source) => source.id === "search-results"),
+		).toBe(false);
+	});
+});
+
+describe("getPinnedContextSources", () => {
+	it("returns pinned sources from the latest context metadata message", () => {
+		const messages: Message[] = [
+			{
+				id: "a1",
+				role: "assistant",
+				content: "old",
+				timestamp: 1,
+				metadata: {
+					contextSources: [
+						{
+							id: "system-prompt",
+							kind: "systemPrompt",
+							label: "System prompt",
+							pinned: true,
+						},
+					],
+				},
+			} as Message,
+			{
+				id: "a2",
+				role: "assistant",
+				content: "new",
+				timestamp: 2,
+				metadata: {
+					contextSources: [
+						{
+							id: "project-rules",
+							kind: "projectRules",
+							label: "Project rules",
+							pinned: true,
+						},
+						{
+							id: "conversation-history",
+							kind: "history",
+							label: "1 history message",
+						},
+					],
+				},
+			} as Message,
+		];
+		expect(getPinnedContextSources(messages)).toEqual([
+			{
+				id: "project-rules",
+				kind: "projectRules",
+				label: "Project rules",
+				pinned: true,
+			},
+		]);
+	});
+});
+
+describe("persistContextCompactedEventForRuntime", () => {
+	it("appends a replayable compact summary session event", async () => {
+		const appendSessionEvent = vi.fn(async () => undefined);
+		await persistContextCompactedEventForRuntime(
+			{
+				conversationId: "session-1",
+				requestId: "req-1",
+				runtimeId: "run-1",
+				model: "claude-3",
+				contextCompactedEvent: {
+					summaryMessageId: "context-summary-1",
+					summary: "Summary of earlier context",
+					originalCount: 3,
+					compactedAt: 1782100001000,
+					estimatedTokens: 512,
+					summarySource: "fallback",
+					strategy: {
+						mode: "compact",
+						strategy: "compact",
+						historyCount: 4,
+						omittedCount: 3,
+						estimatedTokens: 512,
+						availableForMessages: null,
+						compacted: true,
+					},
+				},
+			},
+			{ appendSessionEvent },
+		);
+
+		expect(appendSessionEvent).toHaveBeenCalledWith(
+			"session-1",
+			expect.objectContaining({
+				type: "assistant_message",
+				id: "context-summary-1",
+				content: "Summary of earlier context",
+				eventId:
+					"context-req-1:context.compacted:context-summary-1:1782100001000:3",
+				metadata: expect.objectContaining({
+					contextCompacted: expect.objectContaining({
+						compacted: true,
+						originalCount: 3,
+					}),
+					contextStrategy: expect.objectContaining({
+						strategy: "compact",
+					}),
+				}),
+			}),
+		);
+	});
+
+	it("swallows append failures and logs a warning", async () => {
+		const warn = vi.fn();
+		await persistContextCompactedEventForRuntime(
+			{
+				conversationId: "session-1",
+				requestId: "req-1",
+				runtimeId: "run-1",
+				contextCompactedEvent: {
+					summaryMessageId: "context-summary-1",
+					summary: "Summary",
+					originalCount: 1,
+					compactedAt: 1782100001000,
+					summarySource: "fallback",
+					strategy: {
+						mode: "compact",
+						strategy: "compact",
+						historyCount: 2,
+						omittedCount: 1,
+						estimatedTokens: 128,
+						availableForMessages: null,
+						compacted: true,
+					},
+				},
+			},
+			{
+				appendSessionEvent: async () => {
+					throw new Error("disk full");
+				},
+				log: { warn },
+			},
+		);
+
+		expect(warn).toHaveBeenCalledWith(
+			"Context compacted event persistence failed",
+			expect.objectContaining({
+				requestId: "req-1",
+				conversationId: "session-1",
+				error: "disk full",
+			}),
+		);
 	});
 });
 

@@ -7,6 +7,8 @@ import type { AgentSDKStreamEvent } from "@super-client/shared-types/agent-sdk";
 import type {
 	AssistantPartEvent,
 	ChatSessionStatus,
+	MessageContextSource,
+	ProjectRulesSnapshotDto,
 } from "@super-client/shared-types/chat";
 import type { Message, ToolCall } from "../stores/chatMessageStore";
 import { sanitizeAssistantContent } from "../lib/assistantContent";
@@ -107,6 +109,48 @@ function lastMessage(messages: Message[]): Message | undefined {
 	return messages[messages.length - 1];
 }
 
+function projectRulesSnapshotDetail(snapshot: ProjectRulesSnapshotDto): string {
+	return snapshot.files
+		.map((file) => {
+			const hash = file.sha256 ? ` sha256:${file.sha256.slice(0, 8)}` : "";
+			const truncated = file.truncated ? " truncated" : "";
+			return `${file.filename} ${file.byteLength} B${truncated}${hash}`;
+		})
+		.join(" · ");
+}
+
+export function mergeProjectRulesSnapshotSources(
+	sources: readonly MessageContextSource[] | undefined,
+	snapshot: ProjectRulesSnapshotDto,
+): MessageContextSource[] {
+	const base = sources ? [...sources] : [];
+	if (snapshot.files.length === 0) return base;
+	const bytes = snapshot.files.reduce((sum, file) => sum + file.byteLength, 0);
+	const projectRulesSource: MessageContextSource = {
+		id: "project-rules",
+		kind: "projectRules",
+		label: "Project rules",
+		detail: projectRulesSnapshotDetail(snapshot),
+		bytes,
+		injected: snapshot.files.some((file) => file.injected),
+	};
+	const existingIndex = base.findIndex(
+		(source) =>
+			source.id === projectRulesSource.id || source.kind === "projectRules",
+	);
+	if (existingIndex === -1) return [...base, projectRulesSource];
+	return base.map((source, index) =>
+		index === existingIndex
+			? {
+					...source,
+					detail: projectRulesSource.detail,
+					bytes: projectRulesSource.bytes,
+					injected: projectRulesSource.injected,
+				}
+			: source,
+	);
+}
+
 function terminalActions(
 	context: AgentEventReducerContext,
 	agentSDKRequest?: boolean,
@@ -153,6 +197,7 @@ function updateToolResultActions(
 		result: unknown;
 		isError?: boolean;
 		duration?: number;
+		subagentRunId?: string;
 	},
 ): AgentEventReducerAction[] {
 	return [
@@ -165,6 +210,9 @@ function updateToolResultActions(
 				result: args.result,
 				error: args.isError ? String(args.result) : undefined,
 				duration: args.duration,
+				...(args.subagentRunId
+					? { subagentRunId: args.subagentRunId }
+					: {}),
 			},
 		},
 		{ type: "add_message", message: buildAssistantMessage(context) },
@@ -259,6 +307,9 @@ export function reduceAgentSDKStreamEvent(
 						name: event.toolCall.name,
 						input: event.toolCall.input || {},
 						status: "pending",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						approval: {
 							kind: event.toolCall.kind,
 							title: event.toolCall.title,
@@ -320,6 +371,9 @@ export function reduceAgentSDKStreamEvent(
 						name: event.toolError.name,
 						input: event.toolError.input || {},
 						status: "error",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						result: event.toolError.error,
 						error:
 							typeof event.toolError.error === "string"
@@ -348,6 +402,9 @@ export function reduceAgentSDKStreamEvent(
 						name: event.permissionRequest.toolName,
 						input: event.permissionRequest.toolInput || {},
 						status: "awaiting_approval",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						approval: {
 							kind: isAskUserQuestionToolName(event.permissionRequest.toolName)
 								? "ask-user-question"
@@ -379,6 +436,9 @@ export function reduceAgentSDKStreamEvent(
 						name: event.toolCall.name,
 						input: event.toolCall.input || {},
 						status: "error",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						error: event.error || "Permission denied",
 						approval: {
 							kind: "permission",
@@ -476,20 +536,32 @@ export function reduceAgentRuntimeStreamEvent(
 	switch (event.type) {
 		case "init": {
 			const actions: AgentEventReducerAction[] = [];
+			const lastAssistant = lastMessage(context.messages);
+			const metadata: Partial<NonNullable<Message["metadata"]>> = {};
 			if (event.nativeSessionId) {
 				actions.push({
 					type: "remember_session",
 					sessionId: event.nativeSessionId,
 					target: "runtime",
 				});
-				const lastAssistant = lastMessage(context.messages);
-				if (lastAssistant?.role === "assistant") {
-					actions.push({
-						type: "update_message_metadata",
-						messageId: lastAssistant.id,
-						metadata: { nativeSessionId: event.nativeSessionId },
-					});
-				}
+				metadata.nativeSessionId = event.nativeSessionId;
+			}
+			if (event.projectRulesSnapshot) {
+				metadata.projectRulesSnapshot = event.projectRulesSnapshot;
+				metadata.contextSources = mergeProjectRulesSnapshotSources(
+					lastAssistant?.metadata?.contextSources,
+					event.projectRulesSnapshot,
+				);
+			}
+			if (
+				lastAssistant?.role === "assistant" &&
+				Object.keys(metadata).length > 0
+			) {
+				actions.push({
+					type: "update_message_metadata",
+					messageId: lastAssistant.id,
+					metadata,
+				});
 			}
 			actions.push({ type: "set_session_status", status: "streaming" });
 			return actions;
@@ -510,6 +582,18 @@ export function reduceAgentRuntimeStreamEvent(
 				{ type: "update_last_message", content: event.text },
 			];
 
+		case "assistant.part": {
+			const assistant = lastAssistantMessage(context.messages);
+			if (!assistant) return [];
+			return [
+				{
+					type: "apply_assistant_part",
+					messageId: assistant.id,
+					event: event.partEvent,
+				},
+			];
+		}
+
 		case "tool.call":
 			return [
 				...actionsBeforeToolPatch(context),
@@ -520,6 +604,9 @@ export function reduceAgentRuntimeStreamEvent(
 						name: event.toolName,
 						input: coerceToolInput(event.input),
 						status: "pending",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						approval: {
 							kind: isAskUserQuestionToolName(event.toolName)
 								? "ask-user-question"
@@ -535,6 +622,7 @@ export function reduceAgentRuntimeStreamEvent(
 				toolUseId: event.callId,
 				result: toolResultText(event.content),
 				isError: event.isError,
+				subagentRunId: event.subagentRunId,
 			});
 
 		case "permission.request":
@@ -547,6 +635,9 @@ export function reduceAgentRuntimeStreamEvent(
 						name: event.toolName,
 						input: coerceToolInput(event.input),
 						status: "awaiting_approval",
+						...(event.subagentRunId
+							? { subagentRunId: event.subagentRunId }
+							: {}),
 						approval: {
 							kind: isAskUserQuestionToolName(event.toolName)
 								? "ask-user-question"

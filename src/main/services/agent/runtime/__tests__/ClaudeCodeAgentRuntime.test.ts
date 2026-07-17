@@ -1,4 +1,7 @@
 // @vitest-environment node
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	AgentQueryRequest,
@@ -197,6 +200,83 @@ describe("ClaudeCodeAgentRuntime", () => {
 		expect(body.model).toBe("test-model");
 		expect(body.providerPreset).toBe("openai");
 		expect(body.apiFormat).toBe("chat-completions");
+	});
+
+	it("converts PromptPart[] history text into chat request messages", async () => {
+		const runtime = new ClaudeCodeAgentRuntime();
+		for await (const _ev of runtime.createQuery(
+			makeReq({
+				history: [
+					{
+						role: "user",
+						content: [{ type: "text", text: "previous user" }],
+					},
+					{
+						role: "assistant",
+						content: [
+							{ type: "text", text: "previous assistant" },
+							{
+								type: "image",
+								source: { id: "img", mime: "image/png", uri: "internal://img" },
+							},
+						],
+					},
+					{
+						role: "tool",
+						content: [{ type: "text", text: "tool output" }],
+					},
+				],
+			}),
+		)) {
+			/* drain */
+		}
+		const body = JSON.parse(String(lastFetchInit?.body));
+		expect(body.messages).toEqual([
+			expect.objectContaining({ role: "system" }),
+			{ role: "user", content: "previous user" },
+			{ role: "assistant", content: "previous assistant" },
+			{ role: "user", content: "hello" },
+		]);
+	});
+
+	it("injects read-only AGENTS.md and CLAUDE.md project rules into the system prompt", async () => {
+		const cwd = await mkdtemp(join(tmpdir(), "scr-rules-"));
+		try {
+			await writeFile(join(cwd, "AGENTS.md"), "Always run focused tests.");
+			await writeFile(join(cwd, "CLAUDE.md"), "Prefer concise answers.");
+			const runtime = new ClaudeCodeAgentRuntime();
+			const events: AgentRuntimeStreamEvent[] = [];
+			for await (const ev of runtime.createQuery(makeReq({ cwd }))) {
+				events.push(ev);
+			}
+			const body = JSON.parse(String(lastFetchInit?.body));
+			const system = body.messages[0].content as string;
+			expect(system).toContain("# Project rules");
+			expect(system).toContain("## AGENTS.md");
+			expect(system).toContain("Always run focused tests.");
+			expect(system).toContain("## CLAUDE.md");
+			expect(system).toContain("Prefer concise answers.");
+			const init = events.find((event) => event.type === "init");
+			expect(init).toMatchObject({
+				type: "init",
+				projectRulesSnapshot: {
+					files: [
+						expect.objectContaining({
+							filename: "AGENTS.md",
+							injected: true,
+						}),
+						expect.objectContaining({
+							filename: "CLAUDE.md",
+							injected: true,
+						}),
+					],
+				},
+			});
+			expect(JSON.stringify(init)).not.toContain("Always run focused tests.");
+			expect(JSON.stringify(init)).not.toContain("Prefer concise answers.");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
 	});
 
 	it("emits error event when HTTP returns non-2xx", async () => {

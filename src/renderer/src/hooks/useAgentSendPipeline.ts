@@ -26,16 +26,30 @@
 import { useCallback, type MutableRefObject } from "react";
 import { t } from "i18next";
 import { App } from "antd";
-import type { LLMErrorContext } from "@super-client/shared-types/chat";
 import type {
+	LLMErrorContext,
+	MessageContextSource,
+	MessageContextStrategy,
+} from "@super-client/shared-types/chat";
+import type {
+	ContextCompactedProductEventInput,
+} from "@super-client/shared-types/agent-product-events";
+import type {
+	AgentHistoryMessage,
 	AgentToolBinding,
 } from "@super-client/shared-types/agent-runtime";
 import type { ChatSessionStatus } from "@super-client/shared-types/chat";
+import type { SessionEvent } from "@super-client/shared-types/project";
+import type { Message } from "../stores/chatMessageStore";
 import { agentRuntimeClient } from "../services/agent/agentRuntimeClient";
+import { createContextSummarizer } from "../services/agent/contextSummarizer";
 import {
 	buildAgentRuntimePromptText,
 	buildAgentRuntimeToolBindings,
 } from "../services/agent/agentRuntimeStreamAdapter";
+import { createContextCompactedSessionEvents } from "../lib/contextEventPersistence";
+import { applyContextStrategy } from "../lib/contextManager";
+import { estimateTokensSync } from "../lib/tokenizer";
 import { mcpClient } from "../services/mcp/mcpService";
 import { skillClient } from "../services/skill/skillService";
 import { createLogger } from "../services/logService";
@@ -75,6 +89,322 @@ export interface SkillSendOptions {
 	searchEngine?: string;
 	searchConfigs?: SearchConfig[];
 	attachmentIds?: string[];
+}
+
+export interface PrepareHistoryForRuntimeInput {
+	messages: Message[];
+	contextCount: number;
+	contextMode: "auto" | "compact" | "full";
+	contextWindow: number | null;
+	systemPromptText: string;
+	runtimeTools: readonly AgentToolBinding[];
+	summarizeContext?: (input: {
+		text: string;
+		originalCount: number;
+		strategy: "compact" | "summarized";
+	}) => Promise<string>;
+}
+
+type PreparedHistoryForRuntime = {
+	history: AgentHistoryMessage[];
+	contextCompacted?: NonNullable<Message["metadata"]>["contextCompacted"];
+	contextCompactedEvent?: ContextCompactedProductEventInput;
+	summaryInput?: string;
+	metadata: {
+		mode: "auto" | "compact" | "full";
+		strategy: "full" | "sliding" | "compact" | "summarized";
+		omittedCount: number;
+		estimatedTokens: number;
+		availableForMessages: number | null;
+		historyCount: number;
+		compacted: boolean;
+	};
+};
+
+export function prepareHistoryForRuntime({
+	messages,
+	contextCount,
+	contextMode,
+	contextWindow,
+	systemPromptText,
+	runtimeTools,
+}: PrepareHistoryForRuntimeInput): PreparedHistoryForRuntime {
+	const historicalMessages = messages.slice(0, -2);
+	const toolsText = runtimeTools
+		.map((tool) =>
+			JSON.stringify({
+				name: tool.name,
+				description: tool.description,
+				inputSchema: tool.inputSchema,
+			}),
+		)
+		.join("\n");
+	const result = applyContextStrategy({
+		messages: historicalMessages,
+		contextCount,
+		contextMode,
+		budget: {
+			contextWindow,
+			systemPromptTokens: estimateTokensSync(systemPromptText),
+			toolsTokens: estimateTokensSync(toolsText),
+		},
+	});
+	const metadata = {
+		mode: result.mode,
+		strategy: result.strategy,
+		omittedCount: result.omittedCount,
+		estimatedTokens: result.estimatedTokens,
+		availableForMessages: result.budget.availableForMessages,
+		historyCount: result.history.length,
+		compacted: Boolean(result.summaryMessage),
+	};
+	const compactedMarker = result.summaryMessage?.metadata?.contextCompacted;
+	const contextCompactedEvent =
+		result.summaryMessage && compactedMarker
+			? {
+					summaryMessageId: result.summaryMessage.id,
+					summary: compactedMarker.summary ?? result.summaryMessage.content,
+					originalCount: compactedMarker.originalCount ?? result.omittedCount,
+					compactedAt:
+						compactedMarker.compactedAt ?? result.summaryMessage.timestamp,
+					strategy: metadata,
+					estimatedTokens: result.estimatedTokens,
+					summarySource: "fallback" as const,
+				}
+			: undefined;
+	return {
+		history: result.history,
+		contextCompacted: compactedMarker,
+		contextCompactedEvent,
+		summaryInput: result.summaryInput,
+		metadata,
+	};
+}
+
+export async function prepareHistoryForRuntimeWithSummary(
+	input: PrepareHistoryForRuntimeInput,
+): Promise<PreparedHistoryForRuntime> {
+	const prepared = prepareHistoryForRuntime(input);
+	if (
+		!input.summarizeContext ||
+		!prepared.summaryInput ||
+		!prepared.contextCompacted ||
+		!prepared.contextCompactedEvent ||
+		(prepared.metadata.strategy !== "compact" &&
+			prepared.metadata.strategy !== "summarized")
+	) {
+		return prepared;
+	}
+
+	let summary: string;
+	try {
+		summary = (
+			await input.summarizeContext({
+				text: prepared.summaryInput,
+				originalCount: prepared.contextCompacted.originalCount,
+				strategy: prepared.metadata.strategy,
+			})
+		).trim();
+	} catch (error) {
+		agentLog.warn("Context LLM summarization failed; using fallback summary", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return prepared;
+	}
+	if (!summary) return prepared;
+
+	const history = prepared.history.map((item, index) => {
+		if (index !== 0 || item.role !== "assistant") return item;
+		return {
+			...item,
+			content: item.content.map((part, partIndex) =>
+				partIndex === 0 && part.type === "text"
+					? { ...part, text: summary }
+					: part,
+			),
+		};
+	});
+	return {
+		...prepared,
+		history,
+		contextCompacted: {
+			...prepared.contextCompacted,
+			summary,
+		},
+		contextCompactedEvent: {
+			...prepared.contextCompactedEvent,
+			summary,
+			summarySource: "llm",
+		},
+	};
+}
+
+export function getPinnedContextSources(
+	messages: Message[],
+): MessageContextSource[] {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const sources = messages[i].metadata?.contextSources?.filter(
+			(source) => source.pinned,
+		);
+		if (sources?.length) {
+			return sources.map((source) => ({ ...source, pinned: true }));
+		}
+	}
+	return [];
+}
+
+export function mergePinnedContextSources(
+	sources: MessageContextSource[],
+	pinnedSources: MessageContextSource[],
+): MessageContextSource[] {
+	if (pinnedSources.length === 0) return sources;
+	const pinnedById = new Map(
+		pinnedSources.map((source) => [source.id, source] as const),
+	);
+	return sources.map((source) => {
+		const pinnedSource = pinnedById.get(source.id);
+		if (!pinnedSource) return source;
+		return { ...source, pinned: true };
+	});
+}
+
+export function buildContextMetadataForRuntime(input: {
+	promptContext: BuildPromptContextOutput;
+	historyMetadata: ReturnType<typeof prepareHistoryForRuntime>["metadata"];
+	runtimeToolCount: number;
+	pinnedSources?: MessageContextSource[];
+}): {
+	contextSources: MessageContextSource[];
+	contextStrategy: MessageContextStrategy;
+} {
+	const sources: MessageContextSource[] = [];
+
+	sources.push({
+		id: "system-prompt",
+		kind: "systemPrompt",
+		label: "System prompt",
+		injected: true,
+	});
+
+	if (input.promptContext.cwd) {
+		sources.push({
+			id: "project-rules",
+			kind: "projectRules",
+			label: "Project rules runtime check",
+			detail: "AGENTS.md / CLAUDE.md",
+			injected: false,
+		});
+	}
+
+	if (input.promptContext.attachmentCount > 0) {
+		sources.push({
+			id: "attachments",
+			kind: "attachment",
+			label:
+				input.promptContext.attachmentCount === 1
+					? "1 attachment"
+					: `${input.promptContext.attachmentCount} attachments`,
+			detail: "Current turn",
+			injected: true,
+		});
+	}
+
+	if (input.promptContext.searchResultCount > 0) {
+		sources.push({
+			id: "search-results",
+			kind: "search",
+			label:
+				input.promptContext.searchResultCount === 1
+					? "1 search result"
+					: `${input.promptContext.searchResultCount} search results`,
+			injected: true,
+		});
+	}
+
+	if (input.historyMetadata.historyCount > 0) {
+		sources.push({
+			id: "conversation-history",
+			kind: "history",
+			label:
+				input.historyMetadata.historyCount === 1
+					? "1 history message"
+					: `${input.historyMetadata.historyCount} history messages`,
+			detail:
+				input.historyMetadata.omittedCount > 0
+					? `${input.historyMetadata.omittedCount} omitted`
+					: undefined,
+			injected: true,
+		});
+	}
+
+	if (input.runtimeToolCount > 0) {
+		sources.push({
+			id: "runtime-tools",
+			kind: "other",
+			label:
+				input.runtimeToolCount === 1
+					? "1 runtime tool"
+					: `${input.runtimeToolCount} runtime tools`,
+			injected: true,
+		});
+	}
+
+	return {
+		contextSources: mergePinnedContextSources(sources, input.pinnedSources ?? []),
+		contextStrategy: {
+			mode: input.historyMetadata.mode,
+			strategy: input.historyMetadata.strategy,
+			historyCount: input.historyMetadata.historyCount,
+			omittedCount: input.historyMetadata.omittedCount,
+			estimatedTokens: input.historyMetadata.estimatedTokens,
+			availableForMessages: input.historyMetadata.availableForMessages,
+			compacted: input.historyMetadata.compacted,
+		},
+	};
+}
+
+export async function persistContextCompactedEventForRuntime(
+	input: {
+		conversationId: string;
+		requestId: string;
+		runtimeId: string;
+		model?: string;
+		contextCompactedEvent?: ContextCompactedProductEventInput;
+	},
+	deps: {
+		appendSessionEvent?: (
+			sessionId: string,
+			event: SessionEvent,
+		) => Promise<unknown> | unknown;
+		log?: {
+			warn: (message: string, meta?: Record<string, unknown>) => void;
+		};
+	},
+): Promise<void> {
+	if (!input.contextCompactedEvent || !deps.appendSessionEvent) return;
+	const events = createContextCompactedSessionEvents(
+		{
+			...input.contextCompactedEvent,
+			...(input.model ? { model: input.model } : {}),
+		},
+		{
+			sessionId: input.conversationId,
+			requestId: input.requestId,
+			runId: input.runtimeId,
+			eventIdPrefix: `context-${input.requestId}`,
+		},
+	);
+	for (const event of events) {
+		try {
+			await deps.appendSessionEvent(input.conversationId, event);
+		} catch (error) {
+			deps.log?.warn("Context compacted event persistence failed", {
+				requestId: input.requestId,
+				conversationId: input.conversationId,
+				error: error instanceof Error ? error.message : String(error),
+			});
+		}
+	}
 }
 
 /**
@@ -228,6 +558,14 @@ export interface UseAgentSendPipelineOptions {
 	};
 	messageStoreApi: {
 		setSessionStatus: (status: ChatSessionStatus) => void;
+		updateMessageMetadata: (
+			messageId: string,
+			metadata: Partial<NonNullable<Message["metadata"]>>,
+		) => void;
+		appendSessionEvent?: (
+			sessionId: string,
+			event: SessionEvent,
+		) => Promise<unknown> | unknown;
 	};
 	buildPromptContext: (
 		input: BuildPromptContextInput,
@@ -240,7 +578,13 @@ export interface UseAgentSendPipelineOptions {
 		summary: string,
 		errorContext?: LLMErrorContext,
 	) => void;
-	getSessionSettings: () => { systemPrompt?: string };
+	getSessionSettings: () => {
+		systemPrompt?: string;
+		contextCount?: number;
+		contextMode?: "auto" | "compact" | "full";
+	};
+	getMessages: () => Message[];
+	summarizeContext?: PrepareHistoryForRuntimeInput["summarizeContext"];
 	getSelectedSkillId: () => string | null;
 	/** Optional injection points used mainly for tests. */
 	runtime?: {
@@ -289,6 +633,8 @@ export function useAgentSendPipeline(
 				resolveActiveProviderModel,
 				currentModelInfoRef,
 				getSessionSettings,
+				getMessages,
+				summarizeContext,
 				getSelectedSkillId,
 				runtime,
 			} = opts;
@@ -376,6 +722,48 @@ export function useAgentSendPipeline(
 					connectedMcpServerIds: mcpServerNames,
 					log: agentLog,
 				});
+				const runtimePromptText = buildAgentRuntimePromptText(
+					promptContext.prompt,
+					customSystemPrompt,
+				);
+				const currentMessages = getMessages();
+				const runtimeSummarizeContext =
+					summarizeContext ??
+					createContextSummarizer({
+						provider: effective?.provider,
+						model: effective?.model,
+						conversationId: convId,
+						requestId,
+					});
+				const historyContext = await prepareHistoryForRuntimeWithSummary({
+					messages: currentMessages,
+					contextCount: sessionSettings.contextCount ?? -1,
+					contextMode: sessionSettings.contextMode ?? "auto",
+					contextWindow: effective?.model.contextWindow ?? null,
+					systemPromptText: customSystemPrompt,
+					runtimeTools,
+					summarizeContext: runtimeSummarizeContext,
+				});
+				const currentAssistant = currentMessages[currentMessages.length - 1];
+				if (currentAssistant?.role === "assistant") {
+					const contextMetadata = buildContextMetadataForRuntime({
+						promptContext,
+						historyMetadata: historyContext.metadata,
+						runtimeToolCount: runtimeTools.length,
+						pinnedSources: getPinnedContextSources(currentMessages),
+					});
+					messageStoreApi.updateMessageMetadata(currentAssistant.id, {
+						...contextMetadata,
+						...(historyContext.contextCompacted
+							? { contextCompacted: historyContext.contextCompacted }
+							: {}),
+					});
+				}
+				agentLog.info("Agent history context prepared", {
+					requestId,
+					conversationId: convId,
+					...historyContext.metadata,
+				});
 
 				runController.setRequestType("runtime");
 				const createQuery =
@@ -385,11 +773,9 @@ export function useAgentSendPipeline(
 					conversationId: convId,
 					prompt: {
 						kind: "text",
-						text: buildAgentRuntimePromptText(
-							promptContext.prompt,
-							customSystemPrompt,
-						),
+						text: runtimePromptText,
 					},
+					history: historyContext.history,
 					tools: runtimeTools,
 					cwd,
 					...(runController.agentRuntimeSessionIdRef.current
@@ -401,6 +787,19 @@ export function useAgentSendPipeline(
 							}
 						: {}),
 				});
+				await persistContextCompactedEventForRuntime(
+					{
+						conversationId: convId,
+						requestId,
+						runtimeId,
+						model: effective?.model.id,
+						contextCompactedEvent: historyContext.contextCompactedEvent,
+					},
+					{
+						appendSessionEvent: messageStoreApi.appendSessionEvent,
+						log: agentLog,
+					},
+				);
 				agentLog.info("Agent runtime createQuery accepted", {
 					requestId,
 					runtimeId,

@@ -4,6 +4,7 @@ import type { AgentSDKStreamEvent } from "@super-client/shared-types/agent-sdk";
 import type { Message } from "../../stores/chatMessageStore";
 import {
 	isAskUserQuestionToolName,
+	mergeProjectRulesSnapshotSources,
 	reduceAgentRuntimeStreamEvent,
 	reduceAgentSDKStreamEvent,
 	reduceAgentStreamEvent,
@@ -56,6 +57,43 @@ describe("agent event reducer helpers", () => {
 			true,
 		);
 		expect(isAskUserQuestionToolName("Read")).toBe(false);
+	});
+
+	it("merges project rules snapshot into an existing context source", () => {
+		const sources = mergeProjectRulesSnapshotSources(
+			[
+				{
+					id: "project-rules",
+					kind: "projectRules",
+					label: "Project rules runtime check",
+					detail: "AGENTS.md / CLAUDE.md",
+					injected: false,
+				},
+			],
+			{
+				readAt: 1782100000000,
+				files: [
+					{
+						filename: "AGENTS.md",
+						byteLength: 20,
+						sha256: "abcdef123456",
+						truncated: false,
+						injected: true,
+					},
+				],
+			},
+		);
+
+		expect(sources).toEqual([
+			{
+				id: "project-rules",
+				kind: "projectRules",
+				label: "Project rules runtime check",
+				detail: "AGENTS.md 20 B sha256:abcdef12",
+				bytes: 20,
+				injected: true,
+			},
+		]);
 	});
 });
 
@@ -192,6 +230,47 @@ describe("reduceAgentSDKStreamEvent", () => {
 				content: "Read file",
 			},
 		]);
+	});
+
+	it("threads runtime subagentRunId onto live tool calls and result patches", () => {
+		const callEvent = runtimeBase({
+			type: "tool.call",
+			callId: "call_sub_1",
+			toolName: "Read",
+			input: { path: "README.md" },
+			subagentRunId: "sub-1",
+		});
+		const resultEvent = runtimeBase({
+			type: "tool.result",
+			callId: "call_sub_1",
+			content: { kind: "text", text: "ok" },
+			isError: false,
+			subagentRunId: "sub-1",
+		});
+
+		expect(reduceAgentRuntimeStreamEvent(callEvent, createContext())).toContainEqual({
+			type: "upsert_tool_message",
+			toolUseId: "call_sub_1",
+			toolCall: {
+				name: "Read",
+				input: { path: "README.md" },
+				status: "pending",
+				subagentRunId: "sub-1",
+				approval: { kind: "tool" },
+			},
+			content: "Tool call: Read",
+		});
+		expect(reduceAgentRuntimeStreamEvent(resultEvent, createContext())).toContainEqual({
+			type: "update_tool_call",
+			messageId: "tool_call_sub_1",
+			patch: {
+				status: "success",
+				result: "ok",
+				error: undefined,
+				duration: undefined,
+				subagentRunId: "sub-1",
+			},
+		});
 	});
 
 	it("maps tool errors to an error tool message and streaming status", () => {
@@ -600,13 +679,77 @@ describe("reduceAgentRuntimeStreamEvent", () => {
 		]);
 	});
 
+	it("maps runtime assistant part events onto the last assistant message", () => {
+		const partEvent = {
+			type: "assistant.part_start",
+			messageId: "runtime_msg_1",
+			part: {
+				id: "part_1",
+				type: "code_block",
+				state: "complete",
+				content: "const value = 1;",
+				createdAt: 10,
+				updatedAt: 10,
+			},
+			ts: 10,
+		} as const;
+		const event = runtimeBase({
+			type: "assistant.part",
+			partEvent,
+		});
+
+		expect(reduceAgentRuntimeStreamEvent(event, createContext())).toEqual([
+			{
+				type: "apply_assistant_part",
+				messageId: "assistant_1",
+				event: partEvent,
+			},
+		]);
+	});
+
 	it("maps runtime init to native session persistence and assistant metadata", () => {
 		const event = runtimeBase({
 			type: "init",
 			nativeSessionId: "native_session_1",
+			projectRulesSnapshot: {
+				readAt: 1782100000000,
+				files: [
+					{
+						filename: "AGENTS.md",
+						byteLength: 24,
+						sha256: "hashagents",
+						truncated: false,
+						injected: true,
+					},
+				],
+			},
 		});
 
-		expect(reduceAgentRuntimeStreamEvent(event, createContext())).toEqual([
+		const actions = reduceAgentRuntimeStreamEvent(
+			event,
+			createContext({
+				messages: [
+					{
+						id: "assistant_1",
+						role: "assistant",
+						content: "",
+						timestamp: 1,
+						metadata: {
+							contextSources: [
+								{
+									id: "project-rules",
+									kind: "projectRules",
+									label: "Project rules runtime check",
+									injected: false,
+								},
+							],
+						},
+					},
+				],
+			}),
+		);
+
+		expect(actions).toEqual([
 			{
 				type: "remember_session",
 				sessionId: "native_session_1",
@@ -615,10 +758,36 @@ describe("reduceAgentRuntimeStreamEvent", () => {
 			{
 				type: "update_message_metadata",
 				messageId: "assistant_1",
-				metadata: { nativeSessionId: "native_session_1" },
+				metadata: {
+					nativeSessionId: "native_session_1",
+					projectRulesSnapshot: {
+						readAt: 1782100000000,
+						files: [
+							{
+								filename: "AGENTS.md",
+								byteLength: 24,
+								sha256: "hashagents",
+								truncated: false,
+								injected: true,
+							},
+						],
+					},
+					contextSources: [
+						{
+							id: "project-rules",
+							kind: "projectRules",
+							label: "Project rules runtime check",
+							detail: "AGENTS.md 24 B sha256:hashagen",
+							bytes: 24,
+							injected: true,
+						},
+					],
+				},
 			},
 			{ type: "set_session_status", status: "streaming" },
 		]);
+		expect(JSON.stringify(actions)).not.toContain("/repo");
+		expect(JSON.stringify(actions)).not.toContain("Always run focused tests");
 	});
 
 	it("maps runtime permission requests to awaiting approval", () => {

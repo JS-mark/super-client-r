@@ -6,18 +6,15 @@
  * view, aggregating from data that already lives in the renderer stores
  * and per-message metadata. It **must not** trigger new IPC calls.
  *
- * MVP scope (Phase 3 Round 5):
- *   - System prompt chip (always present when a session is active)
- *   - Project rules chip (AGENTS.md / CLAUDE.md placeholder) when the
- *     session is bound to a project (workspaceId ≠ "default").
- *     File is not read from disk in this round; the chip only signals
- *     that project rules may be in play. ProjectRulesReader wiring is
- *     deferred to a later Phase 3 batch.
- *   - Attached files derived from the latest user message's
- *     `metadata.attachmentIds`.
- *   - Compact-event log entries derived from any message whose metadata
- *     carries a `contextCompacted` marker. If no such messages exist,
- *     the list is empty — we do not synthesise placeholders.
+ * Current scope:
+ *   - Prefer the context source / strategy metadata written by the latest
+ *     agent send. This reflects what the send pipeline actually passed to
+ *     the runtime (history strategy, attachments/search counts, project
+ *     rules runtime hook, tools).
+ *   - Fall back to legacy store-derived chips for sessions that were created
+ *     before context metadata existed.
+ *   - Compact-event log entries are derived from real
+ *     `metadata.contextCompacted` markers.
  *
  * All the compute is pure and store-driven, so `useContextInspectorData`
  * itself is trivially testable by feeding a `buildContextInspectorData`
@@ -30,37 +27,31 @@ import { useAttachmentStore } from "../stores/attachmentStore";
 import { useChatStore } from "../stores/chatStore";
 import { useChatMessageStore } from "../stores/chatMessageStore";
 import { useProjectStore } from "../stores/projectStore";
-import type { Message } from "@super-client/shared-types/chat";
+import type {
+	ContextSourceKind,
+	Message,
+	MessageContextSource,
+	MessageContextStrategy,
+} from "@super-client/shared-types/chat";
 
-export type ContextSourceKind =
-	| "systemPrompt"
-	| "projectRules"
-	| "attachment"
-	| "other";
-
-export interface ContextSourceEntry {
-	/** Stable id (used as React key). */
-	id: string;
-	kind: ContextSourceKind;
-	/** Display label (already localised — callers may still translate the
-	 * fallback but no i18n happens inside this hook). */
-	label: string;
-	/** Optional detail line surfaced in tooltip. */
-	detail?: string;
-	/** Byte count if known (attachment size etc.). */
-	bytes?: number;
-}
+export type { ContextSourceKind };
+export type ContextSourceEntry = MessageContextSource;
 
 export interface ContextCompactEvent {
 	id: string;
 	timestamp: number;
 	/** Free-form description surfaced next to the timestamp. */
 	summary?: string;
+	originalCount?: number;
 }
 
 export interface ContextInspectorData {
 	/** All source chips in a stable render order. */
 	sources: ContextSourceEntry[];
+	/** Message whose metadata supplied the current source list, if any. */
+	latestContextMessageId?: string;
+	/** Context strategy used for the latest send, when available. */
+	strategy?: MessageContextStrategy;
 	/** Compact / summarisation events (chronological). */
 	compactEvents: ContextCompactEvent[];
 	/** True when the active conversation is bound to a project.
@@ -73,12 +64,6 @@ export interface ContextInspectorData {
  * looser index type so we don't couple to the canonical Message
  * metadata type (Round 5 does not add the field to shared-types).
  */
-interface MessageMetadataLike {
-	contextCompacted?: {
-		summary?: string;
-	};
-}
-
 export interface BuildContextInspectorDataInput {
 	/** Current session messages (chronological). */
 	messages: Message[];
@@ -90,6 +75,36 @@ export interface BuildContextInspectorDataInput {
 	systemPromptLabel: string;
 	/** Localised label for the "Project rules: AGENTS.md" chip. */
 	projectRulesLabel: string;
+}
+
+export function findLatestContextMetadata(
+	messages: Message[],
+): {
+	messageId?: string;
+	sources?: MessageContextSource[];
+	strategy?: MessageContextStrategy;
+} {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const meta = messages[i].metadata;
+		if (meta?.contextSources?.length || meta?.contextStrategy) {
+			return {
+				messageId: messages[i].id,
+				sources: meta.contextSources,
+				strategy: meta.contextStrategy,
+			};
+		}
+	}
+	return {};
+}
+
+export function toggleContextSourcePinned(
+	sources: MessageContextSource[],
+	sourceId: string,
+	pinned: boolean,
+): MessageContextSource[] {
+	return sources.map((source) =>
+		source.id === sourceId ? { ...source, pinned } : source,
+	);
 }
 
 /**
@@ -109,73 +124,83 @@ export function buildContextInspectorData(
 	} = input;
 
 	const sources: ContextSourceEntry[] = [];
+	const latestContext = findLatestContextMetadata(messages);
 
-	// 1. System prompt is always present as long as the session is active.
-	sources.push({
-		id: "system-prompt",
-		kind: "systemPrompt",
-		label: systemPromptLabel,
-	});
-
-	// 2. Project rules placeholder when the session has a project cwd.
-	//    Actual AGENTS.md / CLAUDE.md content read is deferred to a later
-	//    Phase 3 batch — this round only signals "rules are available".
-	if (hasProject) {
+	if (latestContext.sources?.length) {
+		sources.push(...latestContext.sources);
+	} else {
+		// Legacy fallback for sessions created before context metadata existed.
 		sources.push({
-			id: "project-rules",
-			kind: "projectRules",
-			label: projectRulesLabel,
-			detail: "AGENTS.md / CLAUDE.md",
+			id: "system-prompt",
+			kind: "systemPrompt",
+			label: systemPromptLabel,
+			injected: true,
 		});
-	}
 
-	// 3. Latest user message's attachments. Older attachments in the same
-	//    conversation are ignored — the "context" pane reflects what got
-	//    injected in the last turn.
-	let latestAttachmentIds: string[] = [];
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const m = messages[i];
-		if (m.role === "user" && m.metadata?.attachmentIds?.length) {
-			latestAttachmentIds = m.metadata.attachmentIds;
-			break;
-		}
-	}
-	for (const id of latestAttachmentIds) {
-		const att = attachments.find((a) => a.id === id);
-		if (att) {
+		if (hasProject) {
 			sources.push({
-				id: `attachment:${id}`,
-				kind: "attachment",
-				label: att.originalName ?? att.name,
-				detail: att.type,
-				bytes: att.size,
-			});
-		} else {
-			// The attachment metadata no longer resolves (e.g. cleared cache).
-			// Still surface the id so users know the message referenced it.
-			sources.push({
-				id: `attachment:${id}`,
-				kind: "attachment",
-				label: id,
+				id: "project-rules",
+				kind: "projectRules",
+				label: projectRulesLabel,
+				detail: "AGENTS.md / CLAUDE.md",
+				injected: true,
 			});
 		}
+
+		let latestAttachmentIds: string[] = [];
+		for (let i = messages.length - 1; i >= 0; i--) {
+			const m = messages[i];
+			if (m.role === "user" && m.metadata?.attachmentIds?.length) {
+				latestAttachmentIds = m.metadata.attachmentIds;
+				break;
+			}
+		}
+		for (const id of latestAttachmentIds) {
+			const att = attachments.find((a) => a.id === id);
+			if (att) {
+				sources.push({
+					id: `attachment:${id}`,
+					kind: "attachment",
+					label: att.originalName ?? att.name,
+					detail: att.type,
+					bytes: att.size,
+					injected: true,
+				});
+			} else {
+				sources.push({
+					id: `attachment:${id}`,
+					kind: "attachment",
+					label: id,
+					injected: true,
+				});
+			}
+		}
 	}
 
-	// 4. Compact events — only surface real markers.
 	const compactEvents: ContextCompactEvent[] = [];
 	for (const m of messages) {
-		const meta = m.metadata as MessageMetadataLike | undefined;
-		const marker = meta?.contextCompacted;
+		const marker = m.metadata?.contextCompacted;
 		if (marker) {
 			compactEvents.push({
 				id: m.id,
 				timestamp: m.timestamp,
-				summary: marker.summary,
+				...(marker.summary !== undefined ? { summary: marker.summary } : {}),
+				...(marker.originalCount !== undefined
+					? { originalCount: marker.originalCount }
+					: {}),
 			});
 		}
 	}
 
-	return { sources, compactEvents, hasProject };
+	return {
+		sources,
+		...(latestContext.messageId
+			? { latestContextMessageId: latestContext.messageId }
+			: {}),
+		...(latestContext.strategy ? { strategy: latestContext.strategy } : {}),
+		compactEvents,
+		hasProject,
+	};
 }
 
 /**

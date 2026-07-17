@@ -148,6 +148,25 @@ export function materializeAgentProductEvent(
 				},
 			];
 
+		case "context.compacted":
+			return [
+				{
+					...base,
+					type: "assistant_message",
+					id: event.payload.summaryMessageId,
+					content: event.payload.summary,
+					metadata: {
+						contextCompacted: {
+							compacted: true,
+							summary: event.payload.summary,
+							originalCount: event.payload.originalCount,
+							compactedAt: event.payload.compactedAt,
+						},
+						contextStrategy: event.payload.strategy,
+					},
+				},
+			];
+
 		case "plan.decision":
 			return [
 				{

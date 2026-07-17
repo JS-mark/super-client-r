@@ -138,6 +138,59 @@ describe("eventsToMessages", () => {
 		});
 	});
 
+	it("replays compacted context assistant metadata without duplicate messages", () => {
+		const compactedEvent: SessionEvent = {
+			type: "assistant_message",
+			eventId: "context.compacted:1",
+			id: "context-summary-1",
+			ts: 100,
+			content: "Earlier messages summarized.",
+			metadata: {
+				contextCompacted: {
+					compacted: true,
+					summary: "Earlier messages summarized.",
+					originalCount: 4,
+					compactedAt: 100,
+				},
+				contextStrategy: {
+					mode: "auto",
+					strategy: "summarized",
+					historyCount: 3,
+					omittedCount: 4,
+					estimatedTokens: 1600,
+					availableForMessages: 1200,
+					compacted: true,
+				},
+			},
+		};
+
+		const msgs = eventsToMessages([compactedEvent, compactedEvent]);
+
+		expect(msgs).toHaveLength(1);
+		expect(msgs[0]).toMatchObject({
+			id: "context-summary-1",
+			role: "assistant",
+			content: "Earlier messages summarized.",
+			metadata: {
+				contextCompacted: {
+					compacted: true,
+					summary: "Earlier messages summarized.",
+					originalCount: 4,
+					compactedAt: 100,
+				},
+				contextStrategy: {
+					mode: "auto",
+					strategy: "summarized",
+					historyCount: 3,
+					omittedCount: 4,
+					estimatedTokens: 1600,
+					availableForMessages: 1200,
+					compacted: true,
+				},
+			},
+		});
+	});
+
 	it("reduces assistant part events into structured Message.parts and text fallback", () => {
 		const events: SessionEvent[] = [
 			{
@@ -1001,6 +1054,7 @@ describe("eventsToMessages", () => {
 				name: "read_file",
 				status: "success",
 				result: "ok",
+				subagentRunId: "sub-x",
 			});
 		});
 

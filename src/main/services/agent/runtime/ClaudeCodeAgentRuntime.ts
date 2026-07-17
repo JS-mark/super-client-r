@@ -40,7 +40,10 @@ import type {
 	AgentRuntimeStreamEvent,
 	PermissionDecision,
 } from "@super-client/shared-types/agent-runtime";
-import type { PlanMode } from "@super-client/shared-types/chat";
+import type {
+	PlanMode,
+	ProjectRulesSnapshotDto,
+} from "@super-client/shared-types/chat";
 import type {
 	ChatCompletionRequest,
 	ChatStreamEvent,
@@ -62,8 +65,38 @@ import {
 import { ChatToRuntimeTranslator } from "./streamEventTranslator";
 import { evaluateSubagentTool, type SubagentPolicy } from "./subagentPolicy";
 import { buildSystemPrompt } from "./systemPrompt";
+import {
+	ProjectRulesReader,
+	type ProjectRulesSnapshot,
+	toProjectRulesSnapshotDto,
+} from "../memory/ProjectRulesReader";
 
 const BUILTIN_PREFIX = "scp-agent-builtins__";
+
+interface RuntimeChatRequestContext {
+	request: ChatCompletionRequest;
+	projectRulesSnapshot?: ProjectRulesSnapshotDto;
+}
+
+function formatProjectRulesPrompt(snapshot: ProjectRulesSnapshot): string {
+	const sections: string[] = [];
+	const files = [
+		["AGENTS.md", snapshot.agentsMd] as const,
+		["CLAUDE.md", snapshot.claudeMd] as const,
+	];
+	for (const [filename, file] of files) {
+		if (!file?.content.trim()) continue;
+		sections.push(
+			`## ${filename}${file.truncated ? " (truncated)" : ""}\n\n${file.content.trim()}`,
+		);
+	}
+	if (sections.length === 0) return "";
+	return [
+		"# Project rules",
+		"These read-only instructions were loaded from the current project cwd. Treat them as project context and follow them unless they conflict with higher-priority user or system instructions.",
+		...sections,
+	].join("\n\n");
+}
 
 const DESCRIPTOR: AgentRuntimeDescriptor = {
 	id: "llm-loop",
@@ -84,11 +117,14 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 	readonly descriptor = DESCRIPTOR;
 	/** Active in-flight requests, keyed by requestId, so `interrupt` works. */
 	private readonly active = new Map<string, AbortController>();
+	private readonly projectRulesReader = new ProjectRulesReader();
 
 	createQuery(req: AgentQueryRequest): AsyncIterable<AgentRuntimeStreamEvent> {
+		let projectRulesSnapshot: ProjectRulesSnapshotDto | undefined;
 		const translator = new ChatToRuntimeTranslator({
 			requestId: req.requestId,
 			conversationId: req.conversationId,
+			getProjectRulesSnapshot: () => projectRulesSnapshot,
 		});
 
 		const controller = new AbortController();
@@ -96,7 +132,7 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		req.signal.addEventListener("abort", onParentAbort);
 		this.active.set(req.requestId, controller);
 
-		const llmRequest = this.buildChatRequest(req);
+		const llmRequestPromise = this.buildChatRequest(req);
 		const port = localServer.getPort();
 		const apiKey = getOrCreateApiKey();
 		const activeRequests = this.active;
@@ -107,6 +143,9 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 			void
 		> {
 			try {
+				const llmRequestContext = await llmRequestPromise;
+				projectRulesSnapshot = llmRequestContext.projectRulesSnapshot;
+				const llmRequest = llmRequestContext.request;
 				let res: Response;
 				try {
 					res = await fetch(
@@ -177,12 +216,12 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 				if (!finished) {
 					for (const ev of translator.finalize()) yield ev;
 				}
-				} finally {
-					req.signal.removeEventListener("abort", onParentAbort);
-					activeRequests.delete(req.requestId);
-				}
-			})();
-		}
+			} finally {
+				req.signal.removeEventListener("abort", onParentAbort);
+				activeRequests.delete(req.requestId);
+			}
+		})();
+	}
 
 	async resolvePermission(
 		approvalId: string,
@@ -304,9 +343,12 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		});
 	}
 
-	private buildChatRequest(req: AgentQueryRequest): ChatCompletionRequest {
+	private async buildChatRequest(
+		req: AgentQueryRequest,
+	): Promise<RuntimeChatRequestContext> {
 		const cwd = req.cwd ?? process.cwd();
-		const customPrompt = "";
+		const projectRules = await this.buildProjectRulesPrompt(cwd);
+		const customPrompt = projectRules.prompt;
 
 		const systemPrompt = buildSystemPrompt({ cwd, customPrompt });
 		const userText =
@@ -379,13 +421,26 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		if (req.history && req.history.length > 0) {
 			for (const m of req.history) {
 				const role = (m as { role?: string }).role;
-				const content = (m as { content?: unknown }).content;
-				if (
-					(role === "user" || role === "assistant" || role === "system") &&
-					typeof content === "string"
-				) {
-					messages.push({ role, content });
+				const rawContent = (m as { content?: unknown }).content;
+				if (role !== "user" && role !== "assistant" && role !== "system") {
+					continue;
 				}
+				let content = "";
+				if (Array.isArray(rawContent)) {
+					content = rawContent
+						.filter(
+							(part): part is { type: "text"; text: string } =>
+								Boolean(part) &&
+								typeof part === "object" &&
+								(part as { type?: unknown }).type === "text" &&
+								typeof (part as { text?: unknown }).text === "string",
+						)
+						.map((part) => part.text)
+						.join("\n");
+				} else if (typeof rawContent === "string") {
+					content = rawContent;
+				}
+				if (content.trim()) messages.push({ role, content });
 			}
 		}
 		messages.push({ role: "user", content: userText });
@@ -410,17 +465,35 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 		);
 
 		return {
-			requestId: req.requestId,
-			conversationId: req.conversationId,
-			baseUrl: provider?.baseUrl ?? "",
-			apiKey: provider?.apiKey ?? "",
-			model: modelId,
-			providerPreset: provider?.preset,
-			apiFormat: provider?.apiFormat,
-			messages,
-			tools: gatedTools,
-			toolMapping: gatedMapping,
+			request: {
+				requestId: req.requestId,
+				conversationId: req.conversationId,
+				baseUrl: provider?.baseUrl ?? "",
+				apiKey: provider?.apiKey ?? "",
+				model: modelId,
+				providerPreset: provider?.preset,
+				apiFormat: provider?.apiFormat,
+				messages,
+				tools: gatedTools,
+				toolMapping: gatedMapping,
+			},
+			projectRulesSnapshot: projectRules.snapshot,
 		};
+	}
+
+	private async buildProjectRulesPrompt(
+		cwd: string,
+	): Promise<{ prompt: string; snapshot?: ProjectRulesSnapshotDto }> {
+		try {
+			const snapshot = await this.projectRulesReader.readProjectRules(cwd);
+			const dto = toProjectRulesSnapshotDto(snapshot);
+			return {
+				prompt: formatProjectRulesPrompt(snapshot),
+				snapshot: dto.files.length > 0 ? dto : undefined,
+			};
+		} catch {
+			return { prompt: "" };
+		}
 	}
 
 	private gateToolsForPlanMode(

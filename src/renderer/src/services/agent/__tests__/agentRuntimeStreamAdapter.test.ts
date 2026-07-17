@@ -133,6 +133,30 @@ describe("adaptAgentRuntimeStreamEventToReducerActions", () => {
 		]);
 	});
 
+	it("preserves subagentRunId on runtime tool calls", () => {
+		const event = runtimeBase({
+			type: "tool.call",
+			callId: "call_1",
+			toolName: "Read",
+			input: { path: "README.md" },
+			subagentRunId: "sub-1",
+		});
+
+		expect(adaptAgentRuntimeStreamEventToReducerActions(event, createContext()))
+			.toContainEqual({
+				type: "upsert_tool_message",
+				toolUseId: "call_1",
+				toolCall: {
+					name: "Read",
+					input: { path: "README.md" },
+					status: "pending",
+					subagentRunId: "sub-1",
+					approval: { kind: "tool" },
+				},
+				content: "Tool call: Read",
+			});
+	});
+
 	it("maps tool results to a tool patch and next assistant bubble", () => {
 		const event = runtimeBase({
 			type: "tool.result",

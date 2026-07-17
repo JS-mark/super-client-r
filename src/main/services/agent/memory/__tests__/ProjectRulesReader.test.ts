@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
 	PROJECT_RULES_MAX_BYTES,
 	ProjectRulesReader,
+	toProjectRulesSnapshotDto,
 } from "../ProjectRulesReader";
 
 describe("ProjectRulesReader", () => {
@@ -62,6 +63,36 @@ describe("ProjectRulesReader", () => {
 
 		expect(snapshot.agentsMd?.content).toBe("agents");
 		expect(snapshot.claudeMd?.content).toBe("claude");
+	});
+
+	it("builds a renderer-safe snapshot DTO without path or content", async () => {
+		const cwd = await makeProject({
+			"AGENTS.md": "agents",
+			"CLAUDE.md": "",
+		});
+		const reader = new ProjectRulesReader({ now: () => 2_000 });
+
+		const dto = toProjectRulesSnapshotDto(await reader.readProjectRules(cwd));
+
+		expect(dto).toEqual({
+			readAt: 2_000,
+			files: [
+				expect.objectContaining({
+					filename: "AGENTS.md",
+					byteLength: Buffer.byteLength("agents", "utf8"),
+					truncated: false,
+					injected: true,
+				}),
+				expect.objectContaining({
+					filename: "CLAUDE.md",
+					byteLength: 0,
+					truncated: false,
+					injected: false,
+				}),
+			],
+		});
+		expect(JSON.stringify(dto)).not.toContain(cwd);
+		expect(JSON.stringify(dto)).not.toContain("agents");
 	});
 
 	it("reads CLAUDE.md alone when AGENTS.md is absent", async () => {

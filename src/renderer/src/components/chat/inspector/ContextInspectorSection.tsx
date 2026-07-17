@@ -12,7 +12,6 @@
  *   - Chip → antd Tooltip carrying source + byte count.
  *
  * NOT in scope for this round:
- *   - Pinning / unpinning.
  *   - Compact triggers.
  *   - Memory editing.
  *   - Reading AGENTS.md / CLAUDE.md content (deferred to a later batch).
@@ -29,15 +28,23 @@ import {
 	FolderOpenOutlined,
 	PaperClipOutlined,
 	CompressOutlined,
+	SearchOutlined,
+	HistoryOutlined,
+	ToolOutlined,
+	PushpinFilled,
+	PushpinOutlined,
 } from "@ant-design/icons";
 import { Progress, Tag, Tooltip, theme } from "antd";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useContextUsage } from "../../../hooks/useContextUsage";
 import {
 	type ContextSourceEntry,
 	type ContextSourceKind,
+	toggleContextSourcePinned,
 	useContextInspectorData,
 } from "../../../hooks/useContextInspectorData";
+import { useChatMessageStore } from "../../../stores/chatMessageStore";
 
 const { useToken } = theme;
 
@@ -67,6 +74,12 @@ function iconForKind(kind: ContextSourceKind): React.ReactNode {
 			return <FolderOpenOutlined />;
 		case "attachment":
 			return <PaperClipOutlined />;
+		case "search":
+			return <SearchOutlined />;
+		case "history":
+			return <HistoryOutlined />;
+		case "other":
+			return <ToolOutlined />;
 		default:
 			return <PaperClipOutlined />;
 	}
@@ -74,9 +87,17 @@ function iconForKind(kind: ContextSourceKind): React.ReactNode {
 
 interface SourceRowProps {
 	entry: ContextSourceEntry;
+	onTogglePinned?: (sourceId: string, pinned: boolean) => void;
+	pinLabel: string;
+	unpinLabel: string;
 }
 
-function SourceRow({ entry }: SourceRowProps) {
+function SourceRow({
+	entry,
+	onTogglePinned,
+	pinLabel,
+	unpinLabel,
+}: SourceRowProps) {
 	const { token } = useToken();
 	const detailBits: string[] = [];
 	if (entry.detail) detailBits.push(entry.detail);
@@ -110,6 +131,35 @@ function SourceRow({ entry }: SourceRowProps) {
 						{formatBytes(entry.bytes)}
 					</span>
 				)}
+				{onTogglePinned && (
+					<button
+						type="button"
+						aria-label={entry.pinned ? unpinLabel : pinLabel}
+						title={entry.pinned ? unpinLabel : pinLabel}
+						data-testid="context-source-pin-toggle"
+						data-pinned={entry.pinned ? "true" : "false"}
+						onClick={(event) => {
+							event.stopPropagation();
+							onTogglePinned(entry.id, !entry.pinned);
+						}}
+						style={{
+							alignItems: "center",
+							background: "transparent",
+							border: 0,
+							color: entry.pinned
+								? token.colorPrimary
+								: token.colorTextTertiary,
+							cursor: "pointer",
+							display: "inline-flex",
+							height: 22,
+							justifyContent: "center",
+							padding: 0,
+							width: 22,
+						}}
+					>
+						{entry.pinned ? <PushpinFilled /> : <PushpinOutlined />}
+					</button>
+				)}
 			</div>
 		</Tooltip>
 	);
@@ -127,6 +177,9 @@ export function ContextInspectorSection(props: ContextInspectorSectionProps = {}
 	const { t } = useTranslation("chat");
 	const { token } = useToken();
 	const usage = useContextUsage();
+	const updateMessageMetadata = useChatMessageStore(
+		(s) => s.updateMessageMetadata,
+	);
 
 	const systemPromptLabel =
 		props.testOverrides?.systemPromptLabel ??
@@ -139,6 +192,22 @@ export function ContextInspectorSection(props: ContextInspectorSectionProps = {}
 		systemPromptLabel,
 		projectRulesLabel,
 	});
+
+	const handleTogglePinned = useCallback(
+		(sourceId: string, pinned: boolean) => {
+			if (!data.latestContextMessageId) return;
+			const messages = useChatMessageStore.getState().messages;
+			const sourceMessage = messages.find(
+				(message) => message.id === data.latestContextMessageId,
+			);
+			const sources = sourceMessage?.metadata?.contextSources;
+			if (!sources?.length) return;
+			updateMessageMetadata(data.latestContextMessageId, {
+				contextSources: toggleContextSourcePinned(sources, sourceId, pinned),
+			});
+		},
+		[data.latestContextMessageId, updateMessageMetadata],
+	);
 
 	const hasBudget = usage.contextWindow != null && usage.contextWindow > 0;
 	const percent =
@@ -165,6 +234,7 @@ export function ContextInspectorSection(props: ContextInspectorSectionProps = {}
 		marginTop: 8,
 		marginBottom: 4,
 	};
+	const strategy = data.strategy;
 
 	return (
 		<div className="flex flex-col" data-testid="context-inspector-section">
@@ -213,13 +283,56 @@ export function ContextInspectorSection(props: ContextInspectorSectionProps = {}
 				</div>
 			)}
 
+			{strategy && (
+				<div
+					className="flex flex-col gap-1"
+					style={{
+						fontSize: 12,
+						padding: "6px 0",
+						marginBottom: 4,
+						color: token.colorText,
+					}}
+					data-testid="context-strategy"
+				>
+					<div className="flex items-center justify-between gap-2">
+						<span style={{ color: token.colorTextSecondary }}>
+							{t("contextInspector.strategy.label", "History strategy")}
+						</span>
+						<Tag style={{ fontSize: 11 }} color={strategy.compacted ? "gold" : "default"}>
+							{t(
+								`contextInspector.strategy.${strategy.strategy}`,
+								strategy.strategy,
+							)}
+						</Tag>
+					</div>
+					<div style={{ color: token.colorTextTertiary, fontSize: 11 }}>
+						{t(
+							"contextInspector.strategy.detail",
+							"{{historyCount}} sent · {{omittedCount}} omitted",
+							{
+								historyCount: strategy.historyCount,
+								omittedCount: strategy.omittedCount,
+							},
+						)}
+					</div>
+				</div>
+			)}
+
 			{/* Sources */}
 			<div style={subHeaderStyle}>
 				{t("contextInspector.sources.header", "Injected sources")}
 			</div>
 			<div className="flex flex-col">
 				{data.sources.map((entry) => (
-					<SourceRow key={entry.id} entry={entry} />
+					<SourceRow
+						key={entry.id}
+						entry={entry}
+						onTogglePinned={
+							data.latestContextMessageId ? handleTogglePinned : undefined
+						}
+						pinLabel={t("contextInspector.sources.pin", "Pin source")}
+						unpinLabel={t("contextInspector.sources.unpin", "Unpin source")}
+					/>
 				))}
 			</div>
 

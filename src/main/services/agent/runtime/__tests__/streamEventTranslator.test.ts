@@ -47,6 +47,62 @@ describe("ChatToRuntimeTranslator", () => {
 		out.forEach((e, i) => expect((e as { seq: number }).seq).toBe(i));
 	});
 
+	it("emits structured assistant parts for fenced code, json, and diff blocks", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: [
+					"Here are artifacts.",
+					"```ts",
+					"const value = 1;",
+					"```",
+					"```json",
+					"{\"ok\":true}",
+					"```",
+					"```diff",
+					"diff --git a/a.txt b/a.txt",
+					"--- a/a.txt",
+					"+++ b/a.txt",
+					"@@ -1 +1 @@",
+					"-old",
+					"+new",
+					"```",
+				].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: {
+				type: string;
+				part?: { type: string; language?: string; value?: unknown; files?: unknown[] };
+				partId?: string;
+			};
+		}>;
+		expect(partEvents.map((e) => e.partEvent.type)).toEqual([
+			"assistant.part_start",
+			"assistant.part_done",
+			"assistant.part_start",
+			"assistant.part_done",
+			"assistant.part_start",
+			"assistant.part_done",
+		]);
+		const started = partEvents
+			.map((e) => e.partEvent.part)
+			.filter(Boolean) as Array<{
+			type: string;
+			language?: string;
+			value?: unknown;
+			files?: unknown[];
+		}>;
+		expect(started[0]).toMatchObject({ type: "code_block", language: "ts" });
+		expect(started[1]).toMatchObject({ type: "data", value: { ok: true } });
+		expect(started[2]).toMatchObject({ type: "diff" });
+		expect(started[2]?.files).toHaveLength(1);
+	});
+
 	it("tool_call → tool.call with parsed input", () => {
 		const out = collect([
 			{
