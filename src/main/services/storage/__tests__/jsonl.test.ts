@@ -1173,5 +1173,78 @@ describe("eventsToMessages", () => {
 				expect(subPart.run.subagentRunId).toBe("sub-3");
 			}
 		});
+
+		it("drops corrupt optional fields when coercing a spawned run snapshot (P-M2)", () => {
+			// Persisted JSON may carry wrong-typed optional fields (older
+			// writes, partial corruption). coerceSubagentRun must not let
+			// them leak through as wrong types into the inspector — bad
+			// values are dropped to `undefined`, valid ones are preserved.
+			const events: SessionEvent[] = [
+				{
+					type: "assistant.part_start",
+					messageId: "assistant-4",
+					ts: 5,
+					part: {
+						id: "text-4",
+						type: "text",
+						state: "streaming",
+						createdAt: 5,
+						updatedAt: 5,
+						content: "…",
+					},
+				},
+				{
+					type: "session_marker",
+					ts: 6,
+					key: "subagent.spawned",
+					value: {
+						subagentRunId: "sub-4",
+						parentRunId: "req-4",
+						parentAssistantMessageId: "assistant-4",
+						run: {
+							subagentRunId: "sub-4",
+							parentRunId: "req-4",
+							taskGoal: "ok goal",
+							status: "spawned",
+							startedAt: 100,
+							// corrupt optional fields — must all be dropped:
+							profileId: 12345,
+							profileName: null,
+							toolCallCount: "not-a-number",
+							endedAt: "later",
+							errorMessage: 42,
+							summary: { blob: true },
+							resultRef: false,
+							tokenUsage: "nope",
+							// a valid optional field — must be preserved:
+							parentAssistantMessageId: "assistant-4",
+						},
+					},
+				},
+			];
+
+			const msgs = eventsToMessages(events);
+			const subPart = msgs
+				.flatMap((m) => m.parts ?? [])
+				.find((p) => p.type === "subagent");
+			expect(subPart).toBeDefined();
+			if (subPart && subPart.type === "subagent") {
+				// Required fields intact.
+				expect(subPart.run.subagentRunId).toBe("sub-4");
+				expect(subPart.run.taskGoal).toBe("ok goal");
+				expect(subPart.run.startedAt).toBe(100);
+				// Valid optional preserved.
+				expect(subPart.run.parentAssistantMessageId).toBe("assistant-4");
+				// Corrupt optionals dropped (not leaked as wrong types).
+				expect(subPart.run.profileId).toBeUndefined();
+				expect(subPart.run.profileName).toBeUndefined();
+				expect(subPart.run.toolCallCount).toBeUndefined();
+				expect(subPart.run.endedAt).toBeUndefined();
+				expect(subPart.run.errorMessage).toBeUndefined();
+				expect(subPart.run.summary).toBeUndefined();
+				expect(subPart.run.resultRef).toBeUndefined();
+				expect(subPart.run.tokenUsage).toBeUndefined();
+			}
+		});
 	});
 });

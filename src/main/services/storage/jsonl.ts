@@ -1163,7 +1163,52 @@ function coerceSubagentRun(value: unknown): SubagentRunSummary | null {
 	}
 	if (typeof taskGoal !== "string" || typeof status !== "string") return null;
 	if (typeof startedAt !== "number") return null;
-	return record as unknown as SubagentRunSummary;
+	// Required fields above are strictly validated. Optional fields are
+	// coerced to safe values rather than trusted from persisted JSON: a
+	// corrupt record (e.g. `toolCallCount: "abc"`) would otherwise leak
+	// through the previous `as unknown as SubagentRunSummary` cast and
+	// surface as wrong types in the inspector. Downstream update/complete
+	// handlers re-derive these independently, so dropping a bad value here
+	// is safe (it just becomes `undefined` until a later event sets it).
+	const opt = <T>(v: unknown, check: (v: unknown) => v is T): T | undefined =>
+		check(v) ? v : undefined;
+	const isStr = (v: unknown): v is string => typeof v === "string";
+	const isNum = (v: unknown): v is number => typeof v === "number";
+	const profileId = opt(record.profileId, isStr);
+	const profileName = opt(record.profileName, isStr);
+	const toolCallCount = opt(record.toolCallCount, isNum);
+	const endedAt = opt(record.endedAt, isNum);
+	const errorMessage = opt(record.errorMessage, isStr);
+	const summary = opt(record.summary, isStr);
+	const resultRef = opt(record.resultRef, isStr);
+	const parentAssistantMessageId = opt(record.parentAssistantMessageId, isStr);
+	const tokenUsageRecord = asRecord(record.tokenUsage);
+	const tokenUsage = tokenUsageRecord
+		? ({
+				...(typeof tokenUsageRecord.input === "number" && {
+					input: tokenUsageRecord.input,
+				}),
+				...(typeof tokenUsageRecord.output === "number" && {
+					output: tokenUsageRecord.output,
+				}),
+			} as NonNullable<SubagentRunSummary["tokenUsage"]>)
+		: undefined;
+	return {
+		subagentRunId,
+		parentRunId,
+		taskGoal,
+		status: status as SubagentTaskStatus,
+		startedAt,
+		...(parentAssistantMessageId !== undefined && { parentAssistantMessageId }),
+		...(profileId !== undefined && { profileId }),
+		...(profileName !== undefined && { profileName }),
+		...(toolCallCount !== undefined && { toolCallCount }),
+		...(endedAt !== undefined && { endedAt }),
+		...(errorMessage !== undefined && { errorMessage }),
+		...(summary !== undefined && { summary }),
+		...(resultRef !== undefined && { resultRef }),
+		...(tokenUsage !== undefined && { tokenUsage }),
+	};
 }
 
 function subagentRunStateFromStatus(
