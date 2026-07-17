@@ -99,6 +99,20 @@
 
 ## Latest Verified Commands
 
+2026-07-17 R2 gate-health fixes (branch `r2/gate-health-fixes`, 3 commits)
+
+- **背景**：R1 只读门禁体检(5 门禁全绿,129 files / 1077 tests / 0 回归)产出 backlog,R2 处理其中确认成立的中风险项。R1 结论未落盘(遵守 R1 只读约束),本条目是 R2 closeout。
+- **已落地**:
+  - **P-M1**:`agentBuiltinsServer.test.ts` 新增 `depth=2 → emits taskDepth=3` 边界用例,锁定 `MAX_TASK_DEPTH=3` 的下界;并订正过时注释(unit 实际覆盖 depth 递增 happy path,不只 error path)。e2e 不重复断言 depth(真 HTTP recursion 拿不到 outgoing body,depth invariant 归 unit)。
+  - **P-M2**:`jsonl.ts` 的 `coerceSubagentRun` 去掉 `as unknown as SubagentRunSummary` 强转,改为对 8 个 optional 字段逐个 coerce-or-drop;新增 regression test 喂入脏类型字段断言被剔除而非渗入。
+  - **P-M4(缩小)**:`SessionStorageService.ReadMessagesPageResult` 改为 re-export `shared-types` 的 `SessionMessagesPageResult`(field-identical,已核对);新增 `DiagnosticExportRedactionMode` / `DiagnosticExportFileEntry` / `DiagnosticExportManifest` 到 `shared-types/electron-api.ts`(纯增量,原只在 main-side `DiagnosticExportService`)。
+- **未做(留 R3)**:
+  - **P-M3**(R1 subagent-B 报 `toBeTruthy()` 弱断言):经主 agent 逐行核对,每个 `toBeTruthy()` 后都紧跟精确断言(`toContain`/`data-percent`/`toHaveLength`),属常规两步式断言,**结论不成立,已移除**。
+  - **P-M4 Pair 3/5**(SessionArchive/ProjectArchive ExportResult):原计划做,实施时发现它们 `manifest` 字段嵌套的 `SessionArchiveManifest` → `SessionArchiveFileEntry.kind` 在本地是 5 成员 union、shared 是 3 成员(本地 emit `project-metadata`/`project-settings`)。只 alias ExportResult 不 alias Manifest 会编译失败,而 Manifest 归 Pair 2/4 已明确留 R3。故 Pair 3/5 随之延后。
+  - **Pair 7 既存 bug**:shared-types 的 `DiagnosticExportResult` 缺 `manifest` 字段(main-side 实际 wire 有),改它会动跨进程契约,留 R3。
+- **验证**(R2 改完后,完整工具链):`git diff --check` ✅;`pnpm check` ✅ exit 0;`pnpm lint` ✅ exit 0(31 warnings,无新增);`pnpm i18n:check` ✅;`pnpm test:run` ✅ **129 files / 1079 tests / 0 failed**(+2: P-M1 +1、P-M2 +1)。
+- **稳定基线更新**:`pnpm test:run` = 129 files / **1079** tests / ~13s(原 1077)。
+
 2026-07-08 blocked verification audit continuation
 
 - **Codebase-memory status**：按 AGENTS.md 优先尝试 codebase-memory MCP，`list_projects` 返回 `Transport closed`，因此本轮代码发现回退到本地文件/命令扫描。
