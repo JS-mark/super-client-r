@@ -400,6 +400,8 @@ export interface ChatStreamEvent {
     name: string;
     arguments: string;
   };
+  /** Subagent run that owns this stream event, when emitted by a child agent. */
+  subagentRunId?: string;
   toolResult?: {
     toolCallId: string;
     name: string;

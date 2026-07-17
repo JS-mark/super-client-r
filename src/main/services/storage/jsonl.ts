@@ -355,6 +355,7 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 					name: e.name,
 					input: e.input,
 					status: "pending",
+					...(e.subagentRunId ? { subagentRunId: e.subagentRunId } : {}),
 				};
 				const msg: Message = {
 					id: messageIdForTool(e),

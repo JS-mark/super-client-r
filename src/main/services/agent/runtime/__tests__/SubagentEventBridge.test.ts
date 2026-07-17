@@ -89,6 +89,29 @@ describe("SubagentEventBridge", () => {
 		expect(updates[0].event.eventId).not.toBe(updates[1].event.eventId);
 	});
 
+	it("update() carries the registered parent assistant message id for live part updates", () => {
+		const h = harness();
+		h.bridge.spawn({
+			parentRunId: "p",
+			subagentRunId: "sub-1",
+			sessionId: "conv-1",
+			parentAssistantMessageId: "msg-parent-1",
+			taskGoal: "goal",
+		});
+		h.tick();
+		h.bridge.update("sub-1", { toolCallCount: 1 });
+
+		const update = h.emitted.find((e) => e.event.type === "subagent.updated");
+		expect(update).toBeDefined();
+		if (update?.event.type === "subagent.updated") {
+			expect(update.event.payload.patch).toMatchObject({
+				toolCallCount: 1,
+				parentAssistantMessageId: "msg-parent-1",
+			});
+		}
+		expect(update?.ctx.parentAssistantMessageId).toBe("msg-parent-1");
+	});
+
 	it("complete() emits subagent.completed with summary + tokenUsage and drops registration", () => {
 		const h = harness();
 		h.bridge.spawn({

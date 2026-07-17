@@ -12,8 +12,6 @@
  * Not in scope this round:
  *   - Navigation on row click (we surface an `onSelect` callback that
  *     wires up the click but do not implement navigation ourselves).
- *   - Real-time tool count from `Message.toolCall.subagentRunId` — see
- *     `useSubagentsInspectorData` for the follow-up note.
  */
 
 import { RobotOutlined } from "@ant-design/icons";

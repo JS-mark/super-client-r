@@ -13,9 +13,9 @@
  *     `SubagentMessagePart` on some assistant message — the runtime is
  *     responsible for pushing that part; we don't re-derive from raw
  *     tool events.
- *   - Follow-up (later batch): once `Message.toolCall.subagentRunId`
- *     lands, this hook could enrich entries with realtime tool-call
- *     counters straight from tool messages instead of the summary field.
+ *   - Tool counts prefer the subagent run summary, then live `tool_use`
+ *     messages tagged with `toolCall.subagentRunId` when those have advanced
+ *     further than the replayed summary.
  */
 
 import { useMemo } from "react";
@@ -47,6 +47,12 @@ export function buildSubagentsInspectorData(
 	messages: Message[],
 ): SubagentInspectorEntry[] {
 	const entries: SubagentInspectorEntry[] = [];
+	const liveToolCounts = new Map<string, number>();
+	for (const message of messages) {
+		const subagentRunId = message.toolCall?.subagentRunId;
+		if (!subagentRunId) continue;
+		liveToolCounts.set(subagentRunId, (liveToolCounts.get(subagentRunId) ?? 0) + 1);
+	}
 	for (const m of messages) {
 		if (m.role !== "assistant") continue;
 		const parts = m.parts;
@@ -55,12 +61,18 @@ export function buildSubagentsInspectorData(
 			if (part.type !== "subagent") continue;
 			const run = (part as SubagentMessagePart).run;
 			if (!run) continue;
+			const liveToolCallCount = liveToolCounts.get(run.subagentRunId);
+			const summaryToolCallCount = run.toolCallCount;
+			const toolCallCount =
+				liveToolCallCount == null
+					? summaryToolCallCount
+					: Math.max(summaryToolCallCount ?? 0, liveToolCallCount);
 			entries.push({
 				subagentRunId: run.subagentRunId,
 				profileName: run.profileName,
 				taskGoal: run.taskGoal,
 				status: run.status,
-				toolCallCount: run.toolCallCount,
+				toolCallCount,
 				startedAt: run.startedAt,
 				endedAt: run.endedAt,
 				hasError: run.status === "failed",

@@ -12,6 +12,8 @@
  *     (for Task tool's HTTP recursion)
  *   - `_scpPort` / `_scpApiKey`: this server's HTTP port + Bearer key
  *   - `_parentRequestId`: parent's requestId (for trace correlation)
+ *   - `_parentAssistantMessageId`: optional parent assistant message id for
+ *     live SubagentMessagePart updates
  *   - `_taskDepth`: current subagent nesting level (root = 0)
  *
  * Wire naming on the model side: `scp-agent-builtins__Read` (etc.) per
@@ -409,6 +411,7 @@ const taskHandler: InternalToolHandler = async (args) => {
 	const bridge = getSubagentEventBridge();
 	const parentRequestId = String(args._parentRequestId ?? "");
 	const parentConversationId = String(args._parentConversationId ?? "");
+	const parentAssistantMessageId = String(args._parentAssistantMessageId ?? "");
 	// Deterministic subagentRunId — includes crypto UUID so parallel Task
 	// calls in the same tick don't collide, and echoes parent request id
 	// for trace correlation.
@@ -455,6 +458,7 @@ const taskHandler: InternalToolHandler = async (args) => {
 				parentRunId: parentRequestId,
 				subagentRunId,
 				sessionId: parentConversationId,
+				...(parentAssistantMessageId ? { parentAssistantMessageId } : {}),
 				taskGoal: `${description}: ${prompt}`,
 			});
 			spawned = true;
@@ -466,12 +470,17 @@ const taskHandler: InternalToolHandler = async (args) => {
 
 		const subRequest = {
 			requestId: subRequestId,
-			conversationId: subRequestId,
+			conversationId: parentConversationId || subRequestId,
 			baseUrl: provider.baseUrl,
 			apiKey: provider.apiKey,
 			model: provider.model,
 			providerPreset: provider.providerPreset,
 			apiFormat: provider.apiFormat,
+			agentBuiltins: {
+				taskDepth: depth + 1,
+				...(parentConversationId ? { parentConversationId } : {}),
+				...(parentAssistantMessageId ? { parentAssistantMessageId } : {}),
+			},
 			messages: [
 				{
 					role: "system" as const,
@@ -514,10 +523,19 @@ const taskHandler: InternalToolHandler = async (args) => {
 		}
 
 		let accumulated = "";
+		let toolCallCount = 0;
 		for await (const frame of parseSSEStream(res.body)) {
 			if (frame.event === "chunk") {
 				const c = (frame.data as { content?: string }).content;
 				if (c) accumulated += c;
+			} else if (isToolCallSseFrame(frame.event)) {
+				toolCallCount += 1;
+				if (spawned && bridge) {
+					bridge.update(subagentRunId, {
+						status: "running",
+						toolCallCount,
+					});
+				}
 			} else if (frame.event === "error") {
 				const e = (frame.data as { error?: string }).error ?? "unknown";
 				throw new Error(`subagent error: ${e}`);
@@ -527,6 +545,7 @@ const taskHandler: InternalToolHandler = async (args) => {
 		if (spawned && bridge) {
 			bridge.complete(subagentRunId, {
 				summary: accumulated || undefined,
+				toolCallCount,
 			});
 		}
 		return textOk(accumulated || "(subagent returned no text)");
@@ -537,6 +556,10 @@ const taskHandler: InternalToolHandler = async (args) => {
 		return textErr(`Task: ${(err as Error).message}`);
 	}
 };
+
+function isToolCallSseFrame(eventName: string): boolean {
+	return eventName === "tool_call" || eventName === "tool.call";
+}
 
 // AskUserQuestion is intercepted by `toolAdapter.ts` before reaching this MCP
 // server. If it ever falls through (e.g. a future code path forgets the
