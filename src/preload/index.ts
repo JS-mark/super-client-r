@@ -1775,6 +1775,7 @@ const electronAPI: ElectronAPI = {
 	git: createBridge<ElectronAPI["git"]>("git", [
 		"getBranchInfo",
 		"createWorktree",
+		"preflightCreateWorktree",
 		"listBranches",
 		"switchBranch",
 		"createBranch",

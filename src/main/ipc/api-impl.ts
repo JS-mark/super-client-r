@@ -1446,6 +1446,16 @@ module.exports = {
 		getBranchInfo: (cwd: string) => getGitInfoService().getBranchInfo(cwd),
 		createWorktree: (cwd: string, worktreePath: string, branchName?: string) =>
 			getGitInfoService().createWorktree(cwd, worktreePath, branchName),
+		preflightCreateWorktree: (
+			cwd: string,
+			worktreePath: string,
+			branchName?: string,
+		) =>
+			getGitInfoService().preflightCreateWorktree(
+				cwd,
+				worktreePath,
+				branchName,
+			),
 		listBranches: (cwd: string) => getGitInfoService().listBranches(cwd),
 		switchBranch: (cwd: string, branch: string) =>
 			getGitInfoService().switchBranch(cwd, branch),

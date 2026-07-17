@@ -25,6 +25,7 @@ import {
 	PushpinOutlined,
 } from "@ant-design/icons";
 import {
+	Alert,
 	Checkbox,
 	Dropdown,
 	type MenuProps,
@@ -37,6 +38,11 @@ import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import type { Project } from "@super-client/shared-types/project";
 import { appService } from "../../services/appService";
+import {
+	gitService,
+	type WorktreePreflightResult,
+} from "../../services/gitService";
+import { describeWorktreePreflight } from "../../lib/worktreePreflightDisplay";
 import { deleteProjectWithCleanup } from "../../services/projectDeletionService";
 import { useProjectStore } from "../../stores/projectStore";
 
@@ -271,6 +277,9 @@ function CreateWorktreeModal({
 }: CreateWorktreeModalProps) {
 	const [form] = Form.useForm<{ worktreePath: string; branchName: string }>();
 	const [submitting, setSubmitting] = useState(false);
+	const [preflight, setPreflight] = useState<WorktreePreflightResult | null>(
+		null,
+	);
 
 	const defaultPath = `${project.cwd}-worktree-${Date.now().toString(36)}`;
 	const defaultBranch = `worktree-${Date.now().toString(36)}`;
@@ -279,6 +288,21 @@ function CreateWorktreeModal({
 		const values = await form.validateFields();
 		setSubmitting(true);
 		try {
+			const preflightRes = await gitService.preflightCreateWorktree(
+				project.cwd,
+				values.worktreePath,
+				values.branchName,
+			);
+			if (preflightRes.success && preflightRes.data) {
+				setPreflight(preflightRes.data);
+				if (preflightRes.data.issues.some((issue) => issue.level === "block")) {
+					return;
+				}
+			} else {
+				setPreflight(null);
+				message.error(preflightRes.error || "工作树检查失败");
+				return;
+			}
 			const newProject = await useProjectStore
 				.getState()
 				.createWorktree(project.id, {
@@ -322,7 +346,7 @@ function CreateWorktreeModal({
 					rules={[{ required: true, message: "请输入工作树路径" }]}
 					help="git worktree add 的目标目录；不能与已存在的目录冲突"
 				>
-					<Input />
+					<Input onFocus={() => setPreflight(null)} />
 				</Form.Item>
 				<Form.Item
 					label="分支名"
@@ -330,9 +354,39 @@ function CreateWorktreeModal({
 					rules={[{ required: true, message: "请输入新建分支名" }]}
 					help="git worktree add -b 创建并切到该分支；同名分支已存在会报错"
 				>
-					<Input />
+					<Input onFocus={() => setPreflight(null)} />
 				</Form.Item>
+				<WorktreePreflightAlert result={preflight} />
 			</Form>
 		</Modal>
+	);
+}
+
+function WorktreePreflightAlert({
+	result,
+}: {
+	result: WorktreePreflightResult | null;
+}) {
+	const display = describeWorktreePreflight(
+		result,
+		"创建前会检查 Git 仓库、目标路径、分支名和当前工作区状态。",
+	);
+	return (
+		<Alert
+			type={display.type}
+			showIcon
+			message={display.message}
+			description={
+				display.items.length > 0 ? (
+					<ul className="m-0 list-disc pl-4">
+						{display.items.map((item) => (
+							<li key={item}>{item}</li>
+						))}
+					</ul>
+				) : (
+					display.emptyDescription || undefined
+				)
+			}
+		/>
 	);
 }

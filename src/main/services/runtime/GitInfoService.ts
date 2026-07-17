@@ -6,21 +6,24 @@
  */
 
 import { execFile } from "child_process";
+import { access, stat } from "fs/promises";
+import { dirname, join } from "path";
 import { promisify } from "util";
 
-import type { GitBranchInfo, GitCommit } from "@super-client/shared-types/git";
+import type {
+	CreateWorktreeResult,
+	GitBranchInfo,
+	GitCommit,
+	WorktreePreflightIssue,
+	WorktreePreflightLevel,
+	WorktreePreflightResult,
+} from "@super-client/shared-types/git";
 
 const execFileAsync = promisify(execFile);
 
 const GIT_TIMEOUT_MS = 2_000;
 const GIT_WRITE_TIMEOUT_MS = 10_000;
 const CACHE_TTL_MS = 3_000;
-
-export interface CreateWorktreeResult {
-	ok: boolean;
-	error?: string;
-	worktreePath?: string;
-}
 
 export interface GitBranchListItem {
 	/** Local branch short name, e.g. "main". */
@@ -55,6 +58,17 @@ async function runGit(cwd: string, args: string[]): Promise<string> {
 		windowsHide: true,
 	});
 	return stdout.toString();
+}
+
+function isSafeBranchName(branch: string): boolean {
+	if (!branch || branch !== branch.trim()) return false;
+	if (branch.startsWith("-")) return false;
+	if (branch.includes("..") || branch.includes("@{")) return false;
+	if (branch.includes("\\") || /\s/.test(branch)) return false;
+	if (branch.endsWith("/") || branch.endsWith(".") || branch.endsWith(".lock")) {
+		return false;
+	}
+	return /^[A-Za-z0-9._\-/]+$/.test(branch);
 }
 
 export class GitInfoService {
@@ -161,21 +175,153 @@ export class GitInfoService {
 		if (!cwd || !worktreePath) {
 			return { ok: false, error: "cwd and worktreePath are required" };
 		}
-		const branch = branchName ?? `fork-${Date.now()}`;
+		const branch = branchName?.trim() || `fork-${Date.now()}`;
+		const preflight = await this.preflightCreateWorktree(
+			cwd,
+			worktreePath,
+			branch,
+		);
+		if (!preflight.ok) {
+			const firstBlock = preflight.issues.find((issue) => issue.level === "block");
+			return {
+				ok: false,
+				error: firstBlock?.message ?? "git worktree preflight failed",
+				preflight,
+			};
+		}
 		try {
 			await execFileAsync(
 				"git",
 				["-C", cwd, "worktree", "add", "-b", branch, worktreePath],
 				{ timeout: GIT_WRITE_TIMEOUT_MS, windowsHide: true },
 			);
-			return { ok: true, worktreePath };
+			return { ok: true, worktreePath, preflight };
 		} catch (err) {
 			const stderr =
 				(err as { stderr?: Buffer | string }).stderr?.toString().trim() || "";
 			const message =
 				stderr || (err as Error).message || "git worktree add failed";
-			return { ok: false, error: message };
+			return { ok: false, error: message, preflight };
 		}
+	}
+
+	async preflightCreateWorktree(
+		cwd: string,
+		worktreePath: string,
+		branchName?: string,
+	): Promise<WorktreePreflightResult> {
+		const branch = branchName?.trim() || `fork-${Date.now()}`;
+		const issues: WorktreePreflightIssue[] = [];
+		const addIssue = (
+			check: WorktreePreflightIssue["check"],
+			level: WorktreePreflightLevel,
+			message: string,
+		) => {
+			issues.push({ check, level, message });
+		};
+
+		if (!cwd || !worktreePath) {
+			addIssue("target-path", "block", "cwd and worktreePath are required");
+			return { ok: false, cwd, worktreePath, branchName: branch, issues };
+		}
+
+		try {
+			const out = (
+				await runGit(cwd, ["rev-parse", "--is-inside-work-tree"])
+			).trim();
+			if (out !== "true") {
+				addIssue("git-repo", "block", "当前项目不是 Git 仓库");
+			}
+		} catch {
+			addIssue("git-repo", "block", "当前项目不是 Git 仓库");
+		}
+
+		if (!isSafeBranchName(branch)) {
+			addIssue("branch-name", "block", "分支名不合法");
+		} else {
+			try {
+				await execFileAsync("git", ["check-ref-format", "--branch", branch], {
+					timeout: GIT_TIMEOUT_MS,
+					windowsHide: true,
+				});
+			} catch {
+				addIssue("branch-name", "block", "分支名不合法");
+			}
+			try {
+				await runGit(cwd, ["show-ref", "--verify", `refs/heads/${branch}`]);
+				addIssue("branch-exists", "block", "分支已存在，请换一个分支名");
+			} catch {
+				// Missing branch is the expected path.
+			}
+		}
+
+		try {
+			await stat(worktreePath);
+			addIssue("target-path", "block", "工作树目录已存在");
+		} catch (err) {
+			if ((err as { code?: string }).code !== "ENOENT") {
+				addIssue("target-path", "block", "无法检查工作树目录");
+			} else {
+				try {
+					await access(dirname(worktreePath));
+				} catch {
+					addIssue("target-path", "block", "工作树父目录不可访问");
+				}
+			}
+		}
+
+		try {
+			const status = await runGit(cwd, ["status", "--porcelain"]);
+			const dirtyCount = status.split(/\r?\n/).filter(Boolean).length;
+			if (dirtyCount > 0) {
+				addIssue(
+					"dirty",
+					"warn",
+					`当前工作区有 ${dirtyCount} 个未提交变更`,
+				);
+			}
+		} catch {
+			// Repo check above already reports blocking failures.
+		}
+
+		try {
+			await stat(join(cwd, ".gitmodules"));
+			addIssue("submodules", "warn", "新工作树可能需要初始化子模块");
+		} catch {
+			// No .gitmodules.
+		}
+
+		try {
+			const attrs = await runGit(cwd, [
+				"grep",
+				"-n",
+				"filter=lfs",
+				"--",
+				".gitattributes",
+			]);
+			if (attrs.trim()) addIssue("lfs", "warn", "新工作树可能需要拉取 LFS 文件");
+		} catch {
+			// No tracked LFS attributes or git grep failed; keep this advisory only.
+		}
+
+		try {
+			await runGit(cwd, [
+				"rev-parse",
+				"--abbrev-ref",
+				"--symbolic-full-name",
+				"@{upstream}",
+			]);
+		} catch {
+			addIssue("upstream", "info", "当前分支无 upstream");
+		}
+
+		return {
+			ok: !issues.some((issue) => issue.level === "block"),
+			cwd,
+			worktreePath,
+			branchName: branch,
+			issues,
+		};
 	}
 
 	/**
