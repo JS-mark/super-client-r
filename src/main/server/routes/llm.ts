@@ -244,6 +244,7 @@ export class LLMController {
 			apiFormat: raw.apiFormat,
 			providerPreset: raw.providerPreset,
 			extraParams: raw.extraParams,
+			agentBuiltins: raw.agentBuiltins,
 			conversationId: raw.conversationId,
 			toolTimeout: raw.toolTimeout,
 		};

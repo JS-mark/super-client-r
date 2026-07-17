@@ -73,6 +73,80 @@ describe("buildSubagentsInspectorData", () => {
 		});
 	});
 
+	it("uses live tool messages to increase a subagent tool count", () => {
+		const messages: Message[] = [
+			makeAssistantWithParts("a1", [
+				makeSubagentPart({
+					subagentRunId: "sr-1",
+					taskGoal: "Investigate",
+					status: "running",
+					startedAt: 100,
+					toolCallCount: 1,
+				}),
+			]),
+			{
+				id: "tool-1",
+				role: "tool",
+				content: "",
+				timestamp: 110,
+				type: "tool_use",
+				toolCall: {
+					id: "tc-1",
+					name: "Read",
+					input: {},
+					status: "success",
+					subagentRunId: "sr-1",
+				},
+			} as Message,
+			{
+				id: "tool-2",
+				role: "tool",
+				content: "",
+				timestamp: 120,
+				type: "tool_use",
+				toolCall: {
+					id: "tc-2",
+					name: "Bash",
+					input: {},
+					status: "pending",
+					subagentRunId: "sr-1",
+				},
+			} as Message,
+		];
+
+		expect(buildSubagentsInspectorData(messages)[0].toolCallCount).toBe(2);
+	});
+
+	it("keeps the summary tool count when it is ahead of live messages", () => {
+		const messages: Message[] = [
+			makeAssistantWithParts("a1", [
+				makeSubagentPart({
+					subagentRunId: "sr-1",
+					taskGoal: "Investigate",
+					status: "running",
+					startedAt: 100,
+					toolCallCount: 4,
+				}),
+			]),
+			{
+				id: "tool-1",
+				role: "tool",
+				content: "",
+				timestamp: 110,
+				type: "tool_use",
+				toolCall: {
+					id: "tc-1",
+					name: "Read",
+					input: {},
+					status: "success",
+					subagentRunId: "sr-1",
+				},
+			} as Message,
+		];
+
+		expect(buildSubagentsInspectorData(messages)[0].toolCallCount).toBe(4);
+	});
+
 	it("sorts multiple entries across messages by startedAt desc", () => {
 		const messages: Message[] = [
 			makeAssistantWithParts("a1", [

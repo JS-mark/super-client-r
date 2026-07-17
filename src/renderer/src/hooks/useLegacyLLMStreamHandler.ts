@@ -151,6 +151,9 @@ export function handleLegacyLLMStreamEvent(
 				name: event.toolCall.name,
 				input: parsedInput,
 				status: "pending",
+				...(event.subagentRunId
+					? { subagentRunId: event.subagentRunId }
+					: {}),
 				...(isAskUserQuestion
 					? { approval: { kind: "ask-user-question" } }
 					: {}),

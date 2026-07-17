@@ -66,9 +66,12 @@ describe("injectBuiltinArgs", () => {
 			scpPort: 31337,
 			scpApiKey: "sk-self",
 			parentRequestId: "r1",
+			taskDepth: 1,
+			parentConversationId: "conv-root",
+			parentAssistantMessageId: "assistant-root",
 		};
 
-		it("injects _cwd + _provider + _scpPort + _scpApiKey + _parentRequestId", () => {
+		it("injects _cwd + provider + Task recursion context", () => {
 			const out = injectBuiltinArgs(
 				"@scp/agent-builtins",
 				{ path: "foo.ts" },
@@ -80,6 +83,9 @@ describe("injectBuiltinArgs", () => {
 			expect(out._scpPort).toBe(31337);
 			expect(out._scpApiKey).toBe("sk-self");
 			expect(out._parentRequestId).toBe("r1");
+			expect(out._taskDepth).toBe(1);
+			expect(out._parentConversationId).toBe("conv-root");
+			expect(out._parentAssistantMessageId).toBe("assistant-root");
 		});
 
 		it("resolves relative path against cwd", () => {

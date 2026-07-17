@@ -49,6 +49,7 @@ export interface AgentBuiltinsContext {
 	scpPort?: number;
 	scpApiKey?: string;
 	parentRequestId?: string;
+	taskDepth?: number;
 	/**
 	 * Multi-Agent Round 6: parent session (aka the outer chat's
 	 * conversationId). Passed to the `Task` tool so subagent lifecycle
@@ -57,6 +58,7 @@ export interface AgentBuiltinsContext {
 	 * compatibility with callers that don't know the conversation.
 	 */
 	parentConversationId?: string;
+	parentAssistantMessageId?: string;
 }
 
 /**
@@ -123,8 +125,17 @@ export function injectBuiltinArgs(
 			resolved._scpApiKey = agentBuiltinsCtx.scpApiKey;
 		if (agentBuiltinsCtx?.parentRequestId)
 			resolved._parentRequestId = agentBuiltinsCtx.parentRequestId;
+		if (
+			agentBuiltinsCtx?.taskDepth !== undefined &&
+			resolved._taskDepth === undefined
+		) {
+			resolved._taskDepth = agentBuiltinsCtx.taskDepth;
+		}
 		if (agentBuiltinsCtx?.parentConversationId)
 			resolved._parentConversationId = agentBuiltinsCtx.parentConversationId;
+		if (agentBuiltinsCtx?.parentAssistantMessageId)
+			resolved._parentAssistantMessageId =
+				agentBuiltinsCtx.parentAssistantMessageId;
 	}
 
 	return resolved;
@@ -170,7 +181,17 @@ export function buildToolExecutorFromRequest(
 		scpPort: extras?.scpPort,
 		scpApiKey: extras?.scpApiKey,
 		parentRequestId: request.requestId,
-		parentConversationId: request.conversationId,
+		parentConversationId:
+			request.agentBuiltins?.parentConversationId ?? request.conversationId,
+		...(request.agentBuiltins?.taskDepth !== undefined
+			? { taskDepth: request.agentBuiltins.taskDepth }
+			: {}),
+		...(request.agentBuiltins?.parentAssistantMessageId
+			? {
+					parentAssistantMessageId:
+						request.agentBuiltins.parentAssistantMessageId,
+				}
+			: {}),
 	};
 
 	return async (

@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentProductEvent } from "@super-client/shared-types/agent-product-events";
 
 const { callToolMock } = vi.hoisted(() => ({
 	callToolMock: vi.fn(),
@@ -15,9 +16,15 @@ import {
 	AGENT_BUILTIN_TOOL_NAMES,
 	createAgentBuiltinsServer,
 } from "../agentBuiltinsServer";
+import { SubagentEventBridge } from "../../../../agent/runtime/SubagentEventBridge";
+import { setSubagentEventBridge } from "../../../../agent/runtime/subagentBridgeRegistry";
 
 const TMP = mkdtempSync(join(tmpdir(), "agent-builtins-test-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
+afterEach(() => {
+	setSubagentEventBridge(null);
+	vi.unstubAllGlobals();
+});
 
 type AnyResult = {
 	content: Array<{ text?: string } | { data: string; mimeType: string }>;
@@ -26,6 +33,24 @@ function textOf(result: AnyResult): string {
 	return result.content
 		.map((c) => ("text" in c ? c.text ?? "" : ""))
 		.join("");
+}
+
+function sseResponse(
+	frames: Array<{ event: string; data: Record<string, unknown> }>,
+): Response {
+	const encoder = new TextEncoder();
+	const body = frames
+		.map((frame) => `event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`)
+		.join("");
+	return new Response(
+		new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(encoder.encode(body));
+				controller.close();
+			},
+		}),
+		{ status: 200 },
+	);
 }
 
 describe("agentBuiltinsServer skeleton", () => {
@@ -365,6 +390,83 @@ describe("Task handler (HTTP recursion)", () => {
 			prompt: "  ",
 		});
 		expect(r2.isError).toBe(true);
+	});
+
+	it("emits subagent.updated tool counts while consuming recursive SSE tool calls", async () => {
+		const emitted: AgentProductEvent[] = [];
+		setSubagentEventBridge(
+			new SubagentEventBridge({
+				emitSubagentEvent: (event) => emitted.push(event),
+				now: () => 123,
+			}),
+		);
+		const fetchMock = vi.fn().mockResolvedValue(
+			sseResponse([
+				{ event: "tool_call", data: { id: "tc-1", name: "Read" } },
+				{ event: "chunk", data: { content: "done" } },
+				{ event: "tool.call", data: { callId: "tc-2", toolName: "Grep" } },
+				{ event: "done", data: {} },
+			]),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Task")!({
+			description: "inspect",
+			prompt: "Find things.",
+			_taskDepth: 0,
+			_provider: { baseUrl: "https://provider.test", apiKey: "sk", model: "m" },
+			_scpPort: 3000,
+			_scpApiKey: "api-key",
+			_parentRequestId: "parent-1",
+			_parentConversationId: "conv-1",
+			_parentAssistantMessageId: "assistant-parent-1",
+		});
+
+		expect(result.isError).toBeFalsy();
+		expect(textOf(result)).toContain("done");
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const requestBody = JSON.parse(
+			(fetchMock.mock.calls[0]?.[1] as { body?: string })?.body ?? "{}",
+		) as {
+			conversationId?: string;
+			agentBuiltins?: {
+				taskDepth?: number;
+				parentConversationId?: string;
+				parentAssistantMessageId?: string;
+			};
+		};
+		expect(requestBody.conversationId).toBe("conv-1");
+		expect(requestBody.agentBuiltins).toMatchObject({
+			taskDepth: 1,
+			parentConversationId: "conv-1",
+			parentAssistantMessageId: "assistant-parent-1",
+		});
+		const updates = emitted.filter(
+			(
+				event,
+			): event is Extract<AgentProductEvent, { type: "subagent.updated" }> =>
+				event.type === "subagent.updated",
+		);
+		expect(updates).toHaveLength(2);
+		expect(updates.map((event) => event.payload.patch.toolCallCount)).toEqual([
+			1,
+			2,
+		]);
+		expect(updates[0].payload.patch).toMatchObject({
+			status: "running",
+			parentAssistantMessageId: "assistant-parent-1",
+		});
+		const completed = emitted.find(
+			(
+				event,
+			): event is Extract<AgentProductEvent, { type: "subagent.completed" }> =>
+				event.type === "subagent.completed",
+		);
+		expect(completed?.payload).toMatchObject({
+			summary: "done",
+			toolCallCount: 2,
+		});
 	});
 
 	// Note: a full HTTP-recursion happy-path test lives in the e2e suite

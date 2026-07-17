@@ -384,6 +384,12 @@ export interface ChatCompletionRequest {
 	apiFormat?: "anthropic-messages" | "chat-completions" | "responses";
 	providerPreset?: ModelProviderPreset;
 	extraParams?: Record<string, unknown>;
+	/** Host-only context for built-in Agent tools; never forwarded to providers. */
+	agentBuiltins?: {
+		taskDepth?: number;
+		parentConversationId?: string;
+		parentAssistantMessageId?: string;
+	};
 	/** Conversation ID for resolving workspace directory in tool calls */
 	conversationId?: string;
 	/** Tool execution timeout in seconds (default 180) */
@@ -424,6 +430,8 @@ export interface ChatStreamEvent {
 		name: string;
 		arguments: string;
 	};
+	/** Subagent run that owns this stream event, when emitted by a child agent. */
+	subagentRunId?: string;
 	toolResult?: {
 		toolCallId: string;
 		name: string;

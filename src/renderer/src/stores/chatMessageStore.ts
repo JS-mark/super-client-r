@@ -338,22 +338,28 @@ export const useChatMessageStore = create<ChatMessageState>()((set) => ({
 							error:
 								nextToolCall.error ??
 								(nextToolCall.result !== undefined ? nextToolCall.result : ""),
-							...(typeof nextToolCall.duration === "number"
-								? { duration: nextToolCall.duration }
-								: {}),
-						});
-					} else {
-						emitSessionEvent({
+								...(typeof nextToolCall.duration === "number"
+									? { duration: nextToolCall.duration }
+									: {}),
+								...(nextToolCall.subagentRunId
+									? { subagentRunId: nextToolCall.subagentRunId }
+									: {}),
+							});
+						} else {
+							emitSessionEvent({
 							type: "tool_result",
 							toolCallId: nextToolCall.id,
 							ts: Date.now(),
 							output: nextToolCall.result ?? "",
-							...(typeof nextToolCall.duration === "number"
-								? { duration: nextToolCall.duration }
-								: {}),
-						});
+								...(typeof nextToolCall.duration === "number"
+									? { duration: nextToolCall.duration }
+									: {}),
+								...(nextToolCall.subagentRunId
+									? { subagentRunId: nextToolCall.subagentRunId }
+									: {}),
+							});
+						}
 					}
-				}
 			return { messages: newMessages };
 		}),
 

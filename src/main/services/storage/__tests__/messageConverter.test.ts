@@ -158,6 +158,41 @@ describe("tool_use", () => {
 		});
 	});
 
+	it("tool_use preserves subagentRunId on call and terminal result", () => {
+		const msg: ChatMessagePersist = {
+			id: "t-sub",
+			role: "tool",
+			content: "",
+			timestamp: 4100,
+			type: "tool_use",
+			toolCall: {
+				id: "tc-sub",
+				name: "read_file",
+				input: { path: "/z" },
+				status: "success",
+				result: "ok",
+				subagentRunId: "sub-1",
+			},
+		};
+		expect(convertChatMessageToEvents(msg)).toEqual([
+			{
+				type: "tool_call",
+				id: "tc-sub",
+				ts: 4100,
+				name: "read_file",
+				input: { path: "/z" },
+				subagentRunId: "sub-1",
+			},
+			{
+				type: "tool_result",
+				toolCallId: "tc-sub",
+				ts: 4100,
+				output: "ok",
+				subagentRunId: "sub-1",
+			},
+		]);
+	});
+
 	it("tool_use with error → tool_call + tool_error", () => {
 		const msg: ChatMessagePersist = {
 			id: "t3",

@@ -1336,6 +1336,7 @@ export interface ChatMessagePersist {
 		name: string;
 		input: Record<string, unknown>;
 		status: "pending" | "success" | "error";
+		subagentRunId?: string;
 		result?: unknown;
 		error?: string;
 		duration?: number;

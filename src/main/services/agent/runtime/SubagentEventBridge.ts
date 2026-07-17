@@ -143,7 +143,16 @@ export class SubagentEventBridge {
 		if (typeof patch.toolCallCount === "number") {
 			reg.toolCallCount = patch.toolCallCount;
 		}
-		const event = createSubagentUpdatedProductEvent(subagentRunId, patch, {
+		const nextPatch: Partial<SubagentRunSummary> = {
+			...patch,
+			...(patch.parentAssistantMessageId ?? reg.parentAssistantMessageId
+				? {
+						parentAssistantMessageId:
+							patch.parentAssistantMessageId ?? reg.parentAssistantMessageId,
+					}
+				: {}),
+		};
+		const event = createSubagentUpdatedProductEvent(subagentRunId, nextPatch, {
 			sessionId: reg.sessionId,
 			projectId: reg.projectId,
 			parentRunId: reg.parentRunId,
