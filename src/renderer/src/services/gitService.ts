@@ -5,7 +5,12 @@
  * 此服务仅做调用代理与类型暴露。
  */
 
-import type { GitBranchInfo, GitCommit } from "@super-client/shared-types/git";
+import type {
+	CreateWorktreeResult,
+	GitBranchInfo,
+	GitCommit,
+	WorktreePreflightResult,
+} from "@super-client/shared-types/git";
 import type { IPCResponse } from "../types/electron";
 
 export const gitService = {
@@ -15,9 +20,14 @@ export const gitService = {
 		cwd: string,
 		worktreePath: string,
 		branchName?: string,
-	): Promise<
-		IPCResponse<{ ok: boolean; error?: string; worktreePath?: string }>
-	> => window.electron.git.createWorktree(cwd, worktreePath, branchName),
+	): Promise<IPCResponse<CreateWorktreeResult>> =>
+		window.electron.git.createWorktree(cwd, worktreePath, branchName),
+	preflightCreateWorktree: (
+		cwd: string,
+		worktreePath: string,
+		branchName?: string,
+	): Promise<IPCResponse<WorktreePreflightResult>> =>
+		window.electron.git.preflightCreateWorktree(cwd, worktreePath, branchName),
 	listBranches: (
 		cwd: string,
 	): Promise<IPCResponse<{ name: string; current: boolean }[]>> =>
@@ -39,4 +49,9 @@ export const gitService = {
 		window.electron.git.listCommits(cwd, opts),
 };
 
-export type { GitBranchInfo, GitCommit };
+export type {
+	CreateWorktreeResult,
+	GitBranchInfo,
+	GitCommit,
+	WorktreePreflightResult,
+};

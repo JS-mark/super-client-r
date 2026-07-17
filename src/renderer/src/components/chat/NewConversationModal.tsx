@@ -23,7 +23,12 @@ import {
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { gitService, type GitBranchInfo } from "../../services/gitService";
+import {
+	gitService,
+	type GitBranchInfo,
+	type WorktreePreflightResult,
+} from "../../services/gitService";
+import { describeWorktreePreflight } from "../../lib/worktreePreflightDisplay";
 import { useChatStore } from "../../stores/chatStore";
 import { useIMBotStore } from "../../stores/imbotStore";
 import { useProjectStore, useSortedProjects } from "../../stores/projectStore";
@@ -62,6 +67,35 @@ function defaultState(currentProjectId: string | null): FormState {
 	};
 }
 
+function WorktreePreflightAlert({
+	result,
+}: {
+	result: WorktreePreflightResult | null;
+}) {
+	const display = describeWorktreePreflight(
+		result,
+		"创建 worktree 会执行 git worktree add，提交前会先检查目标路径、分支名和当前 Git 状态。",
+	);
+	return (
+		<Alert
+			type={display.type}
+			showIcon
+			message={display.message}
+			description={
+				display.items.length > 0 ? (
+					<ul className="m-0 list-disc pl-4">
+						{display.items.map((item) => (
+							<li key={item}>{item}</li>
+						))}
+					</ul>
+				) : (
+					display.emptyDescription || undefined
+				)
+			}
+		/>
+	);
+}
+
 export function NewConversationModal() {
 	const navigate = useNavigate();
 	const [open, setOpen] = useState(false);
@@ -83,6 +117,8 @@ export function NewConversationModal() {
 	const [branchInfo, setBranchInfo] = useState<GitBranchInfo | null>(null);
 	const [branchLoading, setBranchLoading] = useState(false);
 	const [gitModalOpen, setGitModalOpen] = useState(false);
+	const [worktreePreflight, setWorktreePreflight] =
+		useState<WorktreePreflightResult | null>(null);
 	const selectedProject = useMemo(
 		() => sortedWorkspaces.find((w) => w.id === state.workspaceId) ?? null,
 		[sortedWorkspaces, state.workspaceId],
@@ -158,6 +194,20 @@ export function NewConversationModal() {
 		try {
 			let workspaceId = state.workspaceId;
 			if (selectedProject && state.branchMode === "worktree") {
+				const preflightRes = await gitService.preflightCreateWorktree(
+					selectedProject.cwd,
+					state.worktreePath.trim(),
+					state.newBranchName.trim(),
+				);
+				if (preflightRes.success && preflightRes.data) {
+					setWorktreePreflight(preflightRes.data);
+					if (preflightRes.data.issues.some((issue) => issue.level === "block")) {
+						return;
+					}
+				} else {
+					setWorktreePreflight(null);
+					return;
+				}
 				const newProject = await useProjectStore
 					.getState()
 					.createWorktree(selectedProject.id, {
@@ -277,6 +327,7 @@ export function NewConversationModal() {
 												newBranchName: e.target.value,
 											}))
 										}
+										onFocus={() => setWorktreePreflight(null)}
 									/>
 									<Input
 										placeholder="worktree 路径"
@@ -287,12 +338,9 @@ export function NewConversationModal() {
 												worktreePath: e.target.value,
 											}))
 										}
+										onFocus={() => setWorktreePreflight(null)}
 									/>
-									<Alert
-										type="warning"
-										showIcon
-										message="创建 worktree 会执行 git worktree add，后续将接入统一命令审批。"
-									/>
+									<WorktreePreflightAlert result={worktreePreflight} />
 								</div>
 							)}
 						</div>
