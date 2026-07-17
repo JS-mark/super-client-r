@@ -214,7 +214,17 @@
 			"unknown": "模型上下文窗口未知"
 		},
 		"sources": {
-			"header": "已注入来源"
+			"header": "已注入来源",
+			"pin": "固定来源",
+			"unpin": "取消固定来源"
+		},
+		"strategy": {
+			"label": "历史策略",
+			"detail": "已发送 {{historyCount}} 条 · 省略 {{omittedCount}} 条",
+			"full": "完整",
+			"sliding": "滑动窗口",
+			"compact": "压缩",
+			"summarized": "已摘要"
 		},
 		"chips": {
 			"systemPrompt": "系统提示词",
@@ -321,6 +331,16 @@
 		"contextCount": "上下文数",
 		"contextCountDesc": "包含的历史消息数量。更多上下文可以保持对话连贯，但会消耗更多 token。",
 		"contextUnlimited": "不限",
+		"contextMode": "上下文模式",
+		"contextModeDesc": "选择历史对话如何发送给 Agent。",
+		"contextModeAuto": "自动",
+		"contextModeCompact": "压缩",
+		"contextModeFull": "完整",
+		"contextModeHint": {
+			"auto": "自动模式会保留近期历史，并在 token 预算紧张时压缩更早的消息。",
+			"compact": "压缩模式会优先摘要更早的消息，降低 token 消耗。",
+			"full": "完整模式会发送所选历史，不做压缩。"
+		},
 		"streaming": "流式输出",
 		"streamingDesc": "实时逐字输出回复。关闭则一次性返回完整回复。",
 		"systemPrompt": "系统提示词",

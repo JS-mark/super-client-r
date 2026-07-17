@@ -13,14 +13,15 @@
  *     refused. `path.relative` + `fs.realpath` fencing mirrors the pattern
  *     used by `SkillValidator`.
  *
- * This service is NOT yet wired into any Agent system-prompt injection. It
- * only exposes a safe read API that later batches (prompt-context builder,
- * settings pane) can compose on top of.
+ * ClaudeCodeAgentRuntime now composes this safe read API into the Agent system
+ * prompt and emits a renderer-safe snapshot DTO. The reader itself stays
+ * side-effect free and never writes or exposes raw paths/content to the UI.
  */
 
 import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
+import type { ProjectRulesSnapshotDto } from "@super-client/shared-types/chat";
 
 /** Files this reader knows about, in the order it probes them. */
 export const PROJECT_RULES_FILENAMES = ["AGENTS.md", "CLAUDE.md"] as const;
@@ -46,6 +47,34 @@ export interface ProjectRulesSnapshot {
 	claudeMd?: ProjectRulesFile;
 	/** `Date.now()` at the moment the snapshot was built. */
 	readAt: number;
+}
+
+export function toProjectRulesSnapshotDto(
+	snapshot: ProjectRulesSnapshot,
+): ProjectRulesSnapshotDto {
+	const files: ProjectRulesSnapshotDto["files"] = [];
+	if (snapshot.agentsMd) {
+		files.push({
+			filename: "AGENTS.md",
+			byteLength: snapshot.agentsMd.byteLength,
+			sha256: snapshot.agentsMd.sha256,
+			truncated: snapshot.agentsMd.truncated,
+			injected: Boolean(snapshot.agentsMd.content.trim()),
+		});
+	}
+	if (snapshot.claudeMd) {
+		files.push({
+			filename: "CLAUDE.md",
+			byteLength: snapshot.claudeMd.byteLength,
+			sha256: snapshot.claudeMd.sha256,
+			truncated: snapshot.claudeMd.truncated,
+			injected: Boolean(snapshot.claudeMd.content.trim()),
+		});
+	}
+	return {
+		readAt: snapshot.readAt,
+		files,
+	};
 }
 
 export interface ProjectRulesReaderOptions {

@@ -3,6 +3,7 @@ import type { Message } from "@super-client/shared-types/chat";
 import {
 	buildContextInspectorData,
 	type BuildContextInspectorDataInput,
+	toggleContextSourcePinned,
 } from "../useContextInspectorData";
 import type { Attachment } from "../../stores/attachmentStore";
 
@@ -87,6 +88,56 @@ describe("buildContextInspectorData", () => {
 		expect(projectChip?.detail).toBe("AGENTS.md / CLAUDE.md");
 	});
 
+	it("prefers latest send context metadata over legacy fallback chips", () => {
+		const messages: Message[] = [
+			makeUser("u1", ["att-old"]),
+			makeAssistant("a1"),
+			makeAssistant("a2", {
+				contextSources: [
+					{
+						id: "conversation-history",
+						kind: "history",
+						label: "2 history messages",
+						detail: "1 omitted",
+						injected: true,
+					},
+					{
+						id: "search-results",
+						kind: "search",
+						label: "3 search results",
+						injected: true,
+					},
+				],
+				contextStrategy: {
+					mode: "auto",
+					strategy: "summarized",
+					historyCount: 2,
+					omittedCount: 1,
+					estimatedTokens: 120,
+					availableForMessages: 100,
+					compacted: true,
+				},
+			}),
+		];
+		const data = buildContextInspectorData(
+			baseInput({ messages, hasProject: true }),
+		);
+		expect(data.sources.map((s) => s.id)).toEqual([
+			"conversation-history",
+			"search-results",
+		]);
+		expect(data.latestContextMessageId).toBe("a2");
+		expect(data.strategy).toEqual({
+			mode: "auto",
+			strategy: "summarized",
+			historyCount: 2,
+			omittedCount: 1,
+			estimatedTokens: 120,
+			availableForMessages: 100,
+			compacted: true,
+		});
+	});
+
 	it("does not add project-rules chip on casual sessions", () => {
 		const data = buildContextInspectorData(baseInput({ hasProject: false }));
 		expect(data.sources.some((s) => s.kind === "projectRules")).toBe(false);
@@ -129,7 +180,9 @@ describe("buildContextInspectorData", () => {
 				role: "assistant",
 				content: "",
 				timestamp: 100,
-				metadata: { contextCompacted: { summary: "trim 1" } },
+				metadata: {
+					contextCompacted: { summary: "trim 1", originalCount: 2 },
+				},
 			} as unknown as Message,
 			makeAssistant("m2"),
 			{
@@ -142,8 +195,8 @@ describe("buildContextInspectorData", () => {
 		];
 		const data = buildContextInspectorData(baseInput({ messages }));
 		expect(data.compactEvents).toEqual([
-			{ id: "m1", timestamp: 100, summary: "trim 1" },
-			{ id: "m3", timestamp: 200, summary: undefined },
+			{ id: "m1", timestamp: 100, summary: "trim 1", originalCount: 2 },
+			{ id: "m3", timestamp: 200 },
 		]);
 	});
 
@@ -151,5 +204,32 @@ describe("buildContextInspectorData", () => {
 		const messages: Message[] = [makeUser("u1"), makeAssistant("a1")];
 		const data = buildContextInspectorData(baseInput({ messages }));
 		expect(data.compactEvents).toEqual([]);
+	});
+
+	it("toggles a single context source pin while preserving order", () => {
+		const sources = [
+			{
+				id: "system-prompt",
+				kind: "systemPrompt",
+				label: "System prompt",
+			},
+			{
+				id: "project-rules",
+				kind: "projectRules",
+				label: "Project rules",
+				pinned: false,
+			},
+		] as const;
+		const next = toggleContextSourcePinned(
+			[...sources],
+			"project-rules",
+			true,
+		);
+		expect(next.map((source) => source.id)).toEqual([
+			"system-prompt",
+			"project-rules",
+		]);
+		expect(next[0]).toEqual(sources[0]);
+		expect(next[1]).toMatchObject({ id: "project-rules", pinned: true });
 	});
 });

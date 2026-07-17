@@ -8,7 +8,19 @@ import type { ContextInspectorData } from "../../../../hooks/useContextInspector
 // ---------- i18n mock ----------
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
-		t: (_key: string, fallback?: string) => fallback ?? _key,
+		t: (
+			_key: string,
+			fallback?: string,
+			options?: Record<string, string | number>,
+		) => {
+			let text = fallback ?? _key;
+			if (options) {
+				for (const [key, value] of Object.entries(options)) {
+					text = text.replaceAll(`{{${key}}}`, String(value));
+				}
+			}
+			return text;
+		},
 	}),
 }));
 
@@ -73,6 +85,11 @@ vi.mock("@ant-design/icons", () => ({
 	FolderOpenOutlined: () => <span aria-hidden="true" data-icon="folder-open" />,
 	PaperClipOutlined: () => <span aria-hidden="true" data-icon="paperclip" />,
 	CompressOutlined: () => <span aria-hidden="true" data-icon="compress" />,
+	SearchOutlined: () => <span aria-hidden="true" data-icon="search" />,
+	HistoryOutlined: () => <span aria-hidden="true" data-icon="history" />,
+	ToolOutlined: () => <span aria-hidden="true" data-icon="tool" />,
+	PushpinFilled: () => <span aria-hidden="true" data-icon="pushpin-filled" />,
+	PushpinOutlined: () => <span aria-hidden="true" data-icon="pushpin" />,
 }));
 
 // ---------- hook mocks ----------
@@ -103,7 +120,41 @@ vi.mock("../../../../hooks/useContextUsage", () => ({
 
 vi.mock("../../../../hooks/useContextInspectorData", () => ({
 	useContextInspectorData: () => dataMock.current,
+	toggleContextSourcePinned: (
+		sources: ContextInspectorData["sources"],
+		sourceId: string,
+		pinned: boolean,
+	) =>
+		sources.map((source) =>
+			source.id === sourceId ? { ...source, pinned } : source,
+		),
 }));
+
+const chatMessageStoreMock = vi.hoisted(() => ({
+	current: {
+		messages: [] as Array<{
+			id: string;
+			role: string;
+			content: string;
+			timestamp: number;
+			metadata?: {
+				contextSources?: ContextInspectorData["sources"];
+			};
+		}>,
+		updateMessageMetadata: vi.fn(),
+	},
+}));
+
+vi.mock("../../../../stores/chatMessageStore", () => {
+	const useChatMessageStore = Object.assign(
+		(selector: (state: typeof chatMessageStoreMock.current) => unknown) =>
+			selector(chatMessageStoreMock.current),
+		{
+			getState: () => chatMessageStoreMock.current,
+		},
+	);
+	return { useChatMessageStore };
+});
 
 import { ContextInspectorSection } from "../ContextInspectorSection";
 
@@ -130,6 +181,8 @@ beforeEach(() => {
 		compactEvents: [],
 		hasProject: false,
 	};
+	chatMessageStoreMock.current.messages = [];
+	chatMessageStoreMock.current.updateMessageMetadata.mockReset();
 });
 
 afterEach(() => {
@@ -272,5 +325,85 @@ describe("ContextInspectorSection", () => {
 		expect(
 			container?.querySelector("[data-testid='context-empty-hint']"),
 		).toBeFalsy();
+	});
+
+	it("renders latest context strategy metadata", () => {
+		dataMock.current = {
+			sources: [
+				{ id: "system-prompt", kind: "systemPrompt", label: "System prompt" },
+				{
+					id: "conversation-history",
+					kind: "history",
+					label: "2 history messages",
+					detail: "1 omitted",
+				},
+			],
+			strategy: {
+				mode: "auto",
+				strategy: "summarized",
+				historyCount: 2,
+				omittedCount: 1,
+				estimatedTokens: 120,
+				availableForMessages: 100,
+				compacted: true,
+			},
+			compactEvents: [],
+			hasProject: false,
+		};
+		render(<ContextInspectorSection />);
+		const strategy = container?.querySelector(
+			"[data-testid='context-strategy']",
+		);
+		expect(strategy).toBeTruthy();
+		expect(container?.textContent ?? "").toContain("summarized");
+		expect(container?.textContent ?? "").toContain("2 sent");
+		expect(container?.textContent ?? "").toContain("1 omitted");
+	});
+
+	it("pins a source by updating the latest context message metadata", () => {
+		const sources = [
+			{ id: "system-prompt", kind: "systemPrompt", label: "System prompt" },
+			{
+				id: "project-rules",
+				kind: "projectRules",
+				label: "Project rules",
+				pinned: false,
+			},
+		] satisfies ContextInspectorData["sources"];
+		dataMock.current = {
+			sources,
+			latestContextMessageId: "a1",
+			compactEvents: [],
+			hasProject: true,
+		};
+		chatMessageStoreMock.current.messages = [
+			{
+				id: "a1",
+				role: "assistant",
+				content: "hello",
+				timestamp: 1,
+				metadata: { contextSources: sources },
+			},
+		];
+		render(<ContextInspectorSection />);
+		const buttons = container?.querySelectorAll(
+			"[data-testid='context-source-pin-toggle']",
+		);
+		expect(buttons?.length).toBe(2);
+		const projectButton = buttons?.[1] as HTMLButtonElement;
+		expect(projectButton.getAttribute("data-pinned")).toBe("false");
+		expect(projectButton.getAttribute("aria-label")).toBe("Pin source");
+		act(() => {
+			projectButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(chatMessageStoreMock.current.updateMessageMetadata).toHaveBeenCalledWith(
+			"a1",
+			{
+				contextSources: [
+					sources[0],
+					{ ...sources[1], pinned: true },
+				],
+			},
+		);
 	});
 });

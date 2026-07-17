@@ -373,6 +373,78 @@ describe("materializeAgentProductEvent", () => {
 		]);
 	});
 
+	it("materializes context.compacted as a replayable assistant summary message", () => {
+		const events = materializeAgentProductEvent(
+			productEvent({
+				type: "context.compacted",
+				eventId: "pe-context-compact",
+				payload: {
+					summaryMessageId: "context-summary-1",
+					summary: "Earlier discussion was summarized.",
+					originalCount: 4,
+					compactedAt: base.ts,
+					strategy: {
+						mode: "auto",
+						strategy: "summarized",
+						historyCount: 3,
+						omittedCount: 4,
+						estimatedTokens: 1600,
+						availableForMessages: 1200,
+						compacted: true,
+					},
+					originalMessageIds: ["u1", "a1", "u2", "a2"],
+					summarySource: "fallback",
+				},
+				status: "completed",
+			}),
+		);
+
+		expect(events).toEqual([
+			{
+				type: "assistant_message",
+				eventId: "pe-context-compact",
+				ts: base.ts,
+				id: "context-summary-1",
+				content: "Earlier discussion was summarized.",
+				metadata: {
+					contextCompacted: {
+						compacted: true,
+						summary: "Earlier discussion was summarized.",
+						originalCount: 4,
+						compactedAt: base.ts,
+					},
+					contextStrategy: {
+						mode: "auto",
+						strategy: "summarized",
+						historyCount: 3,
+						omittedCount: 4,
+						estimatedTokens: 1600,
+						availableForMessages: 1200,
+						compacted: true,
+					},
+				},
+			},
+		]);
+
+		expect(eventsToMessages(events)).toMatchObject([
+			{
+				id: "context-summary-1",
+				role: "assistant",
+				content: "Earlier discussion was summarized.",
+				metadata: {
+					contextCompacted: {
+						compacted: true,
+						originalCount: 4,
+					},
+					contextStrategy: {
+						strategy: "summarized",
+						compacted: true,
+					},
+				},
+			},
+		]);
+	});
+
 	it("keeps run lifecycle as session markers and skips UI-only transient product events (including per-tick usage)", () => {
 		const events = materializeAgentProductEvents([
 			productEvent({

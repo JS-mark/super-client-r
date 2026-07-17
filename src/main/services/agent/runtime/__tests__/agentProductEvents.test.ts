@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	buildUnknownProductEvent,
+	createContextCompactedProductEvent,
 	createPlanDecisionProductEvent,
 	createPlanExecuteProductEvents,
 	createSubagentCompletedProductEvent,
@@ -32,6 +33,45 @@ function event(overrides: Record<string, unknown>) {
 }
 
 describe("projectAgentRuntimeEvent", () => {
+	it("projects project rules snapshot from init into run.started payload", () => {
+		const [projected] = projectAgentRuntimeEvent(
+			event({
+				type: "init",
+				seq: 0,
+				projectRulesSnapshot: {
+					readAt: 1782100000000,
+					files: [
+						{
+							filename: "AGENTS.md",
+							byteLength: 12,
+							sha256: "hash-agents",
+							truncated: false,
+							injected: true,
+						},
+					],
+				},
+			}),
+		);
+
+		expect(projected).toMatchObject({
+			type: "run.started",
+			eventId: "req-1:0:run.started",
+			payload: {
+				projectRulesSnapshot: {
+					files: [
+						{
+							filename: "AGENTS.md",
+							byteLength: 12,
+							sha256: "hash-agents",
+							truncated: false,
+							injected: true,
+						},
+					],
+				},
+			},
+		});
+	});
+
 	it("projects text deltas as transient non-persisted message deltas", () => {
 		const [projected] = projectAgentRuntimeEvent(
 			event({ type: "text.delta", seq: 4, messageId: "m1", delta: "hello" }),
@@ -534,6 +574,60 @@ describe("projectAgentRuntimeEvent", () => {
 			},
 		]);
 		expect(events.every(shouldPersistAgentProductEvent)).toBe(true);
+	});
+});
+
+describe("createContextCompactedProductEvent", () => {
+	it("creates a deterministic persisted product event", () => {
+		const event = createContextCompactedProductEvent(
+			{
+				summaryMessageId: "context-summary-1",
+				summary: "Earlier work was summarized.",
+				originalCount: 4,
+				compactedAt: 1782100001000,
+				strategy: {
+					mode: "auto",
+					strategy: "summarized",
+					historyCount: 3,
+					omittedCount: 4,
+					estimatedTokens: 1600,
+					availableForMessages: 1200,
+					compacted: true,
+				},
+				originalMessageIds: ["u1", "a1", "u2", "a2"],
+				summarySource: "fallback",
+				model: "claude-3",
+			},
+			{
+				sessionId: "session-1",
+				projectId: "project-1",
+				runId: "run-1",
+				requestId: "req-1",
+				eventIdPrefix: "ctx-test",
+			},
+		);
+
+		expect(event).toMatchObject({
+			type: "context.compacted",
+			eventId: "ctx-test:context.compacted:context-summary-1:1782100001000:4",
+			sourceEventId:
+				"ctx-test:context.compacted:context-summary-1:1782100001000:4",
+			sessionId: "session-1",
+			projectId: "project-1",
+			runId: "run-1",
+			requestId: "req-1",
+			ts: 1782100001000,
+			status: "completed",
+			source: "product",
+			persist: true,
+			payload: {
+				summaryMessageId: "context-summary-1",
+				originalCount: 4,
+				summarySource: "fallback",
+				model: "claude-3",
+			},
+		});
+		expect(shouldPersistAgentProductEvent(event)).toBe(true);
 	});
 });
 

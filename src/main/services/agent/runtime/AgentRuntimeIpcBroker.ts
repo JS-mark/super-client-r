@@ -412,11 +412,20 @@ export class AgentRuntimeIpcBroker {
 		if (
 			ev.type === "text.delta" ||
 			ev.type === "reasoning.delta" ||
-			ev.type === "status"
+			ev.type === "status" ||
+			ev.type === "usage"
 		) {
 			return;
 		}
 		if (!this.deps.storage) return;
+		if (ev.type === "assistant.part") {
+			try {
+				this.deps.storage.appendEvent(ev.conversationId, ev.partEvent);
+			} catch (err) {
+				this.deps.onError?.(err, { requestId: ev.requestId });
+			}
+			return;
+		}
 		if (
 			ev.type === "permission.resolved" &&
 			this.persistedApprovalResolutions.has(

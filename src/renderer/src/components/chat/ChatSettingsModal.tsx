@@ -11,6 +11,7 @@ import {
 	InputNumber,
 	Modal,
 	Select,
+	Segmented,
 	Slider,
 	Switch,
 	Tooltip,
@@ -49,6 +50,7 @@ export interface SessionSettings {
 	topP: number;
 	maxTokens: number;
 	contextCount: number; // -1 = unlimited
+	contextMode: "auto" | "compact" | "full";
 	streamingEnabled: boolean;
 	systemPrompt: string;
 	customParams: CustomParam[];
@@ -65,6 +67,7 @@ export const DEFAULT_SESSION_SETTINGS: SessionSettings = {
 	topP: 1,
 	maxTokens: 4096,
 	contextCount: -1,
+	contextMode: "auto",
 	streamingEnabled: true,
 	systemPrompt: "",
 	customParams: [],
@@ -730,6 +733,53 @@ export function ChatSettingsModal({
 							updateSetting("contextCount", value >= 100 ? -1 : value)
 						}
 					/>
+				</SettingCell>
+
+				<SettingCell
+					label={t("settings.contextMode", "Context Mode")}
+					tooltip={t(
+						"settings.contextModeDesc",
+						"Choose how conversation history is sent to the agent.",
+					)}
+				>
+					<div className="mt-1 flex flex-col gap-1">
+						<Segmented
+							block
+							size="small"
+							value={settings.contextMode ?? "auto"}
+							onChange={(value) =>
+								updateSetting(
+									"contextMode",
+									value as SessionSettings["contextMode"],
+								)
+							}
+							options={[
+								{
+									label: t("settings.contextModeAuto", "Auto"),
+									value: "auto",
+								},
+								{
+									label: t("settings.contextModeCompact", "Compact"),
+									value: "compact",
+								},
+								{
+									label: t("settings.contextModeFull", "Full"),
+									value: "full",
+								},
+							]}
+						/>
+						<p className="m-0 text-[11px] leading-4 text-[var(--ant-color-text-tertiary)]">
+							{t(
+								`settings.contextModeHint.${settings.contextMode ?? "auto"}`,
+								{
+									defaultValue: t(
+										"settings.contextModeHint.auto",
+										"Auto keeps recent history and compacts older messages when the token budget is tight.",
+									),
+								},
+							)}
+						</p>
+					</div>
 				</SettingCell>
 
 				<SettingCell
