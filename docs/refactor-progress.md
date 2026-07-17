@@ -4,13 +4,64 @@
 > 覆盖矩阵：[refactor-traceability-matrix](./refactor-traceability-matrix.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
-> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-05（Phase 0a-c 复核与 P0 renderer 删除项目回归批次）。
+> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-08（resumed completion audit）。
 
 ## Current Status
 
-**In progress.** 当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP 和 `ProjectRulesReader`（AGENTS.md/CLAUDE.md 只读读取，尚未接入 Agent prompt）。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。
+**Blocked on final full-test verification.** 当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status`/`usage` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests，当前审批响应已通过 `useToolApprovalFlow` 接线；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制；当前 Runtime Inspector 和 composer info bar 的用户可见 planMode 已统一映射为 Plan/Execute，不再展示内部 `chat` 兼容值。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP、`ProjectRulesReader` 只读读取和 Agent prompt 注入、多轮 history 低风险切片、`contextCount` / `contextMode` 策略入口。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。当前没有新的可落地代码任务；唯一未完成项是当前沙箱禁止本地 server e2e 监听端口，导致 `pnpm test:run` 剩余 2 个 suite 无法完成。
 
-2026-07-05 代码复核结论：Phase 0a/0b/0c、消息虚拟列表、Agent-only 主发送链路、独立 MCP/Skills/Plugins 入口已经不是“待从零实现”项，后续应转入验收、回归和边界补齐。本批复核后确认 `ProjectStorageService.remove(projectId, { keepFiles:false })` 删除的是 app userData 下 `projects/<projectId>/`，其中包含 `sessions/`、JSONL/meta、attachments、tool-outputs/content-refs；已补 focused tests 锁定默认删除和 `keepFiles:true` 保留语义。旧 `.scr-data` 写入/迁移 helper 已删除，项目 cwd 下 `.scr-data/sessions` 只作为历史清理对象，不再作为写入或迁移目标。renderer 删除当前/运行中项目后的状态机回归已补 focused tests：删除入口先 stop stream，再 remove project，成功后才清理本地项目会话；当前项目会话删除后 fallback 到最新非 archived 会话，message/file artifact/loading/streaming 状态归位。仍待收口：project archive UI、diagnostic export UI/深水区、Recovery wizard 深水区、legacy import / recovery 默认路径脱敏、Phase 3 Context/Memory 深水区（prompt 注入、pin/unpin、compact 触发、artifact library）、Composer pills 编辑态与 git worktree preflight、MCP/Skill 独立市场重设计、完整分页读取、Phase 4 3 个 follow-up（`Message.toolCall.subagentRunId` renderer threading、`run.toolCallCount` 递归 SSE 实时递增、nested-of-nested Task 顶层化）、native structured stream events runtime producer（本阶段暂不做）。
+2026-07-08 resumed completion audit continuation:
+
+- **Subagent status**：按用户要求重新启动只读复核；Export/Recovery、Privacy display、Context/Memory 三个 explorer 已启动，测试/验证复核因 thread limit 由主 agent 承担。codebase-memory MCP 按 AGENTS 要求优先尝试 `list_projects`，但本轮仍返回 `Transport closed`，因此改用本地只读命令和 focused tests 取证。
+- **新增重构原则**：模型调用方式按 provider/model 生态分层。OpenAI、Gemini、Claude/Anthropic 默认使用原生 Function Calling；开源模型和 OpenAI-compatible/local provider 默认通过 LangChain + MCP 协议适配工具调用；用户可在对话设置里的“调用方式”覆盖默认策略。已同步到 `refactor-plan.md`、`design-doc.md` 和 `requirements-plan.md`。
+- **代码事实复核**：
+  - `src/renderer/src/router.tsx` 没有 `/extensions` route；`src/renderer/src/lib/menuConfig.ts` 仍强制隐藏 compatibility `extensions`，并保持 `mcp` / `skills` / `plugins` enabled。
+  - `SessionStorageService.create()` / `updateMeta()` 仍强制 `chatMode:"agent"`；renderer `useChat` / `useSendMessage` 导出的 `ChatMode` 仍为 `"agent"`。旧 `direct/chat` 命中仅为 compatibility type、locale/test 或历史文档残留。
+  - `SessionStorageService.resolveSessionBucket()` 仍把项目会话写入 app userData `projects/<projectId>/sessions/`，`.scr-data` 只剩 app dev userData 名称、历史 cleanup helper 和测试断言，不是正式 project session storage target。
+  - `exportSessionArchive()` / `exportProjectArchive()` 仍以 `includeChatContent === true` 才复制 JSONL；默认写空 JSONL 占位、清空 preview，不列 attachments/contentRefs。Settings 文案说明默认不含聊天记录、附件、tool payload 或真实项目目录。
+  - 发现并修正一个过期代码注释：`ProjectRulesReader` 注释曾称“未接入 Agent system prompt”，但当前 `ClaudeCodeAgentRuntime` 已调用它注入 `AGENTS.md` / `CLAUDE.md` 并发出 renderer-safe `projectRulesSnapshot` DTO；已按代码事实更新注释。
+
+2026-07-05 代码复核结论：Phase 0a/0b/0c、消息虚拟列表、Agent-only 主发送链路、独立 MCP/Skills/Plugins 入口已经不是“待从零实现”项，后续应转入验收、回归和边界补齐。本批复核后确认 `ProjectStorageService.remove(projectId, { keepFiles:false })` 删除的是 app userData 下 `projects/<projectId>/`，其中包含 `sessions/`、JSONL/meta、attachments、tool-outputs/content-refs；已补 focused tests 锁定默认删除和 `keepFiles:true` 保留语义。旧 `.scr-data` 写入/迁移 helper 已删除，项目 cwd 下 `.scr-data/sessions` 只作为历史清理对象，不再作为写入或迁移目标。renderer 删除当前/运行中项目后的状态机回归已补 focused tests：删除入口先 stop stream，再 remove project，成功后才清理本地项目会话；当前项目会话删除后 fallback 到最新非 archived 会话，message/file artifact/loading/streaming 状态归位。后续批次已补 Recovery wizard MVP、`Message.toolCall.subagentRunId` renderer threading、递归 subagent SSE tool count 更新、nested Task 顶层化、native code/json/diff structured producer、git worktree preflight 后端和 UI 展示、paged session message reads、MCP/Skills/Plugins 独立市场边界提示；依赖现已可用，focused tests、`pnpm check`、`pnpm lint`、`pnpm i18n:check` 已通过，`pnpm test:run` 仅剩 sandbox 禁止监听本地端口导致的 server e2e 验证阻塞。
+
+2026-07-07 本批实现前代码事实冲突记录：`RecoverySettings` 已有 session export 入口，但默认成功反馈直接显示 raw `exportDir`；orphan / legacy import / archived project UI 默认直接显示完整 cwd 或 legacy data dir；`SessionStorageService.exportSessionArchive()` / `exportProjectArchive()` 当时默认仍复制 `.jsonl` 和 `.meta.json`。按“当前代码事实优先”处理：先补 project archive / diagnostic export 产品入口、拆清 archived restore 命名、收敛 Settings 默认路径展示为 redacted label；后续 archive 隐私语义批次已把默认改为 `includeChatContent:false`。
+
+2026-07-07 polish 代码事实：只读 subagent 复核确认 session/project/diagnostic export 入口、IPC/preload/shared types、i18n 和 focused tests 已落地；本批只做 Settings 反馈与隐私展示小补丁，不重写底层 storage/export。`RecoverySettings` 现在把 project/session/diagnostic export feedback 放回各自 section；session/project archive 成功反馈已由后续 archive 隐私语义批次改为说明默认只包含 app-managed session metadata，除非显式 `includeChatContent:true`，否则不包含 JSONL transcripts、真实项目目录、attachments 或 tool payloads；legacy import 目录默认仍显示 redacted label，并新增 explicit `Copy full path`；orphan restore 失败 UI 不再原样展示 main 返回的 raw cwd/error message。后续批次已补 Recovery wizard MVP；Context/Memory focused tests 仍待依赖恢复复验。
+
+2026-07-07 Context/Memory low-risk slice 代码事实：四个只读 subagent 复核确认 Export/Recovery 产品入口已齐，当前续点应转入 Context/Memory；`refactor-plan.md` 原“下一批补 project archive UI / diagnostic export UI”与当前代码事实冲突，已改为 Export/Recovery 深水区 follow-up。新增 `contextManager` 纯函数模块，支持 token budget、`contextCount` sliding window、`contextMode` full/auto/compact 和 Message → `AgentHistoryMessage` 转换；`useAgentSendPipeline` 现在排除当前 user + assistant placeholder 后把历史传给 `agentRuntimeClient.createQuery()`；`ClaudeCodeAgentRuntime.buildChatRequest()` 已修复 `PromptPart[]` history 静默跳过问题，并在 main runtime 侧读取 cwd 下 `AGENTS.md` / `CLAUDE.md` 注入 system prompt；`ChatSettingsModal` 新增 context mode segmented control。后续批次已补 LLM 摘要调用、`context.compacted` 可回放事件、Context Inspector source breakdown、pin/unpin 和 artifact library MVP；仍待依赖恢复后复验。
+
+2026-07-07 Context/Memory metadata replay 小批次：本批只做 metadata-level 可观察性，不声称完成独立 `context.compacted` product/session event。`Message.metadata` 新增 `contextSources` / `contextStrategy`；`useAgentSendPipeline` 在发送前把本轮 history strategy、附件/搜索/history/tool source 和 compact marker 写回当前 assistant placeholder metadata，因此 reload 后可通过 `assistant_message.metadata` 回放到 Inspector。`useContextInspectorData` 现在优先读取 latest assistant 的 context metadata，旧会话才 fallback 到 system/project/attachment 推断；`ContextInspectorSection` 显示 history strategy、history/search/tool source icons 和 compact events。边界说明：renderer 侧 `projectRules` 只能表示 main runtime 会执行 AGENTS.md / CLAUDE.md runtime check，不能证明具体规则文件存在或是否截断；真实 project-rules snapshot DTO、独立 `context.compacted` product event、LLM summary seam、pin/unpin 仍是后续。
+
+2026-07-07 Context/Memory product event contract 小批次：新增 shared `context.compacted` product event factory，payload 包含 summary message id、summary、original count、compactedAt、context strategy、summarySource/model 等最小字段；main `productEventMaterializer` 可把该事件转成带 `metadata.contextCompacted/contextStrategy` 的 `assistant_message`，因此 JSONL reducer 无需新 schema 分支即可 replay。后续 continuation 已把 `useAgentSendPipeline` 接到 product-event persistence path，并补 main runtime project-rules snapshot DTO；这些后续接线仍待依赖恢复后复验。LLM summary seam 仍未完成。
+
+2026-07-07 Context/Memory pin/unpin continuation：本批补齐 metadata-level pin/unpin 最小闭环。`MessageContextSource.pinned` 已由 Context Inspector 的 source 行按钮写回 latest context assistant message metadata；`useAgentSendPipeline` 会从 latest context metadata 提取 pinned sources，并在下一轮 `buildContextMetadataForRuntime()` 重新生成同 id source 时保留 `pinned:true`。为避免误导用户，过期 search/attachment 等未在本轮实际出现的 pinned source 不会被强行追加显示。focused tests 已补 `toggleContextSourcePinned`、latest context message id、Inspector pin click、pinned source 跨轮 metadata 保留；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-07 Context/Memory artifact library continuation：本批补 session-scoped artifact library MVP，不新增 Extensions 聚合页，也不改 storage/export 底层。新增 `artifactLibrary` 纯函数，把当前 conversation 的 `ChatFileArtifact` / `ChatFileChangeSet` 聚合为去重 library items；默认展示 `relativePath` 或 redacted path，`fullPath` 只保留给 explicit reveal/copy 操作。`CodexEnvironmentInspector` 的 Changes section 改为 `Artifacts / 工件`，仍复用当前侧栏入口，列表显示 kind/source、diff 计数和显式定位/复制操作。focused tests 已补当前会话过滤、同 message/path/kind 去重、默认不泄露绝对路径、changeSet index；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-07 Export/Recovery archive privacy semantics continuation：本批补底层 archive `includeChatContent` 隐私语义，不引入任意 output path，也不复制真实项目 cwd。`exportSessionArchive()` / `exportProjectArchive()` options 新增 `includeChatContent?: boolean`，默认 false；默认 archive 仍写 meta + 空 JSONL 占位，但 session meta 的 `preview` 清空，manifest 标 `includeChatContent:false`，且不列 attachments/contentRefs。显式 `includeChatContent:true` 时保留旧复制 JSONL 和 referenced payload manifest 行为。IPC/shared/preload/renderer service contract 已支持可选 privacy options，Settings 文案改为默认不含聊天记录。focused tests 已补 storage 默认 no-chat-content、显式 include true、IPC/preload/service options 透传；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-07 Recovery wizard continuation：本批补 Settings Project Recovery 的最小 wizard/checklist，不改 storage/export 底层。新增 `recoveryWizard` 纯函数，从 archived/orphan/legacy/exportable counts 生成稳定步骤和推荐动作；新增 `RecoveryWizardPanel` 复用现有 refresh / legacy import / diagnostic export callbacks，不暴露 raw path，不新增任意导出路径。`RecoverySettings` 顶部现在显示 Recovery checklist、可恢复项计数、推荐步骤；legacy 推荐动作会走现有 `legacyData.importAll()`。focused tests 已补推荐顺序、无路径数据、wizard 渲染和 legacy action；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-07 Multi-agent tool-call threading continuation：本批补齐 `Message.toolCall.subagentRunId` renderer threading 的最小闭环，不改 subagent storage/event 底层。`ToolCall` shared type 新增 `subagentRunId`；runtime stream reducer 和 legacy SDK reducer 会把顶层 `subagentRunId` 写入 live `tool_use` message，`tool.result` patch、`messageConverter`、chatMessageStore terminal persistence 和 JSONL fallback top-level tool message 均保留该字段。`useSubagentsInspectorData` 现在在已有 `SubagentMessagePart.run.toolCallCount` 基础上扫描 live `tool_use.toolCall.subagentRunId`，对同一 run 取 summary/live 的较大值，从而支持运行中实时 tool count。focused tests 已补 runtime adapter/reducer threading、Inspector live count、message converter 和 JSONL fallback；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-08 Multi-agent recursive tool-count continuation：本批补 Task HTTP recursion 内部的 `run.toolCallCount` 递增，不改 subagent storage schema。`Task` handler 现在消费子代理 SSE 时识别 `tool_call` / `tool.call` 帧，每看到一次工具发起就调用 `SubagentEventBridge.update(subagentRunId, { status:"running", toolCallCount })`，完成时把最终 `toolCallCount` 写入 `subagent.completed`。`SubagentEventBridge.update()` 会自动把 spawn 时注册的 `parentAssistantMessageId` 补进 patch，确保 materializer 能生成 `assistant.part_update`；Task handler 也接受可选 `_parentAssistantMessageId` 供 host 注入时使用。focused tests 已补 bridge parent-message patch 和 Task SSE tool-count update；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-08 Multi-agent nested Task continuation：本批补 nested Task 顶层化，不把内部字段塞进 provider `extraParams`。`ChatCompletionRequest` 新增 host-only `agentBuiltins` context；LLM route 原样接收但 provider 调用仍只看 `extraParams`。`buildToolExecutorFromRequest()` 从 `agentBuiltins` 注入 `_taskDepth`、`_parentConversationId`、`_parentAssistantMessageId`，并保留调用参数里显式 `_taskDepth` 的优先级。`Task` handler 发起子代理 HTTP recursion 时保留父 `conversationId`，并通过 `agentBuiltins.taskDepth = depth + 1` 传递深度，因此子代理再调用 Task 时生命周期事件仍写回同一父会话，且 depth cap 不会重置。focused tests 已补 tool executor context 注入和 Task request body 断言；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+2026-07-08 native structured producer continuation：本批补 llm-loop runtime 的 code/json/diff fenced block producer，不新增 direct/chat 模式，不改 storage/export 底层。`AgentRuntimeStreamEvent` 新增 `assistant.part` wrapper；`ChatToRuntimeTranslator` 在 `done` 时保留原 `message.final` markdown，同时为 fenced `code_block`、合法 `json` data 和 diff 生成 `assistant.part_start` / `assistant.part_done`；renderer runtime reducer 把该事件应用到最新 assistant message，broker 侧直接把 `partEvent` 追加到 session storage，避免走 unknown product projection。focused tests 已补 translator producer、runtime reducer 和 broker persistence；因 `node_modules/.bin` 缺失，Vitest 尚未启动验证。
+
+## Code-Based Remaining Work Count (2026-07-06)
+
+按当前代码检索与调用链复核，不按旧文档 checkbox 计数：顶层未完成工作流剩 **0 个**；拆成可落地代码任务，核心未完成约 **0 项**；周边产品深化 MVP 也已接线。当前主要剩余是当前沙箱无法完成的本地端口监听类 full-test verification，以及若产品继续投入时的深化项。
+
+| 组 | 未完成项数 | 代码事实 | 未完成内容 |
+| --- | ---: | --- | --- |
+| Export / Recovery | 0 | `SessionStorageService.exportProjectArchive()` 已接入 Settings project export 入口；`DiagnosticExportService.export()` 已接入 Settings diagnostic export 入口；archived restore 组件已改名为 `ArchivedProjectsPanel`；archive 默认 `includeChatContent:false`，显式 true 才复制 JSONL；Project Recovery 顶部已有 wizard/checklist，引导 archived/orphan/legacy/export/diagnostic 下一步。 | Focused/full tests 已覆盖到该批；zip/package 格式和更完整迁移包可作为后续深化。 |
+| Privacy display cleanup | 0 | Recovery / legacy import / orphan / archived project UI 默认路径展示已收敛为 redacted label，完整路径通过 explicit copy 操作暴露；orphan restore 失败不再把 raw cwd/error message 直接展示给用户；privacy redaction foundation 与 AgentTrace redaction 已有测试；session/project archive 默认不含聊天 JSONL 内容，显式 `includeChatContent:true` 才复制。 | Focused/full tests 已覆盖到该批；legacy import report 的更完整交互可作为后续深化。 |
+| Context / Memory / Artifacts | 0 | `ProjectRulesReader` 已能只读 `AGENTS.md` / `CLAUDE.md` 并注入 Agent runtime system prompt；`contextManager` 纯函数、`PromptPart[]` history 修复、`useAgentSendPipeline` history 组装和 Settings `contextMode` 选择器已有 focused tests；latest assistant metadata 已记录 context source / strategy / compact marker，Inspector 优先读取 metadata 并可回放；`context.compacted` product/session event、project-rules snapshot DTO、Inspector source breakdown、LLM summarize seam 和 HTTP summarizer provider 已接线；metadata-level pin/unpin 已接线到 Inspector 和下一轮 send metadata；session-scoped artifact library MVP 已接到 Inspector。 | Focused/full tests 已覆盖到该批；专用摘要卡片和更完整 artifact actions 可作为后续深化，不阻塞当前 refactor 剩余主线。 |
+| Multi-agent / structured output | 0 | `SubagentMessagePart`、subagent product events、JSONL reducer、`SubagentsInspectorSection` 和 `SubagentPartCard` 已有；`Message.toolCall.subagentRunId` 已从 runtime/SDK stream 贯穿到 renderer live tool messages、JSONL fallback 和 Inspector live count；Task HTTP recursion 会根据子代理 SSE tool-call 帧递增 `run.toolCallCount` 并通过 `subagent.updated` / `assistant.part_update` 持久化；nested Task recursion 通过 host-only `agentBuiltins` 保留父 conversation 和 depth；typed code/diff/data renderers 和 assistant parts 已有；llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并持久化为 session part events。 | Focused/full tests 已覆盖到该批；更细粒度 delta batching、table/tree/sources/artifact native producer 可作为后续深化。 |
+| 周边产品深化 | 0 | MCP / Skills / Plugins 已保持独立入口；MCP、Skills、Plugins 三个独立市场页顶部已展示边界说明和交叉链接，但没有 Extensions 聚合页；Composer/Plan/Execute 主链路已存在；git worktree preflight 后端 API 已覆盖非 Git 仓库、目标路径、分支名、同名分支和 dirty/submodule/LFS/upstream issue，`createWorktree()` 会在 block 时提前返回；NewConversationModal 和 ProjectContextMenu 已在 worktree 创建前展示 preflight block/warn/info；session messages 已有 `readMessagesPage(offset, limit)`，初次切换、删除会话 fallback、删除项目 fallback 和“加载更早消息”均按页读取，不再点击后全量读取。 | Focused/full tests 已覆盖到该批；byte-index/增量 JSONL parse、Composer pill 更完整 branch switch/edit、MCP/Skill marketplace 视觉深水区可作为后续性能/体验深化。 |
+
+当前 Export / Recovery、Privacy、Context / Memory / Artifacts、Multi-agent / structured output 和周边产品深化 MVP 均已完成接线。Focused tests、`pnpm check`、`pnpm lint`、`pnpm i18n:check` 已通过；`pnpm test:run` 在沙箱内仅剩两个需要监听本地端口的 server e2e suite 因 `listen EPERM 0.0.0.0:3000` 无法完成，提升权限重跑被环境策略拒绝。`pnpm build` 仍按用户要求未运行。
 
 ## Next Work Order (Code-Based, 2026-07-04)
 
@@ -26,24 +77,487 @@
    - `canUseProjectScrData()` / `migrateLegacyProjectBucket()` 已删除；当前只保留 `getLegacyProjectScrSessionsDir()` 给项目删除时清理历史 `.scr-data/sessions`。
    - 测试 helper 已改为 `legacyProjectScrSessionPath`；代码/测试命名不再把 `.scr-data` 表达为正式 session storage target。
 
-3. **P1: Export / recovery product entry**
-   - 底层已有 `exportSessionArchive()`、`exportProjectArchive()`、`DiagnosticExportService.export()`；下一步补 Settings 入口和 UX，而不是重写底层。
-   - `ProjectArchiveManager` 当前只是 archived project restore list，命名和功能容易误导；需要拆成 restore manager 与 project export entry，或改名。
-   - Diagnostic export 增加用户入口、成功路径展示、失败结构化错误和 i18n。
+3. **P1 done: Export / recovery product entry**
+   - 底层已有 `exportSessionArchive()`、`exportProjectArchive()`、`DiagnosticExportService.export()`；Settings 现在已有 session/project/diagnostic export 入口和成功/失败反馈。
+   - `ProjectArchiveManager` 已改名为 `ArchivedProjectsPanel`，只表达 archived project restore list；project archive export 走独立 Project Export section。
+   - archive 默认 `includeChatContent:false`，显式 true 才复制 JSONL；Project Recovery 顶部已有 wizard/checklist。迁移包/zip/package 可作为后续深化。
 
-4. **P1: Privacy display cleanup**
-   - Recovery / legacy import / orphan UI 默认不直接显示完整路径；列表显示短名或 redacted path，完整路径只通过 explicit copy/detail 操作暴露。
-   - legacy import report 里的 old data dir 要 redacted；默认 diagnostic/session/project export 不包含 chat content，除非显式选择。
+4. **P1 done: Privacy display cleanup**
+   - Recovery / legacy import / orphan / archived project UI 默认不直接显示完整路径；列表和反馈显示 redacted path，完整路径只通过 explicit copy 操作暴露；orphan restore 失败 toast 不再原样展示 raw cwd/error message。
+   - session/project archive 本体默认不包含 chat content，显式 `includeChatContent:true` 才复制 JSONL。
 
 5. **P2: Context/Memory deepening**
-   - `ProjectRulesReader` 已只读 `AGENTS.md` / `CLAUDE.md`；下一步接入 Agent prompt context，并在 Context Inspector 中展示注入状态。
-   - 补 pin/unpin context、自动 compact/summarize、artifact library。
+   - `ProjectRulesReader` 已只读 `AGENTS.md` / `CLAUDE.md` 并接入 Agent prompt context；`contextManager`、`PromptPart[]` history 修复、`useAgentSendPipeline` 历史组装与 Settings `contextMode` UI 激活已完成低风险切片。
+   - Context Inspector 真实注入状态、pin/unpin context、自动 compact/summarize 和 session-scoped artifact library MVP 已接线，并已通过当前沙箱可运行的 focused/full tests 覆盖。
+   - **上下文管理与 token 自动压缩已有完整 plan**（[context-management-plan](./context-management-plan.md)）：剩余重点是专用摘要卡片和后续 artifact actions 深化。
 
 6. **P2: Multi-agent and structured output follow-up**
-   - 接上 `Message.toolCall.subagentRunId` renderer threading、递归 tool call count、nested Task 顶层化。
-   - Native structured events 暂按用户口径延后；当前 code/diff/data/table/tree/sources/artifact 继续作为计划，不作为本批阻塞项。
+   - `Message.toolCall.subagentRunId` renderer threading 已接上 live tool message、JSONL fallback 和 Subagents Inspector live count。
+   - Task HTTP recursion 已根据子代理 SSE tool-call 帧通过 `subagent.updated` 递增 `run.toolCallCount`。
+   - nested Task recursion 已通过 host-only `agentBuiltins` 保留父 conversation 和 depth，生命周期事件顶层写回父会话。
+   - llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并直写 session part events；table/tree/sources/artifact native producer 和 delta batching 可作为后续深化，不阻塞当前主线。
 
 ## Latest Verified Commands
+
+2026-07-08 blocked verification audit continuation
+
+- **Codebase-memory status**：按 AGENTS.md 优先尝试 codebase-memory MCP，`list_projects` 返回 `Transport closed`，因此本轮代码发现回退到本地文件/命令扫描。
+- **Completion audit**：
+  - 已完整读取 `docs/refactor-plan.md`、`docs/design-doc.md`、`docs/requirements-plan.md`、`docs/refactor-progress.md`。
+  - `git status --short` 显示工作树仍包含既有大批次改动；本轮未回滚用户/既有改动。
+  - 路由/菜单扫描未发现用户可见 `/extensions` route；`AppSidebar` 仍通过 `getEffectiveMenuItems()` 强制隐藏 compatibility `extensions` 并保持 `mcp` / `skills` / `plugins` enabled。
+  - `SessionStorageService.create()` / `updateMeta()` 仍强制 `chatMode:"agent"`；renderer `useChat` / `useSendMessage` 导出的 `ChatMode` 仍为 `"agent"`。旧 `direct/chat` 只作为 compatibility type/locale/test 文本残留。
+  - `SessionStorageService.resolveSessionBucket()` 仍把项目会话写入 app userData `projects/<projectId>/sessions/`，`.scr-data` 只剩 dev userData 名称、历史 cleanup helper 和相关 tests。
+- **Verification rerun**：
+  - `git diff --check` → passed。
+  - `pnpm check` → passed。
+  - `pnpm lint` → passed，0 errors；仍有既有 warnings。
+  - `pnpm i18n:check` → passed。
+  - Focused continuation tests：`CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/streamEventTranslator.test.ts src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/main/services/runtime/__tests__/GitInfoService.worktree.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts src/renderer/src/stores/__tests__/chatStore.test.ts src/renderer/src/lib/__tests__/worktreePreflightDisplay.test.ts src/renderer/src/components/market/__tests__/IndependentMarketNotice.test.ts` → passed，8 files / 135 tests。
+  - Focused regression tests：`CI=true ./node_modules/.bin/vitest run src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx src/renderer/src/services/sessionArchiveService.test.ts` → passed，3 files / 21 tests。
+  - `pnpm test:run` → partial pass：128/130 test files passed，1074 tests passed，5 skipped；remaining 2 suites (`src/test-utils/__tests__/serverFixture.test.ts`、`src/main/services/mcp/internal/servers/__tests__/agentBuiltinsServer.e2e.test.ts`) fail before assertions because sandbox blocks local server listen: `listen EPERM: operation not permitted 0.0.0.0:3000`。
+  - 按权限规则请求提升权限重跑 `pnpm test:run`，但环境策略拒绝 unsandboxed test run；未尝试绕过或间接规避。
+- **Not run**：`pnpm build` / 打包命令按用户要求未运行。
+
+2026-07-08 final verification continuation
+
+- **代码事实**：此前 `node_modules/.bin` 缺失的验证阻塞已经不再成立；focused tests 和项目级命令可以启动。重跑验证时发现并修复了几处真实回归：删除会话/删除项目 fallback 仍走旧 `readMessages({tail})`、独立市场文案仍出现 `Extensions` 聚合词、`ChatStreamEvent` / `ChatMessagePersist.toolCall` 类型未同步 `subagentRunId`、`context.compacted` session event helper 缺少 union narrowing，以及 Recovery / Context Inspector tests 的 mock/按钮选择与当前 UI 不同步。
+- **改动**：
+  - `src/renderer/src/stores/chatStore.ts`：删除当前会话 fallback 和删除项目 fallback 均改为 `readSessionMessagesPage({ offset:0, limit:100 })`，与初次切换和加载更早消息一致。
+  - `src/renderer/src/components/market/IndependentMarketNotice.tsx`：移除 `Extensions bucket` / `UI extensions` 措辞，保留 MCP / Skills / App Plugins 独立市场边界说明。
+  - `packages/shared-types/src/chat.ts`、`src/main/ipc/types.ts`、`src/renderer/src/types/models.ts`、`src/renderer/src/types/electron.d.ts`、`src/preload/index.ts`：同步 `subagentRunId` 类型契约。
+  - `src/renderer/src/lib/contextEventPersistence.ts`：对 `createContextCompactedProductEvent()` 返回值先按 `event.type === "context.compacted"` 窄化后读取 payload。
+  - `src/renderer/src/components/settings/RecoveryWizardPanel.tsx`：wizard step fallback label 改成用户可读动作文案。
+  - Tests 同步：RecoverySettings 精确选择 session export 按钮、sessionArchiveService 断言可选 options 参数、ContextInspectorSection mock 补 `toggleContextSourcePinned`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - Focused continuation tests：`CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/streamEventTranslator.test.ts src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/main/services/runtime/__tests__/GitInfoService.worktree.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts src/renderer/src/stores/__tests__/chatStore.test.ts src/renderer/src/lib/__tests__/worktreePreflightDisplay.test.ts src/renderer/src/components/market/__tests__/IndependentMarketNotice.test.ts` → passed，8 files / 135 tests。
+  - Focused regression tests：`CI=true ./node_modules/.bin/vitest run src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx src/renderer/src/services/sessionArchiveService.test.ts` → passed，3 files / 21 tests。
+  - `pnpm check` → passed (`tsc -b --noEmit`)。
+  - `pnpm lint` → passed，0 errors；仍有既有 warnings。
+  - `pnpm i18n:check` → passed。
+  - `pnpm test:run` → partial pass：128/130 test files passed，1074 tests passed，5 skipped；remaining 2 suites (`src/test-utils/__tests__/serverFixture.test.ts`、`src/main/services/mcp/internal/servers/__tests__/agentBuiltinsServer.e2e.test.ts`) fail before assertions because sandbox blocks local server listen: `listen EPERM: operation not permitted 0.0.0.0:3000`。按规则请求提升权限重跑 `pnpm test:run`，但被环境策略拒绝；未尝试绕过。
+- **Not run**：`pnpm build` / 打包命令按用户要求未运行。
+
+2026-07-08 independent markets continuation
+
+- **代码事实**：MCP、Skills、Plugins 已是独立路由/页面，未恢复 Extensions 聚合页；缺口是三个市场页缺少一致边界说明，用户仍可能把 MCP server、prompt skill、App Plugin 混成一个 Extensions 产品面。
+- **改动**：
+  - 新增 `src/renderer/src/components/market/IndependentMarketNotice.tsx`，提供 MCP / Skills / App Plugins 独立市场边界说明和交叉链接。
+  - `src/renderer/src/pages/McpMarket.tsx`、`src/renderer/src/pages/Skills.tsx`、`src/renderer/src/pages/Plugins.tsx` 顶部接入该 notice；不新增 `/extensions` 路由，不合并市场数据。
+  - Focused tests 已补 `IndependentMarketNotice.test.ts`，覆盖三类市场文案保持独立且不命名 Extensions 聚合页。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/components/market/__tests__/IndependentMarketNotice.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 worktree preflight UI continuation
+
+- **代码事实**：`NewConversationModal` 和 `ProjectContextMenu` 已有 worktree 创建入口，但此前只提示“后续接入统一命令审批”，不会展示新增的 `preflightCreateWorktree()` block/warn/info 结果；Composer info bar 的 pills 本体仍是轻量展示，不适合在本批新增完整 branch switch 编辑器。
+- **改动**：
+  - `src/renderer/src/components/chat/NewConversationModal.tsx`：创建 worktree + 新分支前调用 `gitService.preflightCreateWorktree()`；存在 block issue 时不创建项目/会话，并在表单里展示检查结果；warn/info 显示但允许继续。
+  - `src/renderer/src/components/project/ProjectContextMenu.tsx`：右键创建工作树 modal 接入同一 preflight 展示和阻断。
+  - `src/renderer/src/lib/worktreePreflightDisplay.ts`：抽出 preflight display 纯 helper，避免两个 modal 分叉。
+  - Focused tests 已补 `worktreePreflightDisplay.test.ts`，覆盖 idle/block/warn/success 展示规则。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/runtime/__tests__/GitInfoService.worktree.test.ts src/renderer/src/lib/__tests__/worktreePreflightDisplay.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 paged session message reads continuation
+
+- **代码事实**：`SessionStorageService.readMessages({tail})` 此前仍会 reduce 全量 JSONL 后 slice；renderer `switchConversation()` 初次 tail 读 100 条，但 `loadOlderMessages()` 点击后会无 `tail` 全量读取，长会话仍可能一次性加载全部历史。
+- **改动**：
+  - `src/main/services/storage/SessionStorageService.ts`：新增 `readMessagesPage(sessionId, { offset, limit })`，按“从最新消息往前跳过 offset 条”返回一页 chronological messages、`total`、`hasMore`、`nextOffset`；旧 `readMessages()` 保持兼容。
+  - `packages/shared-types/src/electron-api.ts`、`src/main/ipc/api-impl.ts`、`src/preload/index.ts`：暴露 `sessions.readMessagesPage()`。
+  - `src/renderer/src/stores/chatStore.ts`：`switchConversation()` 改用 page API 读取最新 100 条；`loadOlderMessages()` 用当前已加载数量作为 offset 读取上一页并 prepend，不再全量读取。
+  - Focused tests 已补 `SessionStorageService.test.ts` page case 和 `chatStore.test.ts` older-page prepend case。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/storage/__tests__/SessionStorageService.test.ts src/renderer/src/stores/__tests__/chatStore.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 git worktree preflight backend continuation
+
+- **Subagent status**：按用户要求启动了 3 个只读 explorer（Composer/worktree、MCP/Skills 独立市场、分页/验证），但三个 subagent 均因平台流断开失败：`stream disconnected before completion: error sending request for url (https://chatgpt.com/backend-api/codex/responses)`，没有返回可用报告。主 agent 已改为本地只读复核后继续推进，不让 subagent 改文件。
+- **代码事实**：`docs/git-worktree-preflight.md` 要求 worktree 创建前检查 Git repo、target path、branch name、branch exists、dirty/submodule/LFS/upstream；当前 `GitInfoService.createWorktree()` 此前只直接执行 `git worktree add -b`，Project 右键和 NewConversationModal 已有 worktree 创建入口，Composer `LaunchModePill` / `BranchPill` 仍是 read-only。
+- **改动**：
+  - `packages/shared-types/src/git.ts`：新增 `WorktreePreflightIssue`、`WorktreePreflightResult`、`CreateWorktreeResult`。
+  - `src/main/services/runtime/GitInfoService.ts`：新增 `preflightCreateWorktree()`，阻断非 Git repo、已存在/不可访问目标路径、非法分支名和同名分支；dirty/submodule/LFS/upstream 返回 warn/info；`createWorktree()` 会先跑 preflight，block 时不执行 `git worktree add`。
+  - `packages/shared-types/src/electron-api.ts`、`src/main/ipc/api-impl.ts`、`src/preload/index.ts`、`src/renderer/src/services/gitService.ts`：暴露 `git.preflightCreateWorktree()`，并把 `createWorktree()` 返回类型扩展为带 `preflight`。
+  - `docs/git-worktree-preflight.md`：同步当前实现 snapshot 和测试 checklist。
+  - Focused tests 已补 `src/main/services/runtime/__tests__/GitInfoService.worktree.test.ts`，覆盖非 Git repo 不执行 add、existing target block、invalid branch block、dirty warning 可继续。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/runtime/__tests__/GitInfoService.worktree.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 native structured producer continuation
+
+- **代码事实**：shared `MessagePart` / `AssistantPartEvent` 和 renderer `applyAssistantPartEvent()` 已能承载 code/diff/data parts，但 `AgentRuntimeStreamEvent` 没有 runtime-native assistant part wrapper；llm-loop `ChatToRuntimeTranslator` 只在 `done` 时发 `message.final`，不会把 fenced code/json/diff 产出结构化 part event。
+- **改动**：
+  - `packages/shared-types/src/agent-runtime.ts`：新增 `AgentAssistantPartRuntimeEvent`（`type:"assistant.part"`），承载 existing `AssistantPartEvent`。
+  - `src/main/services/agent/runtime/streamEventTranslator.ts`：在 `done` 时从 fenced blocks 生成 `code_block`、合法 JSON `data`、diff `diff` parts，并发 `assistant.part_start` / `assistant.part_done` wrapper；保留原 `message.final` markdown。
+  - `src/renderer/src/hooks/useAgentEventReducer.ts`：runtime `assistant.part` 映射到最新 assistant message 的 `apply_assistant_part` action。
+  - `src/main/services/agent/runtime/AgentRuntimeIpcBroker.ts`：`assistant.part` 直接把 `partEvent` 写入 session storage，不走 unknown product projection。
+  - Focused tests 已补 `streamEventTranslator.test.ts`、`useAgentEventReducer.test.ts`、`AgentRuntimeIpcBroker.test.ts`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/streamEventTranslator.test.ts src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 Multi-agent nested Task continuation
+
+- **代码事实**：Task handler 的递归 HTTP request 此前使用 `conversationId = subRequestId`，导致子代理内部再次调用 Task 时 lifecycle 事件路由到子会话而不是父会话；递归请求也没有把 `_taskDepth` 传入后续 tool executor，depth cap 会重置。
+- **改动**：
+  - `src/main/ipc/types.ts`、`src/main/server/routes/llm.ts`：`ChatCompletionRequest` 新增 host-only `agentBuiltins` context，LLM route 原样接收但不走 provider `extraParams`。
+  - `src/main/services/llm/toolExecutorFactory.ts`：从 `agentBuiltins` 注入 `_taskDepth`、`_parentConversationId`、`_parentAssistantMessageId`；调用参数显式 `_taskDepth` 仍优先。
+  - `src/main/services/mcp/internal/servers/agentBuiltinsServer.ts`：Task recursion 保留父 `conversationId`，并传递 `agentBuiltins.taskDepth = depth + 1`。
+  - Focused tests 已补 `toolExecutorFactory.test.ts` 和 `agentBuiltinsServer.test.ts`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/llm/__tests__/toolExecutorFactory.test.ts src/main/services/mcp/internal/servers/__tests__/agentBuiltinsServer.test.ts src/main/services/agent/runtime/__tests__/SubagentEventBridge.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-08 Multi-agent recursive tool-count continuation
+
+- **代码事实**：`SubagentEventBridge.update()` 已存在，但此前不会自动把注册时的 `parentAssistantMessageId` 放入 patch；`Task` handler 消费子代理 SSE 时只累计 text chunk，不统计 `tool_call` / `tool.call` 帧，因此 `run.toolCallCount` 只能靠最终 summary 或 replay 吸收，缺少递归 SSE 过程更新。
+- **改动**：
+  - `src/main/services/agent/runtime/SubagentEventBridge.ts`：`update()` 自动把注册的 parent assistant message id 合并进 patch，使 `subagent.updated` 可 materialize 为 `assistant.part_update`。
+  - `src/main/services/mcp/internal/servers/agentBuiltinsServer.ts`：Task HTTP recursion 识别 `tool_call` / `tool.call` SSE frame，递增 `toolCallCount` 并发 `bridge.update()`；完成时把最终 count 写入 `bridge.complete()`；同时接受可选 `_parentAssistantMessageId`。
+  - Focused tests 已补 `SubagentEventBridge.test.ts` 和 `agentBuiltinsServer.test.ts`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/SubagentEventBridge.test.ts src/main/services/mcp/internal/servers/__tests__/agentBuiltinsServer.test.ts src/main/services/agent/runtime/__tests__/productEventMaterializer.test.ts src/main/services/storage/__tests__/jsonl.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Multi-agent tool-call threading continuation
+
+- **代码事实**：shared runtime/product/session event 已有 `subagentRunId`，JSONL reducer 已能把子代理 tool events 吸收到 `SubagentMessagePart`；缺口是 renderer live `ToolCall` 类型/reducer 未携带该字段，Subagents Inspector 只能显示 replay summary count。
+- **改动**：
+  - `packages/shared-types/src/chat.ts`：`ToolCall` 新增 `subagentRunId?: string`。
+  - `src/renderer/src/hooks/useAgentEventReducer.ts`、`src/renderer/src/hooks/useLegacyLLMStreamHandler.ts`、`packages/shared-types/src/agent-sdk.ts`：runtime / legacy SDK tool call、permission request、terminal result patch 透传子代理归属。
+  - `packages/shared-types/src/messageConverter.ts`、`src/renderer/src/stores/chatMessageStore.ts`、`src/main/services/storage/jsonl.ts`：live store persistence、Message → SessionEvent conversion 和 JSONL fallback top-level tool message 均保留 `subagentRunId`。
+  - `src/renderer/src/hooks/useSubagentsInspectorData.ts`：Subagents Inspector 对同一 run 的 summary/live tool count 取较大值，支持运行中实时递增。
+  - Focused tests 已补 `useAgentEventReducer.test.ts`、`agentRuntimeStreamAdapter.test.ts`、`useSubagentsInspectorData.test.ts`、`messageConverter.test.ts`、`jsonl.test.ts`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/renderer/src/services/agent/__tests__/agentRuntimeStreamAdapter.test.ts src/renderer/src/hooks/__tests__/useSubagentsInspectorData.test.ts src/main/services/storage/__tests__/jsonl.test.ts src/main/services/storage/__tests__/messageConverter.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Recovery wizard continuation
+
+- **Subagent 复核结论**：Epicurus 确认最小 Recovery wizard 应是 Project Recovery 顶部 checklist，而不是完整迁移包/恢复包导入；不应改 storage/export 底层，不应新增任意 output path，也不应触碰 direct/chat 或 Extensions 聚合页。
+- **改动**：
+  - 新增 `src/renderer/src/lib/recoveryWizard.ts`，从 archived/orphan/legacy/exportable counts 派生 wizard steps、recommended action、hasRecoveryAction。
+  - 新增 `src/renderer/src/components/settings/RecoveryWizardPanel.tsx`，渲染 Recovery checklist 并复用传入的 refresh / legacy import / diagnostic export callbacks。
+  - `RecoverySettings.tsx` 顶部接入 wizard panel；默认 DOM 仍只显示 redacted paths，full path 仍只通过 explicit copy 操作。
+  - `src/renderer/src/i18n/locales/{en,zh}/settings.json` 新增 wizard 文案。
+  - Focused tests 已补 `recoveryWizard.test.ts` 和 `RecoverySettings.test.tsx` wizard cases。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/settings.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/recoveryWizard.test.ts src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/settings/__tests__/ArchivedProjectsPanel.test.tsx` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Export/Recovery archive privacy semantics continuation
+
+- **改动**：
+  - `src/main/services/storage/SessionStorageService.ts`：`exportSessionArchive()` / `exportProjectArchive()` 新增 `includeChatContent?: boolean`；默认 false 写空 JSONL 占位、清空 exported session meta `preview`、manifest 标 `includeChatContent:false`，且不列 attachments/contentRefs。显式 true 保持旧 JSONL copy 行为。
+  - `packages/shared-types/src/electron-api.ts`、`src/main/ipc/api-impl.ts`、`src/preload/index.ts` auto bridge、`src/renderer/src/services/sessionArchiveService.ts`：archive API 支持可选 privacy options，但仍不接受 renderer-provided output path。
+  - `RecoverySettings` 和 settings i18n 文案改为默认不含聊天 transcript、附件、tool payload 或真实项目目录。
+  - Focused tests 已补 storage 默认 no-chat-content、显式 include true、IPC/preload/service options 透传。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/{chat,settings}.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/storage/__tests__/SessionStorageService.test.ts src/main/ipc/__tests__/sessionArchiveApi.test.ts src/preload/__tests__/sessionArchiveBridge.test.ts src/renderer/src/services/sessionArchiveService.test.ts src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Context/Memory artifact library continuation
+
+- **改动**：
+  - 新增 `src/renderer/src/lib/artifactLibrary.ts`，把当前 conversation 的 `ChatFileArtifact` / `ChatFileChangeSet` 聚合为 session-scoped artifact library items，按 `messageId/path/kind` 去重，默认只输出 `relativePath` 或 redacted path。
+  - `src/renderer/src/components/chat/CodexEnvironmentInspector.tsx`：Changes section 改为 `Artifacts / 工件`，复用现有侧栏入口显示当前会话 artifacts，full path 只用于显式 `定位` / `复制` 操作。
+  - 新增 `src/renderer/src/lib/__tests__/artifactLibrary.test.ts`，覆盖当前会话过滤、去重、默认不泄露绝对路径、changeSet index。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/artifactLibrary.test.ts src/main/services/storage/__tests__/jsonl.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Context/Memory pin/unpin continuation
+
+- **Subagent 复核结论**：Faraday 确认 `MessageContextSource.pinned` 已存在，Inspector 当前可写 latest message metadata，但发送链路跨轮保留未闭环；建议只按同 id 合并 pinned 状态，避免把过期 search/attachment 展示为仍注入。Maxwell 确认 pin/unpin 后最小下一刀是 session-scoped artifact library MVP，并指出 `docs/context-management-plan.md` 的 `send-pipeline product-event persistence pending` 状态已过期。
+- **改动**：
+  - `src/renderer/src/hooks/useContextInspectorData.ts`：新增 latest context message id 和 `toggleContextSourcePinned()` 纯 helper。
+  - `src/renderer/src/components/chat/inspector/ContextInspectorSection.tsx`：source 行新增 pin/unpin 图标按钮，写回 latest context assistant message metadata；fallback legacy chips 不显示 pin 按钮。
+  - `src/renderer/src/hooks/useAgentSendPipeline.ts`：新增 `getPinnedContextSources()` / `mergePinnedContextSources()`，下一轮 send metadata 重新生成同 id source 时保留 `pinned:true`，不追加本轮未出现的过期 pinned source。
+  - `src/renderer/src/i18n/locales/{en,zh}/chat.json`：补 pin/unpin 文案。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts src/renderer/src/hooks/__tests__/useContextInspectorData.test.ts src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；offline dependency restore 先前因 pnpm store 缺 `bun-types-1.3.14.tgz` 失败，network/escalated dependency restore 被环境策略拒绝。本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check` / `pnpm lint` / `pnpm test:run`。`pnpm build` 按用户要求未运行。
+
+2026-07-07 Context/Memory metadata replay + Inspector source strategy
+
+- **Subagent 复核结论**：Curie 确认当前 metadata-level source/strategy 已接入发送管线和 Inspector，但 projectRules source 仍只是 runtime check，不是真实文件 snapshot；Volta 建议完整 `context.compacted` product/session event 应单独接 shared event + materializer + JSONL replay；Jason 确认 Export/Recovery archive `includeChatContent` 不阻塞本批；Einstein 给出本批 focused tests 和 sandbox 风险矩阵。
+- **改动 A：Context source / strategy metadata**
+  - `packages/shared-types/src/chat.ts`：新增 `MessageContextSource`、`MessageContextStrategy`，并挂到 `Message.metadata.contextSources/contextStrategy`。
+  - `src/renderer/src/hooks/useAgentSendPipeline.ts`：`prepareHistoryForRuntime()` 返回 history strategy metadata 和本地 compact marker；发送前把 context source / strategy / compact marker 写回当前 assistant placeholder metadata。
+  - 当前 `projectRules` source 只标识 main runtime 会做 AGENTS.md / CLAUDE.md runtime check，不回传文件内容，也不声称具体文件存在。
+- **改动 B：Context Inspector metadata-first**
+  - `src/renderer/src/hooks/useContextInspectorData.ts`：优先读取 latest assistant 的 `contextSources/contextStrategy/contextCompacted`；旧会话继续 fallback 到 system/project/attachment chips。
+  - `src/renderer/src/components/chat/inspector/ContextInspectorSection.tsx`：显示 history strategy、history/search/tool source icon 和 compact events。
+  - `src/renderer/src/i18n/locales/{en,zh}/chat.json`：补 Context Inspector strategy 文案。
+- **Focused verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts src/renderer/src/hooks/__tests__/useContextInspectorData.test.ts src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx src/renderer/src/lib/__tests__/contextManager.test.ts` → 4 files / 39 tests passed.
+- **Remaining follow-up**：
+  - 依赖恢复后复验 `useAgentSendPipeline` 的 compact marker → `context.compacted` product-event persistence path。
+  - 依赖恢复后复验 main runtime project-rules snapshot DTO → assistant metadata / Context Inspector source breakdown。
+  - 依赖恢复后复验 LLM summarize one-shot seam / real HTTP summarizer provider、pin/unpin、artifact library focused tests。
+
+2026-07-07 Context/Memory HTTP summarizer provider continuation
+
+- **改动**：
+  - 新增 `src/renderer/src/services/agent/contextSummarizer.ts`，通过 `localApiClient.sseStream('/v1/llm/chat/completions')` 调用本地 Koa LLM HTTP 端点执行摘要；请求使用当前 effective provider/model，禁用 tools（`toolPermission: { mode: "none" }`），`maxTokens: 2000`，并复用 conversationId/requestId。
+  - `useAgentSendPipeline` 在未显式注入 `summarizeContext` 时，会基于当前 effective provider/model 自动创建 HTTP summarizer；provider/baseUrl 或 model 缺失时仍回退到本地 fallback summary。
+  - focused tests 已补：`contextSummarizer.test.ts` 覆盖不可调用时返回 undefined、SSE chunk 汇总、请求体包含 provider/model/system prompt/user history、endpoint error 抛出；已有 `useAgentSendPipeline.test.ts` 覆盖 summarizer 注入后的 `summarySource:"llm"`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/services/agent/__tests__/contextSummarizer.test.ts src/renderer/src/lib/__tests__/contextManager.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check`。依赖恢复后需优先复验 HTTP summarizer provider、LLM summarize seam、project-rules Inspector、project-rules DTO 和 compact persistence focused tests。
+
+2026-07-07 Context/Memory LLM summarize seam continuation
+
+- **改动**：
+  - `contextManager.applyContextStrategy()` 现在在 compact/auto summarized 时返回 `summaryInput`，即被压缩旧消息的原始摘要输入文本。
+  - `useAgentSendPipeline` 保留同步 `prepareHistoryForRuntime()`，新增 `prepareHistoryForRuntimeWithSummary()` async wrapper；当调用方提供 `summarizeContext` 且发生 compact/summarized 时，会调用注入 summarizer，把返回值写入 history 首条 summary、`metadata.contextCompacted.summary` 和 `ContextCompactedProductEventInput.summary`，并把 `summarySource` 标为 `"llm"`。
+  - `UseAgentSendPipelineOptions` 新增可选 `summarizeContext` 接缝；当前 `useChat` 尚未提供真实 HTTP summarizer，因此产品行为仍回退到本地 fallback summary。
+  - focused tests 已补：`contextManager.test.ts` 覆盖 `summaryInput`；`useAgentSendPipeline.test.ts` 覆盖 async summarizer 注入、LLM summary 替换 history/event 和 `summarySource:"llm"`。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/contextManager.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check`。依赖恢复后需优先复验 LLM summarize seam、project-rules Inspector、project-rules DTO 和 compact persistence focused tests。
+
+2026-07-07 Context/Memory project rules Inspector continuation
+
+- **改动**：
+  - `Message.metadata` 新增 `projectRulesSnapshot?: ProjectRulesSnapshotDto`，用于持久化 renderer-safe project rules 快照。
+  - `useAgentEventReducer` 新增 `mergeProjectRulesSnapshotSources()`，在 runtime `init` event 携带 `projectRulesSnapshot` 时，把 snapshot 合并进最后一个 assistant 的 `metadata.contextSources`：更新 projectRules source 的 `detail`、`bytes` 和 `injected`，并保留原 label。
+  - runtime init metadata 更新现在同时保存 `nativeSessionId` 和 `projectRulesSnapshot`；`chatMessageStore.updateMessageMetadata()` 已会用同 id `assistant_message` 重发 metadata，因此可随 JSONL replay 保留。
+  - focused tests 已补：`useAgentEventReducer.test.ts` 覆盖 snapshot source merge、runtime init metadata 更新，以及不泄露 path/content 的基本断言。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/renderer/src/hooks/__tests__/useContextInspectorData.test.ts src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check`。依赖恢复后需优先复验本批 reducer/Inspector tests、project-rules snapshot DTO tests 和 compact persistence tests。
+
+2026-07-07 Context/Memory project rules snapshot DTO continuation
+
+- **改动**：
+  - `packages/shared-types/src/chat.ts`：新增 `ProjectRulesSnapshotDto` / `ProjectRulesSnapshotFile`，只包含 `filename`、`byteLength`、`sha256`、`truncated`、`injected` 和 `readAt`，不包含规则正文或绝对路径。
+  - `ProjectRulesReader` 新增 `toProjectRulesSnapshotDto()`，把现有安全读取结果转成 renderer-safe DTO；空文件会记录 `injected:false`，仍不回传 content/path。
+  - `AgentInitEvent` 和 `run.started` product event payload 新增可选 `projectRulesSnapshot`。
+  - `ChatToRuntimeTranslator` 在首个 `init` event 上携带 snapshot DTO；`ClaudeCodeAgentRuntime` 构建 request 时读取 project rules，一边注入 system prompt，一边把 DTO 交给 translator。
+  - focused tests 已补：`ProjectRulesReader.test.ts` 覆盖 DTO 不泄露 path/content；`ClaudeCodeAgentRuntime.test.ts` 覆盖 init event 携带 snapshot 且不泄露规则正文；`agentProductEvents.test.ts` 覆盖 `init` → `run.started.payload.projectRulesSnapshot` projection。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/memory/__tests__/ProjectRulesReader.test.ts src/main/services/agent/runtime/__tests__/ClaudeCodeAgentRuntime.test.ts src/main/services/agent/runtime/__tests__/agentProductEvents.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check`。依赖恢复后需优先复验上述 focused tests 和上一批 compact persistence tests。
+
+2026-07-07 Context/Memory compact persistence continuation
+
+- **改动**：
+  - 新增 `src/renderer/src/lib/contextEventPersistence.ts`，renderer 侧复用 shared `createContextCompactedProductEvent()`，materialize 出 JSONL reducer 可回放的 `assistant_message`，与 main `productEventMaterializer` 的 `context.compacted` 输出保持同构。
+  - `useAgentSendPipeline.prepareHistoryForRuntime()` 现在在 compact 发生时返回 `ContextCompactedProductEventInput`，包含 summary message id、summary、original count、compactedAt、strategy、estimatedTokens 和 fallback summary source。
+  - `useAgentSendPipeline` 在 `createQuery()` 成功后调用 `persistContextCompactedEventForRuntime()`，通过注入的 `appendSessionEvent` 写入 session JSONL；写入失败只记录 warning，不中断发送流程。
+  - `useChat.ts` 给 send pipeline 注入 `window.electron.sessions.appendEvent()`，并在 IPC response 失败时抛出错误交给 persistence helper 记录。
+  - 新增 focused tests 文件/用例：`src/renderer/src/lib/__tests__/contextEventPersistence.test.ts`、`useAgentSendPipeline.test.ts` 的 compact product input 和 persistence helper 覆盖。
+- **Verification**：
+  - `git diff --check` → passed。
+  - `node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` → passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/contextEventPersistence.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts` → 未进入测试，失败于 `zsh:1: no such file or directory: ./node_modules/.bin/vitest`。
+- **Blocked verification**：
+  - `node_modules/.bin` 仍缺失；此前离线 pnpm install 失败于缺少 `bun-types-1.3.14.tgz`，联网恢复依赖的提权安装被环境策略拒绝且不得绕过。
+  - 因此本批已补 focused tests，但尚不能执行 `vitest` / `tsc` / `oxlint` / `pnpm check`；依赖恢复后需优先复验上述两条 focused tests，再跑 context/memory touched-file type/lint。
+
+2026-07-07 Context/Memory product event contract
+
+- **改动**：
+  - `packages/shared-types/src/agent-product-events.ts`：新增 `context.compacted` event type、`ContextCompactedProductEventInput` / context 和 `createContextCompactedProductEvent()`。
+  - `src/main/services/agent/runtime/productEventMaterializer.ts`：新增 `context.compacted` materializer，输出 `assistant_message` 并写入 `metadata.contextCompacted/contextStrategy`。
+  - `src/main/services/storage/__tests__/jsonl.test.ts`：覆盖 compacted assistant metadata replay 和 same-id upsert。
+- **Focused verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/agentProductEvents.test.ts src/main/services/agent/runtime/__tests__/productEventMaterializer.test.ts src/main/services/storage/__tests__/jsonl.test.ts` → 3 files / 68 tests passed.
+- **Verification blocked after this batch**：
+  - 后续 `CI=true pnpm check` 触发 pnpm 重新创建 `node_modules`，在 sandbox 网络下下载依赖时报 `ENOTFOUND registry.npmjs.org` 并失败；此后 `node_modules/.bin` 缺失。
+  - 按权限规则已请求提权恢复依赖（`corepack pnpm@10.24.0 install --ignore-scripts --config.confirmModulesPurge=false --frozen-lockfile`），但自动审批因 usage limit 拒绝；未绕过审批继续尝试。
+  - 因此 product event 小批次尚未完成 `pnpm check` / 后续 lint 复验；需在依赖恢复后继续。
+- **Loop continuation status**：
+  - 2026-07-07 已确认当前 thread goal 仍为 active，目标是按本重构文档持续推进直到完成；本次不是从零重启。
+  - 复核当前工作区后确认 `node_modules/.bin` 仍缺失；上一轮因此暂停继续追加核心 TS 改动。本轮 continuation 已按 goal 要求继续落地 `useAgentSendPipeline` → `context.compacted` persistence path，但验证仍受依赖缺失阻塞。
+  - 当前可用轻量验证：`git diff --check` passed；`node -e` 解析 `src/renderer/src/i18n/locales/{en,zh}/chat.json` passed。
+  - 后续 continuation 尝试 `corepack pnpm@10.24.0 install --offline --ignore-scripts --config.confirmModulesPurge=false --frozen-lockfile` 失败：pnpm store 缺少 `bun-types-1.3.14.tgz`，离线模式无法下载。
+  - 随后按权限规则请求联网恢复依赖的提权安装；环境策略拒绝本会话的 escalated dependency install，并要求不得通过 workaround 绕过。因此当前无法恢复 `node_modules/.bin`，也无法继续运行 `vitest` / `tsc` / `oxlint` / `pnpm check`。
+
+2026-07-07 Context/Memory low-risk slice
+
+- **Subagent 复核结论**：A 确认 Export/Recovery 产品入口、IPC/preload/shared types、i18n 和 focused tests 已落地，建议转入 Context/Memory；B 确认默认 UI 路径展示基本已脱敏，但 archive 本体和 raw error 仍需后续隐私批次；C 确认 `ProjectRulesReader` 未注入 prompt、history/contextCount/contextMode 未生效；D 给出 Context/Memory focused tests 和最终验证建议。
+- **代码事实冲突记录**：`refactor-plan.md` 原“下一批补 project archive UI / diagnostic export UI”已与当前代码冲突；本批已更新为 Export/Recovery 深水区 follow-up，当前实现转入 Context/Memory low-risk slice。
+- **改动 A：Context strategy foundation**
+  - 新增 `src/renderer/src/lib/contextManager.ts` 和测试：覆盖 token budget、`contextCount` sliding window、`contextMode` full/auto/compact、Message → `AgentHistoryMessage`、summary message metadata。
+  - `packages/shared-types/src/chat.ts`：`Message.metadata.contextCompacted` 类型落地，供后续 compact replay / inspector 消费。
+- **改动 B：History replay into Agent runtime**
+  - `src/renderer/src/hooks/useAgentSendPipeline.ts`：新增 `prepareHistoryForRuntime()`，排除当前 user + assistant placeholder 后按策略生成 `history` 并传入 `agentRuntimeClient.createQuery()`。
+  - `src/main/services/agent/runtime/ClaudeCodeAgentRuntime.ts`：`buildChatRequest()` 支持 `AgentHistoryMessage.content: PromptPart[]` text extraction，不再静默跳过历史。
+- **改动 C：Project rules prompt injection + Settings context mode**
+  - `ClaudeCodeAgentRuntime` 在 main runtime 侧通过 `ProjectRulesReader` 只读 cwd 下 `AGENTS.md` / `CLAUDE.md`，作为 `# Project rules` 注入 system prompt；读失败降级为空，不阻塞 run。
+  - `ChatSettingsModal` 新增 `contextMode`（Auto / Compact / Full）segmented control，`DEFAULT_SESSION_SETTINGS.contextMode = "auto"`；`chat.json` 中英文文案已补。
+- **Focused verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/contextManager.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts src/main/services/agent/runtime/__tests__/ClaudeCodeAgentRuntime.test.ts src/main/services/agent/memory/__tests__/ProjectRulesReader.test.ts` → 4 files / 48 tests passed.
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/contextManager.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts src/main/services/agent/runtime/__tests__/ClaudeCodeAgentRuntime.test.ts src/main/services/agent/memory/__tests__/ProjectRulesReader.test.ts src/renderer/src/hooks/__tests__/useContextUsage.test.ts src/renderer/src/hooks/__tests__/useContextInspectorData.test.ts src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx` → 7 files / 73 tests passed.
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/lib/__tests__/contextManager.test.ts src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts src/main/services/agent/runtime/__tests__/ClaudeCodeAgentRuntime.test.ts src/main/services/agent/memory/__tests__/ProjectRulesReader.test.ts src/renderer/src/hooks/__tests__/useContextUsage.test.ts src/renderer/src/hooks/__tests__/useContextInspectorData.test.ts src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/settings/__tests__/ArchivedProjectsPanel.test.tsx` → 9 files / 82 tests passed.
+  - `CI=true ./node_modules/.bin/oxlint <touched Context/Memory files>` → passed，0 warnings / 0 errors.
+  - locale JSON parse for `src/renderer/src/i18n/locales/{en,zh}/*.json` → passed.
+- **Integration verification**：
+  - `CI=true pnpm check` → passed.
+  - `git diff --check` → passed.
+  - `CI=true pnpm lint` → passed with existing warnings, no errors.
+  - `CI=true pnpm test:run` → sandbox failed because server fixture tests could not bind `0.0.0.0:3000`; first elevated rerun reached tests but failed with transient `EADDRINUSE :::3000`; second elevated rerun was rejected by the escalation reviewer, so full suite could not be completed in this turn.
+  - `CI=true pnpm i18n:check` → sandbox failed with `/var/.../tsx-*.pipe` `EPERM`; elevated rerun was rejected by the escalation reviewer. Safe fallback locale JSON parse passed, but full i18n checker was not completed.
+- **Not run**：`pnpm build` / `pnpm dev`。
+- **Remaining follow-up**：
+  - 后续已接线 LLM summary call、`context.compacted` product/session event、Context Inspector real injected sources、pin/unpin context、artifact library；仍待依赖恢复后复验 focused tests。
+  - Export/Recovery still has Recovery wizard and archive `includeChatContent` privacy semantics follow-up.
+
+2026-07-07 Export/Recovery polish + privacy display hardening
+
+- **Subagent 复核结论**：A 确认 session/project/diagnostic export 的 Settings 入口、IPC/preload/shared types、i18n 和 focused tests 已落地；B 确认默认 UI 路径展示基本已脱敏，但指出 archive 本体仍复制 raw `.jsonl` / `.meta.json`、`restoreOrphan()` raw error message 可能透出、legacy import redacted label 缺 explicit copy；C 确认 `ProjectRulesReader` 仍未接入 Agent prompt，Context Inspector project rules 仍是占位；D 给出 focused tests 和最终验证命令建议。
+- **改动 A：Export feedback 就近展示**
+  - `src/renderer/src/components/settings/RecoverySettings.tsx`：新增 `renderExportFeedback()` helper，把 session/project/diagnostic export feedback 分别显示在 Session Export / Project Export / Current Coverage 对应 section，不再把 project/diagnostic feedback 混在 Session Export section。
+  - session/project archive 成功反馈后续已改为说明：默认 archive 只包含 app-managed session metadata；除非显式 `includeChatContent:true`，否则不包含 JSONL transcripts、真实项目目录、attachments 或 tool payloads。
+- **改动 B：Privacy display hardening**
+  - `RecoverySettings.tsx`：legacy import 目录默认显示 redacted label，并新增 explicit `Copy full path` action；orphan restore 失败时记录 console warning，但 UI 只显示通用本地化错误，不直接展示 main 返回的 raw cwd/error message。
+  - `src/renderer/src/i18n/locales/{en,zh}/settings.json`：新增 `settingsNav.recovery.archiveContentNotice`。
+- **Focused verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx` → 1 file / 7 tests passed.
+  - `CI=true ./node_modules/.bin/oxlint src/renderer/src/components/settings/RecoverySettings.tsx src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/i18n/locales/en/settings.json src/renderer/src/i18n/locales/zh/settings.json` → passed，0 warnings / 0 errors.
+  - `CI=true ./node_modules/.bin/vitest run src/main/ipc/__tests__/sessionArchiveApi.test.ts src/preload/__tests__/sessionArchiveBridge.test.ts src/renderer/src/services/sessionArchiveService.test.ts src/renderer/src/services/diagnosticExportService.test.ts src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/settings/__tests__/ArchivedProjectsPanel.test.tsx src/main/services/storage/__tests__/SessionStorageService.test.ts src/main/services/diagnostics/__tests__/DiagnosticExportService.test.ts src/main/services/privacy/__tests__/redaction.test.ts` → 9 files / 87 tests passed.
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx src/renderer/src/components/chat/__tests__/ChatMessageList.plan.test.tsx src/renderer/src/lib/__tests__/planModePresentation.test.ts src/renderer/src/components/chat/composer/__tests__/LaunchModePill.test.tsx` → 5 files / 34 tests passed.
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/components/settings/__tests__/SettingsRail.test.tsx src/renderer/src/pages/settings/__tests__/settingsShell.test.tsx` → 2 files / 7 tests passed.
+- **Integration verification**：
+  - `CI=true pnpm check` → passed.
+  - `git diff --check` → passed.
+  - `CI=true pnpm test:run` → sandbox failed because server fixture tests could not bind `0.0.0.0:3000`; elevated rerun passed, 122 files / 1008 tests passed.
+  - `CI=true pnpm lint` → passed with existing warnings, no errors.
+  - `CI=true pnpm i18n:check` → sandbox failed with `/var/.../tsx-*.pipe` `EPERM`; elevated rerun passed.
+- **Not run**：`pnpm build` / `pnpm dev`。
+- **Remaining follow-up**：
+  - 后续 archive 隐私语义批次已把 `exportSessionArchive()` / `exportProjectArchive()` 改为默认 `includeChatContent:false`，显式 true 才复制 JSONL。
+  - `ProjectRulesReader` 仍未注入 Agent prompt；Context Inspector project rules 仍是 placeholder，完整 Context/Memory 计划见 [context-management-plan](./context-management-plan.md)。
+
+2026-07-07 Export/Recovery product entry + privacy display cleanup
+
+- **Subagent 复核结论**：A/B/C/D 四个只读 subagent 确认当前续点应从 Export/Recovery 和 Privacy display cleanup 增量推进；Phase 0a/0b/0c 不应重写。代码事实：session export 已有 Settings 入口；project archive 只有 storage/test 调用；diagnostic export 有 main/preload IPC 但无 renderer 入口；Recovery / orphan / legacy / archived project UI 默认仍展示 raw paths；`ProjectRulesReader` 仍未接入 Agent prompt。
+- **代码事实冲突记录**：当前 archive 底层默认复制 `.jsonl` / `.meta.json`，与“默认导出不含 chat content，除非显式选择”的目标隐私口径冲突。本批先做产品入口和默认展示脱敏，不在同一批重写 storage archive 内容语义。
+- **改动 A：Project archive + diagnostic export 入口**
+  - `packages/shared-types/src/electron-api.ts`：新增 `ProjectArchiveExportResult` / manifest DTO 和 `projects.exportArchive(projectId)`；新增 `DiagnosticExportResult` 和 `diagnostics.export()` shared contract。
+  - `src/main/ipc/api-impl.ts`、`src/preload/index.ts`：把 `projects.exportArchive` 接到 `SessionStorageService.exportProjectArchive(projectId)`，不接受 renderer-provided output path。
+  - `src/renderer/src/services/sessionArchiveService.ts`：新增 `exportProjectArchive(projectId)`；新增 `src/renderer/src/services/diagnosticExportService.ts`。
+  - `src/renderer/src/components/settings/RecoverySettings.tsx`：新增 Project Export section 和 diagnostic export action，提供 loading、toast 和 inline alert 反馈。
+- **改动 B：Privacy display cleanup**
+  - 新增 `src/renderer/src/lib/privacyDisplay.ts`，renderer 默认展示 redacted path label。
+  - `RecoverySettings.tsx`：orphan cwd、legacy import dir、session/project/diagnostic export success path 默认显示 redacted label；完整路径只通过 explicit copy action 使用。
+  - `ProjectArchiveManager.tsx` 改名为 `ArchivedProjectsPanel.tsx`，只负责 archived project restore list；默认显示 redacted cwd，copy full path 是显式操作。
+- **Focused verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/main/ipc/__tests__/sessionArchiveApi.test.ts src/preload/__tests__/sessionArchiveBridge.test.ts src/renderer/src/services/sessionArchiveService.test.ts src/renderer/src/services/diagnosticExportService.test.ts src/renderer/src/components/settings/__tests__/RecoverySettings.test.tsx src/renderer/src/components/settings/__tests__/ArchivedProjectsPanel.test.tsx src/main/services/storage/__tests__/SessionStorageService.test.ts src/main/services/diagnostics/__tests__/DiagnosticExportService.test.ts src/main/services/privacy/__tests__/redaction.test.ts` → 9 files / 86 tests passed.
+  - `CI=true ./node_modules/.bin/oxlint <touched files>` → passed，0 warnings / 0 errors.
+  - `git diff --check` → passed.
+- **Integration verification**：
+  - `CI=true pnpm check` → passed.
+  - `CI=true pnpm test:run` → sandbox failed because server fixture tests could not bind `0.0.0.0:3000`; first elevated rerun hit transient `EADDRINUSE :::3000`; second elevated rerun passed, 122 files / 1007 tests passed.
+  - `CI=true pnpm lint` → passed with existing warnings, no errors.
+  - `CI=true pnpm i18n:check` → sandbox failed with `/var/.../tsx-*.pipe` `EPERM`; elevated rerun passed.
+- **Not run**：`pnpm build` / `pnpm dev`。
+- **剩余风险 / follow-up**：
+  - 后续 archive 隐私语义批次已把 `exportSessionArchive()` / `exportProjectArchive()` 改为默认 `includeChatContent:false`，显式 true 才复制 JSONL。
+  - Recovery wizard MVP、Context/Memory prompt 注入、compact persistence、LLM summarize/provider、pin/unpin 和 artifact library 已在后续批次接线但待依赖恢复后复验。
+
+2026-07-07 Phase 0a-c 验收补丁：usage fast-skip + Plan/Execute 展示映射 + approval hook 接线
+
+- **Subagent 复核结论**：A/B/C/D 四个只读 subagent 均确认 Phase 0a/0b/0c 主链路已落地，不应从零重写。当前批次只补边界缺口：runtime `usage` telemetry 不进入 projection/materializer 热路径、用户可见 planMode 不暴露内部 `chat` 兼容值、`useChat` 审批响应通过已拆出的 `useToolApprovalFlow` 接线。
+- **改动 A：usage telemetry fast-skip**
+  - `src/main/services/agent/runtime/AgentRuntimeIpcBroker.ts`：把 `usage` 加入 transient fast path，和 `text.delta` / `reasoning.delta` / `status` 一样仍转发给 renderer/trace，但不进入 JSONL materialization。
+  - `src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts`：新增 usage 回归测试，确认 storage 只写 `run.started` / `run.completed` marker。
+- **改动 B：Plan/Execute 展示映射**
+  - `src/renderer/src/components/chat/CodexEnvironmentInspector.tsx`：Runtime 面板使用 `toAgentComposerMode()` + `AGENT_COMPOSER_MODE_LABEL` 显示 Plan/Execute，不直接显示 raw `runtime.planMode`。
+  - `src/renderer/src/components/chat/ChatInputArea.tsx`、`src/renderer/src/components/chat/ClaudeEmptyChatHome.tsx`：把当前会话 `session.planMode` 传给 `ChatComposerInfoBar`，避免 LaunchModePill 默认 Execute 与真实会话策略不一致。
+  - `src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx`：新增 info bar planMode 透传测试。
+- **改动 C：approval helper 接线**
+  - `src/renderer/src/hooks/useChat.ts`：从直接调用 `createRespondToApproval()` 改为使用已拆出的 `useToolApprovalFlow()`，行为保持同一 helper 路径。
+- **Verification**：
+	- `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx src/renderer/src/lib/__tests__/planModePresentation.test.ts src/renderer/src/components/chat/composer/__tests__/LaunchModePill.test.tsx` → 4 files / 28 tests passed。
+	- `CI=true ./node_modules/.bin/oxlint src/main/services/agent/runtime/AgentRuntimeIpcBroker.ts src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/renderer/src/hooks/useChat.ts src/renderer/src/components/chat/CodexEnvironmentInspector.tsx src/renderer/src/components/chat/ChatInputArea.tsx src/renderer/src/components/chat/ClaudeEmptyChatHome.tsx src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx` → passed，0 warnings / 0 errors。
+	- `CI=true pnpm check` → passed.
+	- `CI=true pnpm lint` → passed with existing warnings, no errors.
+	- `CI=true pnpm i18n:check` → sandbox failed with `/var/.../tsx-*.pipe` `EPERM`; elevated rerun passed.
+	- `CI=true pnpm test:run` → sandbox failed because server fixture tests could not bind `0.0.0.0:3000`; first elevated rerun hit transient `EADDRINUSE :::3000`; second elevated rerun passed, 120 files / 996 tests passed.
+- **Not run**：`pnpm build` / `pnpm dev`。
+- **剩余风险 / follow-up**：
+  - Context / Memory 深水区、Plan regenerate version 约束、execute marker failure recovery 和真实 runtime stop/error smoke 仍是后续项；native code/json/diff structured producer 已由 2026-07-08 批次补齐，剩余为更细粒度 delta batching 和更广 typed producer。
+
+2026-07-06 Phase 0a-c 验收补丁：unknown runtime projection 边界 + composer approval 阻塞区回归
+
+- **Subagent 复核结论**：A/B/C/D 四个只读 subagent 均确认 Phase 0a/0b/0c 主链路已落地，不应从零重写。当前批次按代码事实只补验收测试：runtime unknown/debug transient 边界、输入区 approval/Ask 替换普通 composer、transcript 不重复展示 awaiting approval tool message。
+- **改动 A：unknown runtime event 不落 JSONL**
+  - `src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts`：新增 broker 集成测试，覆盖未知 `AgentRuntimeStreamEvent` 仍转发给 renderer、进入 trace，但 projection/materializer 不写 session JSONL，只保留 `run.started` / `run.completed` marker。
+- **改动 B：输入区审批替换回归**
+  - `src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx`：新增普通 tool approval 和 AskUserQuestion 两条阻塞区测试，确认普通 composer 被隐藏，并且 compact card 的 approve/submit 会调用 `respondToApproval`。
+- **改动 C：transcript 去重回归**
+  - `src/renderer/src/components/chat/__tests__/ChatMessageList.plan.test.tsx`：新增 awaiting approval tool message 跳过测试，确认阻塞审批只在 composer 区展示，已完成 tool message 仍正常渲染。
+- **改动 D：SettingsRail 测试环境 shim**
+  - `src/renderer/src/components/settings/__tests__/SettingsRail.test.tsx`：局部补 `window.addEventListener/removeEventListener/dispatchEvent` shim，并设置 React act test environment flag。原因是仓库 `vitest.setup.ts` 会把 jsdom `window` 替换成普通对象，全量测试中 `SidebarResizeHandle` 需要 window 事件 API。
+- **Verification**：
+  - `CI=true ./node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/renderer/src/components/chat/__tests__/ChatInputArea.plan.test.tsx src/renderer/src/components/chat/__tests__/ChatMessageList.plan.test.tsx` → 3 files / 26 tests passed。
+  - `CI=true ./node_modules/.bin/vitest run src/renderer/src/components/settings/__tests__/SettingsRail.test.tsx` → 1 file / 4 tests passed。
+  - `CI=true pnpm check` → passed.
+  - `CI=true pnpm lint` → passed with existing warnings, no errors.
+  - `CI=true pnpm i18n:check` → sandbox failed with `/var/.../tsx-*.pipe` `EPERM`; elevated rerun passed.
+  - `CI=true pnpm test:run` → sandbox failed because server fixture tests could not bind `0.0.0.0:3000`; elevated rerun passed, 120 files / 994 tests passed.
+- **Not run**：`pnpm build` / `pnpm dev`。
+- **剩余风险 / follow-up**：
+  - Plan/Execute 当前仍有 renderer 侧 `planEventPersistence` 直接 materialize session events 的重复路径；main `productEventMaterializer` 已支持同类 product events，但消除重复需要单独协调 `Chat.tsx` 决策链路。
+  - renderer live UI 仍主要消费 raw runtime stream event，而不是 product-event stream；当前 JSONL source-of-truth replay 已可恢复核心消息派生状态，完整 product-event replay store 属后续阶段。
+  - native code/json/diff structured producer 已由 2026-07-08 批次补齐；delta batching、更广 typed producer 和真实 runtime smoke 仍是后续验收项。
 
 2026-07-05 Phase 0a-c 复核后 P0 renderer 删除项目回归批次
 
@@ -352,7 +866,7 @@
     src/renderer/src/components/chat/inspector/__tests__/ContextInspectorSection.test.tsx
   ```
 - Integration verification：`./node_modules/.bin/tsc -b --noEmit --pretty false` 通过；touched-file `./node_modules/.bin/oxlint` 0/0；`./node_modules/.bin/tsx scripts/i18n/check.ts` 通过。
-- 剩余风险 / 需要产品决策：native structured `code_block/diff/data/table/tree/sources/artifact` runtime producer（本阶段用户已 defer）；Phase 3 Context inspector 深水区（pin/unpin、compact 触发、memory 写入、`metadata.contextCompacted` 写入端）；Phase 4 多 Agent 全套；Artifact library 全套；Composer pill 编辑态（worktree preflight / branch switch）；MCP/Skill 独立市场重设计；Recovery wizard 深水区；Project archive UI；Diagnostic export 深水区；`ProjectRulesReader` 接入 Agent prompt 注入。
+- 剩余风险 / 需要产品决策：更广 native structured `table/tree/sources/artifact` producer 和 delta batching；Phase 3 Context inspector 深水区的 memory 写入和专用摘要卡片；Artifact library 后续 actions 深化；Composer pill 编辑态（preflight 展示 / branch switch）；MCP/Skill 独立市场重设计；Recovery wizard 后续迁移包/zip/package 深化。
 - Not run：`pnpm build`、`pnpm install`、全量 `pnpm test:run`。
 
 2026-07-01 Phase 0b continuation：useChat 二次深度抽取 + 补 focused tests + ApprovalDecisionCard 清理
@@ -642,7 +1156,7 @@
 2026-06-30 Subagent C 验证矩阵与文档同步：
 
 - Subagent C 报告 codebase-memory MCP 在其运行上下文可用：`list_projects` 返回 `Users-mark-myself-code-super-client-r`，并用 `search_graph` / `get_code_snippet` 复核了 `projectAgentRuntimeEvent()`、`materializeAgentProductEvent()`、`AgentRuntimeIpcBroker.persistRuntimeEvent()`、`persistPermissionResolved()`、`reduceAgentSDKStreamEvent()`、`reduceAgentRuntimeStreamEvent()`、`PlanCard` 和 Plan/Execute shared contract。主 agent 本轮重试 MCP 仍遇到 `Transport closed`，最终以本地检查和测试为准。
-- Phase 0a checklist：runtime product event projection + main process JSONL 写入已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`；approval closed-loop 已由 `persistPermissionResolved()` 写 trace/product/session audit，并按 `requestId + approvalId` 去重。剩余为 unknown/debug summary、native structured event coverage、delta batching 和 renderer replay 展示细节。
+- Phase 0a checklist：runtime product event projection + main process JSONL 写入已接入 `AgentRuntimeIpcBroker.persistRuntimeEvent()`；approval closed-loop 已由 `persistPermissionResolved()` 写 trace/product/session audit，并按 `requestId + approvalId` 去重。后续已补 unknown/debug summary 与 native code/json/diff producer；剩余为 delta batching、更广 typed producer 和 renderer replay 展示细节。
 - Phase 0b checklist（当时状态）：`useMessageModelResolution()`、`usePromptContextBuilder()`、`useToolApprovalFlow()`、`useAgentEventReducer()` 已存在并有 focused tests；`useChat` 把 SDK `assistant`、tool、permission、`result`、`error`、`rate_limit`、`status` 分支交给 reducer action。当时剩余为抽 `useAgentRunController` 并把发送入口迁到 `agentRuntimeClient`；后续 docs worker 复核确认这两项已部分落地，见本节最上方记录。
 - Phase 0c checklist：Plan/Execute shared types、execute turn prompt helper、`PlanCard` 基础组件、聊天流展示和 composer blocked decision 基础路径已存在并通过测试；剩余为正式 plan decision product event、replay event 和 execute turn 持久化语义。
 - `node_modules/.bin/vitest run src/main/services/agent/runtime/__tests__/agentProductEvents.test.ts src/main/services/agent/runtime/__tests__/productEventMaterializer.test.ts src/main/services/agent/runtime/__tests__/AgentRuntimeIpcBroker.test.ts src/main/services/agent/runtime/__tests__/streamEventTranslator.test.ts src/main/services/storage/__tests__/jsonl.test.ts src/main/services/storage/__tests__/SessionStorageService.test.ts src/renderer/src/hooks/__tests__/useAgentEventReducer.test.ts src/renderer/src/hooks/__tests__/useMessageModelResolution.test.ts src/renderer/src/hooks/__tests__/usePromptContextBuilder.test.ts src/renderer/src/hooks/__tests__/useToolApprovalFlow.test.ts src/renderer/src/services/agent/__tests__/agentRuntimeStreamAdapter.test.ts src/renderer/src/components/chat/__tests__/PlanCard.test.tsx src/renderer/src/lib/__tests__/planExecute.test.ts src/renderer/src/lib/__tests__/planModePresentation.test.ts`：通过，14 个测试文件 / 145 个测试。
@@ -788,11 +1302,12 @@
 | --- | --- |
 | Remote lifecycle | duplicate webhook replay drop 已有 focused test；remote-bound delete ordering 已改为先 tombstone 后 unbind；bound bot stopped/missing 时已发出 `remote.bot-offline` event/log 并抛出 structured `RemoteBotOfflineError`，且 IPC response 会透传 `remote.botOffline` code/details；deleted/archived/missing session 收到 IM 会发出 `remote.inactive-received` 并阻止普通广播/落盘。remote archive/cleanup 状态机仍缺实现证据。 |
 | Settings recovery UI | 已有 `Project Recovery` 安全入口，覆盖 archived/orphan/legacy import/tombstone/relink/backup 的当前状态和有限操作；完整 wizard、backup/export bundle、物理 cleanup 仍未实现。 |
-| Privacy/export/backup | redaction foundation 已有 focused tests；AgentTrace 已接入 shared redactor；storage 已有最小 session archive directory export，包含 redacted manifest、meta 和 JSONL copy；renderer/main 已有 `sessions.exportArchive(sessionId)` 最小 API 出口且不接受任意输出路径；storage 已有 project archive minimum，导出 project metadata/settings/session meta/jsonl 且不复制用户 cwd；diagnostic export minimum 已默认排除聊天正文/payload；Settings Recovery 已有 session export UI 入口。zip/package 格式、project archive UI 和 cleanup 仍未实现。 |
-| Full structured event stream | native code/diff/data/table/tree/source/artifact 专用 stream event 和 delta batching 尚未完成。 |
-| Product event renderer wiring | Phase 0a storage 写入已接入 `AgentRuntimeIpcBroker`；renderer 已有 runtime event reducer/adapter，`useChat` 已 runtime-first。JSONL replay 已覆盖 approval resolved、ask answered、tool terminal states、run terminal status 和 plan parts；仍缺 structured native parts 的完整 renderer-visible 证据。 |
+| Privacy/export/backup | redaction foundation 已有 focused tests；AgentTrace 已接入 shared redactor；storage 已有最小 session/project archive directory export，renderer/main 已有 `sessions.exportArchive(sessionId)` / `projects.exportArchive(projectId)` / diagnostic export 入口且不接受任意输出路径；diagnostic export minimum 已默认排除聊天正文/payload；session/project archive 默认 `includeChatContent:false`，显式 true 才复制 JSONL；Settings Recovery 已有 session/project/diagnostic export UI 和 Recovery checklist。zip/package 格式、完整迁移包和 cleanup 深水区仍未实现。 |
+| Full structured event stream | llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并写入 session storage；table/tree/source/artifact 专用 producer 和 delta batching 尚未完成。 |
+| Product event renderer wiring | Phase 0a storage 写入已接入 `AgentRuntimeIpcBroker`；renderer 已有 runtime event reducer/adapter，`useChat` 已 runtime-first。JSONL replay 已覆盖 approval resolved、ask answered、tool terminal states、run terminal status、plan parts 和 native code/json/diff assistant parts；仍缺更广 structured native parts 的完整 renderer-visible 证据。 |
 | Compatibility cleanup | 旧 workspace/chatMode/direct 兼容 API/type 仍需跟代码实际依赖一起分批收口；文档里保留的历史术语必须继续带 archived/superseded/compatibility 标注。 |
 | Dev runtime smoke follow-up | `pnpm dev` 已验证到 renderer dev server、Electron main window、API server、AgentRuntime registry、IPC 和 internal MCP 初始化；后续仍需真实模型/tool run 的人工 smoke。 |
+| Context management / token compression | 低风险切片已完成：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线。剩余：专用摘要卡片和后续 artifact actions 深化；当前 focused/full tests 已覆盖到沙箱可运行范围。 |
 
 ## Update Rules
 

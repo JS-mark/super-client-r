@@ -14,13 +14,14 @@
 2. **会话存储正式升级为 JSONL structured part events + 小 meta**：消息日志 append-only，assistant text/code/diff/tool/data 等输出按 typed part event 持久化；session meta / project settings 作为小 JSON 维护。
 3. **项目会话数据按当前实现统一写在 app userData**：普通会话在 `casual-sessions/`，项目会话在 `projects/<projectId>/sessions/`；项目 `cwd` 只作为 Agent/runtime 工作目录，不写入客户端 `.scr-data`，也不在删除项目时触碰用户真实项目目录。
 4. **当前产品只保留 Agent 模式**：不再提供 direct/chat 对话模式切换；历史 `chatMode/direct` 文档只作为 migration/compatibility 参考，新实现路径一律走 Agent runtime。
-5. **不使用 Extensions 聚合页**：`/mcp`、`/skills`、`/plugins` 保持独立市场/管理入口；应用插件不混入 Agent capability 产品入口。
-6. **旧 Workspace/Session plan 只作为历史上下文**：其中权限、sandbox、attachments 等运行时要求仍可复用；所有独立 `WorkspaceConfig`、`chatMode/direct`、`Extensions` 产品模型描述以新 project/session plan 和功能 plan 为准。
-7. **功能计划不合并进总文档正文**：composer、sidebar quick actions、skill validation 等具体计划通过索引引用，避免总文档继续膨胀。
+5. **模型调用方式按模型生态分层**：OpenAI、Gemini、Claude/Anthropic 这类原生 tool use / Function Calling 能力成熟的 provider 默认使用原生 Function Calling；开源模型和 OpenAI-compatible/local provider 默认通过 LangChain + MCP 协议适配工具调用。用户可以在对话设置里的“调用方式”覆盖默认策略。
+6. **不使用 Extensions 聚合页**：`/mcp`、`/skills`、`/plugins` 保持独立市场/管理入口；应用插件不混入 Agent capability 产品入口。
+7. **旧 Workspace/Session plan 只作为历史上下文**：其中权限、sandbox、attachments 等运行时要求仍可复用；所有独立 `WorkspaceConfig`、`chatMode/direct`、`Extensions` 产品模型描述以新 project/session plan 和功能 plan 为准。
+8. **功能计划不合并进总文档正文**：composer、sidebar quick actions、skill validation 等具体计划通过索引引用，避免总文档继续膨胀。
 
 ## 2. Implementation Readiness
 
-**当前判定：已进入分批实现阶段，但还不能声明整体重构完成。** Project/session 主线、Agent-only 发送/storage 写入、Agent prompt 附件/搜索上下文注入、composer pending approval、消息虚拟列表、Agent SDK text stream → `assistant_part`、JSONL structured part 基础协议、legacy fenced code/diff 展示、MCP unified runtime gate 已有实现与测试覆盖。2026-07-04 代码复核后，Phase 0a/0b/0c 和虚拟列表不再作为“从零实现”任务；项目删除的 app userData session 物理清理语义已由 `ProjectStorageService.remove()` 和 focused tests 固定，`.scr-data` 写入/迁移 helper 已删除。后续重点改为：删除当前/运行中项目的 renderer 状态回归、project archive / diagnostic export 产品入口、路径隐私展示、Context/Memory 深化、multi-agent follow-up。per-server runtime 回归、导出/备份深水区、native code/diff/data 专用事件流仍是后续收口项。
+**当前判定：已进入分批实现阶段，但还不能声明整体重构完成。** Project/session 主线、Agent-only 发送/storage 写入、Agent prompt 附件/搜索上下文注入、composer pending approval、消息虚拟列表、Agent SDK text stream → `assistant_part`、JSONL structured part 基础协议、legacy fenced code/diff 展示、MCP unified runtime gate 已有实现与测试覆盖。2026-07-04 代码复核后，Phase 0a/0b/0c 和虚拟列表不再作为“从零实现”任务；项目删除的 app userData session 物理清理语义已由 `ProjectStorageService.remove()` 和 focused tests 固定，`.scr-data` 写入/迁移 helper 已删除。后续重点已转入验收、回归和边界补齐：Export/Recovery、路径隐私、Context/Memory、Multi-agent / structured output、paged session reads、worktree preflight 和独立市场 MVP 均已接线，并已通过 focused tests、`pnpm check`、`pnpm lint` 和 `pnpm i18n:check`；`pnpm test:run` 在当前沙箱仅剩本地端口监听类 server e2e 被 `listen EPERM 0.0.0.0:3000` 阻塞。per-server runtime 回归、导出/备份深水区、更完整 marketplace 视觉和 byte-index/增量 JSONL parse 属后续深化项。
 
 开工前硬门槛：
 
@@ -85,7 +86,7 @@ v2 不使用 Node sidecar，生产 Tauri 构建不打包 Node runtime；后端�
 - **Project / Session A-G**：负责 project/session 数据模型、存储、迁移、UI shell 和旧 workspace cleanup。
 - **Agent Phase 0a/0b/0c**：负责 Agent runtime product events、`useChat` 状态机拆分、Plan/Execute 可回放交互。它来自 [requirements-plan](./requirements-plan.md)，优先级高于继续扩展 F/G 之外的新 UI。
 
-当前最近批次已完成 Phase 0a/0b/0c 的 runtime projection、main-process JSONL materializer、helper/hook split、`useAgentRunController`、runtime-first 发送入口、PlanCard 展示和 composer blocked decision 基础接线。剩余重点是 runtime fallback 语义、product-event replay、native structured events、Plan/Execute 持久化链接和真实 runtime smoke。
+当前最近批次已完成 Phase 0a/0b/0c 的 runtime projection、main-process JSONL materializer、helper/hook split、`useAgentRunController`、runtime-first 发送入口、PlanCard 展示和 composer blocked decision 基础接线。后续重点是 runtime fallback/recovery 证据、product-event replay 边界、Plan/Execute 持久化链接、真实 runtime smoke，以及 native structured events 的 server e2e 验证补跑。
 
 | Phase | 范围 | 当前口径 |
 | --- | --- | --- |
@@ -101,10 +102,10 @@ v2 不使用 Node sidecar，生产 Tauri 构建不打包 Node runtime；后端�
 
 1. **P0 删除项目 renderer 回归已补**：main 端 app userData project session 物理清理已验证；renderer 端已覆盖 `deleteProjectWithCleanup()` stop/remove/cleanup 顺序、当前项目会话 fallback、message/file artifact/loading/streaming 状态归位。
 2. **P0 `.scr-data` policy cleanup 已补**：正式口径是项目会话只写 app userData；旧 `.scr-data` 写入/迁移 helper 已删除，剩余 `.scr-data` 代码只用于删除项目时清理历史残留，命名已改为 `LegacyProjectScr*` / `legacyProjectScrSessionPath`，不新增写入路径。
-3. **下一批补产品入口而不是重复底层能力**：`exportSessionArchive`、`exportProjectArchive`、`DiagnosticExportService` 底层已存在；Settings 里 session export 有入口，但 project archive UI、diagnostic export UI、Recovery wizard 深水区仍不足。下一批应补入口、文案和验收，不再重复写底层 storage export。
-4. **补隐私展示与 legacy import report**：默认列表不直接展示完整路径；完整路径只能通过显式 copy/detail 操作；legacy import / orphan / recovery 相关 UI 要按 [data-privacy-export-plan](./data-privacy-export-plan.md) 收口。
-5. **Context/Memory 深化排在删除/导出之后**：`ProjectRulesReader` 已能只读 `AGENTS.md` / `CLAUDE.md`，但 prompt 注入、pin/unpin、compact/summarize、artifact library 仍未完整落地。
-6. **Phase 0a/0b/0c 已进入验收与回归阶段**：projection、`useChat` helper split、Plan/Execute 基础交互、消息虚拟列表已经在代码里存在；本批已把历史已决 PlanCard 改为只读 replay summary，后续只补 stop/error recovery、native structured events 和真实 runtime smoke。
+3. **Export/Recovery 产品入口已补，剩余转为后续深化**：`exportSessionArchive`、`exportProjectArchive`、`DiagnosticExportService` 的 Settings 入口、反馈、i18n 和 focused tests 已落地；archive 默认 `includeChatContent:false`，显式 true 才复制 JSONL；Project Recovery 顶部已有 wizard/checklist，完整迁移包/zip/package 可作为后续深化。
+4. **隐私展示已完成默认脱敏，archive 本体默认不含 chat content**：Recovery / legacy import / orphan / archived project UI 默认不直接展示完整路径，完整路径只通过显式 copy/detail 操作暴露；session/project archive 默认只含 session metadata + 空 JSONL 占位，不含聊天正文、attachments、tool payloads 或真实项目目录。
+5. **Context/Memory 与周边深化进入验收复验阶段**：`ProjectRulesReader` 已接入 Agent runtime system prompt；多轮历史回放、`contextCount` / `contextMode` 策略和 Settings context mode 已有低风险切片；发送管线已把 context source / strategy / compact marker 写入 assistant metadata，并由 Context Inspector 优先展示。`context.compacted` product/session event 最小链路、main runtime project-rules snapshot DTO、Inspector source breakdown、LLM summarize 注入接缝、真实 HTTP summarizer provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线，并已通过 focused/full test 覆盖到当前沙箱可运行范围。archive `includeChatContent` 隐私语义已改为默认不含聊天 JSONL 内容、显式 true 才复制；Recovery wizard MVP 已接线；Multi-agent `Message.toolCall.subagentRunId` renderer threading 已接上 live tool message、JSONL fallback 和 Inspector live count，Task HTTP recursion 已根据子代理 SSE tool-call 帧递增 `run.toolCallCount`，nested Task recursion 已通过 host-only `agentBuiltins` 保留父 conversation 和 depth，llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events；worktree preflight 后端/UI、paged session reads 和 MCP/Skills/Plugins 独立市场边界提示已接线。
+6. **Phase 0a/0b/0c 已进入验收与回归阶段**：projection、`useChat` helper split、Plan/Execute 基础交互、消息虚拟列表已经在代码里存在；本批已把历史已决 PlanCard 改为只读 replay summary，后续只补 stop/error recovery、真实 runtime smoke 和当前沙箱无法完成的 server e2e 补跑。
 7. **项目会话存储不再迁入项目 cwd `.scr-data`**；任何涉及 project session path、删除清理、备份恢复的计划都应以 app-managed userData 为准。
 
 ## 5. 功能 Plan 索引
@@ -140,6 +141,7 @@ v2 不使用 Node sidecar，生产 Tauri 构建不打包 Node runtime；后端�
 | Composer Codex v2 pills | [superpowers/specs/2026-06-21-chat-composer-codex-style-design.md](./superpowers/specs/2026-06-21-chat-composer-codex-style-design.md) | 改 ProjectPill、LaunchModePill、BranchPill、Approval/Model compact pills、composer context bar 时 |
 | Claude sidebar quick actions / global search | [superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md](./superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md) | 改 `ClaudeSidebar` quick actions、global search modal、快捷键时 |
 | Skill 校验机制 | [../packages/docs/SKILL_VALIDATION_REFACTOR.md](../packages/docs/SKILL_VALIDATION_REFACTOR.md) | 改 `SkillValidator`、SkillService 加载、`SKILL.md` frontmatter 校验时 |
+| 上下文管理与 token 自动压缩 | [context-management-plan.md](./context-management-plan.md) | 改多轮历史回放、context window 策略、自动 LLM 摘要压缩、contextMode Settings UI 时 |
 | 缺口 / 边界条件 review | [refactor-gap-review.md](./refactor-gap-review.md) | 开始实现前，检查迁移、并发、删除、runtime、remote、attachment 等风险 |
 | 运行时 policy / approval / sandbox 历史要求 | [workspace-session-ui-plan.md](./workspace-session-ui-plan.md) §11-13、§17、§26 | 改 plan mode、approval、sandbox enforcement、runtime resolver 时 |
 | 实现差距证据 | [workspace-session-implementation-audit.md](./workspace-session-implementation-audit.md) | 需要确认旧代码路径、旧 plan 假设或历史技术债时 |

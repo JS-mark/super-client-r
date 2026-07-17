@@ -2,7 +2,7 @@
 
 > 日期：2026-06-27
 >
-> 最近复核：2026-06-29
+> 最近复核：2026-07-08
 >
 > 状态：设计草案
 >
@@ -28,6 +28,7 @@ Super Client R 是一个 **Agent-only** 桌面 AI 客户端。后续不再恢复
 | 设置页 | 参考 Codex 设置页重组，使用左侧设置导航 + 右侧内容面板。 |
 | 模型层级 | 支持全局默认、项目默认、会话覆盖、输入框 model pill 临时选择、子 Agent 运行时模型选择。 |
 | 模型配置 | 重做为两层：Provider 管理 + Model 能力配置。 |
+| 模型调用方式 | 默认按 provider/model 能力自动选择：OpenAI、Gemini、Claude/Anthropic 使用原生 Function Calling；开源模型和 OpenAI-compatible/local provider 使用 LangChain + MCP 协议适配工具调用；用户可在对话设置中覆盖。 |
 | 本地模型 | Ollama/local 是一等能力，但低优先级。 |
 | 成本展示 | 第一阶段不做准确成本，只展示上下文长度和能力标签。 |
 | Plan/Execute | 用户可手动切换；Plan 只能读/搜/分析，Execute 可在审批/沙箱下执行。 |
@@ -52,6 +53,7 @@ Super Client R 是一个 **Agent-only** 桌面 AI 客户端。后续不再恢复
 5. **低内存占用**：不要把所有长文本、工具输出、artifact 内容长期保存在 renderer 内存中。大内容应以引用、分页、摘要或懒加载方式呈现。
 6. **可恢复和可解释**：Agent run、审批、context compact、模型解析、subagent 委派都要可回放、可解释，避免静默状态变化。
 7. **安全边界清晰**：approval、sandbox、grants 必须分离；用户批准不能绕过沙箱硬限制。
+8. **调用方式默认正确且可覆盖**：模型调用默认优先使用目标 provider 最稳定的原生能力。OpenAI、Gemini、Claude/Anthropic 默认走原生 Function Calling；开源模型默认走 LangChain + MCP 协议以统一工具适配。对话设置必须提供“调用方式”覆盖入口，用于兼容 provider 能力误判或用户偏好。
 
 ## 4. 外部参考
 
@@ -256,6 +258,7 @@ Provider 管理负责连接配置：
 - 拉取模型列表。
 - 测试连接。
 - provider health / last error。
+- 默认调用方式：`auto`、`native-function-calling`、`langchain-mcp`。`auto` 按 provider/model 能力选择；OpenAI、Gemini、Claude/Anthropic 默认解析为 `native-function-calling`，开源模型和 OpenAI-compatible/local provider 默认解析为 `langchain-mcp`。
 
 ### 8.4 Model 能力层
 
@@ -263,7 +266,8 @@ Model 能力配置负责模型元数据：
 
 - 上下文长度。
 - reasoning 支持和 effort 档位。
-- tool/function calling 支持。
+- 原生 tool/function calling 支持。
+- LangChain + MCP 工具适配支持。
 - vision/image 支持。
 - structured output 支持。
 - streaming 支持。

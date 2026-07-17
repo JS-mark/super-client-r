@@ -190,11 +190,38 @@ Tasks:
 - Define parity tests for macOS: create session, send Agent message, MCP tool call,
   PTY, plugin dev page, local API, remote IM, update check, archive/export.
 
+**Raw IPC Cleanup（V2-2 前置）**:
+
+当前 renderer 约 263 处 `window.electron.*` 引用，其中 ~40 处绕过 typed
+namespace 直接使用 raw `window.electron.ipc.invoke/send/on`。V2-2 的
+`renderer-bridge` 包只能处理 typed 方法签名，无法安全代理任意 raw channel。
+以下必须在 V2-0 全部迁移到 typed namespace API：
+
+- `appService.ts`、`pluginService.ts`、`skillService.ts` 等使用
+  `window.electron.ipc.invoke(channel, args)` 的 service 文件。
+- `App.tsx`、`Settings.tsx`、`Plugins.tsx`、`FloatWidget.tsx` 等使用
+  `window.electron.ipc.on(channel, callback)` 的组件文件。
+- 迁移完成后删除或锁定 `ipc` namespace（限定为 dev-only capability）。
+- 需要新增的 typed method 签名追加到 `ElectronAPI` / `ElectronAPIMigrated`。
+
+**Component Direct Call Cleanup（V2-2 前置）**:
+
+约 30+ 组件文件直接调用 `window.electron.*` 而不经过 service 层。这不
+阻塞 V2-2，但会在 bridge 包迁移时增加改动点。建议在 V2-0 统计并记录清单，
+按以下优先级在 V2-0~V2-2 之间渐进收敛：
+
+1. **必须迁移**：使用 raw `ipc.invoke/send/on` 的组件（阻塞 bridge 包）。
+2. **建议迁移**：频繁调用的组件（`TitleBar`、`TerminalSession`、
+   `ChatInputArea`）——迁移到 service 层后，V2-2 bridge 替换只需改
+   service 文件，不需要改组件。
+
 Exit evidence:
 
 - `docs/tauri-migration-v2-matrix.md` exists with every Electron API mapped.
 - No unknown Electron-only feature remains.
 - v1 full verification commands and macOS smoke are recorded.
+- Zero raw `window.electron.ipc.*` calls remain in renderer source.
+- Raw-IPC 和 direct-component-call 清单已产出（附迁移优先级）。
 
 ### Phase V2-1: Tauri Shell Spike
 
@@ -221,26 +248,200 @@ Exit evidence:
 - No Rust backend parity yet; all unavailable backend calls fail with structured
   `platform.notReady` errors.
 
-### Phase V2-2: Platform Bridge Compatibility Layer
+### Phase V2-2: Platform Bridge Package (`packages/renderer-bridge/`)
 
-Goal: make renderer code platform-neutral before moving backend logic.
+Goal: create an independent bridge package that provides a platform-agnostic
+`invoke()` / `onEvent()` API, replacing all direct `window.electron.*` /
+`window.electronAPI.*` calls in the renderer with a single, swappable transport
+layer.
 
-Tasks:
+#### Package Structure
 
-- Introduce `src/renderer/src/services/platformBridge.ts`.
-- Add Electron adapter backed by current preload API.
-- Add Tauri adapter backed by `@tauri-apps/api/core.invoke` and event APIs.
-- Replace direct `window.electronAPI` access in renderer services with the bridge.
-- Keep TypeScript contract aligned with `packages/shared-types/src/electron-api.ts`
-  or rename it to a platform-neutral contract after v1.
-- Remove or constrain raw generic IPC calls.
-- Add adapter tests with mocked Electron and mocked Tauri APIs.
+```
+packages/renderer-bridge/
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── index.ts                # public exports: invoke, onEvent, createBridge, useBridge
+│   ├── types.ts                # BridgeTransport, BridgeConfig, EventUnsubscriber
+│   ├── createBridge.ts         # factory: createBridge(config) → { invoke, onEvent }
+│   ├── transports/
+│   │   ├── electron.ts         # createElectronTransport() → wraps ipcRenderer.invoke
+│   │   └── tauri.ts            # createTauriTransport() → wraps @tauri-apps/api invoke
+│   ├── api/                     # optional: per-namespace typed API wrappers
+│   │   ├── git.ts              # bridge.invoke('git', 'getBranchInfo', args)
+│   │   ├── projects.ts
+│   │   ├── sessions.ts
+│   │   └── index.ts            # aggregate exports
+│   └── hooks/
+│       ├── useBridge.ts        # React hook: returns { invoke, onEvent }
+│       └── useGit.ts           # optional per-namespace hooks
+└── __tests__/
+    ├── createBridge.test.ts
+    ├── electron-transport.test.ts
+    ├── tauri-transport.test.ts
+    └── useBridge.test.ts
+```
+
+#### Core Types
+
+```typescript
+// packages/renderer-bridge/src/types.ts
+
+/** Cancel an event subscription. */
+export type EventUnsubscriber = () => void;
+
+/**
+ * Low-level transport abstraction.
+ * Each platform implements this interface; the bridge delegates to it.
+ */
+export interface BridgeTransport {
+  /** Call a namespaced command and return the result. */
+  invoke<T = unknown>(
+    namespace: string,
+    method: string,
+    ...args: unknown[]
+  ): Promise<T>;
+
+  /** Subscribe to a namespaced event. Returns an unsubscribe function. */
+  onEvent<T = unknown>(
+    namespace: string,
+    event: string,
+    callback: (data: T) => void,
+  ): EventUnsubscriber;
+}
+
+/** Configuration passed to createBridge(). */
+export interface BridgeConfig {
+  /** Explicit transport override. When omitted, auto-detected. */
+  transport?: BridgeTransport;
+}
+```
+
+#### Factory Function
+
+```typescript
+// packages/renderer-bridge/src/createBridge.ts
+
+import type { BridgeTransport, BridgeConfig, EventUnsubscriber } from './types';
+
+export interface BridgeAPI {
+  invoke<T = unknown>(
+    namespace: string,
+    method: string,
+    ...args: unknown[]
+  ): Promise<T>;
+
+  onEvent<T = unknown>(
+    namespace: string,
+    event: string,
+    callback: (data: T) => void,
+  ): EventUnsubscriber;
+}
+
+export function createBridge(config?: BridgeConfig): BridgeAPI {
+  const transport: BridgeTransport =
+    config?.transport ?? detectDefaultTransport();
+
+  return {
+    invoke: (ns, method, ...args) => transport.invoke(ns, method, ...args),
+    onEvent: (ns, event, cb) => transport.onEvent(ns, event, cb),
+  };
+}
+
+function detectDefaultTransport(): BridgeTransport {
+  // Runtime detection:
+  //   - Electron: typeof window !== 'undefined' && 'electronAPI' in window
+  //   - Tauri:    typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+  //   - SSR / test: throw with helpful message
+  // Implementation delegates to the matching transport factory.
+  throw new Error('No platform detected. Pass an explicit transport.');
+}
+```
+
+#### Transport Implementations
+
+**Electron transport** (`transports/electron.ts`):
+- Delegates to `window.electronAPI[namespace][method](...args)` (the existing
+  typed preload bridge — `src/preload/bridge.ts`).
+- Channel naming: reuses the camelCase→kebab convention already in preload.
+- Event subscription: maps `on*` methods to `window.electronAPI[namespace][onMethod](cb)`.
+- This transport is a thin wrapper around the existing preload API — no preload
+  changes needed during V2-2.
+
+**Tauri transport** (`transports/tauri.ts`):
+- Maps `invoke(ns, method, args)` → `@tauri-apps/api/core.invoke(command, { ns, method, args })`.
+- The Rust side registers Tauri commands that route `ns + method` to the correct
+  service module.
+- Maps `onEvent(ns, event, cb)` → `@tauri-apps/api/event.listen('${ns}:${event}', cb)`.
+- The Rust side emits events with the same `${ns}:${event}` naming convention.
+- Initially a stub returning `platform.notReady` errors; populated in V2-3+.
+
+#### Renderer Migration Pattern
+
+Before (Electron-only):
+```typescript
+// services/gitService.ts
+export const gitService = {
+  getBranchInfo: (cwd: string) => window.electron.git.getBranchInfo(cwd),
+};
+```
+
+After (platform-agnostic):
+```typescript
+// services/gitService.ts
+import { createBridge } from '@super-client/renderer-bridge';
+const bridge = createBridge();
+
+export const gitService = {
+  getBranchInfo: (cwd: string) => bridge.invoke('git', 'getBranchInfo', cwd),
+};
+```
+
+React hooks pattern:
+```typescript
+// hooks/useGit.ts
+import { useBridge } from '@super-client/renderer-bridge';
+
+export function useGit() {
+  const { invoke, onEvent } = useBridge();
+  // ... typed wrapper around invoke/onEvent
+}
+```
+
+#### Tasks
+
+1. Create `packages/renderer-bridge/` package skeleton with `package.json`,
+   `tsconfig.json`, and directory structure.
+2. Define core types in `src/types.ts` (`BridgeTransport`, `BridgeConfig`,
+   `EventUnsubscriber`).
+3. Implement `createBridge()` factory with auto-detection in `src/createBridge.ts`.
+4. Implement Electron transport in `src/transports/electron.ts` — wraps
+   existing `window.electronAPI` preload bridge.
+5. Implement Tauri transport stub in `src/transports/tauri.ts` — returns
+   `platform.notReady` errors for all calls.
+6. Create `useBridge()` React hook in `src/hooks/useBridge.ts`.
+7. Add optional per-namespace typed wrappers in `src/api/` (git, projects,
+   sessions) for ergonomic usage.
+8. Migrate renderer services from `window.electron.*` to `bridge.invoke()`:
+   - Phase 2a: migrate service files (~26 services, highest leverage).
+   - Phase 2b: migrate store files (~11 stores).
+   - Phase 2c: migrate remaining component direct calls.
+9. Migrate renderer event listeners from `window.electron.*.on*` to
+   `bridge.onEvent()`.
+10. Write transport adapter tests with mocked Electron and mocked Tauri APIs
+    (≥90% coverage).
+11. Add `@super-client/renderer-bridge` to workspace root `pnpm-workspace.yaml`.
 
 Exit evidence:
 
 - Electron build still passes unchanged behavior.
-- Tauri shell can use the same renderer bundle with mocked backend responses.
-- Renderer code has a single platform integration boundary.
+- Tauri shell can use the same renderer bundle with mocked backend responses
+  (via Tauri transport stub returning `platform.notReady`).
+- Zero `window.electron` / `window.electronAPI` references in renderer source
+  (except inside `renderer-bridge` Electron transport).
+- Transport adapter test coverage ≥90%.
+- Package published to workspace with correct peer dependencies.
 
 ### Phase V2-3: Rust Backend Foundation
 
@@ -563,7 +764,9 @@ Measure before v2 begins and at every major phase:
 - Rust crate choices for PTY, MCP transport, HTTP server/client, archive/export,
   logging/tracing and optional SQLite.
 - Whether all backend APIs use Tauri commands/channels or whether the product local
-  API server remains a separate explicit HTTP surface.
+  API server remains a separate explicit HTTP surface. (Note: renderer side decided
+  — will use `packages/renderer-bridge/` with `invoke()` / `onEvent()` pattern;
+  Rust-side command/channel naming convention still open.)
 - Whether Tauri reuses Electron userData path or imports into a new Tauri path.
 - Whether plugin HTML/pages become Tauri custom protocol, dedicated webview surfaces,
   or static assets served by the explicit local API server.
