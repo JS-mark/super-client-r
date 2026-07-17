@@ -249,6 +249,107 @@ describe("AgentRuntimeIpcBroker", () => {
 		});
 	});
 
+	it("persists runtime assistant part events directly to session storage", async () => {
+		const partEvent = {
+			type: "assistant.part_start",
+			messageId: "m1",
+			part: {
+				id: "part-1",
+				type: "code_block",
+				state: "complete",
+				content: "const value = 1;",
+				createdAt: 10,
+				updatedAt: 10,
+			},
+			ts: 10,
+		} as const;
+		const events: AgentRuntimeStreamEvent[] = [
+			ev("message.final", { messageId: "m1", text: "final" }, 0),
+			ev("assistant.part", { partEvent }, 1),
+			ev("result", { reason: "completed" }, 2),
+		];
+		const registry = new AgentRuntimeRegistry();
+		registry.register(fakeRuntime({ events }));
+		const storage = makeStorage();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace: new AgentTraceCollector(),
+			resolver: makeResolver(),
+			storage,
+		});
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "hello" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			makeSender(),
+		);
+		await flushMicrotasks(20);
+
+		expect(storage.appendEvent).toHaveBeenCalledWith("conv-1", partEvent);
+		expect(storage.appendEvent.mock.calls.map(([, event]) => event.type)).toEqual(
+			["assistant_message", "assistant.part_start", "session_marker"],
+		);
+	});
+
+	it("forwards unknown runtime events without materializing JSONL events", async () => {
+		const unknownRuntimeEvent = {
+			...baseEvent,
+			type: "runtime.future_event",
+			seq: 1,
+			detail: { feature: "native-structured-preview" },
+		} as unknown as AgentRuntimeStreamEvent;
+		const events: AgentRuntimeStreamEvent[] = [
+			ev("init", { model: "m" }, 0),
+			unknownRuntimeEvent,
+			ev("result", { reason: "completed" }, 2),
+		];
+		const registry = new AgentRuntimeRegistry();
+		registry.register(fakeRuntime({ events }));
+		const storage = makeStorage();
+		const trace = new AgentTraceCollector();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace,
+			resolver: makeResolver(),
+			storage,
+		});
+		const sender = makeSender();
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "hello" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			sender,
+		);
+		await flushMicrotasks(20);
+
+		expect(sender.calls.map((c) => c.payload)).toEqual(events);
+		expect(
+			trace
+				.get("req-1")
+				?.events.some(
+					(record) =>
+						record.kind === "event" &&
+						record.payload.kind === "event" &&
+						(record.payload.event as unknown as { type: string }).type ===
+							"runtime.future_event",
+				),
+		).toBe(true);
+		expect(storage.appendEvent.mock.calls.map(([, event]) => event)).toEqual([
+			expect.objectContaining({ type: "session_marker", key: "run.started" }),
+			expect.objectContaining({ type: "session_marker", key: "run.completed" }),
+		]);
+	});
+
 	it("persists AskUserQuestion request and answer with ask markers", async () => {
 		let releaseRuntime: (() => void) | undefined;
 		const resolvePermission = vi.fn().mockResolvedValue(undefined);
@@ -633,6 +734,62 @@ describe("AgentRuntimeIpcBroker", () => {
 			.filter((event) => event.type === "session_marker")
 			.map((event) => (event as Extract<SessionEvent, { type: "session_marker" }>).key);
 		expect(markerKeys).toEqual(["run.started", "run.completed"]);
+	});
+
+	it("fast-skips usage telemetry without materializing JSONL events", async () => {
+		const events: AgentRuntimeStreamEvent[] = [
+			ev("init", { model: "m" }, 0),
+			ev(
+				"usage",
+				{
+					inputTokens: 120,
+					outputTokens: 15,
+					cacheReadTokens: 4,
+					cacheWriteTokens: 2,
+				},
+				1,
+			),
+			ev("result", { reason: "completed" }, 2),
+		];
+		const registry = new AgentRuntimeRegistry();
+		registry.register(fakeRuntime({ events }));
+		const storage = makeStorage();
+		const trace = new AgentTraceCollector();
+		const broker = new AgentRuntimeIpcBroker({
+			registry,
+			trace,
+			resolver: makeResolver(),
+			storage,
+		});
+		const sender = makeSender();
+
+		await broker.createQuery(
+			{
+				requestId: "req-1",
+				conversationId: "conv-1",
+				prompt: { kind: "text", text: "hello" },
+				runtime: undefined as unknown as EffectiveSessionRuntime,
+				tools: [],
+			},
+			sender,
+		);
+		await flushMicrotasks(20);
+
+		expect(sender.calls.map((c) => c.payload)).toEqual(events);
+		expect(
+			trace
+				.get("req-1")
+				?.events.some(
+					(record) =>
+						record.kind === "event" &&
+						record.payload.kind === "event" &&
+						record.payload.event.type === "usage",
+				),
+		).toBe(true);
+		expect(storage.appendEvent.mock.calls.map(([, event]) => event)).toEqual([
+			expect.objectContaining({ type: "session_marker", key: "run.started" }),
+			expect.objectContaining({ type: "session_marker", key: "run.completed" }),
+		]);
 	});
 
 	it("persists user permission resolution once even if runtime later emits permission.resolved", async () => {

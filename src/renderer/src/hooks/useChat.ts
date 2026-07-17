@@ -15,7 +15,7 @@ import { useAgentRunController } from "./useAgentRunController";
 import { type AgentEventReducerContext } from "./useAgentEventReducer";
 import { useMessageModelResolution } from "./useMessageModelResolution";
 import { usePromptContextBuilder } from "./usePromptContextBuilder";
-import { createRespondToApproval } from "./useToolApprovalFlow";
+import { useToolApprovalFlow } from "./useToolApprovalFlow";
 import { useAssistantStreamBuffer } from "./useAssistantStreamBuffer";
 import { materializeStreamErrorPatch } from "./agentRunError";
 import { useAgentRunStopper } from "./useAgentRunStopper";
@@ -171,55 +171,37 @@ export function useChat() {
     onWatchdogTimeout: handleWatchdogTimeout,
   });
 
-  const respondToApproval = useCallback(
-    async (
-      toolCallId: string,
-      approved: boolean,
-      updatedInput?: Record<string, unknown>,
-      updatedPermissions?: Array<Record<string, unknown>>,
-    ) => {
-      const respond = createRespondToApproval({
-        getSessionStatus: () => useChatMessageStore.getState().sessionStatus,
-        hasCurrentRequest: () => Boolean(currentRequestIdRef.current),
-        setAwaitingUserApproval,
-        kickWatchdog,
-        getMessages: () => useChatMessageStore.getState().messages,
-        updateMessageToolCall,
-        isAgentSDKRequest: () =>
-          requestTypeRef.current === "agent-sdk" ||
-          requestTypeRef.current === "runtime",
-        resolveAgentSDKPermission: (id, allowed, input, permissions) => {
-          if (requestTypeRef.current === "runtime") {
-            return agentRuntimeClient.resolveToolApproval(
-              id,
-              allowed,
-              input,
-              permissions,
-            );
-          }
-          return agentSDKClient.resolvePermission(
-            id,
-            allowed,
-            input,
-            permissions,
-          );
-        },
-        resolveLegacyApproval: window.electron.llm.toolApprovalResponse,
-        onResolveError: (err) => {
-          console.error("[useChat] toolApprovalResponse failed:", err);
-        },
-      });
-
-      await respond(toolCallId, approved, updatedInput, updatedPermissions);
+  const respondToApproval = useToolApprovalFlow({
+    getSessionStatus: () => useChatMessageStore.getState().sessionStatus,
+    hasCurrentRequest: () => Boolean(currentRequestIdRef.current),
+    setAwaitingUserApproval,
+    kickWatchdog,
+    getMessages: () => useChatMessageStore.getState().messages,
+    updateMessageToolCall,
+    isAgentSDKRequest: () =>
+      requestTypeRef.current === "agent-sdk" ||
+      requestTypeRef.current === "runtime",
+    resolveAgentSDKPermission: (id, allowed, input, permissions) => {
+      if (requestTypeRef.current === "runtime") {
+        return agentRuntimeClient.resolveToolApproval(
+          id,
+          allowed,
+          input,
+          permissions,
+        );
+      }
+      return agentSDKClient.resolvePermission(
+        id,
+        allowed,
+        input,
+        permissions,
+      );
     },
-    [
-      currentRequestIdRef,
-      kickWatchdog,
-      requestTypeRef,
-      setAwaitingUserApproval,
-      updateMessageToolCall,
-    ],
-  );
+    resolveLegacyApproval: window.electron.llm.toolApprovalResponse,
+    onResolveError: (err) => {
+      console.error("[useChat] toolApprovalResponse failed:", err);
+    },
+  });
 
   useEffect(() => () => clearWatchdog(), [clearWatchdog]);
 
@@ -419,12 +401,25 @@ export function useChat() {
       armWatchdog,
     },
     streamBuffer: { clear: clearAssistantStreamContent },
-    messageStoreApi: { setSessionStatus },
+    messageStoreApi: {
+      setSessionStatus,
+      updateMessageMetadata,
+      appendSessionEvent: async (sessionId, event) => {
+        const response = await window.electron.sessions.appendEvent(
+          sessionId,
+          event,
+        );
+        if (!response.success) {
+          throw new Error(response.error || "Failed to append session event");
+        }
+      },
+    },
     buildPromptContext,
     resolveActiveProviderModel,
     currentModelInfoRef,
     materializeStreamError,
     getSessionSettings: () => sessionSettingsRef.current,
+    getMessages: () => useChatMessageStore.getState().messages,
     getSelectedSkillId: () => selectedSkillId,
   });
 

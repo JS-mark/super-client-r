@@ -472,6 +472,7 @@ export function ClaudeEmptyChatHome({
 						<ChatComposerInfoBar
 							workspaceName={workspaceName}
 							remoteBinding={remoteBinding}
+							planMode={conversation?.session?.planMode}
 							trailing={
 								<ComposerStatusBar messageModelOverride={messageModelOverride} />
 							}

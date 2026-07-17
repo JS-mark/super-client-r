@@ -811,6 +811,7 @@ export function ChatInputArea({
 							<ChatComposerInfoBar
 								workspaceName={workspaceName}
 								remoteBinding={remoteBinding}
+								planMode={currentConversation?.session?.planMode}
 								trailing={
 									<ComposerStatusBar
 										messageModelOverride={messageModelOverride}
