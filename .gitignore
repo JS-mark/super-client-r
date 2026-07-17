@@ -36,3 +36,7 @@ tsconfig.*.tsbuildinfo
 
 # Git worktrees (superpowers)
 .worktrees/
+
+# Local agent/tool working state
+.codebase-memory/
+.zcode/
