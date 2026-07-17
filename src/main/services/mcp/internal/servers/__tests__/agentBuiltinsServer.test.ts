@@ -357,6 +357,42 @@ describe("Task handler (HTTP recursion)", () => {
 		expect(textOf(result)).toMatch(/depth|nest/i);
 	});
 
+	it("succeeds at the maximum allowed depth (depth=2 → emits taskDepth=3)", async () => {
+		// MAX_TASK_DEPTH = 3 means depth 2 is the last allowed recursion:
+		// the handler must still run and emit an outgoing body whose
+		// taskDepth is 3. (That child's own Task call would then be rejected
+		// by the `depth >= MAX_TASK_DEPTH` check above — covered by the
+		// previous test — but emitting taskDepth: 3 from a depth-2 parent is
+		// itself legal.) This pins the cap's lower bound so a future
+		// off-by-one (e.g. `depth > MAX_TASK_DEPTH`) can't silently tighten
+		// the limit without a test going red.
+		const fetchMock = vi.fn().mockResolvedValue(
+			sseResponse([
+				{ event: "chunk", data: { content: "ok" } },
+				{ event: "done", data: {} },
+			]),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const server = createAgentBuiltinsServer();
+		const result = await server.handlers.get("Task")!({
+			description: "boundary",
+			prompt: "Run at max depth.",
+			_taskDepth: 2,
+			_provider: { baseUrl: "https://provider.test", apiKey: "sk", model: "m" },
+			_scpPort: 3000,
+			_scpApiKey: "api-key",
+		});
+
+		expect(result.isError).toBeFalsy();
+		expect(textOf(result)).toContain("ok");
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const requestBody = JSON.parse(
+			(fetchMock.mock.calls[0]?.[1] as { body?: string })?.body ?? "{}",
+		) as { agentBuiltins?: { taskDepth?: number } };
+		expect(requestBody.agentBuiltins?.taskDepth).toBe(3);
+	});
+
 	it("errors when _provider missing", async () => {
 		const server = createAgentBuiltinsServer();
 		const result = await server.handlers.get("Task")!({
@@ -469,7 +505,13 @@ describe("Task handler (HTTP recursion)", () => {
 		});
 	});
 
-	// Note: a full HTTP-recursion happy-path test lives in the e2e suite
-	// (Phase E5.2). The unit tests above cover error paths because they
-	// don't require a live LocalServer.
+	// Note: the unit tests above cover both the depth-cap error path
+	// (`depth >= MAX_TASK_DEPTH`) and the depth-increment happy path
+	// (outgoing body `agentBuiltins.taskDepth === depth + 1`, asserted at
+	// depth 0 and at the max-allowed depth 2) by inspecting the mocked
+	// fetch body. The e2e suite (agentBuiltinsServer.e2e.test.ts) does NOT
+	// re-assert the depth field: it runs real HTTP recursion through a live
+	// LocalServer, whose outgoing body is not interceptable without spying
+	// on LLMService.chatCompletion. The depth invariant is therefore fully
+	// owned here; the e2e only verifies end-to-end real-HTTP recursion.
 });
