@@ -1558,6 +1558,12 @@ module.exports = {
 				ReturnType<typeof getProjectStorage>["saveSettings"]
 			>[1],
 		) => getProjectStorage().saveSettings(id, patch),
+		exportArchive: (
+			projectId: string,
+			options?: Parameters<
+				ReturnType<typeof getSessionStorage>["exportProjectArchive"]
+			>[1],
+		) => getSessionStorage().exportProjectArchive(projectId, options),
 		listOrphans: () => getProjectStorage().listOrphans(),
 		restoreOrphan: (id: string) => getProjectStorage().restoreOrphan(id),
 	},
@@ -1592,6 +1598,12 @@ module.exports = {
 				ReturnType<typeof getSessionStorage>["readMessages"]
 			>[1],
 		) => getSessionStorage().readMessages(sessionId, range),
+		readMessagesPage: (
+			sessionId: string,
+			options?: Parameters<
+				ReturnType<typeof getSessionStorage>["readMessagesPage"]
+			>[1],
+		) => getSessionStorage().readMessagesPage(sessionId, options),
 		readContentRef: (
 			sessionId: string,
 			contentRef: string,
@@ -1602,8 +1614,12 @@ module.exports = {
 			toSessionContentRefReadResult(
 				getSessionStorage().readContentRef(sessionId, contentRef, options),
 			),
-		exportArchive: (sessionId: string) =>
-			getSessionStorage().exportSessionArchive(sessionId),
+		exportArchive: (
+			sessionId: string,
+			options?: Parameters<
+				ReturnType<typeof getSessionStorage>["exportSessionArchive"]
+			>[1],
+		) => getSessionStorage().exportSessionArchive(sessionId, options),
 		fork: (
 			sourceId: string,
 			opts: Parameters<ReturnType<typeof getSessionStorage>["fork"]>[1],

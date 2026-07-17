@@ -407,6 +407,38 @@ describe("appendEvent + readMessages", () => {
 		expect(tail2.map((m) => m.content)).toEqual(["msg 4", "msg 5"]);
 	});
 
+	it("readMessagesPage pages backward from newest messages", () => {
+		const s = sessions.create({ projectId: null });
+		for (let i = 1; i <= 5; i++) {
+			sessions.appendEvent(s.id, {
+				type: "user_message",
+				id: `u${i}`,
+				ts: i,
+				content: `msg ${i}`,
+			});
+		}
+
+		const newest = sessions.readMessagesPage(s.id, { offset: 0, limit: 2 });
+		expect(newest.messages.map((m) => m.content)).toEqual(["msg 4", "msg 5"]);
+		expect(newest).toMatchObject({
+			total: 5,
+			offset: 0,
+			limit: 2,
+			hasMore: true,
+			nextOffset: 2,
+		});
+
+		const older = sessions.readMessagesPage(s.id, { offset: 2, limit: 2 });
+		expect(older.messages.map((m) => m.content)).toEqual(["msg 2", "msg 3"]);
+		expect(older).toMatchObject({
+			total: 5,
+			offset: 2,
+			limit: 2,
+			hasMore: true,
+			nextOffset: 4,
+		});
+	});
+
 	it("readMessages on session without jsonl returns []", () => {
 		const s = sessions.create({ projectId: null });
 		expect(sessions.readMessages(s.id)).toEqual([]);
@@ -527,7 +559,7 @@ describe("appendEvent + readMessages", () => {
 });
 
 describe("exportSessionArchive", () => {
-	it("writes manifest, session meta, and JSONL into app-managed exports with redacted manifest paths", () => {
+	it("writes manifest, session meta, and JSONL when chat content is explicitly included", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "super-client-project-"));
 		writeFileSync(join(cwd, "secret.txt"), "do not copy", "utf-8");
 		const p = projects.add(cwd);
@@ -541,6 +573,7 @@ describe("exportSessionArchive", () => {
 
 		const result = sessions.exportSessionArchive(s.id, {
 			appVersion: "test-version",
+			includeChatContent: true,
 		});
 		const manifest = JSON.parse(
 			readFileSync(result.manifestPath, "utf-8"),
@@ -559,6 +592,7 @@ describe("exportSessionArchive", () => {
 			sessionId: s.id,
 			projectId: p.id,
 			redactionMode: "home-and-app-data",
+			includeChatContent: true,
 		});
 		expect(manifest.files.map((file) => file.path).sort()).toEqual([
 			"manifest.json",
@@ -574,6 +608,30 @@ describe("exportSessionArchive", () => {
 			`${s.id}.meta.json`,
 		]);
 		rmSync(cwd, { recursive: true, force: true });
+	});
+
+	it("omits chat content by default while keeping a replay-safe empty JSONL placeholder", () => {
+		const s = sessions.create({ projectId: null, name: "Private archive" });
+		sessions.appendEvent(s.id, {
+			type: "user_message",
+			id: "u-private",
+			ts: 1,
+			content: "do not export this chat body",
+			attachmentIds: ["att-private"],
+		});
+
+		const { exportDir, manifest } = sessions.exportSessionArchive(s.id);
+		const exportedJsonl = readFileSync(join(exportDir, `${s.id}.jsonl`), "utf-8");
+		const exportedMeta = JSON.parse(
+			readFileSync(join(exportDir, `${s.id}.meta.json`), "utf-8"),
+		) as { preview?: string };
+
+		expect(manifest.includeChatContent).toBe(false);
+		expect(exportedJsonl).toBe("");
+		expect(exportedMeta.preview).toBe("");
+		expect(JSON.stringify(manifest)).not.toContain("do not export this chat body");
+		expect(manifest.referencedPayloads.attachments).toEqual([]);
+		expect(manifest.referencedPayloads.contentRefs).toEqual([]);
 	});
 
 	it("lists attachments and contentRefs in manifest but does not copy payload directories", () => {
@@ -609,7 +667,9 @@ describe("exportSessionArchive", () => {
 			},
 		});
 
-		const { exportDir, manifest } = sessions.exportSessionArchive(s.id);
+		const { exportDir, manifest } = sessions.exportSessionArchive(s.id, {
+			includeChatContent: true,
+		});
 
 		expect(manifest.referencedPayloads.copied).toBe(false);
 		expect(manifest.referencedPayloads.attachments).toEqual(
@@ -644,7 +704,7 @@ describe("exportSessionArchive", () => {
 });
 
 describe("exportProjectArchive", () => {
-	it("exports app-managed project metadata and project sessions without copying cwd contents or casual sessions", () => {
+	it("exports app-managed project metadata and project sessions with chat content only when explicitly included", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "super-client-project-"));
 		const otherCwd = mkdtempSync(join(tmpdir(), "super-client-project-"));
 		writeFileSync(join(cwd, "secret.txt"), "do not copy", "utf-8");
@@ -715,6 +775,7 @@ describe("exportProjectArchive", () => {
 
 		const result = sessions.exportProjectArchive(p.id, {
 			appVersion: "test-version",
+			includeChatContent: true,
 		});
 		const manifest = JSON.parse(
 			readFileSync(result.manifestPath, "utf-8"),
@@ -727,6 +788,7 @@ describe("exportProjectArchive", () => {
 			appVersion: "test-version",
 			projectId: p.id,
 			redactionMode: "home-and-app-data",
+			includeChatContent: true,
 			sessionCount: 2,
 			referencedPayloads: { copied: false },
 		});
@@ -798,6 +860,47 @@ describe("exportProjectArchive", () => {
 
 		rmSync(cwd, { recursive: true, force: true });
 		rmSync(otherCwd, { recursive: true, force: true });
+	});
+
+	it("omits project session chat content by default", () => {
+		const cwd = mkdtempSync(join(tmpdir(), "super-client-project-"));
+		const p = projects.add(cwd, "Private Project Archive");
+		const first = sessions.create({ projectId: p.id, name: "First" });
+		sessions.appendEvent(first.id, {
+			type: "user_message",
+			id: "u1",
+			ts: 1,
+			content: "project archive should not include this body",
+			attachmentIds: ["att-1"],
+		});
+
+		const result = sessions.exportProjectArchive(p.id);
+		const jsonl = readFileSync(
+			join(result.exportDir, `sessions/${first.id}.jsonl`),
+			"utf-8",
+		);
+		const meta = JSON.parse(
+			readFileSync(
+				join(result.exportDir, `sessions/${first.id}.meta.json`),
+				"utf-8",
+			),
+		) as { preview?: string };
+
+		expect(result.manifest.includeChatContent).toBe(false);
+		expect(jsonl).toBe("");
+		expect(meta.preview).toBe("");
+		expect(JSON.stringify(result.manifest)).not.toContain(
+			"project archive should not include this body",
+		);
+		expect(result.manifest.referencedPayloads.sessions).toEqual([
+			{
+				sessionId: first.id,
+				attachments: [],
+				contentRefs: [],
+			},
+		]);
+
+		rmSync(cwd, { recursive: true, force: true });
 	});
 });
 

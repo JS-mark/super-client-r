@@ -79,6 +79,24 @@ export interface ReadMessagesRange {
 	tail?: number;
 }
 
+export interface ReadMessagesPageOptions {
+	/**
+	 * 从最新消息往前跳过多少条。`offset: 0` 读取最新一页；
+	 * `offset: 当前已加载数量` 读取再往前一页。
+	 */
+	offset?: number;
+	limit?: number;
+}
+
+export interface ReadMessagesPageResult {
+	messages: Message[];
+	total: number;
+	offset: number;
+	limit: number;
+	hasMore: boolean;
+	nextOffset?: number;
+}
+
 export interface ForkOptions {
 	/** 目标 projectId；null = casual。可与源不同（跨桶）。 */
 	targetProjectId: string | null;
@@ -122,6 +140,7 @@ export type SessionArchiveRedactionMode = "home-and-app-data";
 
 export interface ExportSessionArchiveOptions {
 	appVersion?: string;
+	includeChatContent?: boolean;
 }
 
 export interface SessionArchiveFileEntry {
@@ -162,6 +181,7 @@ export interface SessionArchiveManifest {
 	sessionId: string;
 	projectId: string | null;
 	redactionMode: SessionArchiveRedactionMode;
+	includeChatContent: boolean;
 	exportDir: string;
 	files: SessionArchiveFileEntry[];
 	referencedPayloads: {
@@ -199,6 +219,7 @@ export interface ProjectArchiveManifest {
 	appVersion?: string;
 	projectId: string;
 	redactionMode: SessionArchiveRedactionMode;
+	includeChatContent: boolean;
 	exportDir: string;
 	sessionCount: number;
 	files: SessionArchiveFileEntry[];
@@ -478,6 +499,37 @@ export class SessionStorageService {
 	 * jsonl 不存在时返回 []。
 	 */
 	readMessages(sessionId: string, range?: ReadMessagesRange): Message[] {
+		const msgs = this.reduceMessages(sessionId);
+		if (range?.tail !== undefined && range.tail >= 0) {
+			return msgs.slice(-range.tail);
+		}
+		return msgs;
+	}
+
+	readMessagesPage(
+		sessionId: string,
+		options: ReadMessagesPageOptions = {},
+	): ReadMessagesPageResult {
+		const msgs = this.reduceMessages(sessionId);
+		const total = msgs.length;
+		const offset = normalizeMessagePageOffset(options.offset);
+		const limit = normalizeMessagePageLimit(options.limit);
+		const end = Math.max(total - offset, 0);
+		const start = Math.max(end - limit, 0);
+		const messages = msgs.slice(start, end);
+		const nextOffset = offset + messages.length;
+		const hasMore = start > 0;
+		return {
+			messages,
+			total,
+			offset,
+			limit,
+			hasMore,
+			...(hasMore ? { nextOffset } : {}),
+		};
+	}
+
+	private reduceMessages(sessionId: string): Message[] {
 		const meta = this.getMeta(sessionId);
 		const jsonlPath = this.sessionFile(meta, ".jsonl");
 		if (!existsSync(jsonlPath)) return [];
@@ -487,11 +539,7 @@ export class SessionStorageService {
 			this.writeMeta({ ...meta, corrupted: true, updatedAt: Date.now() });
 		}
 		const events = report.events;
-		const msgs = eventsToMessages(events);
-		if (range?.tail !== undefined && range.tail >= 0) {
-			return msgs.slice(-range.tail);
-		}
-		return msgs;
+		return eventsToMessages(events);
 	}
 
 	/**
@@ -779,6 +827,7 @@ export class SessionStorageService {
 		options: ExportSessionArchiveOptions = {},
 	): SessionArchiveExportResult {
 		const meta = this.getMeta(sessionId);
+		const includeChatContent = options.includeChatContent === true;
 		const createdAt = new Date().toISOString();
 		const archiveDir = join(
 			this.userRoot,
@@ -797,8 +846,16 @@ export class SessionStorageService {
 		const sourceJsonlPath = this.sessionFile(meta, ".jsonl");
 		const redactionContext = this.privacyRedactionContext();
 
-		writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-		if (existsSync(sourceJsonlPath)) {
+		writeFileSync(
+			metaPath,
+			JSON.stringify(
+				includeChatContent ? meta : this.archiveMetaWithoutChatPreview(meta),
+				null,
+				2,
+			),
+			"utf-8",
+		);
+		if (includeChatContent && existsSync(sourceJsonlPath)) {
 			cpSync(sourceJsonlPath, jsonlPath);
 		} else {
 			writeFileSync(jsonlPath, "", "utf-8");
@@ -818,7 +875,9 @@ export class SessionStorageService {
 				jsonlPath,
 				jsonlFileName,
 				"session-jsonl",
-				existsSync(sourceJsonlPath) ? sourceJsonlPath : undefined,
+				includeChatContent && existsSync(sourceJsonlPath)
+					? sourceJsonlPath
+					: undefined,
 				redactionContext,
 			),
 		];
@@ -829,20 +888,25 @@ export class SessionStorageService {
 			sessionId: meta.id,
 			projectId: meta.projectId,
 			redactionMode: "home-and-app-data",
+			includeChatContent,
 			exportDir: redactPath(archiveDir, redactionContext),
 			files,
 			referencedPayloads: {
 				copied: false,
-				attachments: this.listArchiveAttachments(
-					sessionId,
-					jsonlContent,
-					redactionContext,
-				),
-				contentRefs: this.listArchiveContentRefs(
-					sessionId,
-					jsonlContent,
-					redactionContext,
-				),
+				attachments: includeChatContent
+					? this.listArchiveAttachments(
+							sessionId,
+							jsonlContent,
+							redactionContext,
+						)
+					: [],
+				contentRefs: includeChatContent
+					? this.listArchiveContentRefs(
+							sessionId,
+							jsonlContent,
+							redactionContext,
+						)
+					: [],
 			},
 		};
 		writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
@@ -854,6 +918,7 @@ export class SessionStorageService {
 		options: ExportSessionArchiveOptions = {},
 	): ProjectArchiveExportResult {
 		this.assertProjectExists(projectId);
+		const includeChatContent = options.includeChatContent === true;
 		const createdAt = new Date().toISOString();
 		const archiveDir = join(
 			this.userRoot,
@@ -932,8 +997,16 @@ export class SessionStorageService {
 			const sourceMetaPath = this.sessionFile(meta, ".meta.json");
 			const sourceJsonlPath = this.sessionFile(meta, ".jsonl");
 
-			writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf-8");
-			if (existsSync(sourceJsonlPath)) {
+			writeFileSync(
+				metaPath,
+				JSON.stringify(
+					includeChatContent ? meta : this.archiveMetaWithoutChatPreview(meta),
+					null,
+					2,
+				),
+				"utf-8",
+			);
+			if (includeChatContent && existsSync(sourceJsonlPath)) {
 				cpSync(sourceJsonlPath, jsonlPath);
 			} else {
 				writeFileSync(jsonlPath, "", "utf-8");
@@ -951,7 +1024,9 @@ export class SessionStorageService {
 					jsonlPath,
 					jsonlArchivePath,
 					"session-jsonl",
-					existsSync(sourceJsonlPath) ? sourceJsonlPath : undefined,
+					includeChatContent && existsSync(sourceJsonlPath)
+						? sourceJsonlPath
+						: undefined,
 					redactionContext,
 				),
 			);
@@ -964,16 +1039,12 @@ export class SessionStorageService {
 			const jsonlContent = readFileSync(jsonlPath, "utf-8");
 			referencedPayloadSessions.push({
 				sessionId: meta.id,
-				attachments: this.listArchiveAttachments(
-					meta.id,
-					jsonlContent,
-					redactionContext,
-				),
-				contentRefs: this.listArchiveContentRefs(
-					meta.id,
-					jsonlContent,
-					redactionContext,
-				),
+				attachments: includeChatContent
+					? this.listArchiveAttachments(meta.id, jsonlContent, redactionContext)
+					: [],
+				contentRefs: includeChatContent
+					? this.listArchiveContentRefs(meta.id, jsonlContent, redactionContext)
+					: [],
 			});
 		}
 
@@ -983,6 +1054,7 @@ export class SessionStorageService {
 			...(options.appVersion ? { appVersion: options.appVersion } : {}),
 			projectId,
 			redactionMode: "home-and-app-data",
+			includeChatContent,
 			exportDir: redactPath(archiveDir, redactionContext),
 			sessionCount: sessionEntries.length,
 			files,
@@ -1092,6 +1164,13 @@ export class SessionStorageService {
 		return {
 			...project,
 			cwd: redactArchivePath(project.cwd, redactionContext),
+		};
+	}
+
+	private archiveMetaWithoutChatPreview(meta: SessionMeta): SessionMeta {
+		return {
+			...meta,
+			preview: "",
 		};
 	}
 
@@ -1756,6 +1835,22 @@ function normalizeContentRefOffset(
 		throw new Error(`contentRef offset outside payload: ${offset}`);
 	}
 	return offset;
+}
+
+function normalizeMessagePageOffset(offset: number | undefined): number {
+	if (offset === undefined) return 0;
+	if (!Number.isSafeInteger(offset) || offset < 0) {
+		throw new Error(`invalid message page offset: ${offset}`);
+	}
+	return offset;
+}
+
+function normalizeMessagePageLimit(limit: number | undefined): number {
+	if (limit === undefined) return 100;
+	if (!Number.isSafeInteger(limit) || limit < 1) {
+		throw new Error(`invalid message page limit: ${limit}`);
+	}
+	return Math.min(limit, 500);
 }
 
 function normalizeContentRefMaxBytes(
