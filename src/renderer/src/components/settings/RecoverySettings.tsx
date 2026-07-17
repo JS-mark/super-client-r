@@ -1,4 +1,5 @@
 import {
+	CopyOutlined,
 	DownloadOutlined,
 	ImportOutlined,
 	LinkOutlined,
@@ -10,11 +11,16 @@ import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SessionMeta } from "@super-client/shared-types/project";
+import { toRedactedPathLabel } from "@/lib/privacyDisplay";
+import { buildRecoveryWizardModel } from "@/lib/recoveryWizard";
+import { diagnosticExportService } from "../../services/diagnosticExportService";
+import { fileActionService } from "../../services/fileActionService";
 import { sessionArchiveService } from "../../services/sessionArchiveService";
 import { useChatStore } from "../../stores/chatStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionListStore } from "../../stores/sessionListStore";
-import { ProjectArchiveManager } from "./ProjectArchiveManager";
+import { ArchivedProjectsPanel } from "./ArchivedProjectsPanel";
+import { RecoveryWizardPanel } from "./RecoveryWizardPanel";
 import { SettingSection } from "./SettingSection";
 
 const { Text } = Typography;
@@ -45,8 +51,16 @@ interface SessionExportRow {
 
 interface SessionExportFeedback {
 	type: "success" | "error";
-	sessionId: string;
+	kind: "session" | "project" | "diagnostic";
+	targetId: string;
 	exportDir?: string;
+}
+
+function isFeedbackFor(
+	feedback: SessionExportFeedback | null,
+	kind: SessionExportFeedback["kind"],
+): feedback is SessionExportFeedback {
+	return feedback?.kind === kind;
 }
 
 function sessionRowFromMeta(meta: SessionMeta): SessionExportRow {
@@ -130,8 +144,31 @@ export function RecoverySettings() {
 	const [exportingSessionId, setExportingSessionId] = useState<string | null>(
 		null,
 	);
+	const [exportingProjectId, setExportingProjectId] = useState<string | null>(
+		null,
+	);
+	const [exportingDiagnostic, setExportingDiagnostic] = useState(false);
 	const [exportFeedback, setExportFeedback] =
 		useState<SessionExportFeedback | null>(null);
+	const recoveryWizardModel = useMemo(
+		() =>
+			buildRecoveryWizardModel({
+				archivedCount,
+				orphanCount: orphans.length,
+				legacyCount: legacyInfo?.count ?? 0,
+				legacyAlreadyImported: legacyInfo?.alreadyImported ?? false,
+				exportableProjectCount: projects.length,
+				exportableSessionCount: sessionExportRows.length,
+			}),
+		[
+			archivedCount,
+			legacyInfo?.alreadyImported,
+			legacyInfo?.count,
+			orphans.length,
+			projects.length,
+			sessionExportRows.length,
+		],
+	);
 
 	const refreshRecoveryStatus = useCallback(async () => {
 		setLoading(true);
@@ -182,12 +219,11 @@ export function RecoverySettings() {
 					}),
 				);
 			} catch (error) {
+				console.warn("[RecoverySettings] orphan restore failed:", error);
 				message.error(
-					error instanceof Error
-						? error.message
-						: t("settingsNav.recovery.orphanRestoreError", "Restore failed", {
-								ns: "settings",
-							}),
+					t("settingsNav.recovery.orphanRestoreError", "Restore failed", {
+						ns: "settings",
+					}),
 				);
 			} finally {
 				setRestoringId(null);
@@ -247,6 +283,107 @@ export function RecoverySettings() {
 	const legacyImportDisabled =
 		!legacyInfo || legacyInfo.alreadyImported || legacyInfo.count === 0;
 
+	const handleCopyPath = useCallback(
+		async (path: string) => {
+			const result = await fileActionService.copyPath(path);
+			if (result.success) {
+				message.success(
+					t("settingsNav.recovery.pathCopied", "Full path copied", {
+						ns: "settings",
+					}),
+				);
+				return;
+			}
+			message.error(
+				result.error ??
+					t("settingsNav.recovery.copyPathError", "Failed to copy path", {
+						ns: "settings",
+					}),
+			);
+		},
+		[t],
+	);
+
+	const renderExportFeedback = useCallback(
+		(feedback: SessionExportFeedback) => (
+			<Alert
+				type={feedback.type === "success" ? "success" : "error"}
+				showIcon
+				message={
+					feedback.type === "success"
+						? feedback.kind === "project"
+							? t(
+									"settingsNav.recovery.projectExportSuccessTitle",
+									"Project archive ready",
+									{ ns: "settings" },
+								)
+							: feedback.kind === "diagnostic"
+								? t(
+										"settingsNav.recovery.diagnosticExportSuccessTitle",
+										"Diagnostic export ready",
+										{ ns: "settings" },
+									)
+								: t(
+										"settingsNav.recovery.sessionExportSuccessTitle",
+										"Session archive ready",
+										{ ns: "settings" },
+									)
+						: feedback.kind === "project"
+							? t(
+									"settingsNav.recovery.projectExportErrorTitle",
+									"Project export failed",
+									{ ns: "settings" },
+								)
+							: feedback.kind === "diagnostic"
+								? t(
+										"settingsNav.recovery.diagnosticExportErrorTitle",
+										"Diagnostic export failed",
+										{ ns: "settings" },
+									)
+								: t(
+										"settingsNav.recovery.sessionExportErrorTitle",
+										"Session export failed",
+										{ ns: "settings" },
+									)
+				}
+				description={
+					feedback.type === "success" && feedback.exportDir ? (
+						<div className="flex flex-col gap-1">
+							<div className="flex flex-wrap items-center gap-2">
+								<code>{toRedactedPathLabel(feedback.exportDir)}</code>
+								<Button
+									type="link"
+									icon={<CopyOutlined />}
+									onClick={() => handleCopyPath(feedback.exportDir ?? "")}
+								>
+									{t("settingsNav.recovery.copyFullPath", "Copy full path", {
+										ns: "settings",
+									})}
+								</Button>
+							</div>
+							{feedback.kind === "session" || feedback.kind === "project" ? (
+								<Text type="secondary" className="text-xs">
+									{t(
+										"settingsNav.recovery.archiveContentNotice",
+										"This archive includes app-managed session metadata only by default. JSONL chat transcripts, attachments, tool payloads and the real project directory are excluded unless chat content is explicitly requested.",
+										{ ns: "settings" },
+									)}
+								</Text>
+							) : null}
+						</div>
+					) : (
+						t(
+							"settingsNav.recovery.sessionExportErrorDesc",
+							"The archive service did not return a usable export directory. Try again after refreshing recovery status.",
+							{ ns: "settings" },
+						)
+					)
+				}
+			/>
+		),
+		[handleCopyPath, t],
+	);
+
 	const handleExportSession = useCallback(
 		async (sessionId: string) => {
 			setExportingSessionId(sessionId);
@@ -254,7 +391,7 @@ export function RecoverySettings() {
 			try {
 				const result = await sessionArchiveService.exportArchive(sessionId);
 				if (!result.success || !result.data?.exportDir) {
-					setExportFeedback({ type: "error", sessionId });
+					setExportFeedback({ type: "error", kind: "session", targetId: sessionId });
 					message.error(
 						t(
 							"settingsNav.recovery.sessionExportError",
@@ -266,22 +403,23 @@ export function RecoverySettings() {
 				}
 				setExportFeedback({
 					type: "success",
-					sessionId,
+					kind: "session",
+					targetId: sessionId,
 					exportDir: result.data.exportDir,
 				});
 				message.success(
 					t(
 						"settingsNav.recovery.sessionExportSuccess",
-						"Session archive exported to {{exportDir}}",
+						"Session archive ready at {{exportDir}}",
 						{
 							ns: "settings",
-							exportDir: result.data.exportDir,
+							exportDir: toRedactedPathLabel(result.data.exportDir),
 						},
 					),
 				);
 			} catch (error) {
 				console.warn("[RecoverySettings] session export failed:", error);
-				setExportFeedback({ type: "error", sessionId });
+				setExportFeedback({ type: "error", kind: "session", targetId: sessionId });
 				message.error(
 					t(
 						"settingsNav.recovery.sessionExportError",
@@ -295,6 +433,112 @@ export function RecoverySettings() {
 		},
 		[t],
 	);
+
+	const handleExportProject = useCallback(
+		async (projectId: string) => {
+			setExportingProjectId(projectId);
+			setExportFeedback(null);
+			try {
+				const result =
+					await sessionArchiveService.exportProjectArchive(projectId);
+				if (!result.success || !result.data?.exportDir) {
+					setExportFeedback({ type: "error", kind: "project", targetId: projectId });
+					message.error(
+						t(
+							"settingsNav.recovery.projectExportError",
+							"Project export failed. No archive was created.",
+							{ ns: "settings" },
+						),
+					);
+					return;
+				}
+				setExportFeedback({
+					type: "success",
+					kind: "project",
+					targetId: projectId,
+					exportDir: result.data.exportDir,
+				});
+				message.success(
+					t(
+						"settingsNav.recovery.projectExportSuccess",
+						"Project archive ready at {{exportDir}}",
+						{
+							ns: "settings",
+							exportDir: toRedactedPathLabel(result.data.exportDir),
+						},
+					),
+				);
+			} catch (error) {
+				console.warn("[RecoverySettings] project export failed:", error);
+				setExportFeedback({ type: "error", kind: "project", targetId: projectId });
+				message.error(
+					t(
+						"settingsNav.recovery.projectExportError",
+						"Project export failed. No archive was created.",
+						{ ns: "settings" },
+					),
+				);
+			} finally {
+				setExportingProjectId(null);
+			}
+		},
+		[t],
+	);
+
+	const handleExportDiagnostic = useCallback(async () => {
+		setExportingDiagnostic(true);
+		setExportFeedback(null);
+		try {
+			const result = await diagnosticExportService.export();
+			if (!result.success || !result.data?.exportDir) {
+				setExportFeedback({
+					type: "error",
+					kind: "diagnostic",
+					targetId: "diagnostic",
+				});
+				message.error(
+					t(
+						"settingsNav.recovery.diagnosticExportError",
+						"Diagnostic export failed. No archive was created.",
+						{ ns: "settings" },
+					),
+				);
+				return;
+			}
+			setExportFeedback({
+				type: "success",
+				kind: "diagnostic",
+				targetId: "diagnostic",
+				exportDir: result.data.exportDir,
+			});
+			message.success(
+				t(
+					"settingsNav.recovery.diagnosticExportSuccess",
+					"Diagnostic export ready at {{exportDir}}",
+					{
+						ns: "settings",
+						exportDir: toRedactedPathLabel(result.data.exportDir),
+					},
+				),
+			);
+		} catch (error) {
+			console.warn("[RecoverySettings] diagnostic export failed:", error);
+			setExportFeedback({
+				type: "error",
+				kind: "diagnostic",
+				targetId: "diagnostic",
+			});
+			message.error(
+				t(
+					"settingsNav.recovery.diagnosticExportError",
+					"Diagnostic export failed. No archive was created.",
+					{ ns: "settings" },
+				),
+			);
+		} finally {
+			setExportingDiagnostic(false);
+		}
+	}, [t]);
 
 	return (
 		<div className="space-y-5">
@@ -372,6 +616,16 @@ export function RecoverySettings() {
 							{ ns: "settings" },
 						)}
 					/>
+
+					<RecoveryWizardPanel
+						model={recoveryWizardModel}
+						loading={loading}
+						importing={importing}
+						legacyImportDisabled={legacyImportDisabled}
+						onRefresh={refreshRecoveryStatus}
+						onImportLegacy={handleImportLegacy}
+						onExportDiagnostics={handleExportDiagnostic}
+					/>
 				</div>
 			</SettingSection>
 
@@ -388,7 +642,7 @@ export function RecoverySettings() {
 							{ ns: "settings" },
 						)}
 					</Text>
-					<ProjectArchiveManager />
+					<ArchivedProjectsPanel />
 				</div>
 			</SettingSection>
 
@@ -427,6 +681,16 @@ export function RecoverySettings() {
 								<List.Item
 									actions={[
 										<Button
+											key="copy"
+											type="link"
+											icon={<CopyOutlined />}
+											onClick={() => handleCopyPath(orphan.cwd)}
+										>
+											{t("settingsNav.recovery.copyFullPath", "Copy full path", {
+												ns: "settings",
+											})}
+										</Button>,
+										<Button
 											key="restore"
 											type="link"
 											icon={<UndoOutlined />}
@@ -444,7 +708,7 @@ export function RecoverySettings() {
 										description={
 											<div className="flex flex-col gap-0.5 text-xs">
 												<code style={{ color: token.colorTextSecondary }}>
-													{orphan.cwd}
+													{toRedactedPathLabel(orphan.cwd)}
 												</code>
 												<span style={{ color: token.colorTextTertiary }}>
 													{t(
@@ -453,6 +717,108 @@ export function RecoverySettings() {
 														{
 															ns: "settings",
 															count: orphan.sessionCount,
+														},
+													)}
+												</span>
+											</div>
+										}
+									/>
+								</List.Item>
+							)}
+						/>
+					)}
+				</div>
+			</SettingSection>
+
+			<SettingSection
+				title={t("settingsNav.recovery.projectExportTitle", "Project Export", {
+					ns: "settings",
+				})}
+			>
+				<div className="space-y-3">
+					<Text type="secondary" className="block text-sm">
+						{t(
+							"settingsNav.recovery.projectExportDesc",
+							"Export project metadata, settings and app-managed project sessions. The archive is created under app user data and does not copy the project directory.",
+							{ ns: "settings" },
+						)}
+					</Text>
+					{isFeedbackFor(exportFeedback, "project")
+						? renderExportFeedback(exportFeedback)
+						: null}
+					{projects.length === 0 ? (
+						<Empty
+							image={Empty.PRESENTED_IMAGE_SIMPLE}
+							description={t(
+								"settingsNav.recovery.noExportableProjects",
+								"No projects are currently available to export",
+								{ ns: "settings" },
+							)}
+							className="py-4"
+						/>
+					) : (
+						<List
+							bordered
+							dataSource={projects}
+							rowKey="id"
+							renderItem={(project) => (
+								<List.Item
+									actions={[
+										<Button
+											key="copy"
+											type="link"
+											icon={<CopyOutlined />}
+											onClick={() => handleCopyPath(project.cwd)}
+										>
+											{t(
+												"settingsNav.recovery.copyFullPath",
+												"Copy full path",
+												{ ns: "settings" },
+											)}
+										</Button>,
+										<Button
+											key="export"
+											type="link"
+											icon={<DownloadOutlined />}
+											loading={exportingProjectId === project.id}
+											onClick={() => handleExportProject(project.id)}
+										>
+											{t(
+												"settingsNav.recovery.exportProject",
+												"Export project",
+												{ ns: "settings" },
+											)}
+										</Button>,
+									]}
+								>
+									<List.Item.Meta
+										title={
+											<span className="flex items-center gap-2 min-w-0">
+												<span className="truncate">{project.name}</span>
+												{project.archived ? (
+													<Tag>
+														{t(
+															"settingsNav.recovery.projectStatus.archived",
+															"Archived",
+															{ ns: "settings" },
+														)}
+													</Tag>
+												) : null}
+											</span>
+										}
+										description={
+											<div className="flex flex-col gap-0.5 text-xs">
+												<code style={{ color: token.colorTextSecondary }}>
+													{toRedactedPathLabel(project.cwd)}
+												</code>
+												<span style={{ color: token.colorTextTertiary }}>
+													{t(
+														"settingsNav.recovery.projectExportMeta",
+														"{{count}} app-managed sessions",
+														{
+															ns: "settings",
+															count:
+																sessionsByProject[project.id]?.length ?? 0,
 														},
 													)}
 												</span>
@@ -479,36 +845,9 @@ export function RecoverySettings() {
 							{ ns: "settings" },
 						)}
 					</Text>
-					{exportFeedback ? (
-						<Alert
-							type={exportFeedback.type === "success" ? "success" : "error"}
-							showIcon
-							message={
-								exportFeedback.type === "success"
-									? t(
-											"settingsNav.recovery.sessionExportSuccessTitle",
-											"Session archive ready",
-											{ ns: "settings" },
-										)
-									: t(
-											"settingsNav.recovery.sessionExportErrorTitle",
-											"Session export failed",
-											{ ns: "settings" },
-										)
-							}
-							description={
-								exportFeedback.type === "success" && exportFeedback.exportDir ? (
-									<code>{exportFeedback.exportDir}</code>
-								) : (
-									t(
-										"settingsNav.recovery.sessionExportErrorDesc",
-										"The archive service did not return a usable export directory. Try again after refreshing recovery status.",
-										{ ns: "settings" },
-									)
-								)
-							}
-						/>
-					) : null}
+					{isFeedbackFor(exportFeedback, "session")
+						? renderExportFeedback(exportFeedback)
+						: null}
 					{sessionExportRows.length === 0 ? (
 						<Empty
 							image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -600,12 +939,23 @@ export function RecoverySettings() {
 							)}
 						</Text>
 						{legacyInfo?.legacyDir && (
-							<code
-								className="block text-xs mt-1 truncate"
-								style={{ color: token.colorTextTertiary }}
-							>
-								{legacyInfo.legacyDir}
-							</code>
+							<div className="flex flex-wrap items-center gap-2 mt-1">
+								<code
+									className="block text-xs truncate"
+									style={{ color: token.colorTextTertiary }}
+								>
+									{toRedactedPathLabel(legacyInfo.legacyDir)}
+								</code>
+								<Button
+									type="link"
+									icon={<CopyOutlined />}
+									onClick={() => handleCopyPath(legacyInfo.legacyDir)}
+								>
+									{t("settingsNav.recovery.copyFullPath", "Copy full path", {
+										ns: "settings",
+									})}
+								</Button>
+							</div>
 						)}
 					</div>
 					<Button
@@ -664,15 +1014,15 @@ export function RecoverySettings() {
 								ns: "settings",
 							}),
 							status: t(
-								"settingsNav.recovery.statusPlaceholder",
-								"Placeholder",
+								"settingsNav.recovery.statusAvailable",
+								"Available",
 								{
 									ns: "settings",
 								},
 							),
 							description: t(
 								"settingsNav.recovery.backupDesc",
-								"Full backup export and migration bundles are not implemented in this Settings entry yet.",
+								"Session, project and diagnostic exports are available here. Full migration bundles remain a follow-up.",
 								{ ns: "settings" },
 							),
 						},
@@ -692,6 +1042,22 @@ export function RecoverySettings() {
 						</List.Item>
 					)}
 				/>
+				<div className="mt-3">
+					{isFeedbackFor(exportFeedback, "diagnostic") ? (
+						<div className="mb-3">{renderExportFeedback(exportFeedback)}</div>
+					) : null}
+					<Button
+						icon={<DownloadOutlined />}
+						loading={exportingDiagnostic}
+						onClick={handleExportDiagnostic}
+					>
+						{t(
+							"settingsNav.recovery.exportDiagnostics",
+							"Export diagnostics",
+							{ ns: "settings" },
+						)}
+					</Button>
+				</div>
 			</SettingSection>
 		</div>
 	);

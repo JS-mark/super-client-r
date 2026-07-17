@@ -112,8 +112,14 @@ export type {
 
 export type {
   SessionArchiveExportResult,
+  SessionArchiveExportOptions,
+  DiagnosticExportResult,
   SessionArchiveFileEntry,
   SessionArchiveManifest,
+  ProjectArchiveExportResult,
+  ProjectArchiveManifest,
+  ProjectArchiveReferencedPayloadSession,
+  ProjectArchiveSessionEntry,
   SessionArchiveReferencedAttachment,
   SessionArchiveReferencedContentRef,
   SessionArchiveRedactionMode,

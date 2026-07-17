@@ -94,6 +94,19 @@ import { SettingsRail } from "../SettingsRail";
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
+(
+	globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
+
+function installWindowEventTargetShim(): void {
+	const target = new EventTarget();
+	Object.assign(window, {
+		addEventListener: target.addEventListener.bind(target),
+		removeEventListener: target.removeEventListener.bind(target),
+		dispatchEvent: target.dispatchEvent.bind(target),
+	});
+}
+
 function renderAt(initialPath: string) {
 	container = document.createElement("div");
 	document.body.appendChild(container);
@@ -111,6 +124,7 @@ function renderAt(initialPath: string) {
 
 beforeEach(() => {
 	navigateMock.mockReset();
+	installWindowEventTargetShim();
 });
 
 afterEach(() => {

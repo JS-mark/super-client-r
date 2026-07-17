@@ -10,6 +10,15 @@ import { RecoverySettings } from "../RecoverySettings";
 
 const sessionArchiveMocks = vi.hoisted(() => ({
 	exportArchive: vi.fn(),
+	exportProjectArchive: vi.fn(),
+}));
+
+const diagnosticExportMocks = vi.hoisted(() => ({
+	export: vi.fn(),
+}));
+
+const fileActionMocks = vi.hoisted(() => ({
+	copyPath: vi.fn(),
 }));
 
 const messageMocks = vi.hoisted(() => ({
@@ -37,6 +46,7 @@ const translateMock = vi.hoisted(() =>
 );
 
 vi.mock("@ant-design/icons", () => ({
+	CopyOutlined: () => <span aria-hidden="true" />,
 	DownloadOutlined: () => <span aria-hidden="true" />,
 	ImportOutlined: () => <span aria-hidden="true" />,
 	LinkOutlined: () => <span aria-hidden="true" />,
@@ -154,11 +164,24 @@ vi.mock("antd", () => {
 vi.mock("../../../services/sessionArchiveService", () => ({
 	sessionArchiveService: {
 		exportArchive: sessionArchiveMocks.exportArchive,
+		exportProjectArchive: sessionArchiveMocks.exportProjectArchive,
 	},
 }));
 
-vi.mock("../ProjectArchiveManager", () => ({
-	ProjectArchiveManager: () => <div>Archived projects test double</div>,
+vi.mock("../../../services/diagnosticExportService", () => ({
+	diagnosticExportService: {
+		export: diagnosticExportMocks.export,
+	},
+}));
+
+vi.mock("../../../services/fileActionService", () => ({
+	fileActionService: {
+		copyPath: fileActionMocks.copyPath,
+	},
+}));
+
+vi.mock("../ArchivedProjectsPanel", () => ({
+	ArchivedProjectsPanel: () => <div>Archived projects test double</div>,
 }));
 
 let root: Root | undefined;
@@ -195,8 +218,17 @@ function getButtonsByText(text: string): HTMLButtonElement[] {
 	);
 }
 
+function getButtonsByExactText(text: string): HTMLButtonElement[] {
+	return Array.from(container?.querySelectorAll("button") ?? []).filter(
+		(button) => button.textContent?.trim() === text,
+	);
+}
+
 beforeEach(() => {
 	sessionArchiveMocks.exportArchive.mockReset();
+	sessionArchiveMocks.exportProjectArchive.mockReset();
+	diagnosticExportMocks.export.mockReset();
+	fileActionMocks.copyPath.mockReset();
 	messageMocks.error.mockReset();
 	messageMocks.success.mockReset();
 	messageMocks.warning.mockReset();
@@ -209,6 +241,28 @@ beforeEach(() => {
 			manifest: {},
 		},
 	});
+	sessionArchiveMocks.exportProjectArchive.mockResolvedValue({
+		success: true,
+		data: {
+			exportDir:
+				"/Users/mark/Library/Application Support/Super Client/exports/project-1",
+			manifestPath:
+				"/Users/mark/Library/Application Support/Super Client/exports/project-1/manifest.json",
+			manifest: {},
+		},
+	});
+	diagnosticExportMocks.export.mockResolvedValue({
+		success: true,
+		data: {
+			exportDir:
+				"/Users/mark/Library/Application Support/Super Client/exports/diagnostics/diag-1",
+			manifestPath:
+				"/Users/mark/Library/Application Support/Super Client/exports/diagnostics/diag-1/manifest.json",
+			diagnosticPath:
+				"/Users/mark/Library/Application Support/Super Client/exports/diagnostics/diag-1/diagnostic.json",
+		},
+	});
+	fileActionMocks.copyPath.mockResolvedValue({ success: true, data: { ok: true } });
 	Object.defineProperty(window, "electron", {
 		value: {
 			projects: {
@@ -256,6 +310,72 @@ afterEach(() => {
 });
 
 describe("RecoverySettings session export", () => {
+	it("renders a recovery wizard with counts and a recommended action", async () => {
+		(
+			window.electron.projects.listOrphans as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: [
+				{
+					projectId: "orphan-1",
+					cwd: "/Users/mark/private/orphan-project",
+					sessionCount: 3,
+				},
+			],
+		});
+		(
+			window.electron.legacyData.detect as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: {
+				count: 2,
+				alreadyImported: false,
+				legacyDir: "/Users/mark/private/legacy",
+			},
+		});
+		await renderRecoverySettings();
+
+		const wizard = container?.querySelector(
+			"[data-testid='recovery-wizard-panel']",
+		);
+		expect(wizard).toBeTruthy();
+		expect(container?.textContent).toContain("Recovery checklist");
+		expect(container?.textContent).toContain("Restore orphan projects (1)");
+		expect(container?.textContent).toContain("Import legacy chats (2)");
+		expect(container?.textContent).toContain("Recommended");
+		expect(container?.textContent).not.toContain("/Users/mark/private");
+	});
+
+	it("wizard legacy action calls the existing legacy import flow", async () => {
+		(
+			window.electron.legacyData.detect as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: {
+				count: 2,
+				alreadyImported: false,
+				legacyDir: "/Users/mark/private/legacy",
+			},
+		});
+		(
+			window.electron.legacyData.importAll as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: { imported: 2, skipped: 0, failures: [] },
+		});
+		await renderRecoverySettings();
+
+		await act(async () => {
+			getButtonsByText("Import legacy chats")[0]?.click();
+			await Promise.resolve();
+		});
+
+		expect(window.electron.legacyData.importAll).toHaveBeenCalledTimes(1);
+		expect(messageMocks.success).toHaveBeenCalledWith(
+			"Imported 2 legacy chats",
+		);
+	});
+
 	it("exports the current visible session through sessionArchiveService", async () => {
 		useChatStore.setState({
 			conversations: [
@@ -275,7 +395,7 @@ describe("RecoverySettings session export", () => {
 		await renderRecoverySettings();
 
 		await act(async () => {
-			getButtonsByText("Export")[0]?.click();
+			getButtonsByExactText("Export")[0]?.click();
 			await Promise.resolve();
 		});
 
@@ -285,8 +405,133 @@ describe("RecoverySettings session export", () => {
 		);
 		expect(container?.textContent).toContain("Session archive ready");
 		expect(container?.textContent).toContain(
+			"<app-data>/exports/session-1",
+		);
+		expect(container?.textContent).not.toContain(
 			"/Users/mark/Library/Application Support/Super Client/exports/session-1",
 		);
+	});
+
+	it("exports a project archive through sessionArchiveService", async () => {
+		useProjectStore.setState({
+			projects: [
+				{
+					id: "project-1",
+					name: "Project One",
+					cwd: "/Users/mark/private/project-one",
+					pinned: false,
+					archived: false,
+					createdAt: 1,
+					updatedAt: 2,
+					lastSeenAt: 2,
+				},
+			],
+			currentProjectId: "project-1",
+			loaded: true,
+			settingsByProject: {},
+		});
+		await renderRecoverySettings();
+
+		await act(async () => {
+			getButtonsByText("Export project")[0]?.click();
+			await Promise.resolve();
+		});
+
+		expect(sessionArchiveMocks.exportProjectArchive).toHaveBeenCalledWith(
+			"project-1",
+		);
+		expect(container?.textContent).toContain("Project archive ready");
+		expect(container?.textContent).toContain("<app-data>/exports/project-1");
+		expect(container?.textContent).not.toContain(
+			"/Users/mark/Library/Application Support/Super Client/exports/project-1",
+		);
+		expect(container?.textContent).toContain("~/.../private/project-one");
+		expect(container?.textContent).not.toContain("/Users/mark/private/project-one");
+	});
+
+	it("exports diagnostics through diagnosticExportService", async () => {
+		await renderRecoverySettings();
+
+		await act(async () => {
+			getButtonsByText("Export diagnostics")[0]?.click();
+			await Promise.resolve();
+		});
+
+		expect(diagnosticExportMocks.export).toHaveBeenCalledTimes(1);
+		expect(container?.textContent).toContain("Diagnostic export ready");
+		expect(container?.textContent).toContain(
+			"<app-data>/exports/diagnostics/diag-1",
+		);
+		expect(container?.textContent).not.toContain(
+			"/Users/mark/Library/Application Support/Super Client/exports/diagnostics/diag-1",
+		);
+	});
+
+	it("redacts orphan and legacy paths while copy actions use raw paths", async () => {
+		const orphanCwd = "/Users/mark/private/orphan-project";
+		const legacyDir = "/Users/mark/Library/Application Support/Super Client/old";
+		(
+			window.electron.projects.listOrphans as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: [{ projectId: "orphan-1", cwd: orphanCwd, sessionCount: 3 }],
+		});
+		(
+			window.electron.legacyData.detect as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: { count: 2, alreadyImported: false, legacyDir },
+		});
+
+		await renderRecoverySettings();
+
+		expect(container?.textContent).toContain("~/.../private/orphan-project");
+		expect(container?.textContent).toContain("<app-data>/.../old");
+		expect(container?.textContent).not.toContain(orphanCwd);
+		expect(container?.textContent).not.toContain(legacyDir);
+
+		await act(async () => {
+			getButtonsByText("Copy full path")[0]?.click();
+			await Promise.resolve();
+		});
+
+		expect(fileActionMocks.copyPath).toHaveBeenCalledWith(orphanCwd);
+
+		await act(async () => {
+			getButtonsByText("Copy full path")[1]?.click();
+			await Promise.resolve();
+		});
+
+		expect(fileActionMocks.copyPath).toHaveBeenCalledWith(legacyDir);
+	});
+
+	it("does not surface raw orphan restore errors", async () => {
+		const orphanCwd = "/Users/mark/private/orphan-project";
+		(
+			window.electron.projects.listOrphans as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: true,
+			data: [{ projectId: "orphan-1", cwd: orphanCwd, sessionCount: 3 }],
+		});
+		(
+			window.electron.projects.restoreOrphan as unknown as ReturnType<typeof vi.fn>
+		).mockResolvedValueOnce({
+			success: false,
+			error: "hash mismatch for /Users/mark/private/orphan-project",
+		});
+
+		await renderRecoverySettings();
+
+		await act(async () => {
+			getButtonsByText("Restore")[0]?.click();
+			await Promise.resolve();
+		});
+
+		expect(messageMocks.error).toHaveBeenCalledWith("Restore failed");
+		expect(messageMocks.error).not.toHaveBeenCalledWith(
+			expect.stringContaining("/Users/mark/private/orphan-project"),
+		);
+		expect(container?.textContent).not.toContain("hash mismatch");
 	});
 
 	it("renders deleted session rows and reports structured export failure", async () => {
@@ -306,7 +551,7 @@ describe("RecoverySettings session export", () => {
 		await renderRecoverySettings();
 
 		await act(async () => {
-			getButtonsByText("Export")[0]?.click();
+			getButtonsByExactText("Export")[0]?.click();
 			await Promise.resolve();
 		});
 
@@ -329,6 +574,6 @@ describe("RecoverySettings session export", () => {
 		expect(container?.textContent).toContain(
 			"No sessions are currently available to export",
 		);
-		expect(getButtonsByText("Export")).toHaveLength(0);
+		expect(sessionArchiveMocks.exportArchive).not.toHaveBeenCalled();
 	});
 });
