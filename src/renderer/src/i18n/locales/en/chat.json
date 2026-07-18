@@ -189,6 +189,9 @@
 			"code": "Error code"
 		}
 	},
+	"compactedSummaryCard": {
+		"label": "{{count}} messages compacted"
+	},
 	"inspector": {
 		"toggle": "Environment Inspector"
 	},

@@ -189,6 +189,9 @@
 			"code": "错误代码"
 		}
 	},
+	"compactedSummaryCard": {
+		"label": "已压缩 {{count}} 条消息"
+	},
 	"inspector": {
 		"toggle": "环境检视"
 	},
