@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArtifactDiffPreview } from "../ArtifactDiffPreview";
 
 // ---------- react-i18next mock ----------
-// Mirrors CompactedSummaryCard.test.ts: returns the fallback string so we can
-// assert the en labels ("Expand"/"Collapse"/"No diff content") directly.
+// Mirrors CompactedSummaryCard.test.tsx: returns the fallback string (whatever
+// the component passes) so we can assert the zh fallback labels
+// ("展开"/"折叠"/"无差异内容") directly.
 vi.mock("react-i18next", () => ({
 	useTranslation: () => ({
 		t: (_key: string, fallback?: string) => fallback ?? "",
