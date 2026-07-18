@@ -1,12 +1,15 @@
-# 迭代 Kickoff 提示词：Context Management v1 深化
+<!--
+说明（不要粘贴这部分）：
+本文件分两段。下方 CUT 标记以上的内容是给人看的元信息，
+标记以下全部是要粘贴给新会话 agent 的 prompt。
+用法：复制 === 8< === CUT HERE === 8< === 这行之后的所有内容。
+配套 plan：docs/context-management-plan.md
+收口基线：129 files / 1079 tests / 0 failed（见 refactor-progress.md Gate Health Snapshot 2026-07-18）
+-->
 
-> 用法：新开一个会话，把本文从下面的 `--- CUT HERE ---` 开始的全部内容粘贴给 agent。
-> 这是 `iterative-phase-execution` skill 的 kickoff；agent 会按 skill 的 Core Loop 跑。
->
-> 配套 plan：[context-management-plan](./context-management-plan.md)
-> 收口状态：[refactor-progress](./refactor-progress.md) `## Gate Health Snapshot 2026-07-18`（已收口完成，基线 129 files / 1079 tests / 0 failed）
+> ⬇️ 复制下面 CUT 行开始的所有内容粘贴给新会话 ⬇️
 
----
+=== 8< === CUT HERE === 8< ===
 
 # Iteration Kickoff — Context Management v1 深化
 
