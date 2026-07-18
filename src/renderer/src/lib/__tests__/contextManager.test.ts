@@ -168,3 +168,105 @@ describe("applyContextStrategy", () => {
 		expect(result.omittedCount).toBe(2);
 	});
 });
+
+// Boundary cases for Task 10 — these fill gaps not already covered above:
+// empty list, single-message list, sliding-window ORDER preservation on a
+// larger tail, and the exact position of the summary message in the returned
+// array (summary FIRST, then retained recent messages in chronological order).
+describe("applyContextStrategy boundary cases", () => {
+	it("handles an empty message list without compaction or summarization", () => {
+		const result = applyContextStrategy({
+			messages: [],
+			contextCount: -1,
+			contextMode: "full",
+			estimateTokens: () => 1,
+		});
+		expect(result.history).toEqual([]);
+		expect(result.messages).toEqual([]);
+		expect(result.omittedCount).toBe(0);
+		expect(result.needsSummarization).toBe(false);
+		expect(result.summaryMessage).toBeUndefined();
+	});
+
+	it("leaves a single-message list untouched in compact mode", () => {
+		const single = [msg("m1", "user", "only one")];
+		const result = applyContextStrategy({
+			messages: single,
+			contextCount: -1,
+			contextMode: "compact",
+			estimateTokens: () => 1,
+			now: () => 50,
+		});
+		// compactMessages short-circuits when length <= 2: no summary produced
+		expect(result.needsSummarization).toBe(false);
+		expect(result.summaryMessage).toBeUndefined();
+		expect(result.omittedCount).toBe(0);
+		expect(result.history).toEqual([
+			{ role: "user", content: [{ type: "text", text: "only one" }] },
+		]);
+	});
+
+	it("preserves chronological order of the sliding-window tail (not reversed)", () => {
+		const five = [
+			msg("m1", "user", "alpha"),
+			msg("m2", "assistant", "beta"),
+			msg("m3", "user", "gamma"),
+			msg("m4", "assistant", "delta"),
+			msg("m5", "user", "epsilon"),
+		];
+		const result = applyContextStrategy({
+			messages: five,
+			contextCount: 3,
+			contextMode: "full",
+			estimateTokens: () => 1,
+		});
+		expect(result.strategy).toBe("sliding");
+		// tail must be m3, m4, m5 in original order — guards against a
+		// `.slice(-n).reverse()` or `.slice(0, n)` regression the 2-element
+		// sliding test above cannot catch.
+		expect(result.history.map((item) => item.content[0])).toEqual([
+			{ type: "text", text: "gamma" },
+			{ type: "text", text: "delta" },
+			{ type: "text", text: "epsilon" },
+		]);
+		expect(result.omittedCount).toBe(2);
+	});
+
+	it("places the summary message FIRST, followed by retained recent messages in order", () => {
+		// 6 messages → compactMessages keeps ceil(6/2)=3 recent, summarizes 3.
+		// The synthetic summary must be index 0; retained recent tail must
+		// follow in original chronological order. This guards against a
+		// regression that appends or reverses the summary relative to the tail.
+		const result = applyContextStrategy({
+			messages: [
+				msg("m1", "user", "old1"),
+				msg("m2", "assistant", "old2"),
+				msg("m3", "user", "old3"),
+				msg("m4", "assistant", "recent1"),
+				msg("m5", "user", "recent2"),
+				msg("m6", "assistant", "recent3"),
+			],
+			contextCount: -1,
+			contextMode: "compact",
+			estimateTokens: () => 1,
+			now: () => 777,
+		});
+		expect(result.strategy).toBe("compact");
+		expect(result.history).toHaveLength(4);
+		expect(result.omittedCount).toBe(3);
+		// First element must be the synthetic summary.
+		expect(result.history[0].content[0]).toEqual(
+			expect.objectContaining({
+				type: "text",
+				text: expect.stringContaining("Summary of 3"),
+			}),
+		);
+		// Remaining elements must be the retained tail in original order.
+		expect(result.history.slice(1).map((item) => item.content[0])).toEqual([
+			{ type: "text", text: "recent1" },
+			{ type: "text", text: "recent2" },
+			{ type: "text", text: "recent3" },
+		]);
+		expect(result.summaryMessage?.id).toContain("context_summary_777");
+	});
+});
