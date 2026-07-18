@@ -10,6 +10,26 @@
 
 **收口完成（2026-07-18）。** 收口 loop R1–R4 已走完：全量门禁 5 条全绿（`git diff --check`、`pnpm check`、`pnpm lint`、`pnpm i18n:check`、`pnpm test:run`），`pnpm test:run` = 129 files / 1079 tests / 0 failed（含此前被沙箱 `listen EPERM` 阻塞、现已通过的 2 个 server e2e），工作树 clean，改动按 9 个功能域分组提交。详情见本文末尾 `## Gate Health Snapshot 2026-07-18`。当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status`/`usage` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests，当前审批响应已通过 `useToolApprovalFlow` 接线；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制；当前 Runtime Inspector 和 composer info bar 的用户可见 planMode 已统一映射为 Plan/Execute，不再展示内部 `chat` 兼容值。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP、`ProjectRulesReader` 只读读取和 Agent prompt 注入、多轮 history 低风险切片、`contextCount` / `contextMode` 策略入口。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。当前没有新的可落地代码任务；server e2e 端口监听阻塞已于 2026-07-18 解除，`pnpm test:run` 全量 129 files / 1079 tests / 0 failed。
 
+2026-07-18 Context Management v1 milestone closeout（branch `r3/context-mgmt-v1`）：
+
+- **里程碑收口**：Context Management v1 的三阶段（T1/T2/T3）全部完成，5 个 gate 全绿。本条为 milestone-closeout 记录，汇总 T1+T2 已有 commit 与本批 T3 docs/test 收口。
+- **T1（commit 17dd7b6）— contextSummarizer SSE integration test**：新增 `src/renderer/src/services/agent/__tests__/contextSummarizer.integration.test.ts`，断言本地 `/v1/llm/chat/completions` SSE POST body 含 provider/model/system prompt/user history、SSE chunk 汇总正确、endpoint error 抛出。补齐 HTTP summarizer provider 的自动化复验证据，把「待依赖恢复后复验」收口为「已复验通过」。
+- **T2（commit 13fe6de）— CompactedSummaryCard UI + ChatMessageList wiring**：新增专用 `CompactedSummaryCard` 组件，`ChatMessageList` 对 `role === "assistant"` 且带 `metadata.contextCompacted` 的消息并行渲染摘要卡片（不影响普通 assistant 气泡路径）；组件 focused test 覆盖渲染与 metadata 展示。完成 Task 9 的「message list 专用摘要卡片」缺口。
+- **T3（本批）— boundary gap tests + reverify docs + smoke accounting**：
+  - `src/renderer/src/lib/__tests__/contextManager.test.ts`：新增 `applyContextStrategy boundary cases` describe 块，4 个边界用例填补 Task 10 真实缺口 —— (1) 空消息列表不触发 compaction/summarization；(2) 单条消息列表在 compact 模式保持原样（`compactMessages` 的 `length<=2` short-circuit）；(3) 5 条消息 sliding window 保留尾部 3 条且保持原始时间顺序（防止 `.slice(-n).reverse()` 或 `.slice(0,n)` 回归，2-element 既有测试无法捕获）；(4) compact 模式返回数组中 summary 在 index 0、retained tail 保持原序。既有测试已覆盖 tool message skip、createSummaryMessage metadata、4-message sliding、full/sliding/auto-compact/compact strategy，本批不重复。
+  - `docs/context-management-plan.md`：§1 current-status 段、gaps 表 contextCompacted 行、目标 §3、Task 9、Task 9b known-limitations 中的「待依赖恢复后复验」全部改为「已于 2026-07-18 复验通过」；Task 9 状态改为「已完成（commit 13fe6de）」并把「message list 专用摘要卡片仍未完成」改为「已完成」；Task 10 补自动化覆盖映射（boundary case → test file + line）和手动 smoke 7 步的「自动化已覆盖 / 手测待用户」逐项标注。
+  - `docs/refactor-progress.md`：本 milestone-closeout 条目 + 更新 Remaining Gaps 表 Context management 行。
+- **Honest manual-smoke accounting**：kickoff 硬规则要求不许伪装手测。Context Management v1 的 7 步手动 smoke 中，HTTP body shape（T1 integration test）、摘要卡片组件渲染（T2 组件 test + ChatMessageList 并行分支）、摘要 metadata + 边界逻辑（本批 boundary tests）、full 模式 history（useAgentSendPipeline.test.ts）均已有自动化覆盖。**GUI Electron 手测明确标注为「手测待用户」**：`pnpm dev` 启动、打开 >10 条消息会话、GUI 切换 contextMode、真实端到端发送抓包验证，subagent 环境无法运行 GUI Electron，未伪造。
+- **Verification（5 gates 全绿）**：
+  - `git diff --check` → 通过。
+  - `pnpm check`（`tsc -b --noEmit`）→ 通过。
+  - `pnpm lint` → 通过，**31 warnings / 0 errors**（与 baseline 一致，warnings 为既有 cleanup 项）。
+  - `pnpm i18n:check` → 通过。
+  - `pnpm test:run` → 通过，**131 files / 1087 tests / 0 failed**（baseline 为 T1+T2 后的 131/1083，本批 +4 来自 contextManager 边界用例）。本次首轮未命中 EADDRINUSE。
+- **Tech debt（pre-existing，与 context-management 无关）**：`src/test-utils/__tests__/serverFixture.test.ts` 硬编码 bind port 3000，与 `src/main/services/mcp/internal/servers/__tests__/agentBuiltinsServer.e2e.test.ts` 存在端口竞争；T1、T2 验证均确认偶发 flaky，全量 suite 偶发 `EADDRINUSE: address already in use :::3000` 时需重跑 1-2 次，不属于本里程碑回归。本批未触碰该文件。
+- **Not run**：`pnpm build` / `pnpm dev`（subagent 环境不运行 GUI/打包命令；GUI 手测待用户）。
+- **剩余风险 / follow-up**：Context Management v1 自动化与单元层已收口；剩余仅 GUI 端到端手测（待用户在真实 Electron 环境 once-over）。后续 artifact actions 深化、token usage 真实 API 回写仍是独立深化项，不影响 v1 收口。
+
 2026-07-08 resumed completion audit continuation:
 
 - **Subagent status**：按用户要求重新启动只读复核；Export/Recovery、Privacy display、Context/Memory 三个 explorer 已启动，测试/验证复核因 thread limit 由主 agent 承担。codebase-memory MCP 按 AGENTS 要求优先尝试 `list_projects`，但本轮仍返回 `Transport closed`，因此改用本地只读命令和 focused tests 取证。
@@ -1325,7 +1345,7 @@
 | --- | --- |
 | Compatibility cleanup | 旧 workspace/chatMode/direct 兼容 API/type 仍需跟代码实际依赖一起分批收口；文档里保留的历史术语必须继续带 archived/superseded/compatibility 标注。 |
 | Dev runtime smoke follow-up | `pnpm dev` 已验证到 renderer dev server、Electron main window、API server、AgentRuntime registry、IPC 和 internal MCP 初始化；后续仍需真实模型/tool run 的人工 smoke——尤其是本会话新增的 structured producers streaming 路径、RemoteSessionsPanel UI 和 recovery bundle export 需要在真机环境下走一遍用户操作。 |
-| Context management / token compression | 低风险切片已完成：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线。剩余：专用摘要卡片和后续 artifact actions 深化；当前 focused/full tests 已覆盖到沙箱可运行范围。 |
+| Context management / token compression | **v1 自动化与单元层已收口**：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider（含 SSE integration test）、metadata-level pin/unpin、session-scoped artifact library MVP 和专用 `CompactedSummaryCard` 均已接线并有自动化覆盖。剩余仅 GUI Electron 端到端手测；artifact actions 深化、token usage 真实 API 回写是独立深化项。 |
 
 ## Update Rules
 
