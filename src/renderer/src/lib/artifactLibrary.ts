@@ -1,4 +1,8 @@
-import type { ChatFileArtifact, ChatFileChangeSet } from "../types/electron";
+import type {
+	ChatFileArtifact,
+	ChatFileChangeSet,
+	FileOpenTarget,
+} from "../types/electron";
 import { toRedactedPathLabel } from "./privacyDisplay";
 
 export interface ArtifactLibraryItem {
@@ -16,6 +20,9 @@ export interface ArtifactLibraryItem {
 	canReveal: boolean;
 	canOpen: boolean;
 	origin: "artifact" | "change";
+	canDiff?: boolean;
+	diffPreview?: string;
+	openTargets?: FileOpenTarget[];
 }
 
 export interface BuildArtifactLibraryInput {
@@ -76,6 +83,8 @@ export function buildArtifactLibraryItems(
 			...(artifact.extension ? { extension: artifact.extension } : {}),
 			canReveal: artifact.policy.canReveal !== false,
 			canOpen: artifact.policy.canOpen !== false,
+			canDiff: artifact.policy.canDiff,
+			openTargets: artifact.openTargets,
 			origin: "artifact",
 		});
 	}
@@ -94,6 +103,7 @@ export function buildArtifactLibraryItems(
 				displayPath: displayPathForChange(file.path),
 				fullPath: file.path,
 				...(extension ? { extension } : {}),
+				...(file.diffPreview ? { diffPreview: file.diffPreview } : {}),
 				additions: file.additions,
 				deletions: file.deletions,
 				canReveal: file.status !== "deleted",
