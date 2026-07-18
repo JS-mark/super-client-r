@@ -4,11 +4,11 @@
 > 覆盖矩阵：[refactor-traceability-matrix](./refactor-traceability-matrix.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
-> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-08（resumed completion audit）。
+> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-18（收口 loop R1–R4 完成）。
 
 ## Current Status
 
-**Blocked on final full-test verification.** 当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status`/`usage` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests，当前审批响应已通过 `useToolApprovalFlow` 接线；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制；当前 Runtime Inspector 和 composer info bar 的用户可见 planMode 已统一映射为 Plan/Execute，不再展示内部 `chat` 兼容值。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP、`ProjectRulesReader` 只读读取和 Agent prompt 注入、多轮 history 低风险切片、`contextCount` / `contextMode` 策略入口。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。当前没有新的可落地代码任务；唯一未完成项是当前沙箱禁止本地 server e2e 监听端口，导致 `pnpm test:run` 剩余 2 个 suite 无法完成。
+**收口完成（2026-07-18）。** 收口 loop R1–R4 已走完：全量门禁 5 条全绿（`git diff --check`、`pnpm check`、`pnpm lint`、`pnpm i18n:check`、`pnpm test:run`），`pnpm test:run` = 129 files / 1079 tests / 0 failed（含此前被沙箱 `listen EPERM` 阻塞、现已通过的 2 个 server e2e），工作树 clean，改动按 9 个功能域分组提交。详情见本文末尾 `## Gate Health Snapshot 2026-07-18`。当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status`/`usage` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests，当前审批响应已通过 `useToolApprovalFlow` 接线；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制；当前 Runtime Inspector 和 composer info bar 的用户可见 planMode 已统一映射为 Plan/Execute，不再展示内部 `chat` 兼容值。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP、`ProjectRulesReader` 只读读取和 Agent prompt 注入、多轮 history 低风险切片、`contextCount` / `contextMode` 策略入口。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。当前没有新的可落地代码任务；server e2e 端口监听阻塞已于 2026-07-18 解除，`pnpm test:run` 全量 129 files / 1079 tests / 0 failed。
 
 2026-07-08 resumed completion audit continuation:
 
@@ -51,7 +51,7 @@
 
 ## Code-Based Remaining Work Count (2026-07-06)
 
-按当前代码检索与调用链复核，不按旧文档 checkbox 计数：顶层未完成工作流剩 **0 个**；拆成可落地代码任务，核心未完成约 **0 项**；周边产品深化 MVP 也已接线。当前主要剩余是当前沙箱无法完成的本地端口监听类 full-test verification，以及若产品继续投入时的深化项。
+按当前代码检索与调用链复核，不按旧文档 checkbox 计数：顶层未完成工作流剩 **0 个**；拆成可落地代码任务，核心未完成约 **0 项**；周边产品深化 MVP 也已接线。全量 full-test verification 已于 2026-07-18 收口完成（见末尾 `## Gate Health Snapshot 2026-07-18`），此前"沙箱无法完成本地端口监听类验证"的断言已 supersede。剩余仅是若产品继续投入时的深化项。
 
 | 组 | 未完成项数 | 代码事实 | 未完成内容 |
 | --- | ---: | --- | --- |
@@ -61,7 +61,7 @@
 | Multi-agent / structured output | 0 | `SubagentMessagePart`、subagent product events、JSONL reducer、`SubagentsInspectorSection` 和 `SubagentPartCard` 已有；`Message.toolCall.subagentRunId` 已从 runtime/SDK stream 贯穿到 renderer live tool messages、JSONL fallback 和 Inspector live count；Task HTTP recursion 会根据子代理 SSE tool-call 帧递增 `run.toolCallCount` 并通过 `subagent.updated` / `assistant.part_update` 持久化；nested Task recursion 通过 host-only `agentBuiltins` 保留父 conversation 和 depth；typed code/diff/data renderers 和 assistant parts 已有；llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并持久化为 session part events。 | Focused/full tests 已覆盖到该批；更细粒度 delta batching、table/tree/sources/artifact native producer 可作为后续深化。 |
 | 周边产品深化 | 0 | MCP / Skills / Plugins 已保持独立入口；MCP、Skills、Plugins 三个独立市场页顶部已展示边界说明和交叉链接，但没有 Extensions 聚合页；Composer/Plan/Execute 主链路已存在；git worktree preflight 后端 API 已覆盖非 Git 仓库、目标路径、分支名、同名分支和 dirty/submodule/LFS/upstream issue，`createWorktree()` 会在 block 时提前返回；NewConversationModal 和 ProjectContextMenu 已在 worktree 创建前展示 preflight block/warn/info；session messages 已有 `readMessagesPage(offset, limit)`，初次切换、删除会话 fallback、删除项目 fallback 和“加载更早消息”均按页读取，不再点击后全量读取。 | Focused/full tests 已覆盖到该批；byte-index/增量 JSONL parse、Composer pill 更完整 branch switch/edit、MCP/Skill marketplace 视觉深水区可作为后续性能/体验深化。 |
 
-当前 Export / Recovery、Privacy、Context / Memory / Artifacts、Multi-agent / structured output 和周边产品深化 MVP 均已完成接线。Focused tests、`pnpm check`、`pnpm lint`、`pnpm i18n:check` 已通过；`pnpm test:run` 在沙箱内仅剩两个需要监听本地端口的 server e2e suite 因 `listen EPERM 0.0.0.0:3000` 无法完成，提升权限重跑被环境策略拒绝。`pnpm build` 仍按用户要求未运行。
+当前 Export / Recovery、Privacy、Context / Memory / Artifacts、Multi-agent / structured output 和周边产品深化 MVP 均已完成接线，并已于 2026-07-18 整体验证通过：`git diff --check`、`pnpm check`、`pnpm lint`（31 warnings，无新增）、`pnpm i18n:check`、`pnpm test:run`（129 files / 1079 tests / 0 failed，含此前被沙箱 `listen EPERM` 阻塞的 2 个 server e2e）全绿。`pnpm build` 仍按用户要求未运行。
 
 ## Next Work Order (Code-Based, 2026-07-04)
 
@@ -98,6 +98,8 @@
    - llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并直写 session part events；table/tree/sources/artifact native producer 和 delta batching 可作为后续深化，不阻塞当前主线。
 
 ## Latest Verified Commands
+
+> **归档声明（2026-07-18，R4 收口）**：本节下方 2026-07-03~07-08 各历史批次记录中所有 `Blocked verification` / `node_modules/.bin 缺失` / `尚不能执行 vitest/tsc/oxlint` / `因 listen EPERM 0.0.0.0:3000 无法完成 server e2e` 等阻塞断言**均已 supersede**。工具链早已齐全，server e2e 端口监听阻塞也已解除；全部历史批次的 focused tests + 全量 `pnpm check` / `pnpm lint` / `pnpm i18n:check` / `pnpm test:run` 已于 2026-07-18 整体验证通过（129 files / 1079 tests / 0 failed）。以下历史条目仅保留改动轨迹，其"未验证"措辞不再代表当前状态。最新权威状态见末尾 `## Gate Health Snapshot 2026-07-18`。
 
 2026-07-17 R2 gate-health fixes (branch `r2/gate-health-fixes`, 3 commits)
 
@@ -1329,3 +1331,41 @@
 2. `verified` 必须有用户路径或自动化路径证据；不能只凭 plan checkbox。
 3. 不把功能任务细节写进本文；细节继续放在对应功能 plan。
 4. 不运行打包命令作为常规进度验证；本阶段以 dev 可运行、类型检查、测试和 lint 为准。
+
+## Gate Health Snapshot 2026-07-18
+
+> 收口 loop（[refactor-closeout-loop](./refactor-closeout-loop.md)）R3 + R4 合并执行。R3 分组提交此前已在 `main`（6 个功能域 commit）+ `r2/gate-health-fixes`（4 个 R2 增量 commit）上完成；本轮 R3 做抽样复核 + R4 做文档归档，一次性走完收口 loop。
+
+### R3 — 分组提交复核
+
+| 检查项 | 结果 | 证据 |
+| --- | --- | --- |
+| 工作树 clean | ✅ | `git status --short` 空输出 |
+| `git diff --check` | ✅ | exit 0 |
+| commit 按功能域分组 | ✅ | `main..HEAD` + `main` 上共 10 个 commit，覆盖 9 个功能域：shared-types / Context·Memory / Multi-agent / native structured producer / Export·Recovery·Privacy / worktree+paged reads / Settings 壳+独立市场 / i18n / docs；每条自洽、可单独回滚 |
+| 抽样 commit 过域 focused test（≥3） | ✅ | `c9f6e81` Task max-depth → `agentBuiltinsServer.test.ts` 26 passed；`14fef18` shared-types diagnostic manifest → `SessionStorageService.test.ts` 64 passed；`f741079` SubagentRunSummary coerce → `jsonl.test.ts` 36 passed |
+
+### R4 — 全量门禁复跑
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff --check` | ✅ PASS | exit 0 |
+| `pnpm check` | ✅ PASS | `tsc -b --noEmit` exit 0 |
+| `pnpm lint` | ✅ PASS | oxlint 31 warnings / 0 errors，无新增 |
+| `pnpm i18n:check` | ✅ PASS | en/zh 均通过 |
+| `pnpm test:run` | ✅ PASS | **129 files / 1079 tests / 0 failed**（含此前被沙箱 `listen EPERM 0.0.0.0:3000` 阻塞、现已通过的 2 个 server e2e：`serverFixture.test.ts`、`agentBuiltinsServer.e2e.test.ts`） |
+
+### 关键状态更新（R4 归档）
+
+- **server e2e 端口监听阻塞已解除**：此前多轮记录的 `listen EPERM 0.0.0.0:3000` 环境阻塞在本轮不再复现，`serverFixture.test.ts` 和 `agentBuiltinsServer.e2e.test.ts` 均已通过。
+- **`node_modules/.bin` 缺失断言已 supersede**：2026-07-03~07-08 各历史批次记录中的 17 处 `Blocked verification` / `node_modules/.bin 缺失` / `尚不能执行 vitest/tsc/oxlint` 断言统一由 `## Latest Verified Commands` 顶部的归档声明覆盖，历史条目保留轨迹不删除。
+- **Current Status / Code-Based Remaining Work Count 段**已更新为反映"已整体验证通过"的真实状态。
+- **refactor-plan.md** Implementation Readiness 段 + §1.5/§1.6 已同步更新沙箱阻塞与 server e2e 补跑断言。
+
+### Retrospective
+
+- **What worked**：R2 已把回归修完并按域分 commit，R3 复核只需抽样验证，无需重新分组；全量门禁一次跑通，server e2e 端口阻塞自然解除（非代码变更导致，是环境差异）。
+- **What blocked**：无。本轮无任何环境或代码阻塞。
+- **代码事实更新**：`pnpm test:run` 稳定基线 = 129 files / 1079 tests / 0 failed（与 R2 closeout 一致，本轮复跑确认）。
+- **是否继续 loop**：**否**。终止条件全部满足——工作树 clean + 全量门禁绿（含历史阻塞的 server e2e）+ 进度文档无过期阻塞条目。收口 loop R1–R4 正式关闭。
+- **后续工作（loop 外）**：per-server runtime 回归、导出/备份深水区（zip/package/完整迁移包）、marketplace 视觉深化、byte-index/增量 JSONL parse、专用摘要卡片、table/tree/source/artifact native producer 等属产品深化项，不再纳入收口 loop。V2 Tauri 迁移需等 v1 达 `shippable` 后启动。
