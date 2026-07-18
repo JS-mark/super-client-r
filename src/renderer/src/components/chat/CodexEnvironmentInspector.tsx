@@ -25,6 +25,7 @@ import type { SubagentInspectorEntry } from "../../hooks/useSubagentsInspectorDa
 import { useCodexBranchSection } from "./CodexBranchSection";
 import { ContextInspectorSection } from "./inspector/ContextInspectorSection";
 import { SubagentsInspectorSection } from "./inspector/SubagentsInspectorSection";
+import { ArtifactDiffPreview } from "./ArtifactDiffPreview";
 import { buildArtifactLibraryItems } from "../../lib/artifactLibrary";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
 import {
@@ -273,50 +274,56 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 				{artifactLibraryItems.map((item) => (
 					<div
 						key={item.id}
-						style={rowStyle}
+						className="flex flex-col"
 						data-testid="artifact-library-row"
 						data-kind={item.kind}
 						data-source={item.source}
 					>
-						<span style={{ flexShrink: 0 }}>
-							{pickFileIcon(item.extension ?? extOf(item.name))}
-						</span>
-						<span
-							className="truncate"
-							title={item.displayPath}
-							style={{ flex: 1, minWidth: 0 }}
-						>
-							{item.displayPath}
-						</span>
-						<Tag style={{ fontSize: 11 }}>{item.kind}</Tag>
-						<Tag style={{ fontSize: 11 }}>{item.source}</Tag>
-						{item.additions !== undefined && item.deletions !== undefined && (
-							<>
-								<span
-									style={{ color: token.colorSuccess, fontSize: 11 }}
-								>{`+${item.additions}`}</span>
-								<span
-									style={{ color: token.colorError, fontSize: 11 }}
-								>{`-${item.deletions}`}</span>
-							</>
+						<div style={rowStyle}>
+							<span style={{ flexShrink: 0 }}>
+								{pickFileIcon(item.extension ?? extOf(item.name))}
+							</span>
+							<span
+								className="truncate"
+								title={item.displayPath}
+								style={{ flex: 1, minWidth: 0 }}
+							>
+								{item.displayPath}
+							</span>
+							<Tag style={{ fontSize: 11 }}>{item.kind}</Tag>
+							<Tag style={{ fontSize: 11 }}>{item.source}</Tag>
+							{item.additions !== undefined &&
+								item.deletions !== undefined && (
+									<>
+										<span
+											style={{ color: token.colorSuccess, fontSize: 11 }}
+										>{`+${item.additions}`}</span>
+										<span
+											style={{ color: token.colorError, fontSize: 11 }}
+										>{`-${item.deletions}`}</span>
+									</>
+								)}
+							<Button
+								type="link"
+								size="small"
+								disabled={!item.canReveal}
+								style={{ padding: 0, fontSize: 12 }}
+								onClick={() => handleReveal(item.fullPath)}
+							>
+								{t("artifacts.reveal", "定位")}
+							</Button>
+							<Button
+								type="link"
+								size="small"
+								style={{ padding: 0, fontSize: 12 }}
+								onClick={() => handleCopyPath(item.fullPath)}
+							>
+								{t("artifacts.copy", "复制")}
+							</Button>
+						</div>
+						{item.diffPreview && item.diffPreview.trim().length > 0 && (
+							<ArtifactDiffPreview diffPreview={item.diffPreview} />
 						)}
-						<Button
-							type="link"
-							size="small"
-							disabled={!item.canReveal}
-							style={{ padding: 0, fontSize: 12 }}
-							onClick={() => handleReveal(item.fullPath)}
-						>
-							{t("artifacts.reveal", "定位")}
-						</Button>
-						<Button
-							type="link"
-							size="small"
-							style={{ padding: 0, fontSize: 12 }}
-							onClick={() => handleCopyPath(item.fullPath)}
-						>
-							{t("artifacts.copy", "复制")}
-						</Button>
 					</div>
 				))}
 			</div>
