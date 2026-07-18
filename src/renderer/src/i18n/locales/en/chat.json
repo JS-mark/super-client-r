@@ -564,5 +564,21 @@
 	},
 	"subagentSource": {
 		"badge": "▲ From subagent: {{name}}"
+	},
+	"artifacts": {
+		"empty": "No artifacts yet",
+		"fileCount": "{{count}} files",
+		"reveal": "Reveal",
+		"copy": "Copy",
+		"openWith": "Open with…",
+		"diff": {
+			"expand": "Expand",
+			"collapse": "Collapse",
+			"empty": "No diff content"
+		},
+		"status": {
+			"deleted": "Deleted",
+			"renamed": "Renamed"
+		}
 	}
 }

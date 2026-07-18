@@ -238,7 +238,9 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 		artifactLibraryItems.length === 0 ? (
 			<Empty
 				image={Empty.PRESENTED_IMAGE_SIMPLE}
-				description={<span style={{ fontSize: 12 }}>暂无工件</span>}
+				description={
+					<span style={{ fontSize: 12 }}>{t("artifacts.empty", "暂无工件")}</span>
+				}
 				style={{ margin: "8px 0" }}
 			/>
 		) : (
@@ -251,18 +253,22 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 					}}
 				>
 					{totals.additions === 0 && totals.deletions === 0
-						? `${artifactLibraryItems.length} 个文件`
-						: `${artifactLibraryItems.length} 个文件 · `}
-					{(totals.additions !== 0 || totals.deletions !== 0) && (
-						<>
-							<span style={{ color: token.colorSuccess }}>
-								+{totals.additions}
-							</span>{" "}
-							<span style={{ color: token.colorError }}>
-								-{totals.deletions}
-							</span>
-						</>
-					)}
+						? t("artifacts.fileCount", "{{count}} 个文件", {
+								count: artifactLibraryItems.length,
+							})
+						: `${t("artifacts.fileCount", "{{count}} 个文件", {
+								count: artifactLibraryItems.length,
+							})} · `}
+						{(totals.additions !== 0 || totals.deletions !== 0) && (
+							<>
+								<span style={{ color: token.colorSuccess }}>
+									+{totals.additions}
+								</span>{" "}
+								<span style={{ color: token.colorError }}>
+									-{totals.deletions}
+								</span>
+							</>
+						)}
 				</div>
 				{artifactLibraryItems.map((item) => (
 					<div
@@ -301,7 +307,7 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 							style={{ padding: 0, fontSize: 12 }}
 							onClick={() => handleReveal(item.fullPath)}
 						>
-							定位
+							{t("artifacts.reveal", "定位")}
 						</Button>
 						<Button
 							type="link"
@@ -309,7 +315,7 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 							style={{ padding: 0, fontSize: 12 }}
 							onClick={() => handleCopyPath(item.fullPath)}
 						>
-							复制
+							{t("artifacts.copy", "复制")}
 						</Button>
 					</div>
 				))}

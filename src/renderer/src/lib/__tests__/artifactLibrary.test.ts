@@ -127,4 +127,66 @@ describe("buildArtifactLibraryItems", () => {
 			}),
 		]);
 	});
+
+	it("passes canDiff through from artifact policy", () => {
+		const items = buildArtifactLibraryItems({
+			conversationId: "session-1",
+			artifacts: [
+				artifact({ id: "diffable", kind: "modified" }),
+				artifact({
+					id: "readonly",
+					kind: "read",
+					path: "/Users/mark/project/src/read.ts",
+					relativePath: "src/read.ts",
+					name: "read.ts",
+					policy: { canOpen: true, canReveal: true, canDiff: false },
+				}),
+			],
+			changeSets: [],
+		});
+		expect(items[0].canDiff).toBe(true);
+		expect(items[1].canDiff).toBe(false);
+	});
+
+	it("passes diffPreview through from changeSet file when present", () => {
+		const preview = "--- a/foo.ts\n+++ b/foo.ts\n@@ -1,1 +1,2 @@\n-old\n+new\n";
+		const items = buildArtifactLibraryItems({
+			conversationId: "session-1",
+			artifacts: [],
+			changeSets: [
+				changeSet({
+					files: [
+						{
+							path: "/Users/mark/project/src/foo.ts",
+							status: "modified",
+							additions: 1,
+							deletions: 1,
+							diffPreview: preview,
+						},
+					],
+				}),
+			],
+		});
+		expect(items[0].diffPreview).toBe(preview);
+	});
+
+	it("omits diffPreview when the changeSet file does not provide one", () => {
+		const items = buildArtifactLibraryItems({
+			conversationId: "session-1",
+			artifacts: [],
+			changeSets: [
+				changeSet({
+					files: [
+						{
+							path: "/Users/mark/project/src/bar.ts",
+							status: "modified",
+							additions: 1,
+							deletions: 0,
+						},
+					],
+				}),
+			],
+		});
+		expect(items[0].diffPreview).toBeUndefined();
+	});
 });

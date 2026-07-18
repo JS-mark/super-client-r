@@ -564,5 +564,21 @@
 	},
 	"subagentSource": {
 		"badge": "▲ 来自子代理：{{name}}"
+	},
+	"artifacts": {
+		"empty": "暂无工件",
+		"fileCount": "{{count}} 个文件",
+		"reveal": "定位",
+		"copy": "复制",
+		"openWith": "打开方式",
+		"diff": {
+			"expand": "展开",
+			"collapse": "折叠",
+			"empty": "无差异内容"
+		},
+		"status": {
+			"deleted": "已删除",
+			"renamed": "已重命名"
+		}
 	}
 }
