@@ -10,6 +10,27 @@
 
 **收口完成（2026-07-18）。** 收口 loop R1–R4 已走完：全量门禁 5 条全绿（`git diff --check`、`pnpm check`、`pnpm lint`、`pnpm i18n:check`、`pnpm test:run`），`pnpm test:run` = 129 files / 1079 tests / 0 failed（含此前被沙箱 `listen EPERM` 阻塞、现已通过的 2 个 server e2e），工作树 clean，改动按 9 个功能域分组提交。详情见本文末尾 `## Gate Health Snapshot 2026-07-18`。当前代码已经进入分批实现和验证阶段，但整体重构还不能标记为完成。P0 主线已经覆盖 Agent-only、JSONL structured parts、核心 runtime gate、项目/会话基础存储和对话展示骨架；Phase 0a 已完成 runtime projection 写入主流程 + `unknown` 兜底 + broker 对 `text.delta`/`reasoning.delta`/`status`/`usage` 的 fast-skip + reducer 端 `plan.decision`/`execute.turn.created`/`run.rate_limit` 分支 + `run.usage` 改 transient；Phase 0b `useChat.ts` 已通过三轮抽取从 **1826 行降到 545 行（-1281 行 / -70%）**，新增 helper hooks 并有 focused tests，当前审批响应已通过 `useToolApprovalFlow` 接线；发送入口 runtime-first 且 runtime create failure 不再默认 fallback 到 Agent SDK。Phase 0c 已落地可测试 Plan card、聊天流展示、composer blocked decision + `paused-error` recovery、ApprovalDecisionCard/AskUserQuestionCard 键盘支持，以及 `planModeToolGuard` 的写/删/危险命令限制；当前 Runtime Inspector 和 composer info bar 的用户可见 planMode 已统一映射为 Plan/Execute，不再展示内部 `chat` 兼容值。Phase 1 已完成模型 one-shot 选择、会话默认、生效来源展示、发送后清理和能力元数据 chip。Phase 2 已完成 Settings IA 二次重构 + 交互 v2：11 项顶级 nav、Settings 嵌套路由、SettingsRail、TitleBar 空、底部 `SidebarUserRow` 共享、无 Extensions 聚合入口，MCP/Skills/Plugins 独立市场页保留。Phase 3 已完成大 tool result 折叠态 capped preview、typed tool part summary、500-turn 虚拟列表测试、storage `contentRef` producer、typed IPC read path 和 lightweight renderer service，另加 Plan/Execute replay summary、Context Inspector MVP、`ProjectRulesReader` 只读读取和 Agent prompt 注入、多轮 history 低风险切片、`contextCount` / `contextMode` 策略入口。Phase 4 Multi-Agent MVP 已落地 `SubagentMessagePart`、subagent 产品事件、JSONL reducer、Task tool bridge、SubagentPartCard、SubagentsInspectorSection 和 approval subagent badge prop。Phase 5 Remote IM 已用 `RemoteSessionLifecycle` 纯状态机形式化并接入 `RemoteChatBridge`；remote duplicate replay drop、remote bot-offline、privacy redaction foundation、AgentTrace redaction、session archive directory export 已有 focused tests。当前没有新的可落地代码任务；server e2e 端口监听阻塞已于 2026-07-18 解除，`pnpm test:run` 全量 129 files / 1079 tests / 0 failed。
 
+2026-07-19 Artifact Actions v1 milestone closeout（branch `r3/artifact-actions-v1`）：
+
+- **里程碑收口**：Artifact Actions v1 三阶段（A1/A2/A3）全部完成，5 个 gate 全绿。本条为 milestone-closeout 记录，汇总 A1+A2 已有 commit 与本批 A3 收口。
+- **A1（commit 39fb557）— i18n + canDiff/diffPreview/openTargets 透传**：补齐 `artifacts.openWith`（en/zh）、`artifacts.status.{added,modified,deleted,renamed}`（en/zh）等 i18n key 与 fallback；`ArtifactLibraryItem` 新增 `canDiff`、`diffPreview`、`openTargets` 字段并把 artifact policy / changeSet file diffPreview / artifact openTargets 透传到 renderer。
+- **A2（commit e32a4c4，doc 56342fa）— diff preview**：新增 `src/renderer/src/components/chat/ArtifactDiffPreview.tsx`，change-origin ArtifactLibraryItem 在 inspector 中渲染展开/折叠的 monospace diff 预览；focused test 覆盖展开/折叠、空内容占位和长 diff 完整渲染（zh fallback）。
+- **A3（本批）— openWith dropdown + status visual + docs**：
+  - `src/renderer/src/lib/artifactLibrary.ts`：`ArtifactLibraryItem` 新增可选 `status?: "added" | "modified" | "deleted" | "renamed"`；在 change-set 分支 push 站点（`for (const file of changeSet.files)`）透传 `status: file.status`。不动 artifact 分支、dedup、过滤或既有 `kind` 映射。
+  - `src/renderer/src/components/chat/ArtifactOpenWith.tsx`（新文件）：artifact-origin 项的 `openTargets` 渲染为 antd `Dropdown`，trigger 为 `Button type="link" size="small"`，label = `t("artifacts.openWith", "打开方式")`；menu items 来自 `openTargets.map(t => ({ key: t.id, label: t.label, disabled: !t.available }))`，点击调 `onOpenWith(key)`，父层调 `fileActionService.openWith(fullPath, targetId)`。
+  - `src/renderer/src/components/chat/CodexEnvironmentInspector.tsx`：change-origin 项在 `<Tag>{item.kind}</Tag>` 旁渲染状态 `<Tag color={STATUS_COLOR[item.status]}>{item.status}</Tag>`（仅当 `item.status` 存在；颜色与 `ChangedFilesSummary.STATUS_TAG` 对齐：added=green, modified=blue, deleted=red, renamed=purple）；复制按钮后渲染 `<ArtifactOpenWith>`（仅当 `openTargets.length > 0`，故只出现在 artifact-origin 行）。`data-testid="artifact-library-row"`、`data-kind`、`data-source` 保持不变。
+- **测试**：`artifactLibrary.test.ts` 新增 1 个用例（deleted/renamed 两文件的 status 透传与 canReveal 断言）；`__tests__/ArtifactOpenWith.test.tsx`（新文件）3 个用例：trigger label 断言 + menu items 镜像断言、menu onClick → onOpenWith 调用断言、空 openTargets 时 trigger 仍渲染。
+- **Honest manual-smoke accounting**：kickoff 硬规则要求不许伪装手测。openWith 的渲染契约（trigger label、menu items、onClick → onOpenWith）、status 透传与 Tag 颜色绑定、diff preview 行为均有自动化覆盖。**GUI Electron 手测明确标注为「手测待用户」**：`pnpm dev` 启动后真实点击 openWith 触发主进程 `openWith` IPC、真实展开 diff preview、真实渲染 deleted/renamed 行（含颜色），subagent 环境无法运行 GUI Electron，未伪造。
+- **Verification（5 gates 全绿）**：
+  - `git diff --check` → 通过。
+  - `pnpm check`（`tsc -b --noEmit`）→ 通过。
+  - `pnpm lint` → 通过（warnings/errors 与 baseline 持平）。
+  - `pnpm i18n:check` → 通过。
+  - `pnpm test:run` → 通过（具体 test files / tests 数字见 commit 验证记录；baseline 132 files / 1093 tests，本批新增 ≥4 用例）。
+- **Tech debt（pre-existing，与 artifact-actions 无关）**：`src/test-utils/__tests__/serverFixture.test.ts` 硬编码 bind port 3000，与 `agentBuiltinsServer.e2e.test.ts` 存在端口竞争；偶发 `EADDRINUSE: address already in use :::3000` 时需重跑 1-2 次，不属于本里程碑回归。本批未触碰该文件。
+- **Not run**：`pnpm build` / `pnpm dev`（subagent 环境不运行 GUI/打包命令；GUI 手测待用户）。
+- **剩余风险 / follow-up**：Artifact Actions v1 自动化与单元层已收口；剩余仅 GUI 端到端手测（待用户在真实 Electron 环境 once-over）。inspector 的 runtime/branch/sources 标签仍是硬编码中文（独立 cleanup 项，不在本里程碑范围）；renamed 的 oldPath 展示因共享类型 `ChatFileChangeSet.files[]` 未暴露 `oldPath` 暂只能 label 展示，需后续类型变更。
+
 2026-07-08 resumed completion audit continuation:
 
 - **Subagent status**：按用户要求重新启动只读复核；Export/Recovery、Privacy display、Context/Memory 三个 explorer 已启动，测试/验证复核因 thread limit 由主 agent 承担。codebase-memory MCP 按 AGENTS 要求优先尝试 `list_projects`，但本轮仍返回 `Transport closed`，因此改用本地只读命令和 focused tests 取证。
@@ -1325,7 +1346,7 @@
 | --- | --- |
 | Compatibility cleanup | 旧 workspace/chatMode/direct 兼容 API/type 仍需跟代码实际依赖一起分批收口；文档里保留的历史术语必须继续带 archived/superseded/compatibility 标注。 |
 | Dev runtime smoke follow-up | `pnpm dev` 已验证到 renderer dev server、Electron main window、API server、AgentRuntime registry、IPC 和 internal MCP 初始化；后续仍需真实模型/tool run 的人工 smoke——尤其是本会话新增的 structured producers streaming 路径、RemoteSessionsPanel UI 和 recovery bundle export 需要在真机环境下走一遍用户操作。 |
-| Context management / token compression | 低风险切片已完成：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线。剩余：专用摘要卡片和后续 artifact actions 深化；当前 focused/full tests 已覆盖到沙箱可运行范围。 |
+| Context management / token compression | 低风险切片已完成：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线。Artifact actions 深化已补 i18n、diff preview、Open With 与状态视觉；专用摘要卡片由独立 Context/Memory 提取 PR 交付。 |
 
 ## Update Rules
 

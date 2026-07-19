@@ -189,4 +189,40 @@ describe("buildArtifactLibraryItems", () => {
 		});
 		expect(items[0].diffPreview).toBeUndefined();
 	});
+
+	it("passes status through for change-set files (deleted hides reveal, renamed keeps it)", () => {
+		const items = buildArtifactLibraryItems({
+			conversationId: "session-1",
+			artifacts: [],
+			changeSets: [
+				changeSet({
+					files: [
+						{
+							path: "/Users/mark/project/src/gone.ts",
+							status: "deleted",
+							additions: 0,
+							deletions: 5,
+						},
+						{
+							path: "/Users/mark/project/src/moved.ts",
+							status: "renamed",
+							additions: 0,
+							deletions: 0,
+						},
+					],
+				}),
+			],
+		});
+		expect(items).toHaveLength(2);
+		expect(items[0]).toMatchObject({
+			status: "deleted",
+			canReveal: false,
+			origin: "change",
+		});
+		expect(items[1]).toMatchObject({
+			status: "renamed",
+			canReveal: true,
+			origin: "change",
+		});
+	});
 });
