@@ -23,6 +23,7 @@ export interface ArtifactLibraryItem {
 	canDiff?: boolean;
 	diffPreview?: string;
 	openTargets?: FileOpenTarget[];
+	status?: "added" | "modified" | "deleted" | "renamed";
 }
 
 export interface BuildArtifactLibraryInput {
@@ -109,6 +110,7 @@ export function buildArtifactLibraryItems(
 				canReveal: file.status !== "deleted",
 				canOpen: file.status !== "deleted",
 				origin: "change",
+				status: file.status,
 			});
 		}
 	}

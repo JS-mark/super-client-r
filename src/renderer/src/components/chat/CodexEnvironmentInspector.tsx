@@ -26,6 +26,7 @@ import { useCodexBranchSection } from "./CodexBranchSection";
 import { ContextInspectorSection } from "./inspector/ContextInspectorSection";
 import { SubagentsInspectorSection } from "./inspector/SubagentsInspectorSection";
 import { ArtifactDiffPreview } from "./ArtifactDiffPreview";
+import { ArtifactOpenWith } from "./ArtifactOpenWith";
 import { buildArtifactLibraryItems } from "../../lib/artifactLibrary";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
 import {
@@ -106,6 +107,15 @@ function formatBytes(n?: number): string {
 	if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)}KB`;
 	return `${(n / 1024 / 1024).toFixed(1)}MB`;
 }
+
+// Status → antd Tag color, aligned with ChangedFilesSummary STATUS_TAG.
+// Rendered only for change-origin items that carry a status.
+const STATUS_COLOR: Record<string, string> = {
+	added: "green",
+	modified: "blue",
+	deleted: "red",
+	renamed: "purple",
+};
 
 export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 	const { token } = useToken();
@@ -291,6 +301,11 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 								{item.displayPath}
 							</span>
 							<Tag style={{ fontSize: 11 }}>{item.kind}</Tag>
+							{item.status && (
+								<Tag color={STATUS_COLOR[item.status]} style={{ fontSize: 11 }}>
+									{item.status}
+								</Tag>
+							)}
 							<Tag style={{ fontSize: 11 }}>{item.source}</Tag>
 							{item.additions !== undefined &&
 								item.deletions !== undefined && (
@@ -320,6 +335,16 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 							>
 								{t("artifacts.copy", "复制")}
 							</Button>
+							{item.openTargets && item.openTargets.length > 0 && (
+								<ArtifactOpenWith
+									openTargets={item.openTargets}
+									onOpenWith={(targetId) => {
+										fileActionService
+											.openWith(item.fullPath, targetId)
+											.catch(() => {});
+									}}
+								/>
+							)}
 						</div>
 						{item.diffPreview && item.diffPreview.trim().length > 0 && (
 							<ArtifactDiffPreview diffPreview={item.diffPreview} />
