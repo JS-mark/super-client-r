@@ -1369,3 +1369,41 @@
 - **代码事实更新**：`pnpm test:run` 稳定基线 = 129 files / 1079 tests / 0 failed（与 R2 closeout 一致，本轮复跑确认）。
 - **是否继续 loop**：**否**。终止条件全部满足——工作树 clean + 全量门禁绿（含历史阻塞的 server e2e）+ 进度文档无过期阻塞条目。收口 loop R1–R4 正式关闭。
 - **后续工作（loop 外）**：per-server runtime 回归、导出/备份深水区（zip/package/完整迁移包）、marketplace 视觉深化、byte-index/增量 JSONL parse、专用摘要卡片、table/tree/source/artifact native producer 等属产品深化项，不再纳入收口 loop。V2 Tauri 迁移需等 v1 达 `shippable` 后启动。
+
+## Gate Health Snapshot 2026-07-19 (mirror-type cleanup)
+
+> **R 编号纠正声明**：本节执行的是 **R2 closeout（commit `f7dc551`）里写明"留 R3"的那批实改**——`SessionArchiveFileEntry.kind` union 统一 + `DiagnosticExportResult` 补 `manifest` 既存 bug + 镜像类型合并。它与上方 `## Gate Health Snapshot 2026-07-18` 里的"R3 分组提交复核"**同名但不同内涵**：那个 R3 是抽样验证（零代码改动），本节 R3 是实改 shared-types 跨进程契约。编号撞车是历史会话遗留，此处按 R2 closeout 的原始定义补完，不推翻 2026-07-18 的归档结论（那份归档针对的是"分组复核 + 全量门禁"，与本节的契约修复合并各自独立成立）。
+
+### 本批落地（commit `0590d56`，branch `r2/gate-health-fixes`）
+
+| 项 | 改动 | 说明 |
+| --- | --- | --- |
+| FileEntry union 统一 | `packages/shared-types/src/electron-api.ts`：`SessionArchiveFileEntry.kind` 从 3 成员拓宽到 5 成员（加 `project-metadata` / `project-settings`） | shared 侧原本欠spec；main 在 project archive 里一直 emit 这两种 kind（`SessionStorageService.ts:956, 981`），拓宽后 shared 契约匹配实际 wire shape |
+| SessionStorageService 镜像类型合并 | `SessionArchive{FileEntry,Manifest,ExportResult,RedactionMode,ReferencedAttachment,ReferencedContentRef}` + `ProjectArchive{Manifest,ExportResult,SessionEntry,ReferencedPayloadSession}` 全部改为 re-export shared 的 alias | field-for-field 核对一致；本地 `ExportSessionArchiveOptions` / `ProjectArchiveMetadata` 保留（shared 无对应） |
+| Pair 7 既存 bug 修复 | `DiagnosticExportResult` 在 shared 侧补 `manifest: DiagnosticExportManifest` 字段 | main exporter 一直在 wire 上返回该字段，shared 契约欠spec；属契约纠正非行为变更 |
+| Preload / DiagnosticExportService 收口 | preload 本地 inline 的 `DiagnosticExportResult` 改为 import shared；`DiagnosticExportService` 本地 4 个类型改为 re-export shared | renderer 经 `electron.d.ts` 自动继承，无需改 |
+
+### 验证（5 门禁）
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff --check` | ✅ PASS | exit 0 |
+| `pnpm check` | ✅ PASS | `tsc -b --noEmit` exit 0 |
+| `pnpm lint` | ✅ PASS | oxlint 31 warnings / 0 errors，无新增 |
+| `pnpm i18n:check` | ✅ PASS | en 通过 |
+| `pnpm test:run` | ✅ PASS | 129 files / 1079 tests / 0 failed |
+
+### 已知 pre-existing 测试基建 flake（本批未引入，记为 follow-up）
+
+- **现象**：本批首次全量 `pnpm test:run` 出现 `src/test-utils/__tests__/serverFixture.test.ts` FAIL，报 `listen EADDRINUSE: address already in use :::3000`；立即重跑通过（129/1079 全绿）。
+- **根因**：`src/main/server/app.ts:177` 的 `LocalServer.start()` 走 `getPort({ port: 3000 })`，当多个 vitest worker 并行调用时会在 port 3000 上 race（get-port 看到 3000 空闲 → 两 worker 同时 listen → 一个 EADDRINUSE）。
+- **与历史阻塞的区别**：2026-07-18 之前记录的 `listen EPERM 0.0.0.0:3000` 是沙箱拒绑（权限问题，已解除）；本次 `EADDRINUSE :::3000` 是并行 worker 端口竞争（并发问题，仍存在但概率低）。
+- **是否阻塞**：否。孤立重跑（`vitest run` 单跑那 2 个 e2e）稳定通过；全量重跑也通过。属 flake，非确定性失败。
+- **建议修法（留独立批次）**：`LocalServer.start()` 改为 `getPort({ port: 0 })` 或让 test fixture 强制随机端口，消除固定 3000 的竞争面。
+
+### Retrospective
+
+- **What worked**：FileEntry union 方向有事实支撑（grep 到 main 实际 emit `project-metadata`/`project-settings`），无需问用户即可定方向 = shared 拓宽。Pair 7 补 manifest 是纯 widening（renderer 没人读 `.manifest`），向后兼容零风险。
+- **What blocked**：无代码阻塞。中途发现仓库已有 `4e7cfb8` 声明"loop R1-R4 关闭"，与用户"进 R3"指令表面冲突——经 AskUserQuestion 对齐后按用户指令做、文档里加编号纠正声明解决，没擅自推翻或无视。
+- **代码事实更新**：`SessionArchiveFileEntry.kind` 现在是 5 成员 union（shared 侧）；`DiagnosticExportResult` 现含 `manifest` 字段（shared 侧）。preprocess/preload/renderer 全部经 shared 统一。镜像类型重复声明已消除。
+- **是否继续 loop**：否。R2 closeout 写明的 R3 实改已完成验证。剩余 P-L1（`useChat.ts:404` 死 throw）、P-L2（`server/routes/llm.ts` 补 unit）、清 31 个 lint warnings、以及上面记的 EADDRINUSE flake 修法，均属独立小批次，不再纳入本 mirror-type cleanup loop。
