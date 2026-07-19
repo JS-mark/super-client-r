@@ -6,7 +6,6 @@ import {
 	LinkOutlined,
 	LoadingOutlined,
 	PlusOutlined,
-	RobotOutlined,
 	SearchOutlined,
 	ThunderboltOutlined,
 } from "@ant-design/icons";
@@ -14,7 +13,6 @@ import {
 	Alert,
 	App,
 	Button,
-	Divider,
 	Empty,
 	Form,
 	Input,
@@ -136,9 +134,6 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>([]);
 	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
 	const [manageModalOpen, setManageModalOpen] = useState(false);
-	const watchedPreset = Form.useWatch("preset", form) as
-		| ModelProviderPreset
-		| undefined;
 
 	const isZh = i18n.language?.startsWith("zh");
 

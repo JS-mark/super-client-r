@@ -14,9 +14,7 @@
  *     → accumulated text returned as tool result
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 vi.mock("electron", () => {
 	const { mkdtempSync: mk } = require("node:fs") as typeof import("node:fs");
