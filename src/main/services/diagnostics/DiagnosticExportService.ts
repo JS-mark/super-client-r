@@ -10,6 +10,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentTraceSummary } from "@super-client/shared-types/agent-trace";
 import type { SessionMeta } from "@super-client/shared-types/project";
+import type {
+	DiagnosticExportFileEntry,
+	DiagnosticExportManifest,
+	DiagnosticExportRedactionMode,
+	DiagnosticExportResult,
+} from "@super-client/shared-types/electron-api";
 import {
 	redactDiagnosticValue,
 	redactPath,
@@ -18,30 +24,15 @@ import {
 import type { AgentTraceCollector } from "../agent/trace/AgentTraceCollector";
 import type { SessionStorageService } from "../storage/SessionStorageService";
 
-export type DiagnosticExportRedactionMode = "home-and-app-data";
-
-export interface DiagnosticExportFileEntry {
-	path: string;
-	kind: "manifest" | "diagnostic-json";
-	byteLength?: number;
-	sha256?: string;
-}
-
-export interface DiagnosticExportManifest {
-	schemaVersion: 1;
-	createdAt: string;
-	appVersion: string;
-	redactionMode: DiagnosticExportRedactionMode;
-	exportDir: string;
-	files: DiagnosticExportFileEntry[];
-}
-
-export interface DiagnosticExportResult {
-	exportDir: string;
-	manifestPath: string;
-	diagnosticPath: string;
-	manifest: DiagnosticExportManifest;
-}
+// Re-export the canonical shared-types contracts so existing importers
+// (e.g. IPC handlers inferring from the service return type) keep working
+// without tracking the type's source.
+export type {
+	DiagnosticExportFileEntry,
+	DiagnosticExportManifest,
+	DiagnosticExportRedactionMode,
+	DiagnosticExportResult,
+};
 
 export interface DiagnosticSessionEntry {
 	sessionId: string;

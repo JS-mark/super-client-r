@@ -96,7 +96,18 @@ export interface SessionArchiveExportOptions {
 
 export interface SessionArchiveFileEntry {
 	path: string;
-	kind: "manifest" | "session-meta" | "session-jsonl";
+	/**
+	 * `project-metadata` / `project-settings` are only emitted by project
+	 * archives (not session archives). Widened from the earlier 3-member
+	 * union so the shared contract matches what the main process actually
+	 * writes; session-archive consumers simply never see those two kinds.
+	 */
+	kind:
+		| "manifest"
+		| "session-meta"
+		| "session-jsonl"
+		| "project-metadata"
+		| "project-settings";
 	byteLength?: number;
 	sha256?: string;
 	sourcePath?: string;
@@ -210,6 +221,13 @@ export interface DiagnosticExportResult {
 	exportDir: string;
 	manifestPath: string;
 	diagnosticPath: string;
+	/**
+	 * Inline manifest snapshot. The main-process exporter has always
+	 * returned this field on the wire; it was missing from the shared
+	 * contract (a pre-existing underspec). Added here so preload/renderer
+	 * consumers can read it without a local re-declaration.
+	 */
+	manifest: DiagnosticExportManifest;
 }
 
 /** 已迁移到 shared-types 的 ElectronAPI namespace 子集。 */

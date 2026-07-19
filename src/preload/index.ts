@@ -5,7 +5,10 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import type { LLMErrorContext } from "@super-client/shared-types/chat";
-import type { ElectronAPIMigrated } from "@super-client/shared-types/electron-api";
+import type {
+	DiagnosticExportResult,
+	ElectronAPIMigrated,
+} from "@super-client/shared-types/electron-api";
 import { createBridge } from "./bridge";
 
 // ============ 类型定义 ============
@@ -701,25 +704,7 @@ export interface AgentStreamEvent {
 	data: unknown;
 }
 
-export interface DiagnosticExportResult {
-	exportDir: string;
-	manifestPath: string;
-	diagnosticPath: string;
-	manifest: {
-		schemaVersion: 1;
-		createdAt: string;
-		appVersion: string;
-		redactionMode: "home-and-app-data";
-		exportDir: string;
-		files: Array<{
-			path: string;
-			kind: "manifest" | "diagnostic-json";
-			byteLength?: number;
-			sha256?: string;
-		}>;
-	};
-}
-
+export type { DiagnosticExportResult };
 // ============ Agent SDK 类型 ============
 
 export type AgentSDKEffort = "low" | "medium" | "high" | "max";
