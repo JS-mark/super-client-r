@@ -1407,3 +1407,35 @@
 - **What blocked**：无代码阻塞。中途发现仓库已有 `4e7cfb8` 声明"loop R1-R4 关闭"，与用户"进 R3"指令表面冲突——经 AskUserQuestion 对齐后按用户指令做、文档里加编号纠正声明解决，没擅自推翻或无视。
 - **代码事实更新**：`SessionArchiveFileEntry.kind` 现在是 5 成员 union（shared 侧）；`DiagnosticExportResult` 现含 `manifest` 字段（shared 侧）。preprocess/preload/renderer 全部经 shared 统一。镜像类型重复声明已消除。
 - **是否继续 loop**：否。R2 closeout 写明的 R3 实改已完成验证。剩余 P-L1（`useChat.ts:404` 死 throw）、P-L2（`server/routes/llm.ts` 补 unit）、清 31 个 lint warnings、以及上面记的 EADDRINUSE flake 修法，均属独立小批次，不再纳入本 mirror-type cleanup loop。
+
+## Gate Health Snapshot 2026-07-19 (quality-debt cleanup)
+
+> 接 R3 closeout 的剩余 backlog,清质保债:lint warnings + P-L2。branch `r2/gate-health-fixes`,commit `06bc06e`（lint）+ `8cf1397`（P-L2 测试）。
+
+### 落地
+
+| 项 | 改动 | 结果 |
+| --- | --- | --- |
+| **lint warnings 清理** | 12 文件:`no-unused-vars`(删未用 import/var/param + iconfont skill 12 个 catch 去绑定)、`no-useless-catch`(requestLogger 删纯重抛 catch)、`no-control-regex`(assistantContent 改 RegExp 构造保留 \u0000 sentinel 语义)、`unicorn/no-useless-fallback-in-spread`(ProjectSettingsModal 3 处加 targeted eslint-disable——TS null-check 与 unicorn 规则真冲突,运行时 no-op 但 tsc 要求) | **31 → 2 warnings**(剩 2 个是 RequestLogService 的 pre-existing `no-this-alias`,不同规则类、在 network-interceptor 代码里、本批未触) |
+| **P-L2** | 新增 `src/main/server/routes/__tests__/llm.test.ts`,7 tests 覆盖 `fetchModels` / `testConnection` 的 400/200/500 分支(直接 mock ctx,不 boot LocalServer;SSE chat-completion 的真 HTTP recursion 已由 e2e 覆盖) | 130 files / **1086 tests** / 0 failed |
+
+### P-L1 移除说明
+
+R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是死代码。本批核对后**结论不成立,移除**:该 throw 是 `messageStoreApi.appendSessionEvent` 对真实 IPC 失败的正常错误传播(契约 API);被 `useAgentSendPipeline` 的 try/catch 吞掉是 pipeline 层的容错选择,不代表 producer 的 throw 无用。相关测试(`useAgentSendPipeline.test.ts:463`)mock 的是 `appendSessionEvent` 自己 throw,与 useChat 的 throw 无关。删 throw 会破坏契约(IPC 失败静默成功)。
+
+### 验证(5 门禁)
+
+| 命令 | 结果 |
+| --- | --- |
+| `git diff --check` | ✅ exit 0 |
+| `pnpm check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0,**2 warnings**(RequestLogService pre-existing `no-this-alias`)/ 0 errors |
+| `pnpm i18n:check` | ✅ exit 0 |
+| `pnpm test:run` | ✅ exit 0,**130 files / 1086 tests / 0 failed**(本次无 EADDRINUSE flake 复现) |
+
+### Retrospective
+
+- **What worked**:lint 清理按规则分类做,no-unused-vars 是机械批处理、control-regex 和 useless-fallback 需个案判断(后者是 TS/lint 真冲突,用 targeted disable + 注释解决而非硬改)。P-L2 用最小 mock ctx 直接测 controller 方法,避免 boot LocalServer 的重负担。
+- **What blocked**:无。中途发现我之前的 lint warning 计数脚本(node 解析)有 bug,把 warning-to-location 配对错位,导致一度以为 ProjectSettingsModal 是 no-unused-vars、RequestLogService 有 catch warning——实际是 unicorn 规则和 no-this-alias。纠正后按真实规则集处理。
+- **代码事实更新**:lint 稳定基线 = **2 warnings**(剩 RequestLogService 的 `no-this-alias`,留独立批次);test 稳定基线 = 130 files / 1086 tests。
+- **是否继续 loop**:否。质保债已清(剩 2 个 no-this-alias + EADDRINUSE flake 是独立技术债,不属本质量清理 loop)。
