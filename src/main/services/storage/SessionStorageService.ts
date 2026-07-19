@@ -34,6 +34,16 @@ import { homedir } from "node:os";
 import { extname, join } from "node:path";
 import type { Message, MessagePart } from "@super-client/shared-types/chat";
 import type {
+	ProjectArchiveExportResult as SharedProjectArchiveExportResult,
+	ProjectArchiveManifest as SharedProjectArchiveManifest,
+	ProjectArchiveReferencedPayloadSession as SharedProjectArchiveReferencedPayloadSession,
+	ProjectArchiveSessionEntry as SharedProjectArchiveSessionEntry,
+	SessionArchiveExportResult as SharedSessionArchiveExportResult,
+	SessionArchiveFileEntry as SharedSessionArchiveFileEntry,
+	SessionArchiveManifest as SharedSessionArchiveManifest,
+	SessionArchiveRedactionMode as SharedSessionArchiveRedactionMode,
+	SessionArchiveReferencedAttachment as SharedSessionArchiveReferencedAttachment,
+	SessionArchiveReferencedContentRef as SharedSessionArchiveReferencedContentRef,
 	SessionMessagesPageResult,
 } from "@super-client/shared-types/electron-api";
 import type {
@@ -137,109 +147,31 @@ export interface ReadContentRefResult extends StoredContentRef {
 	nextOffset?: number;
 }
 
-export type SessionArchiveRedactionMode = "home-and-app-data";
-
 export interface ExportSessionArchiveOptions {
 	appVersion?: string;
 	includeChatContent?: boolean;
 }
 
-export interface SessionArchiveFileEntry {
-	path: string;
-	kind:
-		| "manifest"
-		| "project-metadata"
-		| "project-settings"
-		| "session-meta"
-		| "session-jsonl";
-	byteLength?: number;
-	sha256?: string;
-	sourcePath?: string;
-}
-
-export interface SessionArchiveReferencedAttachment {
-	id: string;
-	name?: string;
-	sourcePath?: string;
-	byteLength?: number;
-	missing?: boolean;
-}
-
-export interface SessionArchiveReferencedContentRef {
-	contentRef: string;
-	sha256?: string;
-	sourcePath?: string;
-	byteLength?: number;
-	mediaType?: string;
-	source?: StoredContentRef["source"];
-	missing?: boolean;
-}
-
-export interface SessionArchiveManifest {
-	schemaVersion: 1;
-	createdAt: string;
-	appVersion?: string;
-	sessionId: string;
-	projectId: string | null;
-	redactionMode: SessionArchiveRedactionMode;
-	includeChatContent: boolean;
-	exportDir: string;
-	files: SessionArchiveFileEntry[];
-	referencedPayloads: {
-		copied: false;
-		attachments: SessionArchiveReferencedAttachment[];
-		contentRefs: SessionArchiveReferencedContentRef[];
-	};
-}
-
-export interface SessionArchiveExportResult {
-	exportDir: string;
-	manifestPath: string;
-	manifest: SessionArchiveManifest;
-}
+// Archive-related types below are re-exported as aliases of the canonical
+// shared-types contracts (SessionArchiveFileEntry.kind was widened to the
+// full 5-member union on the shared side in the same change, so project
+// archives emitting `project-metadata` / `project-settings` now type-check
+// against the shared contract too). The local names are preserved for
+// import compatibility.
+export type SessionArchiveRedactionMode = SharedSessionArchiveRedactionMode;
+export type SessionArchiveFileEntry = SharedSessionArchiveFileEntry;
+export type SessionArchiveReferencedAttachment = SharedSessionArchiveReferencedAttachment;
+export type SessionArchiveReferencedContentRef = SharedSessionArchiveReferencedContentRef;
+export type SessionArchiveManifest = SharedSessionArchiveManifest;
+export type SessionArchiveExportResult = SharedSessionArchiveExportResult;
+export type ProjectArchiveSessionEntry = SharedProjectArchiveSessionEntry;
+export type ProjectArchiveReferencedPayloadSession = SharedProjectArchiveReferencedPayloadSession;
+export type ProjectArchiveManifest = SharedProjectArchiveManifest;
+export type ProjectArchiveExportResult = SharedProjectArchiveExportResult;
 
 export type ProjectArchiveMetadata = Omit<Project, "cwd"> & {
 	cwd: string;
 };
-
-export interface ProjectArchiveSessionEntry {
-	sessionId: string;
-	metaPath: string;
-	jsonlPath: string;
-}
-
-export interface ProjectArchiveReferencedPayloadSession {
-	sessionId: string;
-	attachments: SessionArchiveReferencedAttachment[];
-	contentRefs: SessionArchiveReferencedContentRef[];
-}
-
-export interface ProjectArchiveManifest {
-	schemaVersion: 1;
-	createdAt: string;
-	appVersion?: string;
-	projectId: string;
-	redactionMode: SessionArchiveRedactionMode;
-	includeChatContent: boolean;
-	exportDir: string;
-	sessionCount: number;
-	files: SessionArchiveFileEntry[];
-	project?: {
-		metadataPath?: string;
-		settingsPath?: string;
-	};
-	sessions: ProjectArchiveSessionEntry[];
-	referencedPayloads: {
-		copied: false;
-		sessions: ProjectArchiveReferencedPayloadSession[];
-	};
-}
-
-export interface ProjectArchiveExportResult {
-	exportDir: string;
-	manifestPath: string;
-	manifest: ProjectArchiveManifest;
-}
 
 export class SessionStorageService {
 	private readonly userRoot: string;
