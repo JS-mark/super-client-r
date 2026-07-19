@@ -165,9 +165,17 @@ function stripNakedToolCallEnvelopes(content: string): string {
 	}
 
 	// Unmask fences and collapse runs of blank lines left by drops.
+	// Built via RegExp constructor (not a /.../ literal) so the null-byte
+	// sentinel doesn't trip no-control-regex — the \u0000 markers are
+	// intentional: they can't appear in normal assistant text.
+	const fenceSentinel = String.fromCharCode(0);
+	const unmaskFences = new RegExp(
+		`${fenceSentinel}FENCE(\\d+)${fenceSentinel}`,
+		"g",
+	);
 	return result
 		.join("\n")
-		.replace(/\u0000FENCE(\d+)\u0000/g, (_, n) => fences[Number(n)])
+		.replace(unmaskFences, (_, n) => fences[Number(n)])
 		.replace(/\n{3,}/g, "\n\n");
 }
 

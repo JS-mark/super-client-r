@@ -36,7 +36,6 @@ export function ChatComposer({
 	isStreaming,
 	onStopStream,
 	placeholder,
-	hideToolbar = false,
 	infoBar,
 	renderFooter,
 	registerKeydownHandler,

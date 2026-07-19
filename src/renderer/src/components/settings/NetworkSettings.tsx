@@ -74,7 +74,6 @@ const DEFAULT_PROXY: ProxyConfig = {
 /* ------------------------------------------------------------------ */
 export function NetworkSettings() {
 	const { t } = useTranslation("settings");
-	const { token } = useToken();
 	const { message, modal } = App.useApp();
 
 	const [proxyConfig, setProxyConfig] = useState<ProxyConfig>(DEFAULT_PROXY);

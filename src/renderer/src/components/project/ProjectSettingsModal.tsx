@@ -243,6 +243,11 @@ export function ProjectSettingsModal({
 		: undefined;
 
 	const updateSettings = (patch: Partial<ProjectSettings>) => {
+		// `s` is `ProjectSettings | null`; spreading null is a runtime no-op,
+		// but TS requires the null-narrow, so the `?? {}` is required for the
+		// type checker even though unicorn(no-useless-fallback-in-spread)
+		// flags it. The runtime and TS views genuinely conflict here.
+		// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
 		setSettings((s) => ({ ...(s ?? {}), ...patch }));
 	};
 
@@ -250,8 +255,13 @@ export function ProjectSettingsModal({
 		patch: Partial<NonNullable<ProjectSettings["runtimePolicy"]>>,
 	) => {
 		setSettings((s) => ({
+			// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
 			...(s ?? {}),
-			runtimePolicy: { ...(s?.runtimePolicy ?? {}), ...patch },
+			runtimePolicy: {
+				// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
+				...(s?.runtimePolicy ?? {}),
+				...patch,
+			},
 		}));
 	};
 

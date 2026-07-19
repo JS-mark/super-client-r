@@ -56,8 +56,6 @@ export const requestLogger = async (ctx: Koa.Context, next: Koa.Next) => {
 
 	try {
 		await next();
-	} catch (err) {
-		throw err;
 	} finally {
 		const duration = Date.now() - start;
 		const status = ctx.status;

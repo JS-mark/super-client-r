@@ -38,7 +38,7 @@ async function detectBrowserTool() {
 			console.log("[Iconfont] 检测到 MCP 浏览器工具");
 			return { type: "mcp", name: "mcp-browser" };
 		}
-	} catch (e) {
+	} catch {
 		// MCP 不可用，继续检测其他选项
 	}
 	// 2. 检测 Playwright
@@ -46,7 +46,7 @@ async function detectBrowserTool() {
 		const playwright = await import("playwright");
 		console.log("[Iconfont] 检测到 Playwright");
 		return { type: "playwright", name: "playwright", instance: playwright };
-	} catch (e) {
+	} catch {
 		// Playwright 未安装
 	}
 	// 3. 检测 Puppeteer
@@ -54,7 +54,7 @@ async function detectBrowserTool() {
 		const puppeteer = await import("puppeteer");
 		console.log("[Iconfont] 检测到 Puppeteer");
 		return { type: "puppeteer", name: "puppeteer", instance: puppeteer };
-	} catch (e) {
+	} catch {
 		// Puppeteer 未安装
 	}
 	return null;
@@ -277,7 +277,7 @@ async function login(credentials) {
 				await browser.click(
 					'a[href="#"]:has-text("账号登录"), .login-tab:has-text("账号")',
 				);
-			} catch (e) {
+			} catch {
 				// 可能已经在账号登录页
 			}
 			// 输入账号密码
@@ -334,7 +334,7 @@ async function login(credentials) {
 				browserTool: tool.name,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "登录失败";
 		console.error(`[Iconfont] 登录失败: ${errorMessage}`);
 		return {
@@ -379,7 +379,7 @@ async function checkLoginStatus() {
 					: "登录已过期",
 			},
 		};
-	} catch (error) {
+	} catch {
 		return {
 			success: true,
 			output: {
@@ -426,7 +426,7 @@ async function search(input) {
 		// 尝试使用 API 搜索
 		try {
 			icons = await searchByAPI(keyword, limit, page);
-		} catch (apiError) {
+		} catch {
 			console.log("[Iconfont] API 搜索失败，尝试页面爬取...");
 			icons = await searchByScraping(keyword, limit, page);
 		}
@@ -475,7 +475,7 @@ async function search(input) {
 					'• 批量下载："下载全部" 或 "下载前5个"',
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "搜索失败";
 		console.error(`[Iconfont] 搜索失败: ${errorMessage}`);
 		return {
@@ -621,7 +621,7 @@ async function download(input) {
 				fileSize: svgContent.length,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "下载失败";
 		console.error(`[Iconfont] 下载失败: ${errorMessage}`);
 		return {
@@ -682,7 +682,7 @@ async function downloadBatch(input) {
 				message: `下载完成: ${results.length} 成功, ${errors.length} 失败`,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage =
 			error instanceof Error ? error.message : "批量下载失败";
 		return {

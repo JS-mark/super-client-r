@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import type { IMBotConfig, IMMessage } from "../types";
+import type { IMBotConfig } from "../types";
 
 /**
  * IM 机器人抽象基类

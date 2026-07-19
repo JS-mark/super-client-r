@@ -89,7 +89,7 @@ async function detectBrowserTool(): Promise<BrowserTool | null> {
 			console.log("[Iconfont] 检测到 MCP 浏览器工具");
 			return { type: "mcp", name: "mcp-browser" };
 		}
-	} catch (e) {
+	} catch {
 		// MCP 不可用，继续检测其他选项
 	}
 
@@ -98,7 +98,7 @@ async function detectBrowserTool(): Promise<BrowserTool | null> {
 		const playwright = await import("playwright");
 		console.log("[Iconfont] 检测到 Playwright");
 		return { type: "playwright", name: "playwright", instance: playwright };
-	} catch (e) {
+	} catch {
 		// Playwright 未安装
 	}
 
@@ -107,7 +107,7 @@ async function detectBrowserTool(): Promise<BrowserTool | null> {
 		const puppeteer = await import("puppeteer" as string);
 		console.log("[Iconfont] 检测到 Puppeteer");
 		return { type: "puppeteer", name: "puppeteer", instance: puppeteer };
-	} catch (e) {
+	} catch {
 		// Puppeteer 未安装
 	}
 
@@ -363,7 +363,7 @@ async function login(credentials: LoginCredentials): Promise<SkillResult> {
 				await browser.click(
 					'a[href="#"]:has-text("账号登录"), .login-tab:has-text("账号")',
 				);
-			} catch (e) {
+			} catch {
 				// 可能已经在账号登录页
 			}
 
@@ -428,7 +428,7 @@ async function login(credentials: LoginCredentials): Promise<SkillResult> {
 				browserTool: tool.name,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "登录失败";
 		console.error(`[Iconfont] 登录失败: ${errorMessage}`);
 		return {
@@ -478,7 +478,7 @@ async function checkLoginStatus(): Promise<SkillResult> {
 					: "登录已过期",
 			},
 		};
-	} catch (error) {
+	} catch {
 		return {
 			success: true,
 			output: {
@@ -531,7 +531,7 @@ async function search(input: SearchInput): Promise<SkillResult> {
 		// 尝试使用 API 搜索
 		try {
 			icons = await searchByAPI(keyword, limit, page);
-		} catch (apiError) {
+		} catch {
 			console.log("[Iconfont] API 搜索失败，尝试页面爬取...");
 			icons = await searchByScraping(keyword, limit, page);
 		}
@@ -584,7 +584,7 @@ async function search(input: SearchInput): Promise<SkillResult> {
 					'• 批量下载："下载全部" 或 "下载前5个"',
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "搜索失败";
 		console.error(`[Iconfont] 搜索失败: ${errorMessage}`);
 		return {
@@ -765,7 +765,7 @@ async function download(input: DownloadInput): Promise<SkillResult> {
 				fileSize: svgContent.length,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage = error instanceof Error ? error.message : "下载失败";
 		console.error(`[Iconfont] 下载失败: ${errorMessage}`);
 		return {
@@ -839,7 +839,7 @@ async function downloadBatch(input: {
 				message: `下载完成: ${results.length} 成功, ${errors.length} 失败`,
 			},
 		};
-	} catch (error) {
+	} catch {
 		const errorMessage =
 			error instanceof Error ? error.message : "批量下载失败";
 		return {

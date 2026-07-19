@@ -9,7 +9,7 @@ const DEFAULT_ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/";
 function resolveElectronPackageDir() {
 	try {
 		return dirname(require.resolve("electron/package.json"));
-	} catch (error) {
+	} catch {
 		console.error("[ensure-electron] Electron package is not installed.");
 		console.error(
 			"[ensure-electron] Run `pnpm install --no-frozen-lockfile` first.",
@@ -18,7 +18,7 @@ function resolveElectronPackageDir() {
 	}
 }
 
-function readElectronPath(electronDir) {
+function readElectronPath(_electronDir) {
 	try {
 		return require("electron");
 	} catch {
