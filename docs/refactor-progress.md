@@ -13,7 +13,7 @@
 2026-07-19 Artifact Actions v1 milestone closeout（branch `r3/artifact-actions-v1`）：
 
 - **里程碑收口**：Artifact Actions v1 三阶段（A1/A2/A3）全部完成，5 个 gate 全绿。本条为 milestone-closeout 记录，汇总 A1+A2 已有 commit 与本批 A3 收口。
-- **A1（commit 39fb557）— i18n + canDiff/diffPreview/openTargets 透传**：补齐 `artifacts.openWith`（en/zh）、`artifacts.status.{added,modified,deleted,renamed}`（en/zh）等 i18n key 与 fallback；`ArtifactLibraryItem` 新增 `canDiff`、`diffPreview`、`openTargets` 字段并把 artifact policy / changeSet file diffPreview / artifact openTargets 透传到 renderer。
+- **A1（commit 39fb557）— i18n + canDiff/diffPreview/openTargets 透传**：补齐 `artifacts.openWith`（en/zh）、`artifacts.diff.{expand,collapse,empty}`（en/zh）和 `artifacts.status.{deleted,renamed}`（en/zh）等 i18n key 与 fallback；`added`/`modified` 状态暂未分配独立 key（A3 的状态 Tag 直接渲染 `item.status` 原值，与同行 kind/source Tag 一致）。`ArtifactLibraryItem` 新增 `canDiff`、`diffPreview`、`openTargets` 字段并把 artifact policy / changeSet file diffPreview / artifact openTargets 透传到 renderer。
 - **A2（commit e32a4c4，doc 56342fa）— diff preview**：新增 `src/renderer/src/components/chat/ArtifactDiffPreview.tsx`，change-origin ArtifactLibraryItem 在 inspector 中渲染展开/折叠的 monospace diff 预览；focused test 覆盖展开/折叠、空内容占位和长 diff 完整渲染（zh fallback）。
 - **A3（本批）— openWith dropdown + status visual + docs**：
   - `src/renderer/src/lib/artifactLibrary.ts`：`ArtifactLibraryItem` 新增可选 `status?: "added" | "modified" | "deleted" | "renamed"`；在 change-set 分支 push 站点（`for (const file of changeSet.files)`）透传 `status: file.status`。不动 artifact 分支、dedup、过滤或既有 `kind` 映射。
@@ -29,7 +29,7 @@
   - `pnpm test:run` → 通过（具体 test files / tests 数字见 commit 验证记录；baseline 132 files / 1093 tests，本批新增 ≥4 用例）。
 - **Tech debt（pre-existing，与 artifact-actions 无关）**：`src/test-utils/__tests__/serverFixture.test.ts` 硬编码 bind port 3000，与 `agentBuiltinsServer.e2e.test.ts` 存在端口竞争；偶发 `EADDRINUSE: address already in use :::3000` 时需重跑 1-2 次，不属于本里程碑回归。本批未触碰该文件。
 - **Not run**：`pnpm build` / `pnpm dev`（subagent 环境不运行 GUI/打包命令；GUI 手测待用户）。
-- **剩余风险 / follow-up**：Artifact Actions v1 自动化与单元层已收口；剩余仅 GUI 端到端手测（待用户在真实 Electron 环境 once-over）。inspector 的 runtime/branch/sources 标签仍是硬编码中文（独立 cleanup 项，不在本里程碑范围）；renamed 的 oldPath 展示因共享类型 `ChatFileChangeSet.files[]` 未暴露 `oldPath` 暂只能 label 展示，需后续类型变更。
+- **剩余风险 / follow-up**：Artifact Actions v1 自动化与单元层已收口；剩余仅 GUI 端到端手测（待用户在真实 Electron 环境 once-over）。inspector 的 runtime/branch/sources 标签仍是硬编码中文（独立 cleanup 项，不在本里程碑范围）；renamed 的 oldPath 展示因共享类型 `ChatFileChangeSet.files[]` 未暴露 `oldPath` 暂只能 label 展示，需后续类型变更。A3 的状态 Tag 直接渲染 `item.status` 原值（与 kind/source Tag 一致），`status.added`/`status.modified` 的独立 i18n key 与 kind/source 标签的对齐留作后续 cleanup。
 
 2026-07-08 resumed completion audit continuation:
 
