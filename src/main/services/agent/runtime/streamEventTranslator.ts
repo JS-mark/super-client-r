@@ -27,11 +27,15 @@ import type { ChatStreamEvent } from "../../../ipc/types";
 import type { AgentRuntimeStreamEvent } from "@super-client/shared-types/agent-runtime";
 import type {
 	AssistantPartEvent,
+	ArtifactMessagePart,
 	CodeBlockMessagePart,
 	DataMessagePart,
 	DiffMessagePart,
 	MessagePart,
 	ProjectRulesSnapshotDto,
+	SourcesMessagePart,
+	TableMessagePart,
+	TreeMessagePart,
 } from "@super-client/shared-types/chat";
 
 const RUNTIME_ID = "llm-loop" as const;
@@ -320,6 +324,30 @@ function buildMessagePart(
 			// Invalid JSON still renders as a code block below.
 		}
 	}
+	if (block.language === "table") {
+		const parsed = parseTable(block.content);
+		if (parsed) {
+			return { ...base, type: "table", ...parsed } satisfies TableMessagePart;
+		}
+	}
+	if (block.language === "tree") {
+		const nodes = parseTree(block.content);
+		if (nodes.length > 0) {
+			return { ...base, type: "tree", nodes } satisfies TreeMessagePart;
+		}
+	}
+	if (block.language === "sources") {
+		const sources = parseSources(block.content);
+		if (sources.length > 0) {
+			return { ...base, type: "sources", sources } satisfies SourcesMessagePart;
+		}
+	}
+	if (block.language === "artifact") {
+		const parsed = parseArtifact(block.content);
+		if (parsed) {
+			return { ...base, type: "artifact", ...parsed } satisfies ArtifactMessagePart;
+		}
+	}
 	if (block.language === "diff" || looksLikeDiff(block.content)) {
 		return {
 			...base,
@@ -344,6 +372,165 @@ function looksLikeDiff(content: string): boolean {
 		/^@@\s/m.test(content) ||
 		/^\+\+\+ [ab]\//m.test(content)
 	);
+}
+
+// ── Structured-body parsers for table / tree / sources / artifact ─────
+// All four follow the json-producer contract: return null/[] on malformed
+// input so buildMessagePart falls through to the default code_block branch
+// (LLM-written fences that don't parse degrade gracefully, never crash).
+
+/**
+ * Parse a GFM-style markdown table fence body into columns + rows.
+ * Requires a header row followed by a `|---|---|` separator row. Cells are
+ * kept as strings (no type coercion) for predictability.
+ */
+function parseTable(content: string): {
+	columns: string[];
+	rows: unknown[][];
+	title?: string;
+} | null {
+	const lines = content.split(/\r?\n/).filter((l) => l.trim() !== "");
+	if (lines.length < 2) return null;
+	const splitRow = (line: string): string[] =>
+		line
+			.replace(/^\s*\|/, "")
+			.replace(/\|\s*$/, "")
+			.split("|")
+			.map((c) => c.trim());
+	const header = splitRow(lines[0]);
+	if (header.length === 0) return null;
+	// Row 1 must be the separator: only dashes, colons, pipes, whitespace,
+	// and must contain at least one dash (GFM `|---|` / `|:--:|` shapes).
+	const sep = lines[1].trim();
+	if (!/^[|\s:-]+$/.test(sep) || !sep.includes("-")) return null;
+	const rows: unknown[][] = [];
+	for (let i = 2; i < lines.length; i++) {
+		const cells = splitRow(lines[i]);
+		// Pad/truncate to header width so columns stay aligned.
+		const padded: unknown[] = header.map((_, idx) => cells[idx] ?? "");
+		rows.push(padded);
+	}
+	return { columns: header, rows };
+}
+
+/**
+ * Parse an indented tree fence body (tree-command style) into flat nodes
+ * with parentId inferred from indentation level. Accepts 2-space or tab
+ * indentation; optional `kind:file` / `kind:folder` prefix per line.
+ */
+function parseTree(content: string): TreeMessagePart["nodes"] {
+	const lines = content.split(/\r?\n/).filter((l) => l.trim() !== "");
+	if (lines.length === 0) return [];
+	const nodes: TreeMessagePart["nodes"] = [];
+	// stack of [level, nodeId] for ancestor tracking.
+	const stack: Array<{ level: number; id: string }> = [];
+	lines.forEach((line, idx) => {
+		const indentMatch = line.match(/^[\t ]*/);
+		const indent = indentMatch ? indentMatch[0] : "";
+		// Normalize: tabs count as one level each; 2 spaces = one level.
+		const level = indent.replace(/\t/g, "  ").length / 2;
+		let rest = line.slice(indent.length);
+		let kind: TreeMessagePart["nodes"][number]["kind"];
+		const kindMatch = rest.match(/^kind:(file|folder|task|item)\s+/);
+		if (kindMatch) {
+			kind = kindMatch[1] as NonNullable<typeof kind>;
+			rest = rest.slice(kindMatch[0].length);
+		}
+		const label = rest.replace(/^[-•*]\s*/, "").trim();
+		if (!label) return;
+		const id = `node-${idx}`;
+		// Pop stack until top is shallower than this node.
+		while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+			stack.pop();
+		}
+		const parentId = stack.length > 0 ? stack[stack.length - 1].id : undefined;
+		const node: TreeMessagePart["nodes"][number] = { id, label };
+		if (parentId !== undefined) node.parentId = parentId;
+		if (kind !== undefined) node.kind = kind;
+		nodes.push(node);
+		stack.push({ level, id });
+	});
+	return nodes;
+}
+
+/**
+ * Parse a markdown-list fence body into sources. Each `- ...` line becomes a
+ * source; `[title](url)` sets title+url+sourceType:web, a bare path-like
+ * string sets path+sourceType:file, otherwise title only.
+ */
+function parseSources(content: string): SourcesMessagePart["sources"] {
+	const lines = content.split(/\r?\n/).filter((l) => l.trim() !== "");
+	const sources: SourcesMessagePart["sources"] = [];
+	lines.forEach((line, idx) => {
+		const trimmed = line.replace(/^\s*[-*]\s+/, "").trim();
+		if (!trimmed) return;
+		const link = trimmed.match(/^\[([^\]]*)\]\(([^)\s]+)\)$/);
+		if (link) {
+			sources.push({
+				id: `src-${idx}`,
+				title: link[1] || undefined,
+				url: link[2],
+				sourceType: "web",
+			});
+			return;
+		}
+		// Bare path: looks like a filesystem path (contains / or \ and no spaces-only).
+		if (/^[^\s]*[/\\][^\s]*$/.test(trimmed)) {
+			sources.push({
+				id: `src-${idx}`,
+				path: trimmed,
+				sourceType: "file",
+			});
+			return;
+		}
+		sources.push({ id: `src-${idx}`, title: trimmed, sourceType: "unknown" });
+	});
+	return sources;
+}
+
+/**
+ * Parse an artifact JSON fence body. Requires at least `artifactId`; unknown
+ * `type` values normalize to "unknown". Returns null on invalid JSON or
+ * missing artifactId so buildMessagePart falls back to code_block.
+ */
+function parseArtifact(content: string): {
+	artifactId: string;
+	artifactType: ArtifactMessagePart["artifactType"];
+	title?: string;
+	preview?: string;
+} | null {
+	let value: {
+		artifactId?: unknown;
+		type?: unknown;
+		title?: unknown;
+		preview?: unknown;
+	};
+	try {
+		value = JSON.parse(content);
+	} catch {
+		return null;
+	}
+	if (typeof value.artifactId !== "string" || !value.artifactId) return null;
+	const artifactType: ArtifactMessagePart["artifactType"] = (() => {
+		if (
+			value.type === "markdown" ||
+			value.type === "html" ||
+			value.type === "image" ||
+			value.type === "file"
+		) {
+			return value.type;
+		}
+		return "unknown";
+	})();
+	const result: {
+		artifactId: string;
+		artifactType: ArtifactMessagePart["artifactType"];
+		title?: string;
+		preview?: string;
+	} = { artifactId: value.artifactId, artifactType };
+	if (typeof value.title === "string") result.title = value.title;
+	if (typeof value.preview === "string") result.preview = value.preview;
+	return result;
 }
 
 function parseDiffFiles(content: string): DiffMessagePart["files"] {

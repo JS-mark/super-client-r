@@ -103,6 +103,193 @@ describe("ChatToRuntimeTranslator", () => {
 		expect(started[2]?.files).toHaveLength(1);
 	});
 
+	it("emits a table part from a markdown-table fence", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: [
+					"```table",
+					"| name | age |",
+					"| --- | --- |",
+					"| Ada | 36 |",
+					"| Bob | 24 |",
+					"```",
+				].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: { type: string; part?: { type: string; columns?: string[]; rows?: unknown[][] } };
+		}>;
+		expect(partEvents.map((e) => e.partEvent.type)).toEqual([
+			"assistant.part_start",
+			"assistant.part_done",
+		]);
+		const part = partEvents[0]?.partEvent.part;
+		expect(part).toMatchObject({ type: "table" });
+		expect(part?.columns).toEqual(["name", "age"]);
+		expect(part?.rows).toEqual([
+			["Ada", "36"],
+			["Bob", "24"],
+		]);
+	});
+
+	it("emits a tree part from an indented fence", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: [
+					"```tree",
+					"src/",
+					"  index.ts",
+					"  lib/",
+					"    utils.ts",
+					"```",
+				].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: {
+				type: string;
+				part?: { type: string; nodes?: Array<{ id: string; label: string; parentId?: string }> };
+			};
+		}>;
+		const part = partEvents[0]?.partEvent.part;
+		expect(part).toMatchObject({ type: "tree" });
+		expect(part?.nodes).toHaveLength(4);
+		expect(part?.nodes?.[0]).toMatchObject({ id: "node-0", label: "src/" });
+		expect(part?.nodes?.[0]?.parentId).toBeUndefined();
+		// index.ts + lib/ are children of src/ (node-0)
+		expect(part?.nodes?.[1]).toMatchObject({ id: "node-1", parentId: "node-0" });
+		expect(part?.nodes?.[2]).toMatchObject({ id: "node-2", parentId: "node-0" });
+		// utils.ts is child of lib/ (node-2)
+		expect(part?.nodes?.[3]).toMatchObject({ id: "node-3", parentId: "node-2" });
+	});
+
+	it("emits a sources part from a markdown-list fence", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: [
+					"```sources",
+					"- [Google](https://google.com)",
+					"- /etc/hosts",
+					"- Plain note",
+					"```",
+				].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: {
+				type: string;
+				part?: {
+					type: string;
+					sources?: Array<{ id: string; title?: string; url?: string; path?: string; sourceType?: string }>;
+				};
+			};
+		}>;
+		const part = partEvents[0]?.partEvent.part;
+		expect(part).toMatchObject({ type: "sources" });
+		expect(part?.sources).toHaveLength(3);
+		expect(part?.sources?.[0]).toMatchObject({
+			title: "Google",
+			url: "https://google.com",
+			sourceType: "web",
+		});
+		expect(part?.sources?.[1]).toMatchObject({
+			path: "/etc/hosts",
+			sourceType: "file",
+		});
+		expect(part?.sources?.[2]).toMatchObject({
+			title: "Plain note",
+			sourceType: "unknown",
+		});
+	});
+
+	it("emits an artifact part from a JSON fence", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: [
+					"```artifact",
+					JSON.stringify({
+						artifactId: "art-1",
+						type: "markdown",
+						title: "Notes",
+						preview: "# hi",
+					}),
+					"```",
+				].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: {
+				type: string;
+				part?: {
+					type: string;
+					artifactId?: string;
+					artifactType?: string;
+					title?: string;
+					preview?: string;
+				};
+			};
+		}>;
+		const part = partEvents[0]?.partEvent.part;
+		expect(part).toMatchObject({
+			type: "artifact",
+			artifactId: "art-1",
+			artifactType: "markdown",
+			title: "Notes",
+			preview: "# hi",
+		});
+	});
+
+	it("falls back to code_block when a table fence body is malformed", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				// Missing the |---| separator row → parseTable returns null.
+				content: ["```table", "| name | age |", "| Ada | 36 |", "```"].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: { part?: { type: string; language?: string } };
+		}>;
+		expect(partEvents[0]?.partEvent.part?.type).toBe("code_block");
+		expect(partEvents[0]?.partEvent.part?.language).toBe("table");
+	});
+
+	it("falls back to code_block when an artifact JSON is invalid", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: ["```artifact", "{not valid json", "```"].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: { part?: { type: string; language?: string } };
+		}>;
+		expect(partEvents[0]?.partEvent.part?.type).toBe("code_block");
+		expect(partEvents[0]?.partEvent.part?.language).toBe("artifact");
+	});
+
 	it("tool_call → tool.call with parsed input", () => {
 		const out = collect([
 			{
