@@ -324,6 +324,21 @@ beforeEach(() => {
 					data: { purged: true, previousCount: 0, legacyDir: "" },
 				}),
 			},
+			recovery: {
+				exportBundle: vi.fn().mockResolvedValue({
+					success: true,
+					data: {
+						bundleDir: "/redacted/bundle",
+						manifestPath: "/redacted/bundle/bundle-manifest.json",
+						manifest: {
+							schemaVersion: 1,
+							createdAt: "2026-07-20T00:00:00Z",
+							includeChatContent: false,
+							entries: [],
+						},
+					},
+				}),
+			},
 		},
 		configurable: true,
 	});

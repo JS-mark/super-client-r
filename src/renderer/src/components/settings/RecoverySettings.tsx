@@ -154,6 +154,7 @@ export function RecoverySettings() {
 		null,
 	);
 	const [exportingDiagnostic, setExportingDiagnostic] = useState(false);
+	const [exportingBundle, setExportingBundle] = useState(false);
 	const [exportFeedback, setExportFeedback] =
 		useState<SessionExportFeedback | null>(null);
 	const recoveryWizardModel = useMemo(
@@ -813,6 +814,50 @@ export function RecoverySettings() {
 		}
 	}, [t]);
 
+	/**
+	 * Export a combined recovery bundle: session archives + project
+	 * archives + diagnostic snapshot, all under one directory with a
+	 * shared bundle-manifest.json. Directory-only today (zip packaging is
+	 * a follow-up). No confirm modal — this is an additive read-only
+	 * export, not destructive.
+	 */
+	const handleExportBundle = useCallback(async () => {
+		setExportingBundle(true);
+		try {
+			const result = await window.electron.recovery.exportBundle({
+				sessionIds: sessionExportRows.map((row) => row.id),
+				projectIds: projects
+					.filter((p) => !p.archived)
+					.map((p) => p.id),
+				includeDiagnostic: true,
+				// Chat content is opt-in — matches the archive default.
+				includeChatContent: false,
+			});
+			if (!result.success || !result.data) {
+				throw new Error(result.error ?? "exportBundle failed");
+			}
+			message.success(
+				t(
+					"settingsNav.recovery.bundleExportSuccess",
+					"Recovery bundle exported ({{count}} entries)",
+					{
+						ns: "settings",
+						count: result.data.manifest.entries.length,
+					},
+				),
+			);
+		} catch (error) {
+			console.warn("[RecoverySettings] bundle export failed:", error);
+			message.error(
+				t("settingsNav.recovery.bundleExportError", "Bundle export failed", {
+					ns: "settings",
+				}),
+			);
+		} finally {
+			setExportingBundle(false);
+		}
+	}, [sessionExportRows, projects, t]);
+
 	return (
 		<div className="space-y-5">
 			<SettingSection
@@ -1381,17 +1426,32 @@ export function RecoverySettings() {
 					{isFeedbackFor(exportFeedback, "diagnostic") ? (
 						<div className="mb-3">{renderExportFeedback(exportFeedback)}</div>
 					) : null}
-					<Button
-						icon={<DownloadOutlined />}
-						loading={exportingDiagnostic}
-						onClick={handleExportDiagnostic}
-					>
-						{t(
-							"settingsNav.recovery.exportDiagnostics",
-							"Export diagnostics",
-							{ ns: "settings" },
-						)}
-					</Button>
+					<div className="flex items-center gap-2">
+						<Button
+							icon={<DownloadOutlined />}
+							loading={exportingDiagnostic}
+							onClick={handleExportDiagnostic}
+						>
+							{t(
+								"settingsNav.recovery.exportDiagnostics",
+								"Export diagnostics",
+								{ ns: "settings" },
+							)}
+						</Button>
+						<Button
+							type="primary"
+							icon={<DownloadOutlined />}
+							loading={exportingBundle}
+							onClick={handleExportBundle}
+							data-testid="bundle-export"
+						>
+							{t(
+								"settingsNav.recovery.exportBundle",
+								"Export recovery bundle",
+								{ ns: "settings" },
+							)}
+						</Button>
+					</div>
 				</div>
 			</SettingSection>
 		</div>

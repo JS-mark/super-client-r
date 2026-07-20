@@ -230,6 +230,49 @@ export interface DiagnosticExportResult {
 	manifest: DiagnosticExportManifest;
 }
 
+/**
+ * Options for a combined "recovery bundle" — one directory containing
+ * session archives + project archives + a diagnostic snapshot, all sharing
+ * a single top-level manifest. The bundle is a plain directory tree today;
+ * zip packaging is a separate follow-up so this contract stays stable.
+ */
+export interface RecoveryBundleExportOptions {
+	/** Session ids to include (each exported via `exportSessionArchive`). */
+	sessionIds?: string[];
+	/** Project ids to include (each exported via `exportProjectArchive`). */
+	projectIds?: string[];
+	/** Include a `diagnostic/` snapshot (default false). */
+	includeDiagnostic?: boolean;
+	/** Passed through to session/project archive exporters. */
+	includeChatContent?: boolean;
+	/** Optional app version marker (defaults to service's own reader). */
+	appVersion?: string;
+}
+
+export interface RecoveryBundleEntry {
+	kind: "session" | "project" | "diagnostic";
+	/** The id (sessionId / projectId), or `"diagnostic"` for the snapshot. */
+	id: string;
+	/** Sub-path inside the bundle dir (e.g. `sessions/<sid>` / `diagnostic`). */
+	path: string;
+}
+
+export interface RecoveryBundleManifest {
+	schemaVersion: 1;
+	createdAt: string;
+	appVersion?: string;
+	includeChatContent: boolean;
+	entries: RecoveryBundleEntry[];
+}
+
+export interface RecoveryBundleExportResult {
+	/** App-managed absolute path to the bundle directory. */
+	bundleDir: string;
+	/** Path to `bundle-manifest.json` inside `bundleDir`. */
+	manifestPath: string;
+	manifest: RecoveryBundleManifest;
+}
+
 /** 已迁移到 shared-types 的 ElectronAPI namespace 子集。 */
 export interface ElectronAPIMigrated {
 	runtime: {
@@ -587,6 +630,17 @@ export interface ElectronAPIMigrated {
 			}>
 		>;
 		};
+
+	/**
+	 * Combined recovery bundle export. Orchestrates session / project /
+	 * diagnostic archive exporters into one bundle directory with a shared
+	 * top-level manifest. Directory-only today; zip packaging is a follow-up.
+	 */
+	recovery: {
+		exportBundle: (
+			options?: RecoveryBundleExportOptions,
+		) => Promise<IPCResponse<RecoveryBundleExportResult>>;
+	};
 
 	/**
 	 * AgentRuntime 适配层（spec: 2026-06-21-agent-runtime-adapter-design）。
