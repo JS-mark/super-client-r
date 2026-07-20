@@ -1587,3 +1587,63 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无代码阻塞。中途遇到 antd Button wave effect 在 jsdom 崩溃(读 undefined.ELEMENT_NODE)——和 RecoverySettings.test 同样问题,mock antd 解决;mock Button 一开始没转发 `data-testid` 导致测试找不到元素,加 `...rest` 修复;一处 TS strict 的 closure narrowing 问题(`if(harness)` 在 act callback 内不生效)用局部 const 捕获解决。3 个小问题都被测试/类型检查抓住,没漏到后面。
 - **代码事实更新**:`RecoveryWizardPanel` 现在是真 wizard(currentStepId + Prev/Next + per-step action by actionKind);archived/orphan remediation 已接入 wizard;test 基线 = 131 files / **1106 tests**。
 - **下一步可选**:wizard 的另 3 个子工作流(bundle / cleanup / relink),或转其他 Remaining Gaps(export zip / remote lifecycle)。
+
+## 2026-07-20 feat: physical cleanup (deleteOrphan / purgeTombstone / legacyPurge)
+
+> Remaining Gaps "Settings recovery UI" 的第 2 个子工作流(物理 cleanup)。接续上轮 wizard 状态机。branch `r2/gate-health-fixes`,commit `d103d93`。
+
+### 落地
+
+3 个物理删除 IPC + service 方法 + confirm modal UI。每个都有 containment guards(不可逆操作的安全设计)。
+
+| Op | Service | 关键 guard |
+| --- | --- | --- |
+| **deleteOrphan** | `ProjectStorageService`,删 `<userRoot>/projects/<projectId>/` | (1) projectId 拒 `/`/`\`/`..`/空 (2) 路径**从 projectId 派生**(绝不从 `entry.cwd`,那是用户真实项目工作目录);(3) 断言 resolved 在 projects 根内;(4) 拒删注册中项目(用 `remove` 走注册注销路径);(5) `isBlockedPath` L3 |
+| **purgeTombstone** | `SessionStorageService`,删 meta+jsonl+session subdir | (1) `findMeta(includeDeleted:true)`,missing 返 `{purged:false}`;(2) **拒 live session**(`!meta.deletedAt` 抛);(3) 断言 bucket 在 userRoot 内;(4) L3 |
+| **purge**(legacy) | `LegacyImporter`,删 `<userData>/chats/<userId>/` | (1) 拒 un-imported chats(`detect().count > 0 && !alreadyImported` 抛);(2) 断言 `info.legacyDir` 匹配 `app.getPath("userData")` 派生的期望路径;(3) L3;(4) `migrationV2Done` flag 保留 |
+
+### 关键安全事实(subagent 探查确认,最高优先)
+
+**`deleteOrphan` 绝不能 `rmSync(orphan.cwd)`** —— `ListOrphansEntry.cwd` 是用户的真实项目工作目录(源代码!),只有 `projectDir(projectId)`(app-managed storage)能删。测试专门写了一个 tmpdir 作为假 cwd,删完 orphan 断言 cwd **仍存在**,把这个 invariant 钉死。
+
+### IPC 6-step + 顺带修复的 pre-existing bug
+
+3 个 op 各自走完整链:type → service → api-impl 一行 → auto-register → preload key → renderer call。中途**顺带修复**:`listDeleted`/`restoreDeleted` 早已在 sessions type 里定义,但**preload createBridge key list 漏了**,一直是"type 有,renderer 调用会崩"的死状态。本批把它们补上了。
+
+### UI 挂载
+
+3 个 danger 按钮 + `App.useApp()` modal.confirm(红 ExclamationCircleFilled 图标、danger OK 按钮,镜像 `ProjectSettingsModal` 项目删除模式):
+- **orphan Delete**:orphan 列表行的 Restore 旁
+- **session Purge permanently**:Session Export 列表 tombstoned 行的 Export 旁(条件渲染)
+- **legacy Delete legacy data**:Import Legacy Chats 按钮旁(gate on `count > 0 || alreadyImported`)
+
+**不加到 RecoveryWizardPanel**——wizard 是 safe-mode only,与 destructive 操作语义冲突。用户进 wizard 走指引恢复,destructive ops 在相邻 SettingSection 里,靠近对应的 per-item Restore 按钮。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `git diff --check` | ✅ exit 0 |
+| `pnpm check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0(2 warnings,无新增) |
+| `pnpm i18n:check` | ✅ exit 0 |
+| `pnpm test:run` | ✅ exit 0,**131 files / 1116 tests / 0 failed**(+10:deleteOrphan 4 + purgeTombstone 3 + legacyPurge 3) |
+
+### 测试覆盖(每个 op 3-4 case)
+
+- **deleteOrphan**:happy(专门用真 tmpdir 作 cwd,断言 cwd 未被 touch)、幂等、unsafe id 拒(`../`、`/`、`\`、空)、拒注册中项目
+- **purgeTombstone**:soft-delete 后 purge 断言 meta+jsonl 全删且不在 listDeleted、拒 live session、幂等
+- **legacyPurge**:importAll 后 purge 断言 dir 全删且 detect 返 count:0、un-imported 时拒、dir 不存在返 `purged:false`
+
+### Remaining Gaps 更新
+
+"Settings recovery UI" 的 **wizard 状态机 + 物理 cleanup** 完成。剩 2 个子工作流(独立):
+- **backup/export bundle**(可能引入 zip 库)
+- **relink-with-path-change**(`restoreOrphan` hash mismatch 时接受新 cwd)
+
+### Retrospective
+
+- **What worked**:探查阶段 subagent 把最高安全风险(`deleteOrphan` 误删 cwd)直接标出来,让 plan 一开始就把"不删 cwd"作为 load-bearing invariant。每个 service 方法都镜像了现有 `restoreOrphan`/`delete` 的 pattern,IPC 6-step 走 registerAPI 自动路径(零手写 handler),模式风险低。测试用真 tmpdir 作 fake cwd 把"不删 cwd"这个 invariant 直接钉死,不是靠"信 code review"。
+- **What blocked**:无代码阻塞。中途发现 `listDeleted`/`restoreDeleted` 在 preload key list 漏了(pre-existing bug,type 有但 renderer 调用会崩),顺带补上。RecoverySettings.test 需要补 antd `App` mock(`App.useApp()` 返 modal stub 让 onOk 同步执行)+ 新图标 mock,3 处补齐,现有 9 个测试仍全绿。
+- **代码事实更新**:3 个物理删除路径全部落地并有 guard 保护;preload sessions bridge 现在暴露完整的 delete/list/restore/purge tombstone 语义;test 基线 = 131 files / **1116 tests**。
+- **下一步可选**:recovery wizard 剩 2 子工作流(bundle / relink),或转其他 Remaining Gaps(export zip / remote lifecycle)。
