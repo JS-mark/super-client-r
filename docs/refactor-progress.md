@@ -1484,3 +1484,60 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:中途 table producer 的 separator 正则 `[\s:-]+` 把 `:` 和 `-` 当 ASCII range 解析出错,导致 `| --- | --- |` 匹配失败、测试红了。改成简单的字符类 `[|\s:-]+` 修好——这是真 bug 不是 flake,测试抓住的。
 - **代码事实更新**:`streamEventTranslator.buildMessagePart` 现支持 code/json/diff/table/tree/sources/artifact 7 种 fence producer;test 基线 = 130 files / **1092 tests**。
 - **是否继续 loop**:本轮是功能开发(非 gate-health loop),无 loop 概念。下一步可选:delta batching、或转其他 Remaining Gaps(recovery wizard / export zip / remote lifecycle)。
+
+## 2026-07-20 feat: stream structured parts (E1 — open-fence state machine + throttle)
+
+> plan task E1("part delta batch 合并,避免每 token 一行")的实改。branch `r2/gate-health-fixes`,commit `ea078d4`。接续上轮 structured parts producer,把 producer 从 finalize-then-emit 改成真流式。
+
+### 落地
+
+`streamEventTranslator` 加 per-instance fence 状态机,每个 chunk 驱动:
+
+| 状态 | 行为 |
+| --- | --- |
+| fence 外 | 扫描 buffer 尾部找开标记 ` ``` `;开时 emit `part_start`(type:`code_block`,state:`streaming`),记 language |
+| fence 内 | 累积 content;**按行边界**(非 per-token)flush `part_delta`——这就是 E1 的 batching |
+| 闭合(` ``` ` 或 stream end) | flush 残余 content → `part_update` **re-classify**(body 能 parse 成 table/tree/sources/artifact/json/diff 就替换成结构化 part,否则保持 code_block)→ `part_done` |
+
+设计要点:
+- **所有 fence 先以 code_block 流式出现**(用户立刻看到代码边写边显示),闭合时 re-classify 成最终结构化卡片——因为 table/tree 等没法逐 token parse,但 code_block 能。
+- **batching 在 producer 侧**(按行 flush),不改 renderer/storage。避免 per-token 一次 JSONL append+fsync + 一次 re-render。
+- 跨 chunk 边界的开标记处理:outside buffer 留尾部切片;info-string 换行未到的开标记等下个 chunk。
+
+### 不是 gap(探查确认)
+
+- **renderer 不需改**:`chatMessageStore.applyAssistantPartToMessage` 早有 `part_delta`/`part_update`/`part_done` 分支(`:114-152`)。
+- **JSONL replay 不需改**:`jsonl.ts:261-277` 早处理 part_delta。
+- **`AssistantPartEvent` union 不需改**:5 个变体早定义。
+- **唯一改动**:`streamEventTranslator.ts` 加状态机 + 删 dead code(`buildStructuredAssistantPartEvents`/`extractFencedBlocks`)。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `git diff --check` | ✅ exit 0 |
+| `pnpm check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0(2 warnings,无新增——test helper 的 3 处 `?? {}` 加了 targeted disable) |
+| `pnpm i18n:check` | ✅ exit 0 |
+| `pnpm test:run` | ✅ exit 0,**130 files / 1097 tests / 0 failed**(+5 streaming 专用测试) |
+
+### 测试覆盖(新增 5 个 streaming 专用)
+
+1. 多 chunk fence:start → delta → update → done 完整序列
+2. 行边界 throttle:单行内 4 个 token chunk 只发 1 个 delta(非 per-token)
+3. part_start 是 code_block,闭合后 re-classify 成 table
+4. `done` 时未闭合的 fence 仍被 finalize(completeFence:false)
+5. 连续两个 fence:闭合后 outside-fence 扫描正确恢复
+
+原有 6 个 structured-part 测试改成用 `finalPartsArray()` 折叠事件序列(因为结构化类型现在经 part_update 到达,不在 part_start)。
+
+### Remaining Gaps 更新
+
+"Full structured event stream" 项**整体完成**:producer(code/json/diff/table/tree/sources/artifact 7 种)+ 流式(E1 delta batching)都已落地。该项从 Remaining Gaps 移除。
+
+### Retrospective
+
+- **What worked**:探查阶段先确认 renderer/JSONL/union 都不是 gap,把改动精确收敛到 1 个 producer 文件——避免了改 renderer 或重定义 event 契约的多文件返工。两个关键设计决策(结构化类型策略=全部流式+闭合 re-classify、batching 位置=producer 侧)经 AskUserQuestion 让用户定,没猜。5 个 streaming 测试覆盖了状态机的所有转换(开/关/跨 chunk/未闭合/连续)。
+- **What blocked**:无代码阻塞。中途 lint 多了 3 个 `unicorn/no-useless-fallback-in-spread`(test helper 的 `?? {}`)——和 ProjectSettingsModal 同样的 TS-null-check vs unicorn 规则真冲突,加了 targeted disable + 注释解决。
+- **代码事实更新**:`streamEventTranslator` 现在是流式 producer(fence 状态机 + 行边界 throttle + 闭合 re-classify);test 基线 = 130 files / **1097 tests**。"Full structured event stream" Remaining Gap 项整体完成。
+- **下一步可选**:转其他 Remaining Gaps —— recovery wizard 完整版 / export zip 打包 / remote lifecycle 状态机。
