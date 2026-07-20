@@ -49,8 +49,10 @@ vi.mock("@ant-design/icons", () => ({
 	CopyOutlined: () => <span aria-hidden="true" />,
 	DownloadOutlined: () => <span aria-hidden="true" />,
 	ImportOutlined: () => <span aria-hidden="true" />,
+	LeftOutlined: () => <span aria-hidden="true" />,
 	LinkOutlined: () => <span aria-hidden="true" />,
 	ReloadOutlined: () => <span aria-hidden="true" />,
+	RightOutlined: () => <span aria-hidden="true" />,
 	UndoOutlined: () => <span aria-hidden="true" />,
 }));
 
@@ -340,9 +342,18 @@ describe("RecoverySettings session export", () => {
 		);
 		expect(wizard).toBeTruthy();
 		expect(container?.textContent).toContain("Recovery checklist");
+		// The wizard now shows ONE step at a time (recommended = orphans here,
+		// count 1) plus a Recommended tag and Prev/Next navigation.
 		expect(container?.textContent).toContain("Restore orphan projects (1)");
-		expect(container?.textContent).toContain("Import legacy chats (2)");
 		expect(container?.textContent).toContain("Recommended");
+		// The legacy step's count is visible only after navigating to it.
+		expect(container?.textContent).not.toContain("Import legacy chats (2)");
+		await act(async () => {
+			getButtonsByText("Next")[0]?.click();
+			await Promise.resolve();
+		});
+		// After Next we land on the legacy step, whose count (2) now shows.
+		expect(container?.textContent).toContain("Import legacy chats (2)");
 		expect(container?.textContent).not.toContain("/Users/mark/private");
 	});
 

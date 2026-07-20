@@ -90,6 +90,7 @@ export function RecoverySettings() {
 	const { token } = useToken();
 	const projects = useProjectStore((s) => s.projects);
 	const loadProjects = useProjectStore((s) => s.load);
+	const archive = useProjectStore((s) => s.archive);
 	const conversations = useChatStore((s) => s.conversations);
 	const currentConversationId = useChatStore((s) => s.currentConversationId);
 	const casualSessions = useSessionListStore((s) => s.casual);
@@ -231,6 +232,44 @@ export function RecoverySettings() {
 		},
 		[loadProjects, refreshRecoveryStatus, t],
 	);
+
+	/**
+	 * Wizard-driven archived restore. The wizard step is a single button (not a
+	 * per-row list), so it restores the first archived project and lets the
+	 * user repeat for additional ones. The full per-project list stays in the
+	 * Archived Projects section below for targeted restores.
+	 */
+	const handleRestoreArchivedFromWizard = useCallback(async () => {
+		const firstArchived = projects.find((project) => project.archived);
+		if (!firstArchived) return;
+		try {
+			await archive(firstArchived.id, false);
+			await loadProjects();
+			await refreshRecoveryStatus();
+			message.success(
+				t("settingsNav.recovery.archivedRestoreSuccess", "Project restored", {
+					ns: "settings",
+				}),
+			);
+		} catch (error) {
+			console.warn("[RecoverySettings] archived restore failed:", error);
+			message.error(
+				t("settingsNav.recovery.archivedRestoreError", "Restore failed", {
+					ns: "settings",
+				}),
+			);
+		}
+	}, [projects, archive, loadProjects, refreshRecoveryStatus, t]);
+
+	/**
+	 * Wizard-driven orphan restore. Restores the first listed orphan; the full
+	 * per-project list with explicit paths stays in the orphans section below.
+	 */
+	const handleRestoreOrphanFromWizard = useCallback(async () => {
+		const first = orphans[0];
+		if (!first) return;
+		await handleRestoreOrphan(first.projectId);
+	}, [orphans, handleRestoreOrphan]);
 
 	const handleImportLegacy = useCallback(async () => {
 		setImporting(true);
@@ -625,6 +664,8 @@ export function RecoverySettings() {
 						onRefresh={refreshRecoveryStatus}
 						onImportLegacy={handleImportLegacy}
 						onExportDiagnostics={handleExportDiagnostic}
+						onRestoreArchived={handleRestoreArchivedFromWizard}
+						onRestoreOrphan={handleRestoreOrphanFromWizard}
 					/>
 				</div>
 			</SettingSection>
