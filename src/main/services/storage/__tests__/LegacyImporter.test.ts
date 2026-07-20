@@ -252,3 +252,49 @@ describe("LegacyImporter.importAll", () => {
 		expect(sm._getDone()).toBe(true);
 	});
 });
+
+describe("LegacyImporter.purge", () => {
+	it("removes the legacy dir after a successful importAll", () => {
+		writeLegacyConv("c1", { name: "Kept" }, [
+			{ role: "user", content: "hi" },
+		]);
+		const legacyRoot = join(userDataDir, "chats", userId);
+		expect(existsSync(legacyRoot)).toBe(true);
+
+		const sm = makeStoreManager();
+		const importer = new LegacyImporter(sessions, sm as never, userId);
+		const result = importer.importAll();
+		expect(result.imported).toBe(1);
+		expect(sm._getDone()).toBe(true);
+
+		const purge = importer.purge();
+		expect(purge.purged).toBe(true);
+		expect(purge.previousCount).toBe(1);
+		expect(existsSync(legacyRoot)).toBe(false);
+		// detect() afterwards reports count 0 and stays alreadyImported=true
+		// (migrationV2Done flag is deliberately left set).
+		const after = importer.detect();
+		expect(after.count).toBe(0);
+		expect(after.alreadyImported).toBe(true);
+	});
+
+	it("purge refuses when un-imported chats are still present", () => {
+		writeLegacyConv("c1", { name: "Un-imported" }, []);
+		const sm = makeStoreManager();
+		const importer = new LegacyImporter(sessions, sm as never, userId);
+		// Did NOT run importAll — migrationV2Done still false.
+		expect(sm._getDone()).toBe(false);
+		expect(() => importer.purge()).toThrow(/un-imported|refusing/i);
+		// Dir untouched.
+		expect(existsSync(join(userDataDir, "chats", userId))).toBe(true);
+	});
+
+	it("purge returns purged:false when the legacy dir doesn't exist", () => {
+		const sm = makeStoreManager();
+		const importer = new LegacyImporter(sessions, sm as never, userId);
+		// No writeLegacyConv → dir doesn't exist.
+		const result = importer.purge();
+		expect(result.purged).toBe(false);
+		expect(result.previousCount).toBe(0);
+	});
+});

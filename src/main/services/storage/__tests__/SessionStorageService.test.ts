@@ -1000,6 +1000,43 @@ describe("rename / updateMeta / delete", () => {
 	it("getMeta throws for unknown session", () => {
 		expect(() => sessions.getMeta("nope")).toThrow("session not found");
 	});
+
+	it("purgeTombstone physically removes meta + jsonl + per-session subdir", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.appendEvent(s.id, {
+			type: "user_message",
+			id: "u1",
+			ts: 1,
+			content: "x",
+		});
+		// Soft-delete first — purge refuses live sessions.
+		sessions.delete(s.id);
+		expect(existsSync(casualPath(s.id, ".meta.json"))).toBe(true);
+		expect(existsSync(casualPath(s.id, ".jsonl"))).toBe(true);
+
+		const result = sessions.purgeTombstone(s.id);
+		expect(result.purged).toBe(true);
+		expect(result.removedPaths?.length).toBeGreaterThan(0);
+		// Every file/dir the session had on disk is gone.
+		expect(existsSync(casualPath(s.id, ".meta.json"))).toBe(false);
+		expect(existsSync(casualPath(s.id, ".jsonl"))).toBe(false);
+		// listDeleted no longer sees it.
+		expect(sessions.listDeleted().map((m) => m.id)).not.toContain(s.id);
+	});
+
+	it("purgeTombstone refuses to purge a live (non-tombstoned) session", () => {
+		const s = sessions.create({ projectId: null });
+		expect(() => sessions.purgeTombstone(s.id)).toThrow(/live|not tombstoned/i);
+		// Session is untouched.
+		expect(existsSync(casualPath(s.id, ".meta.json"))).toBe(true);
+	});
+
+	it("purgeTombstone is idempotent on a second call", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.delete(s.id);
+		expect(sessions.purgeTombstone(s.id).purged).toBe(true);
+		expect(sessions.purgeTombstone(s.id).purged).toBe(false);
+	});
 });
 
 describe("fork", () => {

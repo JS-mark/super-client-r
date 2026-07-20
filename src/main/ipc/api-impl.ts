@@ -1566,6 +1566,7 @@ module.exports = {
 		) => getSessionStorage().exportProjectArchive(projectId, options),
 		listOrphans: () => getProjectStorage().listOrphans(),
 		restoreOrphan: (id: string) => getProjectStorage().restoreOrphan(id),
+		deleteOrphan: (id: string) => getProjectStorage().deleteOrphan(id),
 	},
 
 	// ─── Sessions（A-6: project-session-redesign）─
@@ -1586,6 +1587,8 @@ module.exports = {
 		delete: (sessionId: string) => getSessionStorage().delete(sessionId),
 		restoreDeleted: (sessionId: string) =>
 			getSessionStorage().restoreDeleted(sessionId),
+		purgeTombstone: (sessionId: string) =>
+			getSessionStorage().purgeTombstone(sessionId),
 		reassignProject: (sessionId: string, nextProjectId: string | null) =>
 			getSessionStorage().reassignProject(sessionId, nextProjectId),
 		appendEvent: (
@@ -1758,6 +1761,7 @@ module.exports = {
 	legacyData: {
 		detect: () => getLegacyImporter().detect(),
 		importAll: () => getLegacyImporter().importAll(),
+		purge: () => getLegacyImporter().purge(),
 	},
 };
 

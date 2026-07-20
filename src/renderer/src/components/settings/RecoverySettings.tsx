@@ -1,12 +1,14 @@
 import {
 	CopyOutlined,
+	DeleteOutlined,
 	DownloadOutlined,
+	ExclamationCircleFilled,
 	ImportOutlined,
 	LinkOutlined,
 	ReloadOutlined,
 	UndoOutlined,
 } from "@ant-design/icons";
-import { Alert, Button, Empty, Tag, Typography, message, theme } from "antd";
+import { Alert, App, Button, Empty, Tag, Typography, message, theme } from "antd";
 import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -87,6 +89,9 @@ function getSessionStatusColor(status: SessionExportStatus): string {
 
 export function RecoverySettings() {
 	const { t } = useTranslation();
+	// App.useApp() modal respects theme tokens; static Modal.confirm bypasses
+	// them. Required for the physical-delete confirm modals below.
+	const { modal } = App.useApp();
 	const { token } = useToken();
 	const projects = useProjectStore((s) => s.projects);
 	const loadProjects = useProjectStore((s) => s.load);
@@ -270,6 +275,154 @@ export function RecoverySettings() {
 		if (!first) return;
 		await handleRestoreOrphan(first.projectId);
 	}, [orphans, handleRestoreOrphan]);
+
+	/**
+	 * Physical delete of an orphan project's app-managed storage. The confirm
+	 * modal mirrors ProjectSettingsModal's danger pattern (App.useApp() modal
+	 * + red icon + danger OK button). The user's real project cwd is
+	 * intentionally NOT shown in the confirm text — the redacted label is
+	 * enough; the raw cwd is only revealed via the explicit Copy full path
+	 * button elsewhere.
+	 */
+	const handleDeleteOrphan = useCallback(
+		(projectId: string) => {
+			modal.confirm({
+				icon: <ExclamationCircleFilled style={{ color: "#ff4d4f" }} />,
+				title: t(
+					"settingsNav.recovery.deleteOrphanTitle",
+					"Permanently delete this orphan?",
+					{ ns: "settings" },
+				),
+				content: t(
+					"settingsNav.recovery.deleteOrphanContent",
+					"Removes the app-managed storage directory for this orphan. Irreversible. Your real project working directory is NOT touched.",
+					{ ns: "settings" },
+				),
+				okText: t("settingsNav.recovery.deleteOrphanOk", "Delete permanently", {
+					ns: "settings",
+				}),
+				okButtonProps: { danger: true },
+				cancelText: t("common.cancel", "Cancel"),
+				async onOk() {
+					try {
+						const result =
+							await window.electron.projects.deleteOrphan(projectId);
+						if (!result.success) {
+							throw new Error(result.error ?? "deleteOrphan failed");
+						}
+						await refreshRecoveryStatus();
+						message.success(
+							t(
+								"settingsNav.recovery.deleteOrphanSuccess",
+								"Orphan deleted",
+								{ ns: "settings" },
+							),
+						);
+					} catch (error) {
+						console.warn("[RecoverySettings] deleteOrphan failed:", error);
+						message.error(
+							t("settingsNav.recovery.deleteOrphanError", "Delete failed", {
+								ns: "settings",
+							}),
+						);
+					}
+				},
+			});
+		},
+		[modal, refreshRecoveryStatus, t],
+	);
+
+	const handlePurgeTombstone = useCallback(
+		(sessionId: string) => {
+			modal.confirm({
+				icon: <ExclamationCircleFilled style={{ color: "#ff4d4f" }} />,
+				title: t(
+					"settingsNav.recovery.purgeTombstoneTitle",
+					"Permanently purge this deleted session?",
+					{ ns: "settings" },
+				),
+				content: t(
+					"settingsNav.recovery.purgeTombstoneContent",
+					"Removes the session's on-disk artifacts (meta, jsonl, attachments, tool outputs). Irreversible. Only tombstoned sessions can be purged.",
+					{ ns: "settings" },
+				),
+				okText: t("settingsNav.recovery.purgeOk", "Purge permanently", {
+					ns: "settings",
+				}),
+				okButtonProps: { danger: true },
+				cancelText: t("common.cancel", "Cancel"),
+				async onOk() {
+					try {
+						const result =
+							await window.electron.sessions.purgeTombstone(sessionId);
+						if (!result.success) {
+							throw new Error(result.error ?? "purgeTombstone failed");
+						}
+						await refreshRecoveryStatus();
+						message.success(
+							t(
+								"settingsNav.recovery.purgeTombstoneSuccess",
+								"Session purged",
+								{ ns: "settings" },
+							),
+						);
+					} catch (error) {
+						console.warn("[RecoverySettings] purgeTombstone failed:", error);
+						message.error(
+							t("settingsNav.recovery.purgeTombstoneError", "Purge failed", {
+								ns: "settings",
+							}),
+						);
+					}
+				},
+			});
+		},
+		[modal, refreshRecoveryStatus, t],
+	);
+
+	const handleLegacyPurge = useCallback(() => {
+		modal.confirm({
+			icon: <ExclamationCircleFilled style={{ color: "#ff4d4f" }} />,
+			title: t(
+				"settingsNav.recovery.legacyPurgeTitle",
+				"Permanently delete legacy chats folder?",
+				{ ns: "settings" },
+			),
+			content: t(
+				"settingsNav.recovery.legacyPurgeContent",
+				"Removes the imported legacy chats directory on disk. Irreversible. Refuses to run if un-imported chats are still present.",
+				{ ns: "settings" },
+			),
+			okText: t("settingsNav.recovery.legacyPurgeOk", "Delete legacy data", {
+				ns: "settings",
+			}),
+			okButtonProps: { danger: true },
+			cancelText: t("common.cancel", "Cancel"),
+			async onOk() {
+				try {
+					const result = await window.electron.legacyData.purge();
+					if (!result.success) {
+						throw new Error(result.error ?? "legacyData.purge failed");
+					}
+					await refreshRecoveryStatus();
+					message.success(
+						t(
+							"settingsNav.recovery.legacyPurgeSuccess",
+							"Legacy data deleted",
+							{ ns: "settings" },
+						),
+					);
+				} catch (error) {
+					console.warn("[RecoverySettings] legacyData.purge failed:", error);
+					message.error(
+						t("settingsNav.recovery.legacyPurgeError", "Delete failed", {
+							ns: "settings",
+						}),
+					);
+				}
+			},
+		});
+	}, [modal, refreshRecoveryStatus, t]);
 
 	const handleImportLegacy = useCallback(async () => {
 		setImporting(true);
@@ -742,6 +895,18 @@ export function RecoverySettings() {
 												ns: "settings",
 											})}
 										</Button>,
+										<Button
+											key="delete"
+											type="link"
+											danger
+											icon={<DeleteOutlined />}
+											onClick={() => handleDeleteOrphan(orphan.projectId)}
+											data-testid={`orphan-delete-${orphan.projectId}`}
+										>
+											{t("settingsNav.recovery.deletePermanently", "Delete", {
+												ns: "settings",
+											})}
+										</Button>,
 									]}
 								>
 									<List.Item.Meta
@@ -918,6 +1083,24 @@ export function RecoverySettings() {
 												ns: "settings",
 											})}
 										</Button>,
+										...(session.status === "tombstoned"
+											? [
+													<Button
+														key="purge"
+														type="link"
+														danger
+														icon={<DeleteOutlined />}
+														onClick={() => handlePurgeTombstone(session.id)}
+														data-testid={`session-purge-${session.id}`}
+													>
+														{t(
+															"settingsNav.recovery.purgePermanently",
+															"Purge permanently",
+															{ ns: "settings" },
+														)}
+													</Button>,
+												]
+											: []),
 									]}
 								>
 									<List.Item.Meta
@@ -999,17 +1182,34 @@ export function RecoverySettings() {
 							</div>
 						)}
 					</div>
-					<Button
-						type="primary"
-						icon={<ImportOutlined />}
-						loading={importing}
-						disabled={legacyImportDisabled}
-						onClick={handleImportLegacy}
-					>
-						{t("settingsNav.recovery.importButton", "Import Legacy Chats", {
-							ns: "settings",
-						})}
-					</Button>
+					<div className="flex items-center gap-2">
+						<Button
+							type="primary"
+							icon={<ImportOutlined />}
+							loading={importing}
+							disabled={legacyImportDisabled}
+							onClick={handleImportLegacy}
+						>
+							{t("settingsNav.recovery.importButton", "Import Legacy Chats", {
+								ns: "settings",
+							})}
+						</Button>
+						{legacyInfo &&
+						(legacyInfo.count > 0 || legacyInfo.alreadyImported) ? (
+							<Button
+								danger
+								icon={<DeleteOutlined />}
+								onClick={handleLegacyPurge}
+								data-testid="legacy-purge"
+							>
+								{t(
+									"settingsNav.recovery.legacyPurgeButton",
+									"Delete legacy data",
+									{ ns: "settings" },
+								)}
+							</Button>
+						) : null}
+					</div>
 				</div>
 			</SettingSection>
 

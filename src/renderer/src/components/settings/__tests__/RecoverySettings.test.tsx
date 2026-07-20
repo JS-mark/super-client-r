@@ -47,7 +47,9 @@ const translateMock = vi.hoisted(() =>
 
 vi.mock("@ant-design/icons", () => ({
 	CopyOutlined: () => <span aria-hidden="true" />,
+	DeleteOutlined: () => <span aria-hidden="true" />,
 	DownloadOutlined: () => <span aria-hidden="true" />,
+	ExclamationCircleFilled: () => <span aria-hidden="true" />,
 	ImportOutlined: () => <span aria-hidden="true" />,
 	LeftOutlined: () => <span aria-hidden="true" />,
 	LinkOutlined: () => <span aria-hidden="true" />,
@@ -137,8 +139,34 @@ vi.mock("antd", () => {
 		},
 	};
 
+	// modal.confirm needs to synchronously invoke `onOk` so tests can assert
+	// IPC calls without spinning the event loop through an actual antd modal
+	// mount. `App.useApp()` returns this stub; production code goes through
+	// the real antd modal at runtime.
+	const modalMock = {
+		confirm: (opts: { onOk?: () => unknown | Promise<unknown> }) => {
+			void opts.onOk?.();
+			return { destroy: () => {}, update: () => {} };
+		},
+	};
+	function App({ children }: { children?: React.ReactNode }) {
+		return <>{children}</>;
+	}
+	App.useApp = () => ({
+		modal: modalMock,
+		message: messageMocks,
+		notification: {
+			open: vi.fn(),
+			success: vi.fn(),
+			error: vi.fn(),
+			info: vi.fn(),
+			warning: vi.fn(),
+		},
+	});
+
 	return {
 		Alert,
+		App,
 		Button,
 		Empty,
 		Tag,
@@ -270,6 +298,16 @@ beforeEach(() => {
 			projects: {
 				listOrphans: vi.fn().mockResolvedValue({ success: true, data: [] }),
 				restoreOrphan: vi.fn(),
+				deleteOrphan: vi.fn().mockResolvedValue({
+					success: true,
+					data: { removed: true },
+				}),
+			},
+			sessions: {
+				purgeTombstone: vi.fn().mockResolvedValue({
+					success: true,
+					data: { purged: true, removedPaths: [] },
+				}),
 			},
 			legacyData: {
 				detect: vi.fn().mockResolvedValue({
@@ -277,6 +315,10 @@ beforeEach(() => {
 					data: { count: 0, alreadyImported: false, legacyDir: "" },
 				}),
 				importAll: vi.fn(),
+				purge: vi.fn().mockResolvedValue({
+					success: true,
+					data: { purged: true, previousCount: 0, legacyDir: "" },
+				}),
 			},
 		},
 		configurable: true,
