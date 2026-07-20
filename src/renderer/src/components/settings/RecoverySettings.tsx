@@ -8,7 +8,7 @@ import {
 	ReloadOutlined,
 	UndoOutlined,
 } from "@ant-design/icons";
-import { Alert, App, Button, Empty, Tag, Typography, message, theme } from "antd";
+import { Alert, App, Button, Empty, Input, Tag, Typography, message, theme } from "antd";
 import { LiteList as List } from "@/components/ui/LiteList";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -378,6 +378,87 @@ export function RecoverySettings() {
 			});
 		},
 		[modal, refreshRecoveryStatus, t],
+	);
+
+	/**
+	 * Relink an orphan to a new cwd (project directory moved/renamed). Uses
+	 * modal.confirm with an Input in content; the entered value is captured
+	 * via a mutable box so onOk can read it (modal.confirm doesn't return
+	 * form values).
+	 */
+	const handleRelinkOrphan = useCallback(
+		(projectId: string, currentCwd: string) => {
+			const box: { value: string } = { value: currentCwd };
+			modal.confirm({
+				icon: <LinkOutlined />,
+				title: t(
+					"settingsNav.recovery.relinkTitle",
+					"Relink orphan to a new path",
+					{ ns: "settings" },
+				),
+				content: (
+					<div className="space-y-2 mt-2">
+						<Typography.Text type="secondary" className="text-xs">
+							{t(
+								"settingsNav.recovery.relinkHint",
+								"Use this when the project directory was moved or renamed on disk. The storage dir will be re-hashed to the new path.",
+								{ ns: "settings" },
+							)}
+						</Typography.Text>
+						<Input
+							defaultValue={currentCwd}
+							onChange={(e) => {
+								box.value = e.target.value;
+							}}
+							data-testid="orphan-relink-input"
+							placeholder="/absolute/path/to/project"
+						/>
+					</div>
+				),
+				okText: t("settingsNav.recovery.relinkOk", "Relink", {
+					ns: "settings",
+				}),
+				cancelText: t("common.cancel", "Cancel"),
+				async onOk() {
+					const nextCwd = box.value.trim();
+					if (!nextCwd) {
+						message.error(
+							t("settingsNav.recovery.relinkEmpty", "Path cannot be empty", {
+								ns: "settings",
+							}),
+						);
+						throw new Error("relink cancelled: empty path");
+					}
+					try {
+						const result = await window.electron.projects.relinkOrphan(
+							projectId,
+							nextCwd,
+						);
+						if (!result.success || !result.data) {
+							throw new Error(result.error ?? "relinkOrphan failed");
+						}
+						await loadProjects();
+						await refreshRecoveryStatus();
+						message.success(
+							t(
+								"settingsNav.recovery.relinkSuccess",
+								"Project relinked",
+								{ ns: "settings" },
+							),
+						);
+					} catch (error) {
+						console.warn("[RecoverySettings] relinkOrphan failed:", error);
+						message.error(
+							t("settingsNav.recovery.relinkError", "Relink failed", {
+								ns: "settings",
+							}),
+						);
+						throw error;
+					}
+				},
+			});
+		},
+		[modal, loadProjects, refreshRecoveryStatus, t],
 	);
 
 	const handleLegacyPurge = useCallback(() => {
@@ -892,6 +973,19 @@ export function RecoverySettings() {
 											onClick={() => handleRestoreOrphan(orphan.projectId)}
 										>
 											{t("settingsNav.recovery.restore", "Restore", {
+												ns: "settings",
+											})}
+										</Button>,
+										<Button
+											key="relink"
+											type="link"
+											icon={<LinkOutlined />}
+											onClick={() =>
+												handleRelinkOrphan(orphan.projectId, orphan.cwd)
+											}
+											data-testid={`orphan-relink-${orphan.projectId}`}
+										>
+											{t("settingsNav.recovery.relink", "Relink", {
 												ns: "settings",
 											})}
 										</Button>,

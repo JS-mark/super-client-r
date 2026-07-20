@@ -1567,6 +1567,8 @@ module.exports = {
 		listOrphans: () => getProjectStorage().listOrphans(),
 		restoreOrphan: (id: string) => getProjectStorage().restoreOrphan(id),
 		deleteOrphan: (id: string) => getProjectStorage().deleteOrphan(id),
+		relinkOrphan: (id: string, newCwd: string) =>
+			getProjectStorage().relinkOrphan(id, newCwd),
 	},
 
 	// ─── Sessions（A-6: project-session-redesign）─
