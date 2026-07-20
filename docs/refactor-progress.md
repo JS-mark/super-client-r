@@ -1541,3 +1541,49 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无代码阻塞。中途 lint 多了 3 个 `unicorn/no-useless-fallback-in-spread`(test helper 的 `?? {}`)——和 ProjectSettingsModal 同样的 TS-null-check vs unicorn 规则真冲突,加了 targeted disable + 注释解决。
 - **代码事实更新**:`streamEventTranslator` 现在是流式 producer(fence 状态机 + 行边界 throttle + 闭合 re-classify);test 基线 = 130 files / **1097 tests**。"Full structured event stream" Remaining Gap 项整体完成。
 - **下一步可选**:转其他 Remaining Gaps —— recovery wizard 完整版 / export zip 打包 / remote lifecycle 状态机。
+
+## 2026-07-20 feat: recovery wizard step state machine + per-step actions
+
+> Remaining Gaps "Settings recovery UI" 项的第一个子工作流(wizard 状态机 + 接线)。branch `r2/gate-health-fixes`,commit `ff9692e`。
+
+### 落地
+
+把 RecoveryWizardPanel 从**扁平 checklist**改成**真 step-by-step wizard**:
+
+| 层 | 改动 |
+| --- | --- |
+| **model**(`recoveryWizard.ts`) | 每个 `RecoveryWizardStep` 加 `actionKind`(refresh/restore-archived/restore-orphan/import-legacy/export-diagnostics/none),让 panel 按 kind 渲染 per-step action 按钮。actionKind 在 step 状态变化时保持稳定(done 的 archived step 仍声明 restore-archived)。 |
+| **panel**(`RecoveryWizardPanel.tsx`) | 扁平 `.map` → 单个 current-step 视图 + Prev/Next 导航 + "Step N of M" 指示器。`currentStepId` 状态 seed 到 recommended step,推荐变化时 useEffect 重置。per-step action 按 actionKind 渲染,handler 缺失时按钮整组隐藏(优雅降级)。新增 props `onRestoreArchived`/`onRestoreOrphan`。 |
+| **parent**(`RecoverySettings.tsx`) | 加 `handleRestoreArchivedFromWizard`(恢复首个 archived project)+ `handleRestoreOrphanFromWizard`(恢复首个 orphan)。wizard 步骤是单按钮,恢复首个 + 让用户重复;完整 per-project 列表仍在各自 section 做精准操作。 |
+
+**关键接线价值**:之前 archived/orphan remediation 在独立的 SettingSection 里,wizard 里是死路(recommended=archived 时只能 fallback 到 "Refresh status")。现在 wizard 的 archived/orphan 步骤能直接触发恢复操作。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `git diff --check` | ✅ exit 0 |
+| `pnpm check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0(2 warnings,无新增) |
+| `pnpm i18n:check` | ✅ exit 0 |
+| `pnpm test:run` | ✅ exit 0,**131 files / 1106 tests / 0 failed**(+9:lib +2、新 panel test +7) |
+
+### 测试覆盖
+
+- `recoveryWizard.test.ts` +2:actionKind 分配到每个 step + 状态变化时 actionKind 稳定
+- 新 `RecoveryWizardPanel.test.tsx` +7:recommended seed、Prev/Next 导航、最后步 Next 禁用、per-step action 触发 archived/orphan handler、handler 缺失时按钮隐藏、推荐变化时重置 currentStep
+- `RecoverySettings.test.tsx` 更新:wizard 可见性测试适配单步 UI(当前步显 count + Recommended,其他步经 Next 可达);icons mock 补 LeftOutlined/RightOutlined
+
+### Remaining Gaps 更新
+
+"Settings recovery UI" 项的 **wizard 状态机 + 接线** 子工作流完成。剩 3 个子工作流(均独立,留后续批次):
+- **backup/export bundle**:组合 3 个 exporter 成单一 artifact,可能引入 zip 库
+- **物理 cleanup**:`deleteOrphan`/`purgeTombstone`/`legacyPurge` IPC(不可逆删除,需确认 UI + 安全设计)
+- **relink-with-path-change**:`restoreOrphan` 在 hash mismatch 时抛错,改路径的 relink 仍 out of scope
+
+### Retrospective
+
+- **What worked**:探查阶段确认 wizard 实际是 4 个正交子工作流(wizard 状态机 / bundle / cleanup / 接线),经 AskUserQuestion 让用户选收敛到"wizard 状态机+接线"——避免一轮做不完 4 个的糊弄。model 保持纯函数、panel 持 currentStepId 状态的设计干净(handler 缺失时优雅降级,panel 可独立测试)。新 RecoveryWizardPanel.test.tsx 覆盖了状态机所有转换。
+- **What blocked**:无代码阻塞。中途遇到 antd Button wave effect 在 jsdom 崩溃(读 undefined.ELEMENT_NODE)——和 RecoverySettings.test 同样问题,mock antd 解决;mock Button 一开始没转发 `data-testid` 导致测试找不到元素,加 `...rest` 修复;一处 TS strict 的 closure narrowing 问题(`if(harness)` 在 act callback 内不生效)用局部 const 捕获解决。3 个小问题都被测试/类型检查抓住,没漏到后面。
+- **代码事实更新**:`RecoveryWizardPanel` 现在是真 wizard(currentStepId + Prev/Next + per-step action by actionKind);archived/orphan remediation 已接入 wizard;test 基线 = 131 files / **1106 tests**。
+- **下一步可选**:wizard 的另 3 个子工作流(bundle / cleanup / relink),或转其他 Remaining Gaps(export zip / remote lifecycle)。
