@@ -394,6 +394,14 @@ export interface ElectronAPIMigrated {
 			>
 		>;
 		restoreOrphan: (projectId: string) => Promise<IPCResponse<Project>>;
+		/**
+		 * Physically delete an orphan project's app-managed storage dir
+		 * (`<userRoot>/projects/<projectId>/`). Irreversible; guarded to
+		 * never touch the user's real project cwd. Idempotent.
+		 */
+		deleteOrphan: (
+			projectId: string,
+		) => Promise<IPCResponse<{ removed: boolean }>>;
 	};
 
 	/**
@@ -425,6 +433,14 @@ export interface ElectronAPIMigrated {
 			IPCResponse<{ deleted: boolean; tombstone?: SessionTombstone }>
 		>;
 		restoreDeleted: (sessionId: string) => Promise<IPCResponse<SessionMeta>>;
+		/**
+		 * Physically remove a tombstoned session's on-disk artifacts (meta,
+		 * jsonl, attachments, tool-outputs, content-refs). Irreversible;
+		 * refuses to purge a live (non-tombstoned) session. Idempotent.
+		 */
+		purgeTombstone: (
+			sessionId: string,
+		) => Promise<IPCResponse<{ purged: boolean; removedPaths?: string[] }>>;
 		/** §9.10 (C1) 锁前可改 projectId；锁后报错。 */
 		reassignProject: (
 			sessionId: string,
@@ -545,9 +561,22 @@ export interface ElectronAPIMigrated {
 					recoverable: boolean;
 				}>;
 				dismissed: boolean;
+				}>
+			>;
+		/**
+		 * Physically remove `<userData>/chats/<userId>/`. Irreversible;
+		 * refuses if un-imported chats are still present. The
+		 * `migrationV2Done` flag is intentionally left as-is so `detect()`
+		 * afterwards returns `{count:0, alreadyImported:true}`.
+		 */
+		purge: () => Promise<
+			IPCResponse<{
+				purged: boolean;
+				previousCount: number;
+				legacyDir: string;
 			}>
 		>;
-	};
+		};
 
 	/**
 	 * AgentRuntime 适配层（spec: 2026-06-21-agent-runtime-adapter-design）。

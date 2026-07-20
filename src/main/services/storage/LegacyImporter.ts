@@ -22,10 +22,12 @@ import {
 	existsSync,
 	readFileSync,
 	readdirSync,
+	rmSync,
 	statSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { app } from "electron";
+import { isBlockedPath } from "../../utils/pathSafety";
 import { messagesToEvents } from "@super-client/shared-types/messageConverter";
 import type { ChatMessagePersist } from "@super-client/shared-types/chat";
 import type { SessionMeta } from "@super-client/shared-types/project";
@@ -176,6 +178,45 @@ export class LegacyImporter {
 			this.storeManager.markMigrationV2Done();
 		}
 		return result;
+	}
+
+	/**
+	 * Physically remove the legacy `<userData>/chats/<userId>/` dir.
+	 * Irreversible.
+	 *
+	 * SAFETY:
+	 *   - Refuses if `detect()` reports un-imported data (`count > 0 &&
+	 *     !alreadyImported`) — protects against destroying user data that
+	 *     was never migrated.
+	 *   - Re-derives the legacy dir from `app.getPath("userData")` at call
+	 *     time and asserts it matches `detect().legacyDir` (defence against
+	 *     a stale detect result).
+	 *   - `isBlockedPath` L3 backup.
+	 *   - `migrationV2Done` flag is left as-is so a future `detect()`
+	 *     returns `{count:0, alreadyImported:true}` — no re-prompt for
+	 *     import of nothing.
+	 */
+	purge(): { purged: boolean; previousCount: number; legacyDir: string } {
+		const info = this.detect();
+		if (info.count > 0 && !info.alreadyImported) {
+			throw new Error(
+				`refusing to purge legacy data: ${info.count} un-imported chat(s) still present — import or back up first`,
+			);
+		}
+		const expected = join(app.getPath("userData"), "chats", this.userId);
+		if (resolve(info.legacyDir) !== resolve(expected)) {
+			throw new Error(
+				`refusing to purge legacy: dir mismatch (info=${info.legacyDir}, expected=${expected})`,
+			);
+		}
+		if (isBlockedPath(resolve(expected))) {
+			throw new Error(`refusing to purge blocked path: ${expected}`);
+		}
+		if (!existsSync(expected)) {
+			return { purged: false, previousCount: info.count, legacyDir: expected };
+		}
+		rmSync(expected, { recursive: true, force: true });
+		return { purged: true, previousCount: info.count, legacyDir: expected };
 	}
 
 	// ─── helpers ─────────────────────────────────────────────────

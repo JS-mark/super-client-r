@@ -31,7 +31,7 @@ import {
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { homedir } from "node:os";
-import { extname, join } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import type { Message, MessagePart } from "@super-client/shared-types/chat";
 import type {
 	ProjectArchiveExportResult as SharedProjectArchiveExportResult,
@@ -61,6 +61,7 @@ import {
 	serializeEvent,
 } from "./jsonl";
 import type { ProjectStorageService } from "./ProjectStorageService";
+import { isBlockedPath } from "../../utils/pathSafety";
 import { redactPath, type PrivacyRedactionContext } from "../privacy/redaction";
 
 const CASUAL_DIR = "casual-sessions";
@@ -337,6 +338,61 @@ export class SessionStorageService {
 		delete restored.tombstone;
 		this.writeMeta(restored);
 		return restored;
+	}
+
+	/**
+	 * Physically remove a tombstoned session's on-disk artifacts:
+	 * `<sid>.meta.json`, `<sid>.jsonl`, and the per-session subdir
+	 * (`attachments/`, `tool-outputs/`, `tool-outputs/content-refs/`).
+	 * Irreversible.
+	 *
+	 * SAFETY:
+	 *   - Refuses to purge a live (non-tombstoned) session.
+	 *   - Bucket dir is asserted to be strictly inside `userRoot`.
+	 *   - Idempotent: a session that no longer exists returns `{purged:false}`.
+	 */
+	purgeTombstone(sessionId: string): {
+		purged: boolean;
+		removedPaths?: string[];
+	} {
+		const meta = this.findMeta(sessionId, { includeDeleted: true });
+		if (!meta) return { purged: false };
+		if (!meta.deletedAt) {
+			throw new Error(
+				`refusing to purge live session ${sessionId} (not tombstoned)`,
+			);
+		}
+		const bucket = this.resolveSessionBucket(meta.projectId);
+		const resolvedBucket = resolve(bucket.dir);
+		const resolvedRoot = resolve(this.userRoot);
+		if (
+			resolvedBucket !== resolvedRoot &&
+			!resolvedBucket.startsWith(resolvedRoot + sep)
+		) {
+			throw new Error(
+				`refusing to purge outside storage root: ${resolvedBucket}`,
+			);
+		}
+		if (isBlockedPath(resolvedBucket)) {
+			throw new Error(`refusing to purge blocked path: ${resolvedBucket}`);
+		}
+		const metaPath = this.sessionFile(meta, ".meta.json");
+		const jsonlPath = this.sessionFile(meta, ".jsonl");
+		const sessionSubdir = join(bucket.dir, meta.id);
+		const removed: string[] = [];
+		if (existsSync(jsonlPath)) {
+			rmSync(jsonlPath, { force: true });
+			removed.push(jsonlPath);
+		}
+		if (existsSync(metaPath)) {
+			rmSync(metaPath, { force: true });
+			removed.push(metaPath);
+		}
+		if (existsSync(sessionSubdir)) {
+			rmSync(sessionSubdir, { recursive: true, force: true });
+			removed.push(sessionSubdir);
+		}
+		return { purged: true, removedPaths: removed };
 	}
 
 	/**

@@ -24,12 +24,13 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 import type {
 	Project,
 	ProjectSettings,
 } from "@super-client/shared-types/project";
 import { hashCwd, normalizeCwd } from "./cwd";
+import { isBlockedPath } from "../../utils/pathSafety";
 
 /** 物理目录布局（per user）：
  *
@@ -348,6 +349,54 @@ export class ProjectStorageService {
 		}
 		// re-add via the normal path; idempotent will preserve directory contents
 		return this.add(cwd);
+	}
+
+	/**
+	 * Physically delete an orphan project's app-managed storage directory
+	 * (`<userRoot>/projects/<projectId>/`). Irreversible.
+	 *
+	 * SAFETY — this is the highest-stakes operation in the service because it
+	 * `rmSync`s recursively. The guards below are load-bearing:
+	 *   1. `projectId` must not contain path separators / `..` (defends against
+	 *      `deleteOrphan("../..")` style escapes).
+	 *   2. The deleted path is re-derived from `projectId` via `projectDir()`
+	 *      — NEVER from a `ListOrphansEntry.cwd` value, which is the user's
+	 *      real project working directory (their source tree) and must not be
+	 *      touched.
+	 *   3. The resolved path is asserted to be strictly inside the projects
+	 *      storage root.
+	 *   4. The entry must NOT be in the registry (registered projects should
+	 *      go through `remove({keepFiles:false})`, which also unregisters).
+	 *   5. `isBlockedPath` runs as an L3 blocklist backup.
+	 */
+	deleteOrphan(projectId: string): { removed: boolean } {
+		if (
+			!projectId ||
+			projectId.includes("/") ||
+			projectId.includes("\\") ||
+			projectId.includes("..")
+		) {
+			throw new Error(`refusing to delete orphan with unsafe id: ${projectId}`);
+		}
+		if (this.list().some((p) => p.id === projectId)) {
+			throw new Error(
+				`project ${projectId} is registered; use remove({keepFiles:false}) instead`,
+			);
+		}
+		const dir = this.projectDir(projectId);
+		const resolved = resolve(dir);
+		const root = resolve(join(this.userRoot, PROJECTS_DIR));
+		if (resolved !== root && !resolved.startsWith(root + sep)) {
+			throw new Error(`refusing to delete outside storage root: ${resolved}`);
+		}
+		if (isBlockedPath(resolved)) {
+			throw new Error(`refusing to delete blocked path: ${resolved}`);
+		}
+		if (!existsSync(dir)) {
+			return { removed: false };
+		}
+		rmSync(dir, { recursive: true, force: true });
+		return { removed: true };
 	}
 
 	// ─── helpers ─────────────────────────────────────────────────

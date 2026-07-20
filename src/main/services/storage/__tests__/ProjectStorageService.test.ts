@@ -353,4 +353,44 @@ describe("orphan recovery", () => {
 		writeFileSync(join(dir, "path.txt"), "/some/other/path", "utf-8");
 		expect(() => svc.restoreOrphan(fakeId)).toThrow("hash");
 	});
+
+	it("deleteOrphan removes the app-managed dir without touching project.cwd", () => {
+		// Create a real orphan whose "cwd" is a file the test writes ITSELF —
+		// then assert that the file is still there after deleteOrphan. This
+		// pins the load-bearing invariant "deleteOrphan must never rmSync
+		// the user's real project working directory".
+		const cwdSurface = mkdtempSync(join(tmpdir(), "orphan-cwd-"));
+		const p = svc.add(cwdSurface);
+		svc.remove(p.id, { keepFiles: true });
+		// Sanity: the orphan storage dir + the user's cwd both exist now.
+		expect(existsSync(projectDir(p.id))).toBe(true);
+		expect(existsSync(cwdSurface)).toBe(true);
+		const result = svc.deleteOrphan(p.id);
+		expect(result.removed).toBe(true);
+		// The app-managed storage dir is gone.
+		expect(existsSync(projectDir(p.id))).toBe(false);
+		// The user's real project working directory is UNTOUCHED.
+		expect(existsSync(cwdSurface)).toBe(true);
+		rmSync(cwdSurface, { recursive: true, force: true });
+	});
+
+	it("deleteOrphan is idempotent when the orphan dir no longer exists", () => {
+		const p = svc.add("/a/b");
+		svc.remove(p.id, { keepFiles: true });
+		expect(svc.deleteOrphan(p.id).removed).toBe(true);
+		expect(svc.deleteOrphan(p.id).removed).toBe(false);
+	});
+
+	it("deleteOrphan refuses unsafe projectId (path escape)", () => {
+		expect(() => svc.deleteOrphan("../etc")).toThrow(/unsafe/);
+		expect(() => svc.deleteOrphan("foo/bar")).toThrow(/unsafe/);
+		expect(() => svc.deleteOrphan("foo\\bar")).toThrow(/unsafe/);
+		expect(() => svc.deleteOrphan("")).toThrow(/unsafe/);
+	});
+
+	it("deleteOrphan refuses to delete a registered project", () => {
+		const p = svc.add("/a/b");
+		// Still in the registry → must not be deletable as orphan.
+		expect(() => svc.deleteOrphan(p.id)).toThrow(/registered/);
+	});
 });

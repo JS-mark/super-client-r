@@ -1783,6 +1783,7 @@ const electronAPI: ElectronAPI = {
 		"exportArchive",
 		"listOrphans",
 		"restoreOrphan",
+		"deleteOrphan",
 	]),
 	sessions: createBridge<ElectronAPI["sessions"]>("sessions", [
 		"list",
@@ -1791,6 +1792,9 @@ const electronAPI: ElectronAPI = {
 		"updateMeta",
 		"rename",
 		"delete",
+		"listDeleted",
+		"restoreDeleted",
+		"purgeTombstone",
 		"reassignProject",
 		"appendEvent",
 		"readMessages",
@@ -1809,6 +1813,7 @@ const electronAPI: ElectronAPI = {
 	legacyData: createBridge<ElectronAPI["legacyData"]>("legacyData", [
 		"detect",
 		"importAll",
+		"purge",
 	]),
 	theme: createBridge<ElectronAPI["theme"]>("theme", [
 		"get",
