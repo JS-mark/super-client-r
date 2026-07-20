@@ -1439,3 +1439,48 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无。中途发现我之前的 lint warning 计数脚本(node 解析)有 bug,把 warning-to-location 配对错位,导致一度以为 ProjectSettingsModal 是 no-unused-vars、RequestLogService 有 catch warning——实际是 unicorn 规则和 no-this-alias。纠正后按真实规则集处理。
 - **代码事实更新**:lint 稳定基线 = **2 warnings**(剩 RequestLogService 的 `no-this-alias`,留独立批次);test 稳定基线 = 130 files / 1086 tests。
 - **是否继续 loop**:否。质保债已清(剩 2 个 no-this-alias + EADDRINUSE flake 是独立技术债,不属本质量清理 loop)。
+
+## 2026-07-20 feat: native structured producers (table/tree/sources/artifact)
+
+> Remaining Gaps "Full structured event stream" 项的深化。branch `r2/gate-health-fixes`,commit `0e170cf`。
+
+### 落地
+
+给 llm-loop fence-producer(`streamEventTranslator.buildMessagePart`)加 4 个 native producer,LLM 在 fence 里写的 table/tree/sources/artifact 现在被解析成 typed `MessagePart`,不再 fallback 成 code_block:
+
+| fence 语言 | 输出 part | body 格式 |
+| --- | --- | --- |
+| ` ```table ` | `TableMessagePart` | GFM markdown table(`\| col \|` + `\|---\|`) |
+| ` ```tree ` | `TreeMessagePart` | 缩进语法(2 空格/tab 算层级,可选 `kind:` 前缀) |
+| ` ```sources ` | `SourcesMessagePart` | markdown 列表(`- [title](url)` / bare path / 纯文本) |
+| ` ```artifact ` | `ArtifactMessagePart` | JSON(`{artifactId, type, title?, preview?}`) |
+
+4 个 producer 全部遵循现有 json-producer 的容错契约:**解析失败 → fall through 到 code_block**(带 language 标记),LLM 写坏不崩。
+
+### 关键事实(探查确认,非 gap)
+
+- **renderer 不是 gap**:`StreamPartRenderer.tsx` 早有 4 个 typed handler,producer 一发就渲染;之前是死代码等 producer。
+- **shared-types 不是 gap**:`Table/Tree/Sources/ArtifactMessagePart` 已定义、已在 `MessagePart` union。
+- **persistence 不是 gap**:JSONL replay 通用处理所有 `assistant.part_*` 事件。
+- **唯一 gap**:`buildMessagePart` 的 if/else 链缺 4 个分支 + 4 个 body parser。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| `git diff --check` | ✅ exit 0 |
+| `pnpm check` | ✅ exit 0 |
+| `pnpm lint` | ✅ exit 0(2 warnings,无新增) |
+| `pnpm i18n:check` | ✅ exit 0 |
+| `pnpm test:run` | ✅ exit 0,**130 files / 1092 tests / 0 failed**(+6:table/tree/sources/artifact happy + 2 fallback) |
+
+### Remaining Gaps 更新
+
+"Full structured event stream" 项的 table/tree/sources/artifact producer 部分**已完成**;剩 **delta batching**(plan task E1:part_delta 批量合并,目前 producer 全是 post-stream synchronous emit start+done)作为后续独立深化。
+
+### Retrospective
+
+- **What worked**:探查阶段先确认 renderer/shared-types/persistence 都不是 gap,把改动面精确收敛到 1 个文件的 if/else 链 + parser——避免了误改 renderer 或重定义类型的多文件返工。body schema 经 2 轮 AskUserQuestion 让用户定(table=Markdown、tree=缩进、sources=列表、artifact=JSON,各选最自然格式),没猜。
+- **What blocked**:中途 table producer 的 separator 正则 `[\s:-]+` 把 `:` 和 `-` 当 ASCII range 解析出错,导致 `| --- | --- |` 匹配失败、测试红了。改成简单的字符类 `[|\s:-]+` 修好——这是真 bug 不是 flake,测试抓住的。
+- **代码事实更新**:`streamEventTranslator.buildMessagePart` 现支持 code/json/diff/table/tree/sources/artifact 7 种 fence producer;test 基线 = 130 files / **1092 tests**。
+- **是否继续 loop**:本轮是功能开发(非 gate-health loop),无 loop 概念。下一步可选:delta batching、或转其他 Remaining Gaps(recovery wizard / export zip / remote lifecycle)。
