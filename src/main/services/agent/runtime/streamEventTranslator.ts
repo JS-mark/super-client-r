@@ -26,7 +26,6 @@
 import type { ChatStreamEvent } from "../../../ipc/types";
 import type { AgentRuntimeStreamEvent } from "@super-client/shared-types/agent-runtime";
 import type {
-	AssistantPartEvent,
 	ArtifactMessagePart,
 	CodeBlockMessagePart,
 	DataMessagePart,
@@ -56,6 +55,27 @@ export class ChatToRuntimeTranslator {
 		| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
 		| undefined;
 	private finalizedAt: number | undefined;
+	/**
+	 * Streaming fence state machine (plan task E1). When undefined, the
+	 * translator is "between fences" (plain text). When set, we're inside an
+	 * open fence: a part_start with type:"code_block" has already been
+	 * emitted, content is being accumulated + flushed as throttled part_delta
+	 * events, and the fence is waiting for its closing ``` to re-classify.
+	 */
+	private pendingFence: {
+		partId: string;
+		language?: string;
+		content: string;
+		/** Length of content already emitted via part_delta. */
+		flushedLength: number;
+	} | undefined;
+	private structuredPartIndex = 0;
+	/**
+	 * Buffer of text received while outside a fence that hasn't yet been
+	 * scanned for a fence-opening ``` (the opening marker can span chunk
+	 * boundaries). Re-scanned from this point on each chunk.
+	 */
+	private outsideScanBuffer = "";
 
 	constructor(ctx: TranslatorContext) {
 		this.ctx = ctx;
@@ -84,6 +104,10 @@ export class ChatToRuntimeTranslator {
 						messageId: this.messageId,
 						delta: ev.content,
 					});
+					// Drive the streaming fence state machine (plan task E1).
+					// Emits assistant.part events for fences as they open/close,
+					// throttled by line boundaries to avoid one event per token.
+					this.processChunkForFences(ev.content, out);
 				}
 				break;
 			}
@@ -168,17 +192,12 @@ export class ChatToRuntimeTranslator {
 					messageId: this.messageId,
 					text: this.accumulatedText,
 				});
-				for (const partEvent of buildStructuredAssistantPartEvents(
-					this.messageId,
-					this.accumulatedText,
-					finalizedAt,
-				)) {
-					out.push({
-						...this.base(),
-						type: "assistant.part",
-						partEvent,
-					});
-				}
+				// If a fence is still open at finalize (stream ended mid-fence),
+				// close it: flush any unflushed content and emit part_done. The
+				// body is re-classified from code_block to its structured type
+				// if it parses (same path as a normal close, just without a
+				// closing ```).
+				this.closePendingFence(out, finalizedAt, /* unterminated */ true);
 				if (this.finalUsage) {
 					out.push({
 						...this.base(),
@@ -229,6 +248,227 @@ export class ChatToRuntimeTranslator {
 		];
 	}
 
+	/**
+	 * Streaming fence scanner (plan task E1). Called per chunk with the new
+	 * delta. Maintains a small state machine:
+	 *   - outside a fence: look for an opening ``` in the buffer; on open,
+	 *     emit part_start (as code_block), capture the info-string language.
+	 *   - inside a fence: accumulate content; flush part_delta on line
+	 *     boundaries (throttle — avoids one event per token). On a closing
+	 *     ```, finalize: emit any pending delta, then re-classify the part to
+	 *     its structured type via part_update if the body parses.
+	 *
+	 * Fence markers can span chunk boundaries (the ``` may be split), so the
+	 * outside-buffer is retained and re-scanned, and the inside-content is
+	 * scanned for the closing marker incrementally.
+	 */
+	private processChunkForFences(
+		delta: string,
+		out: AgentRuntimeStreamEvent[],
+	): void {
+		if (this.pendingFence) {
+			this.processInsideFence(delta, out);
+		} else {
+			this.processOutsideFence(delta, out);
+		}
+	}
+
+	private processOutsideFence(
+		delta: string,
+		out: AgentRuntimeStreamEvent[],
+	): void {
+		this.outsideScanBuffer += delta;
+		// Look for an opening fence marker ```. Keep a 2-char overlap to catch
+		// a marker split across chunk boundaries (max marker run is 3 chars).
+		const openIdx = this.outsideScanBuffer.indexOf("```");
+		if (openIdx === -1) {
+			// No opener yet; retain a tail slice in case ``` is mid-arrival.
+			if (this.outsideScanBuffer.length > 2) {
+				this.outsideScanBuffer = this.outsideScanBuffer.slice(-2);
+			}
+			return;
+		}
+		const afterMarker = this.outsideScanBuffer.slice(openIdx + 3);
+		// The info string runs to end of line; language is its first token.
+		const newlineIdx = afterMarker.indexOf("\n");
+		let language: string | undefined;
+		let remainder: string;
+		if (newlineIdx === -1) {
+			// Info string not yet terminated (opener split across chunks); keep
+			// the buffer for next chunk.
+			this.outsideScanBuffer = `\`\`\`${afterMarker}`;
+			return;
+		}
+		const info = afterMarker.slice(0, newlineIdx).trim();
+		language = info.split(/\s+/)[0]?.toLowerCase() || undefined;
+		remainder = afterMarker.slice(newlineIdx + 1);
+		this.outsideScanBuffer = "";
+		// Open the fence.
+		const partId = `${this.messageId}:structured:${this.structuredPartIndex++}`;
+		this.pendingFence = { partId, language, content: "", flushedLength: 0 };
+		out.push({
+			...this.base(),
+			type: "assistant.part",
+			partEvent: {
+				type: "assistant.part_start",
+				messageId: this.messageId,
+				part: {
+					id: partId,
+					type: "code_block",
+					state: "streaming",
+					...(language ? { language } : {}),
+					content: "",
+					completeFence: false,
+					lineCount: 0,
+					createdAt: Date.now(),
+					updatedAt: Date.now(),
+				},
+				ts: Date.now(),
+			},
+		});
+		// remainder is the first slice of in-fence content; feed it through the
+		// inside-fence path (which will also catch an immediate ``` close).
+		if (remainder.length > 0) {
+			this.processInsideFence(remainder, out);
+		}
+	}
+
+	private processInsideFence(
+		delta: string,
+		out: AgentRuntimeStreamEvent[],
+	): void {
+		if (!this.pendingFence) return;
+		this.pendingFence.content += delta;
+		// Detect a closing ``` (preceded by a newline or at content start).
+		const content = this.pendingFence.content;
+		const closeMatch = content.match(/\n```/);
+		if (closeMatch && closeMatch.index !== undefined) {
+			const closeIdx = closeMatch.index;
+			// Trim the closing marker + everything after from the body.
+			const body = content.slice(0, closeIdx);
+			this.pendingFence.content = body;
+			// Flush any unflushed body content as a final delta.
+			this.flushPendingDelta(out);
+			this.closePendingFence(out, Date.now(), /* unterminated */ false);
+			// Anything after the closing ``` is outside-fence text; re-feed it.
+			const after = content.slice(closeIdx + 4);
+			this.pendingFence = undefined;
+			if (after.length > 0) {
+				this.processOutsideFence(after, out);
+			}
+			return;
+		}
+		// No close yet — throttle: flush when we have at least one complete
+		// line beyond what's already flushed.
+		const unflushed = content.slice(this.pendingFence.flushedLength);
+		const lastNewline = unflushed.lastIndexOf("\n");
+		if (lastNewline >= 0) {
+			const flushUpTo = this.pendingFence.flushedLength + lastNewline + 1;
+			const chunk = content.slice(this.pendingFence.flushedLength, flushUpTo);
+			this.pendingFence.flushedLength = flushUpTo;
+			out.push({
+				...this.base(),
+				type: "assistant.part",
+				partEvent: {
+					type: "assistant.part_delta",
+					messageId: this.messageId,
+					partId: this.pendingFence.partId,
+					delta: chunk,
+					ts: Date.now(),
+				},
+			});
+		}
+	}
+
+	private flushPendingDelta(out: AgentRuntimeStreamEvent[]): void {
+		if (!this.pendingFence) return;
+		const { content, flushedLength, partId } = this.pendingFence;
+		if (content.length > flushedLength) {
+			const chunk = content.slice(flushedLength);
+			this.pendingFence.flushedLength = content.length;
+			out.push({
+				...this.base(),
+				type: "assistant.part",
+				partEvent: {
+					type: "assistant.part_delta",
+					messageId: this.messageId,
+					partId,
+					delta: chunk,
+					ts: Date.now(),
+				},
+			});
+		}
+	}
+
+	/**
+	 * Finalize the pending fence: re-classify the accumulated body to its
+	 * structured type (table/tree/sources/artifact/json/diff) if it parses,
+	 * otherwise leave it as code_block; then emit part_done. If `unterminated`
+	 * is true the closing ``` was never seen (stream ended mid-fence).
+	 */
+	private closePendingFence(
+		out: AgentRuntimeStreamEvent[],
+		ts: number,
+		unterminated: boolean,
+	): void {
+		if (!this.pendingFence) return;
+		const { partId, language, content } = this.pendingFence;
+		// Re-classify: reuse the existing buildMessagePart logic by synthesizing
+		// a FencedBlock and, if it yields a non-code_block type, emit a
+		// part_update replacing the part with the fully-parsed structured part.
+		const block: FencedBlock = {
+			...(language ? { language } : {}),
+			content,
+		};
+		const structured = buildMessagePart(this.messageId, 0, block, ts);
+		if (structured && structured.type !== "code_block") {
+			// Replace the streaming code_block with the final structured part.
+			// Carry over the same partId so the renderer updates in place.
+			out.push({
+				...this.base(),
+				type: "assistant.part",
+				partEvent: {
+					type: "assistant.part_update",
+					messageId: this.messageId,
+					partId,
+					patch: { ...structured, id: partId, state: "complete" },
+					ts,
+				},
+			});
+		} else {
+			// Stays code_block: just mark complete + set final content/lineCount
+			// via part_done patch (the streamed content is already in place).
+			out.push({
+				...this.base(),
+				type: "assistant.part",
+				partEvent: {
+					type: "assistant.part_update",
+					messageId: this.messageId,
+					partId,
+					patch: {
+						content,
+						completeFence: !unterminated,
+						lineCount: countLines(content),
+						updatedAt: ts,
+					},
+					ts,
+				},
+			});
+		}
+		out.push({
+			...this.base(),
+			type: "assistant.part",
+			partEvent: {
+				type: "assistant.part_done",
+				messageId: this.messageId,
+				partId,
+				patch: { state: "complete" },
+				ts,
+			},
+		});
+		this.pendingFence = undefined;
+	}
+
 	private base() {
 		return {
 			v: 1 as const,
@@ -250,52 +490,9 @@ function stringify(v: unknown): string {
 	}
 }
 
-function buildStructuredAssistantPartEvents(
-	messageId: string,
-	text: string,
-	ts: number,
-): AssistantPartEvent[] {
-	const events: AssistantPartEvent[] = [];
-	let index = 0;
-	for (const block of extractFencedBlocks(text)) {
-		const part = buildMessagePart(messageId, index, block, ts);
-		if (!part) continue;
-		events.push({
-			type: "assistant.part_start",
-			messageId,
-			part,
-			ts,
-		});
-		events.push({
-			type: "assistant.part_done",
-			messageId,
-			partId: part.id,
-			patch: { state: "complete" },
-			ts,
-		});
-		index++;
-	}
-	return events;
-}
-
 interface FencedBlock {
 	language?: string;
 	content: string;
-}
-
-function extractFencedBlocks(text: string): FencedBlock[] {
-	const blocks: FencedBlock[] = [];
-	const re = /```([^\n`]*)\n([\s\S]*?)```/g;
-	let match: RegExpExecArray | null;
-	while ((match = re.exec(text))) {
-		const info = match[1]?.trim() ?? "";
-		const language = info.split(/\s+/)[0]?.toLowerCase() || undefined;
-		blocks.push({
-			...(language ? { language } : {}),
-			content: match[2] ?? "",
-		});
-	}
-	return blocks;
 }
 
 function buildMessagePart(

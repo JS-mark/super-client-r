@@ -15,6 +15,58 @@ function collect(events: ChatStreamEvent[]): AgentRuntimeStreamEvent[] {
 	return out;
 }
 
+type PartEvent = Extract<
+	AgentRuntimeStreamEvent,
+	{ type: "assistant.part" }
+>["partEvent"];
+
+/**
+ * Fold the streaming assistant.part event sequence into the FINAL state of
+ * each part (keyed by partId / start-order). part_start seeds the part,
+ * part_delta appends content (string deltas onto code_block/text), part_update
+ * shallow-merges its patch (this is how a streaming code_block gets
+ * re-classified to table/tree/sources/artifact on fence close), part_done
+ * sets state:"complete".
+ */
+function finalParts(events: AgentRuntimeStreamEvent[]): Record<string, unknown> {
+	const parts: Record<string, unknown> = {};
+	const order: string[] = [];
+	for (const ev of events) {
+		if (ev.type !== "assistant.part") continue;
+		const pe = (ev as { partEvent: PartEvent }).partEvent;
+		if (pe.type === "assistant.part_start" && pe.part) {
+			parts[pe.part.id] = { ...pe.part };
+			order.push(pe.part.id);
+		} else if (pe.type === "assistant.part_delta") {
+			const existing = parts[pe.partId] as { content?: string } | undefined;
+			if (existing && typeof existing.content === "string" && typeof pe.delta === "string") {
+				existing.content = existing.content + pe.delta;
+			}
+		} else if (pe.type === "assistant.part_update") {
+			// parts[pe.partId] may be undefined if an update arrives without a
+			// preceding start (defensive); the ?? {} is required for safety.
+			// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
+			parts[pe.partId] = { ...(parts[pe.partId] ?? {}), ...pe.patch };
+		} else if (pe.type === "assistant.part_done") {
+			parts[pe.partId] = {
+				// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
+				...(parts[pe.partId] ?? {}),
+				// eslint-disable-next-line unicorn/no-useless-fallback-in-spread
+				...(pe.patch ?? {}),
+				state: "complete",
+			};
+		}
+	}
+	// Return in start-order as an array.
+	return Object.fromEntries(order.map((id) => [id, parts[id]]));
+}
+
+/** Convenience: the final parts as an array (start-order). */
+function finalPartsArray(events: AgentRuntimeStreamEvent[]): unknown[] {
+	const map = finalParts(events) as Record<string, unknown>;
+	return Object.values(map);
+}
+
 describe("ChatToRuntimeTranslator", () => {
 	it("emits init first then text.delta + message.final + result on chunk→done", () => {
 		const out = collect([
@@ -75,32 +127,27 @@ describe("ChatToRuntimeTranslator", () => {
 
 		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
 			type: "assistant.part";
-			partEvent: {
-				type: string;
-				part?: { type: string; language?: string; value?: unknown; files?: unknown[] };
-				partId?: string;
-			};
+			partEvent: { type: string };
 		}>;
-		expect(partEvents.map((e) => e.partEvent.type)).toEqual([
-			"assistant.part_start",
-			"assistant.part_done",
-			"assistant.part_start",
-			"assistant.part_done",
-			"assistant.part_start",
-			"assistant.part_done",
-		]);
-		const started = partEvents
-			.map((e) => e.partEvent.part)
-			.filter(Boolean) as Array<{
+		// Each fence emits a part_start on open + a part_update (re-classify or
+		// finalize-as-code_block) + a part_done on close. Deltas appear only
+		// when content crossed a line boundary before the close.
+		const starts = partEvents.filter((e) => e.partEvent.type === "assistant.part_start");
+		expect(starts).toHaveLength(3);
+		expect(partEvents.some((e) => e.partEvent.type === "assistant.part_done")).toBe(true);
+		// Final parts (after folding start + update + done) carry the
+		// structured type, not the streaming code_block placeholder.
+		const finals = finalPartsArray(out) as Array<{
 			type: string;
 			language?: string;
 			value?: unknown;
 			files?: unknown[];
 		}>;
-		expect(started[0]).toMatchObject({ type: "code_block", language: "ts" });
-		expect(started[1]).toMatchObject({ type: "data", value: { ok: true } });
-		expect(started[2]).toMatchObject({ type: "diff" });
-		expect(started[2]?.files).toHaveLength(1);
+		expect(finals).toHaveLength(3);
+		expect(finals[0]).toMatchObject({ type: "code_block", language: "ts" });
+		expect(finals[1]).toMatchObject({ type: "data", value: { ok: true } });
+		expect(finals[2]).toMatchObject({ type: "diff" });
+		expect(finals[2]?.files).toHaveLength(1);
 	});
 
 	it("emits a table part from a markdown-table fence", () => {
@@ -119,18 +166,14 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: { type: string; part?: { type: string; columns?: string[]; rows?: unknown[][] } };
-		}>;
-		expect(partEvents.map((e) => e.partEvent.type)).toEqual([
-			"assistant.part_start",
-			"assistant.part_done",
-		]);
-		const part = partEvents[0]?.partEvent.part;
+		const part = finalPartsArray(out)[0] as {
+			type: string;
+			columns?: string[];
+			rows?: unknown[][];
+		};
 		expect(part).toMatchObject({ type: "table" });
-		expect(part?.columns).toEqual(["name", "age"]);
-		expect(part?.rows).toEqual([
+		expect(part.columns).toEqual(["name", "age"]);
+		expect(part.rows).toEqual([
 			["Ada", "36"],
 			["Bob", "24"],
 		]);
@@ -152,23 +195,19 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: {
-				type: string;
-				part?: { type: string; nodes?: Array<{ id: string; label: string; parentId?: string }> };
-			};
-		}>;
-		const part = partEvents[0]?.partEvent.part;
+		const part = finalPartsArray(out)[0] as {
+			type: string;
+			nodes?: Array<{ id: string; label: string; parentId?: string }>;
+		};
 		expect(part).toMatchObject({ type: "tree" });
-		expect(part?.nodes).toHaveLength(4);
-		expect(part?.nodes?.[0]).toMatchObject({ id: "node-0", label: "src/" });
-		expect(part?.nodes?.[0]?.parentId).toBeUndefined();
+		expect(part.nodes).toHaveLength(4);
+		expect(part.nodes?.[0]).toMatchObject({ id: "node-0", label: "src/" });
+		expect(part.nodes?.[0]?.parentId).toBeUndefined();
 		// index.ts + lib/ are children of src/ (node-0)
-		expect(part?.nodes?.[1]).toMatchObject({ id: "node-1", parentId: "node-0" });
-		expect(part?.nodes?.[2]).toMatchObject({ id: "node-2", parentId: "node-0" });
+		expect(part.nodes?.[1]).toMatchObject({ id: "node-1", parentId: "node-0" });
+		expect(part.nodes?.[2]).toMatchObject({ id: "node-2", parentId: "node-0" });
 		// utils.ts is child of lib/ (node-2)
-		expect(part?.nodes?.[3]).toMatchObject({ id: "node-3", parentId: "node-2" });
+		expect(part.nodes?.[3]).toMatchObject({ id: "node-3", parentId: "node-2" });
 	});
 
 	it("emits a sources part from a markdown-list fence", () => {
@@ -186,29 +225,22 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: {
-				type: string;
-				part?: {
-					type: string;
-					sources?: Array<{ id: string; title?: string; url?: string; path?: string; sourceType?: string }>;
-				};
-			};
-		}>;
-		const part = partEvents[0]?.partEvent.part;
+		const part = finalPartsArray(out)[0] as {
+			type: string;
+			sources?: Array<{ id: string; title?: string; url?: string; path?: string; sourceType?: string }>;
+		};
 		expect(part).toMatchObject({ type: "sources" });
-		expect(part?.sources).toHaveLength(3);
-		expect(part?.sources?.[0]).toMatchObject({
+		expect(part.sources).toHaveLength(3);
+		expect(part.sources?.[0]).toMatchObject({
 			title: "Google",
 			url: "https://google.com",
 			sourceType: "web",
 		});
-		expect(part?.sources?.[1]).toMatchObject({
+		expect(part.sources?.[1]).toMatchObject({
 			path: "/etc/hosts",
 			sourceType: "file",
 		});
-		expect(part?.sources?.[2]).toMatchObject({
+		expect(part.sources?.[2]).toMatchObject({
 			title: "Plain note",
 			sourceType: "unknown",
 		});
@@ -232,20 +264,13 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: {
-				type: string;
-				part?: {
-					type: string;
-					artifactId?: string;
-					artifactType?: string;
-					title?: string;
-					preview?: string;
-				};
-			};
-		}>;
-		const part = partEvents[0]?.partEvent.part;
+		const part = finalPartsArray(out)[0] as {
+			type: string;
+			artifactId?: string;
+			artifactType?: string;
+			title?: string;
+			preview?: string;
+		};
 		expect(part).toMatchObject({
 			type: "artifact",
 			artifactId: "art-1",
@@ -265,12 +290,9 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: { part?: { type: string; language?: string } };
-		}>;
-		expect(partEvents[0]?.partEvent.part?.type).toBe("code_block");
-		expect(partEvents[0]?.partEvent.part?.language).toBe("table");
+		const part = finalPartsArray(out)[0] as { type: string; language?: string };
+		expect(part.type).toBe("code_block");
+		expect(part.language).toBe("table");
 	});
 
 	it("falls back to code_block when an artifact JSON is invalid", () => {
@@ -282,12 +304,9 @@ describe("ChatToRuntimeTranslator", () => {
 			},
 			{ requestId: "r1", type: "done" },
 		]);
-		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
-			type: "assistant.part";
-			partEvent: { part?: { type: string; language?: string } };
-		}>;
-		expect(partEvents[0]?.partEvent.part?.type).toBe("code_block");
-		expect(partEvents[0]?.partEvent.part?.language).toBe("artifact");
+		const part = finalPartsArray(out)[0] as { type: string; language?: string };
+		expect(part.type).toBe("code_block");
+		expect(part.language).toBe("artifact");
 	});
 
 	it("tool_call → tool.call with parsed input", () => {
@@ -417,5 +436,114 @@ describe("ChatToRuntimeTranslator", () => {
 			expect((ev as { runtime: string }).runtime).toBe("llm-loop");
 			expect(typeof (ev as { timestamp: number }).timestamp).toBe("number");
 		}
+	});
+
+	// ── Streaming fence state machine (plan task E1) ────────────────────
+	// These cover the new streaming behavior: fences emit part_start on
+	// open, throttled part_delta as content arrives across chunk boundaries,
+	// and a re-classifying part_update + part_done on close.
+
+	it("streams a fence across multiple chunks: start → delta → update → done", () => {
+		const out = collect([
+			{ requestId: "r1", type: "chunk", content: "```table\n" },
+			{ requestId: "r1", type: "chunk", content: "| a | b |\n" },
+			{ requestId: "r1", type: "chunk", content: "| --- | --- |\n" },
+			{ requestId: "r1", type: "chunk", content: "| 1 | 2 |\n" },
+			{ requestId: "r1", type: "chunk", content: "```" },
+			{ requestId: "r1", type: "done" },
+		]);
+		const partEvents = out.filter((e) => e.type === "assistant.part") as Array<{
+			type: "assistant.part";
+			partEvent: { type: string; part?: { type: string }; delta?: unknown };
+		}>;
+		const seq = partEvents.map((e) => e.partEvent.type);
+		// Opens with part_start (as code_block), emits one or more part_delta
+		// as content crosses line boundaries, then re-classifies via
+		// part_update and closes with part_done.
+		expect(seq[0]).toBe("assistant.part_start");
+		expect(seq.filter((t) => t === "assistant.part_delta").length).toBeGreaterThan(0);
+		expect(seq).toContain("assistant.part_update");
+		expect(seq[seq.length - 1]).toBe("assistant.part_done");
+		// part_start carries the code_block placeholder (streaming state).
+		expect(partEvents[0]?.partEvent.part?.type).toBe("code_block");
+		// After folding, the final part is re-classified to table.
+		const final = finalPartsArray(out)[0] as { type: string; columns?: string[] };
+		expect(final.type).toBe("table");
+		expect(final.columns).toEqual(["a", "b"]);
+	});
+
+	it("throttles part_delta by line boundary, not per chunk", () => {
+		// Feed many small chunks (simulating per-token arrival) within a single
+		// line — no newline until the end. The producer should NOT emit a delta
+		// per chunk; it flushes only when a line boundary is crossed.
+		const out = collect([
+			{ requestId: "r1", type: "chunk", content: "```ts\n" },
+			...["const ", "x ", "= ", "1;"].map((c) => ({
+				requestId: "r1",
+				type: "chunk" as const,
+				content: c,
+			})),
+			{ requestId: "r1", type: "chunk", content: "\n" },
+			{ requestId: "r1", type: "chunk", content: "```" },
+			{ requestId: "r1", type: "done" },
+		]);
+		const deltas = out.filter(
+			(e) =>
+				e.type === "assistant.part" &&
+				(e as { partEvent: { type: string } }).partEvent.type === "assistant.part_delta",
+		);
+		// Exactly one delta for the single line — not one per token chunk.
+		expect(deltas).toHaveLength(1);
+		const delta = (deltas[0] as { partEvent: { delta: string } }).partEvent.delta;
+		expect(delta).toBe("const x = 1;\n");
+	});
+
+	it("part_start carries code_block during streaming; close re-classifies to table", () => {
+		const out = collect([
+			{ requestId: "r1", type: "chunk", content: "```table\n| a |\n| --- |\n| 1 |\n```" },
+			{ requestId: "r1", type: "done" },
+		]);
+		const start = out.find(
+			(e) =>
+				e.type === "assistant.part" &&
+				(e as { partEvent: { type: string } }).partEvent.type === "assistant.part_start",
+		) as { partEvent: { part: { type: string; state: string } } } | undefined;
+		expect(start?.partEvent.part.type).toBe("code_block");
+		expect(start?.partEvent.part.state).toBe("streaming");
+		// Final folded state is the structured table.
+		expect((finalPartsArray(out)[0] as { type: string }).type).toBe("table");
+	});
+
+	it("finalizes an unterminated fence at done (stream ended mid-fence)", () => {
+		// Fence opens but never closes before `done`. The producer should
+		// still finalize it: flush content, attempt re-classify, emit done.
+		const out = collect([
+			{ requestId: "r1", type: "chunk", content: "```ts\nconst x = 1;\n" },
+			{ requestId: "r1", type: "done" },
+		]);
+		const finals = finalPartsArray(out) as Array<{ type: string; completeFence?: boolean }>;
+		expect(finals).toHaveLength(1);
+		expect(finals[0].type).toBe("code_block");
+		// Unterminated → completeFence stays false (the ``` never arrived).
+		expect(finals[0].completeFence).toBe(false);
+	});
+
+	it("resumes outside-fence scanning after a fence closes (two consecutive fences)", () => {
+		const out = collect([
+			{
+				requestId: "r1",
+				type: "chunk",
+				content: ["```ts", "a", "```", "```json", "{\"ok\":true}", "```"].join("\n"),
+			},
+			{ requestId: "r1", type: "done" },
+		]);
+		const starts = out.filter(
+			(e) =>
+				e.type === "assistant.part" &&
+				(e as { partEvent: { type: string } }).partEvent.type === "assistant.part_start",
+		);
+		expect(starts).toHaveLength(2);
+		const finals = finalPartsArray(out) as Array<{ type: string }>;
+		expect(finals.map((p) => p.type)).toEqual(["code_block", "data"]);
 	});
 });
