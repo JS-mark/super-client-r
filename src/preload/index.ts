@@ -1784,6 +1784,7 @@ const electronAPI: ElectronAPI = {
 		"listOrphans",
 		"restoreOrphan",
 		"deleteOrphan",
+		"relinkOrphan",
 	]),
 	sessions: createBridge<ElectronAPI["sessions"]>("sessions", [
 		"list",

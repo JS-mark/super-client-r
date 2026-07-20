@@ -393,4 +393,68 @@ describe("orphan recovery", () => {
 		// Still in the registry → must not be deletable as orphan.
 		expect(() => svc.deleteOrphan(p.id)).toThrow(/registered/);
 	});
+
+	it("relinkOrphan renames storage dir to the new hash and registers newCwd", () => {
+		const oldCwd = "/a/moved-from";
+		const newCwd = "/a/moved-to";
+		const p = svc.add(oldCwd);
+		const oldId = p.id;
+		svc.remove(oldId, { keepFiles: true });
+		expect(svc.list()).toHaveLength(0);
+		expect(existsSync(projectDir(oldId))).toBe(true);
+
+		const relinked = svc.relinkOrphan(oldId, newCwd);
+		const newId = hashCwd(newCwd);
+		expect(relinked.id).toBe(newId);
+		expect(relinked.cwd).toBe(newCwd);
+		// Storage dir renamed: old id gone, new id present.
+		expect(existsSync(projectDir(oldId))).toBe(false);
+		expect(existsSync(projectDir(newId))).toBe(true);
+		// path.txt refreshed to the new cwd.
+		expect(readFileSync(join(projectDir(newId), "path.txt"), "utf-8")).toBe(
+			newCwd,
+		);
+		// Registry now contains the new project.
+		expect(svc.list().map((p) => p.id)).toEqual([newId]);
+	});
+
+	it("relinkOrphan degrades to restore-style behavior when newCwd hash matches", () => {
+		const cwd = "/a/same";
+		const p = svc.add(cwd);
+		svc.remove(p.id, { keepFiles: true });
+		// Relinking to the same cwd should NOT rename (hash unchanged) but
+		// should still re-register the project.
+		const relinked = svc.relinkOrphan(p.id, cwd);
+		expect(relinked.id).toBe(p.id);
+		expect(existsSync(projectDir(p.id))).toBe(true);
+		expect(svc.list().map((p) => p.id)).toEqual([p.id]);
+	});
+
+	it("relinkOrphan refuses when the target hash dir already exists", () => {
+		// Create two orphans; try to relink one onto the other's id.
+		const p1 = svc.add("/a/one");
+		const p2 = svc.add("/a/two");
+		svc.remove(p1.id, { keepFiles: true });
+		svc.remove(p2.id, { keepFiles: true });
+		// Attempt to relink p1's orphan to p2's cwd — target dir already
+		// exists at hashCwd("/a/two") == p2.id.
+		expect(() => svc.relinkOrphan(p1.id, "/a/two")).toThrow(
+			/target dir already exists/,
+		);
+		// Both orphan dirs still intact.
+		expect(existsSync(projectDir(p1.id))).toBe(true);
+		expect(existsSync(projectDir(p2.id))).toBe(true);
+	});
+
+	it("relinkOrphan refuses unsafe projectId + registered project + missing source dir", () => {
+		expect(() => svc.relinkOrphan("../etc", "/a/b")).toThrow(/unsafe/);
+		expect(() => svc.relinkOrphan("foo/bar", "/a/b")).toThrow(/unsafe/);
+		const registered = svc.add("/a/live");
+		expect(() =>
+			svc.relinkOrphan(registered.id, "/a/live-renamed"),
+		).toThrow(/registered/);
+		expect(() =>
+			svc.relinkOrphan("deadbeefdeadbeef", "/a/nowhere"),
+		).toThrow(/not found/);
+	});
 });

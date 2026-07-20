@@ -302,6 +302,10 @@ beforeEach(() => {
 					success: true,
 					data: { removed: true },
 				}),
+				relinkOrphan: vi.fn().mockResolvedValue({
+					success: true,
+					data: { id: "new", cwd: "/new", name: "new" },
+				}),
 			},
 			sessions: {
 				purgeTombstone: vi.fn().mockResolvedValue({

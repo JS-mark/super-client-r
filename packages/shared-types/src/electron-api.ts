@@ -402,6 +402,16 @@ export interface ElectronAPIMigrated {
 		deleteOrphan: (
 			projectId: string,
 		) => Promise<IPCResponse<{ removed: boolean }>>;
+		/**
+		 * Relink an orphan project to a NEW cwd (project directory
+		 * moved/renamed). Rehashes newCwd, renames storage dir to the new
+		 * id, rewrites path.txt, and registers under the new id. Refuses
+		 * if the target id's dir already exists.
+		 */
+		relinkOrphan: (
+			projectId: string,
+			newCwd: string,
+		) => Promise<IPCResponse<Project>>;
 	};
 
 	/**

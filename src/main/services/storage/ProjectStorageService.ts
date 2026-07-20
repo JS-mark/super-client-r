@@ -20,6 +20,7 @@ import {
 	mkdirSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs";
@@ -397,6 +398,65 @@ export class ProjectStorageService {
 		}
 		rmSync(dir, { recursive: true, force: true });
 		return { removed: true };
+	}
+
+	/**
+	 * Relink an orphan project to a NEW cwd (e.g. the user moved/renamed
+	 * their project directory). This is the "hash mismatch" case
+	 * `restoreOrphan` explicitly rejects — it re-hashes the new cwd, renames
+	 * the storage directory to the new id, rewrites `path.txt`, and
+	 * registers the project under the new id.
+	 *
+	 * SAFETY:
+	 *   1. `projectId` guarded like `deleteOrphan` (no path separators / ..).
+	 *   2. Must be an orphan (not in the registry).
+	 *   3. Source dir (old id) must exist; target dir (new id) must NOT
+	 *      already exist — this refuses to overwrite another orphan.
+	 *   4. If newCwd hashes to the SAME id (no-op relink), delegate to
+	 *      `restoreOrphan` behavior (rewrite path.txt + add).
+	 *
+	 * Idempotence: calling twice with the same args throws on the second
+	 * call (orphan already registered as new id). Callers should treat
+	 * "orphan not found" as success-after-the-fact.
+	 */
+	relinkOrphan(projectId: string, newCwd: string): Project {
+		if (
+			!projectId ||
+			projectId.includes("/") ||
+			projectId.includes("\\") ||
+			projectId.includes("..")
+		) {
+			throw new Error(`refusing to relink orphan with unsafe id: ${projectId}`);
+		}
+		if (this.list().some((p) => p.id === projectId)) {
+			throw new Error(
+				`project ${projectId} is registered; not an orphan (relink is for unregistered dirs only)`,
+			);
+		}
+		const sourceDir = this.projectDir(projectId);
+		if (!existsSync(sourceDir)) {
+			throw new Error(`orphan ${projectId} not found (no source dir)`);
+		}
+		const normalizedCwd = normalizeCwd(newCwd);
+		const newId = hashCwd(normalizedCwd);
+		if (newId === projectId) {
+			// Hash unchanged — no rename needed; just refresh path.txt and
+			// register. This preserves relinkOrphan as a valid superset of
+			// restoreOrphan for callers that don't want to pre-check the hash.
+			writeFileSync(join(sourceDir, PATH_FILE), normalizedCwd, "utf-8");
+			return this.add(normalizedCwd);
+		}
+		const targetDir = this.projectDir(newId);
+		if (existsSync(targetDir)) {
+			throw new Error(
+				`refusing to relink: target dir already exists at new id ${newId}`,
+			);
+		}
+		// Rename storage dir to the new id, then rewrite path.txt to newCwd
+		// so `restoreOrphan`-style hash check would pass in the future too.
+		renameSync(sourceDir, targetDir);
+		writeFileSync(join(targetDir, PATH_FILE), normalizedCwd, "utf-8");
+		return this.add(normalizedCwd);
 	}
 
 	// ─── helpers ─────────────────────────────────────────────────
