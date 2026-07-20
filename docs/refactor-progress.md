@@ -1684,3 +1684,45 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无。`modal.confirm` 无法返回表单值——用 mutable box `{ value: currentCwd }` + onChange 直接 mutate 解决(闭包持有 box 引用,onOk 读它)。这是 antd modal.confirm 带 input 的通用 workaround。
 - **代码事实更新**:orphan 现有完整 5 操作(list / restore / relink / delete / archive delegate);test 基线 = 131 files / **1120 tests**。
 - **下一步可选**:剩 1 个 recovery 子工作流(bundle,可能引入 zip),或转其他 Remaining Gaps(export zip / remote lifecycle)。
+
+## 2026-07-20 feat: recovery bundle export(recovery UI 第 4 子工作流)
+
+> Remaining Gaps "Settings recovery UI" 的最后一个子工作流(backup/export bundle)。commit `b8b22ab`。**Recovery UI 4 个子工作流全部完成**。
+
+### 落地
+
+新 `RecoveryBundleService` 编排 3 个现有 exporter 成单一 bundle 目录 + 顶层 manifest。**目录形式,不引入 zip 依赖**(为未来 `packAsZip:true` 保留接口)。
+
+**Service 设计**(不改现有 exporter 签名):
+1. 创建 `<userRoot>/exports/bundles/<timestamp>/`
+2. 每个 session/project 调现有 `exportSessionArchive`/`exportProjectArchive`(写自己的 timestamp dir),然后 `renameSync` 移进 bundle 下的 `sessions/<sid>` / `projects/<pid>`
+3. `DiagnosticExportService.export()` + rename 到 `bundle/diagnostic/`
+4. 写 `bundle-manifest.json`(schemaVersion + createdAt + appVersion + includeChatContent + entries[])
+
+**Guards**:空请求(无 sessions/projects/diagnostic)抛;id 拒 `../`/`/`/`\`
+
+**IPC**:新 `recovery.exportBundle(options?)` 命名空间;`SessionStorageService` 新增 `getUserRoot()` public getter(peer service 需要复合路径时用)
+
+**UI**:诊断按钮旁加 primary "Export recovery bundle" 按钮(non-destructive 无 confirm modal)
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1125 tests / 0 failed**(+5 bundle service) |
+
+首跑遇到已知的 pre-existing EADDRINUSE `:::3000` flake(`serverFixture` 并行 worker 端口竞争,与本批改动无关),重跑绿。
+
+### Remaining Gaps 更新
+
+**"Settings recovery UI" 整体完成**——wizard 状态机 + 物理 cleanup + relink + bundle 全部 4 个子工作流完成。从 Remaining Gaps 移除。
+
+剩独立候选:**export zip 打包**(引入 zip 依赖)、**remote lifecycle 状态机**。
+
+### Retrospective
+
+- **What worked**:组合式设计(编排现有 exporter + rename)避免了改动 3 个 exporter 签名,把 blast radius 收敛到 1 个新 service + 1 个 IPC channel + 1 个按钮。`renameSync` 在同 fs 上是原子的,失败也不会污染源 exporter 输出。为未来 zip 打包保留了干净接口(`packAsZip:true` 只需 wrap 目录树,不动 API 契约)。
+- **What blocked**:无代码阻塞。`SessionStorageService.userRoot` 是 private,需加 `getUserRoot()` public getter 给 peer service 复合路径——合理的最小侵入改动。
+- **代码事实更新**:Recovery UI 4 子工作流全成;`SessionStorageService` 新增 `getUserRoot()` 供 peer services 用;test 基线 = **132 files / 1125 tests**。
+- **下一步可选**:export zip 打包(引入 zip 库),或 remote lifecycle 状态机。
