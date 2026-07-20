@@ -1647,3 +1647,40 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无代码阻塞。中途发现 `listDeleted`/`restoreDeleted` 在 preload key list 漏了(pre-existing bug,type 有但 renderer 调用会崩),顺带补上。RecoverySettings.test 需要补 antd `App` mock(`App.useApp()` 返 modal stub 让 onOk 同步执行)+ 新图标 mock,3 处补齐,现有 9 个测试仍全绿。
 - **代码事实更新**:3 个物理删除路径全部落地并有 guard 保护;preload sessions bridge 现在暴露完整的 delete/list/restore/purge tombstone 语义;test 基线 = 131 files / **1116 tests**。
 - **下一步可选**:recovery wizard 剩 2 子工作流(bundle / relink),或转其他 Remaining Gaps(export zip / remote lifecycle)。
+
+## 2026-07-20 feat: relinkOrphan(recovery UI 第 3 子工作流)
+
+> Remaining Gaps "Settings recovery UI" 的第 3 个子工作流(relink-with-path-change)。commit `48f8d09`。
+
+### 落地
+
+用户可以把 orphan 项目 relink 到新 cwd(项目目录被移动/改名)。此前 `restoreOrphan` 在 hash mismatch 时抛 "manual migration required (out of scope)",本批把这个缺口补上。
+
+**service `ProjectStorageService.relinkOrphan(projectId, newCwd)`**:
+1. rehash newCwd → newId
+2. rename storage dir(旧 id → 新 id,`renameSync`)
+3. rewrite path.txt 到 newCwd
+4. `add(newCwd)` 注册
+
+**Guards**:(a) projectId 拒 `/`/`\`/`..`/空;(b) 拒注册中项目(relink 只对 orphan);(c) 拒 source dir 不存在;(d) 拒 target dir 已存在(不覆盖另一个 orphan);(e) newId === projectId 时降级为 restoreOrphan 行为(no-rename,只 refresh path.txt + add)。
+
+**UI**:orphan 行加 Relink 按钮(在 Restore 和 Delete 之间),点击弹 `modal.confirm` 带 Input(预填当前 cwd),onOk 通过 mutable box 捕获输入值调用 `relinkOrphan`。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **131 files / 1120 tests / 0 failed**(+4:happy + no-op relink + target-exists + guards) |
+
+### Remaining Gaps 更新
+
+"Settings recovery UI" 的 **wizard 状态机 + 物理 cleanup + relink** 已完成。剩 1 个独立子工作流:
+- **backup/export bundle**(可能引入 zip 库)
+
+### Retrospective
+
+- **What worked**:范围小,复用 `deleteOrphan` 的 guard pattern + `restoreOrphan` 的 hash 校验 pattern + `add()` 的 idempotent registry pattern,新方法几乎全是组合已有 primitives。测试的 happy 用例专门断言 path.txt 被更新为新 cwd + 旧目录消失 + 新目录出现,把 rename 语义钉死。
+- **What blocked**:无。`modal.confirm` 无法返回表单值——用 mutable box `{ value: currentCwd }` + onChange 直接 mutate 解决(闭包持有 box 引用,onOk 读它)。这是 antd modal.confirm 带 input 的通用 workaround。
+- **代码事实更新**:orphan 现有完整 5 操作(list / restore / relink / delete / archive delegate);test 基线 = 131 files / **1120 tests**。
+- **下一步可选**:剩 1 个 recovery 子工作流(bundle,可能引入 zip),或转其他 Remaining Gaps(export zip / remote lifecycle)。
