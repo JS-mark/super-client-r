@@ -1816,6 +1816,7 @@ const electronAPI: ElectronAPI = {
 		"importAll",
 		"purge",
 	]),
+	recovery: createBridge<ElectronAPI["recovery"]>("recovery", ["exportBundle"]),
 	theme: createBridge<ElectronAPI["theme"]>("theme", [
 		"get",
 		"set",

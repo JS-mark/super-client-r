@@ -703,6 +703,16 @@ export class SessionStorageService {
 	 *   casual:  `<userRoot>/casual-sessions/<id>/`
 	 *   project: `<userRoot>/projects/<projectId>/sessions/<id>/`
 	 */
+	/**
+	 * Absolute path to the per-user storage root
+	 * (`<baseDir>/<userId>/`). Used by peer services that need to compose
+	 * paths under the same user root (e.g. RecoveryBundleService places its
+	 * bundle dir at `<userRoot>/exports/bundles/...`).
+	 */
+	getUserRoot(): string {
+		return this.userRoot;
+	}
+
 	getSessionDir(sessionId: string): string {
 		const meta = this.getMeta(sessionId);
 		return join(this.resolveSessionBucket(meta.projectId).dir, meta.id);

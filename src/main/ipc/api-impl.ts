@@ -52,6 +52,9 @@ import { getSessionRuntimeResolver } from "../services/runtime/SessionRuntimeRes
 import { getLegacyImporter } from "../services/storage/LegacyImporter";
 import { getProjectStorage } from "../services/storage/ProjectStorageService";
 import { getSessionStorage } from "../services/storage/SessionStorageService";
+import { DiagnosticExportService } from "../services/diagnostics/DiagnosticExportService";
+import { RecoveryBundleService } from "../services/recovery/RecoveryBundleService";
+import { getAgentTraceCollector } from "../services/agent/trace/AgentTraceCollector";
 import {
 	resolveConversationCwd,
 	resolveConversationProjectRoot,
@@ -1764,6 +1767,26 @@ module.exports = {
 		detect: () => getLegacyImporter().detect(),
 		importAll: () => getLegacyImporter().importAll(),
 		purge: () => getLegacyImporter().purge(),
+	},
+	recovery: {
+		exportBundle: (
+			options?: Parameters<RecoveryBundleService["exportBundle"]>[0],
+		) => {
+			const sessionStorage = getSessionStorage();
+			const diagnosticExport = new DiagnosticExportService({
+				appUserDataDir: app.getPath("userData"),
+				sessionStorage,
+				traceCollector: getAgentTraceCollector(),
+				appVersion: app.getVersion(),
+			});
+			const service = new RecoveryBundleService({
+				userRoot: sessionStorage.getUserRoot(),
+				sessionStorage,
+				diagnosticExport,
+				appVersion: () => app.getVersion(),
+			});
+			return service.exportBundle(options);
+		},
 	},
 };
 
