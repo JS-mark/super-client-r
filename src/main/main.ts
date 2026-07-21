@@ -507,6 +507,13 @@ app.whenReady().then(async () => {
 		psUserId,
 		projectStorage,
 	);
+	// Wire the project → sessions archive cascade so archiving a project
+	// flips archived flag on every non-tombstoned session under it. Kept
+	// as a runtime DI point so ProjectStorageService stays session-storage-
+	// agnostic (avoids circular deps).
+	projectStorage.setArchiveSessionsSink((projectId, archived) => {
+		sessionStorage.archiveByProject(projectId, archived);
+	});
 
 	// Crash recovery sweep: if the previous run crashed / was killed
 	// mid-tool-execution, the jsonl will have a `tool_call` with no matching

@@ -1160,6 +1160,48 @@ describe("rename / updateMeta / delete", () => {
 		expect(meta.archived).toBe(true);
 	});
 
+	it("archiveByProject flips archived on every session under the project", () => {
+		const projectCwd = mkdtempSync(join(tmpdir(), "archive-cascade-"));
+		try {
+			const project = projects.add(projectCwd);
+			const s1 = sessions.create({ projectId: project.id });
+			const s2 = sessions.create({ projectId: project.id });
+			// Sanity: nothing archived yet.
+			expect(sessions.getMeta(s1.id).archived).toBeUndefined();
+			expect(sessions.getMeta(s2.id).archived).toBeUndefined();
+			// Cascade archive.
+			const affected = sessions.archiveByProject(project.id, true);
+			expect(affected.affectedSessionIds.sort()).toEqual([s1.id, s2.id].sort());
+			expect(sessions.getMeta(s1.id).archived).toBe(true);
+			expect(sessions.getMeta(s2.id).archived).toBe(true);
+			// Cascade unarchive.
+			const un = sessions.archiveByProject(project.id, false);
+			expect(un.affectedSessionIds.sort()).toEqual([s1.id, s2.id].sort());
+			expect(sessions.getMeta(s1.id).archived).toBe(false);
+			expect(sessions.getMeta(s2.id).archived).toBe(false);
+		} finally {
+			rmSync(projectCwd, { recursive: true, force: true });
+		}
+	});
+
+	it("archiveByProject is per-session idempotent (skips sessions already in state)", () => {
+		const projectCwd = mkdtempSync(join(tmpdir(), "archive-cascade-idem-"));
+		try {
+			const project = projects.add(projectCwd);
+			const s1 = sessions.create({ projectId: project.id });
+			// Manually flip only s1.
+			sessions.archive(s1.id, true);
+			const s2 = sessions.create({ projectId: project.id });
+			// Cascade archive → only s2 should be affected (s1 already true).
+			const affected = sessions.archiveByProject(project.id, true);
+			expect(affected.affectedSessionIds).toEqual([s2.id]);
+			expect(sessions.getMeta(s1.id).archived).toBe(true);
+			expect(sessions.getMeta(s2.id).archived).toBe(true);
+		} finally {
+			rmSync(projectCwd, { recursive: true, force: true });
+		}
+	});
+
 	it("purgeTombstone with no remote binding passes without the force flag", () => {
 		// Plain (no-remote) session: existing purge behavior unchanged.
 		const s = sessions.create({ projectId: null });
