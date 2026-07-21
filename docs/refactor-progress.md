@@ -1885,3 +1885,35 @@ Remote lifecycle **4/7 完成**。剩 3:
 - **What blocked**:无。
 - **代码事实更新**:bind() 现在抛类型化错误(向后兼容——继承 Error,message 相同);preload 现在暴露 5 个 lifecycle 通道(此前 4 个);test 基线 = **132 files / 1143 tests**。
 - **下一步可选**:remote lifecycle 剩 3 子项,或转 export zip 打包。
+
+## 2026-07-21 feat: session.archive — session 级 archive 一等公民(remote lifecycle 5/7)
+
+> Remaining Gaps "Remote lifecycle" 第 5 个子工作流。commit `6ad643e`。
+
+### 落地
+
+`SessionMeta.archived` 字段现在有 production 写入路径。此前 `RemoteChatBridge.readSessionLifecycleFacts` 一直读 `meta.archived`,但没有生产代码写它——只有测试用 `as any` 强制写入。本批把这个不对称补上。
+
+- **Type**:`SessionMeta` 加 `archived?: boolean`(镜像 `Project.archived`)
+- **Service**:`SessionStorageService.archive(sid, archived)` 镜像 `ProjectStorageService.archive`(idempotent、不影响 tombstoned session、走 `updateMeta` 保持 writeMeta pipeline)
+- **IPC 6-step**:`sessions.archive` 全链路(shared-types → api-impl → preload)
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1147 tests / 0 failed**(+4) |
+
+### Remaining Gaps 更新
+
+Remote lifecycle **5/7 完成**。剩 2:
+- `ProjectStorageService.archive` 级联到 remote-bound sessions(现在有 `session.archive` 作为基础)
+- `remoteChat.listBindings` + `RemoteSessionsPanel` UI
+
+### Retrospective
+
+- **What worked**:范围最小(1 类型字段 + 1 service 方法 + 1 IPC + 4 测试),但填补了一个真实的**非对称**——bridge 读、生产代码不写。基础放稳后,project cascade 就能直接调 `sessions.archive` 而不需要重复实现。
+- **What blocked**:无。
+- **代码事实更新**:renderer 现在有 `window.electron.sessions.archive(sid, archived)`;`SessionMeta.archived` 是官方字段(非 `as any` 补丁);test 基线 = **132 files / 1147 tests**。
+- **下一步可选**:remote lifecycle 剩 2 子项(project cascade / listBindings + UI),或转 export zip 打包。
