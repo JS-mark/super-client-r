@@ -98,6 +98,58 @@ export class RemoteOutboundRejectedError extends Error {
 	}
 }
 
+export interface RemoteBindingConflictPayload {
+	requestedConversationId: string;
+	existingConversationId: string;
+	botId: string;
+	chatId: string;
+}
+
+/**
+ * Thrown by `bind()` when `(botId, chatId)` is already bound to another
+ * conversation. Carries the existing conversation id so UI can offer to
+ * jump to it (renderer will typically render a "already bound elsewhere,
+ * open it?" recovery flow instead of a plain error toast).
+ */
+export class RemoteBindingConflictError extends Error {
+	readonly code = "remote.binding-conflict";
+	readonly details: RemoteBindingConflictPayload;
+
+	constructor(details: RemoteBindingConflictPayload) {
+		super(
+			`Bot ${details.botId} chatId ${details.chatId} is already bound to conversation ${details.existingConversationId}`,
+		);
+		this.name = "RemoteBindingConflictError";
+		this.details = details;
+	}
+}
+
+export interface RemoteBotMissingPayload {
+	botId: string;
+	/** Conversation id when reported at bind time; array on startup load. */
+	conversationId?: string;
+	/** Conversations that still hold a binding to the missing bot. */
+	conversationIds?: string[];
+}
+
+/**
+ * Thrown by `bind()` when `botId` is not present in `IMBotService`
+ * (e.g. bot config was deleted after the renderer picked it). Also
+ * emitted as a `remote.bot-missing` lifecycle event during
+ * `loadBindingsFromStorage` so renderer can surface a recovery banner
+ * for bindings whose bot config is gone.
+ */
+export class RemoteBotMissingError extends Error {
+	readonly code = "remote.bot-missing";
+	readonly details: RemoteBotMissingPayload;
+
+	constructor(details: RemoteBotMissingPayload) {
+		super(`Bot ${details.botId} not found`);
+		this.name = "RemoteBotMissingError";
+		this.details = details;
+	}
+}
+
 interface SendCapableBot {
 	sendMessage(chatId: string, content: string): Promise<void>;
 }
@@ -123,8 +175,12 @@ export class RemoteChatBridge extends EventEmitter {
 		super();
 		this.imbotService = imbotService;
 		this.setupIMListener();
-		this.loadBindingsFromStorage();
+		// wireLifecycleBroadcasts must run BEFORE loadBindingsFromStorage so
+		// startup-time `remote.bot-missing` events (emitted when a stored
+		// binding references a bot config that's gone) are broadcast to
+		// renderer, not swallowed by the initial no-listener window.
 		this.wireLifecycleBroadcasts();
+		this.loadBindingsFromStorage();
 		logger.info("[RemoteChatBridge] Initialized");
 	}
 
@@ -148,6 +204,9 @@ export class RemoteChatBridge extends EventEmitter {
 		this.on("remote.bot-offline", (payload: RemoteBotOfflinePayload) => {
 			broadcastEvent("remote-chat:bot-offline", payload);
 		});
+		this.on("remote.bot-missing", (payload: RemoteBotMissingPayload) => {
+			broadcastEvent("remote-chat:bot-missing", payload);
+		});
 	}
 
 	/**
@@ -159,14 +218,17 @@ export class RemoteChatBridge extends EventEmitter {
 		// Check if this (botId, chatId) is already bound to another conversation
 		const existingConvId = this.reverseIndex.get(reverseKey);
 		if (existingConvId && existingConvId !== conversationId) {
-			throw new Error(
-				`Bot ${botId} chatId ${chatId} is already bound to conversation ${existingConvId}`,
-			);
+			throw new RemoteBindingConflictError({
+				requestedConversationId: conversationId,
+				existingConversationId: existingConvId,
+				botId,
+				chatId,
+			});
 		}
 
 		const config = this.imbotService.getBotConfig(botId);
 		if (!config) {
-			throw new Error(`Bot ${botId} not found`);
+			throw new RemoteBotMissingError({ botId, conversationId });
 		}
 
 		const binding: RemoteBinding = {
@@ -399,16 +461,36 @@ export class RemoteChatBridge extends EventEmitter {
 	private loadBindingsFromStorage(): void {
 		try {
 			const sessions = getSessionStorage().listAll();
+			// Group missing-bot conversations by botId so we emit one event
+			// per missing bot rather than one per conversation.
+			const missing = new Map<string, string[]>();
 			for (const meta of sessions) {
 				if (meta.remote) {
 					this.bindings.set(meta.id, meta.remote);
 					const reverseKey = `${meta.remote.botId}:${meta.remote.chatId}`;
 					this.reverseIndex.set(reverseKey, meta.id);
+					// Detect bot-missing: binding survives but bot config is gone.
+					// Retain the binding (per spec: "startup with missing bot
+					// preserves binding as recoverable") but flag it so renderer
+					// can surface a recovery banner.
+					if (!this.imbotService.getBotConfig(meta.remote.botId)) {
+						const list = missing.get(meta.remote.botId) ?? [];
+						list.push(meta.id);
+						missing.set(meta.remote.botId, list);
+					}
 				}
 			}
 			logger.info(
 				`[RemoteChatBridge] Loaded ${this.bindings.size} binding(s) from storage`,
 			);
+			for (const [botId, conversationIds] of missing) {
+				const payload: RemoteBotMissingPayload = {
+					botId,
+					conversationIds,
+				};
+				this.emit("remote.bot-missing", payload);
+				logger.warn("[RemoteChatBridge] remote.bot-missing", payload);
+			}
 		} catch (error) {
 			logger.error(
 				"[RemoteChatBridge] Failed to load bindings",

@@ -581,6 +581,9 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 		onBotOffline: (
 			callback: (payload: RemoteBotOfflinePayload) => void,
 		) => () => void;
+		onBotMissing: (
+			callback: (payload: RemoteBotMissingPayload) => void,
+		) => () => void;
 	};
 
 	// Network API（代理 + 请求日志）
@@ -1651,6 +1654,18 @@ export interface RemoteBotOfflinePayload {
 	platform: IMPlatform;
 }
 
+export interface RemoteBotMissingPayload {
+	botId: string;
+	/** Present when reported at bind time. */
+	conversationId?: string;
+	/**
+	 * Conversation ids that still hold a binding to a missing bot;
+	 * populated at startup when `loadBindingsFromStorage` discovers a
+	 * binding whose bot config is no longer present.
+	 */
+	conversationIds?: string[];
+}
+
 // ============ Network 相关类型 ============
 
 export interface ProxyConfig {
@@ -2006,6 +2021,7 @@ const electronAPI: ElectronAPI = {
 		"onDuplicateDropped",
 		"onInactiveReceived",
 		"onBotOffline",
+		"onBotMissing",
 	]),
 	remoteDevice: createBridge<ElectronAPI["remoteDevice"]>("remoteDevice", [
 		"listDevices",
