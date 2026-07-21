@@ -1069,6 +1069,53 @@ describe("rename / updateMeta / delete", () => {
 		expect(sink).not.toHaveBeenCalled();
 	});
 
+	it("purgeTombstone refuses when tombstone still carries remoteBinding", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.updateMeta(s.id, {
+			remote: {
+				botId: "bot-1",
+				chatId: "chat-1",
+				botName: "Bot",
+				platform: "telegram",
+				boundAt: Date.now(),
+			},
+		} as Parameters<typeof sessions.updateMeta>[1]);
+		// Delete WITHOUT wiring a sink → tombstone.remoteBinding is present
+		// and no unbind happened. Purge must refuse.
+		sessions.delete(s.id);
+		expect(() => sessions.purgeTombstone(s.id)).toThrow(
+			/remote binding still present/,
+		);
+		// Session still tombstoned (delete completed) but files are intact.
+		expect(sessions.listDeleted().map((m) => m.id)).toContain(s.id);
+	});
+
+	it("purgeTombstone with forceIgnoreRemoteBinding bypasses the remote-binding guard", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.updateMeta(s.id, {
+			remote: {
+				botId: "bot-1",
+				chatId: "chat-1",
+				botName: "Bot",
+				platform: "telegram",
+				boundAt: Date.now(),
+			},
+		} as Parameters<typeof sessions.updateMeta>[1]);
+		sessions.delete(s.id);
+		const result = sessions.purgeTombstone(s.id, {
+			forceIgnoreRemoteBinding: true,
+		});
+		expect(result.purged).toBe(true);
+		expect(sessions.listDeleted().map((m) => m.id)).not.toContain(s.id);
+	});
+
+	it("purgeTombstone with no remote binding passes without the force flag", () => {
+		// Plain (no-remote) session: existing purge behavior unchanged.
+		const s = sessions.create({ projectId: null });
+		sessions.delete(s.id);
+		expect(sessions.purgeTombstone(s.id).purged).toBe(true);
+	});
+
 	it("delete swallows sink errors so the local tombstone still commits", () => {
 		const s = sessions.create({ projectId: null });
 		sessions.updateMeta(s.id, {

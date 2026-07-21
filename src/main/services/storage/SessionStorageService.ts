@@ -184,6 +184,16 @@ export type ProjectArchiveMetadata = Omit<Project, "cwd"> & {
  */
 export type RemoteBindingSink = (sessionId: string) => void;
 
+/**
+ * Options for `purgeTombstone`. The remote-binding guard is on by
+ * default; callers can opt out via `forceIgnoreRemoteBinding` when they
+ * have out-of-band knowledge that the binding is stale/unreachable
+ * (e.g. bot deleted, relay-server permanently offline).
+ */
+export interface PurgeTombstoneOptions {
+	forceIgnoreRemoteBinding?: boolean;
+}
+
 export class SessionStorageService {
 	private readonly userRoot: string;
 	private remoteBindingSink: RemoteBindingSink | undefined;
@@ -389,7 +399,10 @@ export class SessionStorageService {
 	 *   - Bucket dir is asserted to be strictly inside `userRoot`.
 	 *   - Idempotent: a session that no longer exists returns `{purged:false}`.
 	 */
-	purgeTombstone(sessionId: string): {
+	purgeTombstone(
+		sessionId: string,
+		opts?: PurgeTombstoneOptions,
+	): {
 		purged: boolean;
 		removedPaths?: string[];
 	} {
@@ -398,6 +411,22 @@ export class SessionStorageService {
 		if (!meta.deletedAt) {
 			throw new Error(
 				`refusing to purge live session ${sessionId} (not tombstoned)`,
+			);
+		}
+		// Remote-binding guard: `deletion-retention-matrix.md:49` requires
+		// bindings to be unbound before physical cleanup. `delete()` already
+		// invokes the remoteBindingSink (main.ts wires it to
+		// RemoteChatBridge.unbind), and the tombstone snapshot preserves
+		// `remoteBinding` for audit. If it's still present here, either the
+		// sink wasn't wired at delete time (tests / dev-time misconfig) or
+		// the caller wants to purge anyway; require explicit
+		// `forceIgnoreRemoteBinding` to acknowledge the risk.
+		if (
+			meta.tombstone?.remoteBinding &&
+			!opts?.forceIgnoreRemoteBinding
+		) {
+			throw new Error(
+				`refusing to purge tombstone ${sessionId}: remote binding still present on tombstone (pass forceIgnoreRemoteBinding to override)`,
 			);
 		}
 		const bucket = this.resolveSessionBucket(meta.projectId);
