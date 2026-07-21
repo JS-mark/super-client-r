@@ -14,6 +14,8 @@ import type { IMBotService } from "../../imbot/IMBotService";
 import type { BotStatus, IMBotConfig, IMMessage } from "../../imbot/types";
 import type { RemoteChatMessage } from "../../../ipc/types";
 import {
+	RemoteBindingConflictError,
+	RemoteBotMissingError,
 	RemoteBotOfflineError,
 	RemoteChatBridge,
 	RemoteOutboundRejectedError,
@@ -68,8 +70,16 @@ class MockIMBotService extends EventEmitter {
 		}
 	}
 
+	private configPresent = true;
+
 	getBotConfig(botId: string): IMBotConfig | undefined {
+		if (!this.configPresent) return undefined;
 		return botId === this.config.id ? this.config : undefined;
+	}
+
+	/** Test helper: simulate the bot config being deleted after bindings exist. */
+	removeConfig(): void {
+		this.configPresent = false;
 	}
 
 	getBotStatuses(): BotStatus[] {
@@ -590,6 +600,95 @@ describe("RemoteChatBridge lifecycle broadcast wiring", () => {
 				conversationId: session.id,
 				botId: "bot-1",
 			}),
+		);
+	});
+});
+
+describe("RemoteChatBridge typed binding errors", () => {
+	it("bind throws RemoteBindingConflictError when (botId, chatId) is already bound to another conversation", () => {
+		const s1 = getSessionStorage().create({ projectId: null });
+		const s2 = getSessionStorage().create({ projectId: null });
+		bridge.bind(s1.id, "bot-1", "chat-1");
+		let caught: unknown;
+		try {
+			bridge.bind(s2.id, "bot-1", "chat-1");
+		} catch (error) {
+			caught = error;
+		}
+		expect(caught).toBeInstanceOf(RemoteBindingConflictError);
+		expect(caught).toMatchObject({
+			name: "RemoteBindingConflictError",
+			code: "remote.binding-conflict",
+			details: {
+				requestedConversationId: s2.id,
+				existingConversationId: s1.id,
+				botId: "bot-1",
+				chatId: "chat-1",
+			},
+		});
+	});
+
+	it("bind throws RemoteBotMissingError when bot config is not present", () => {
+		const s = getSessionStorage().create({ projectId: null });
+		let caught: unknown;
+		try {
+			bridge.bind(s.id, "bot-missing-xyz", "chat-1");
+		} catch (error) {
+			caught = error;
+		}
+		expect(caught).toBeInstanceOf(RemoteBotMissingError);
+		expect(caught).toMatchObject({
+			name: "RemoteBotMissingError",
+			code: "remote.bot-missing",
+			details: { botId: "bot-missing-xyz", conversationId: s.id },
+		});
+	});
+
+	it("bind is idempotent when the same conversationId re-binds the same (botId, chatId)", () => {
+		const s = getSessionStorage().create({ projectId: null });
+		const first = bridge.bind(s.id, "bot-1", "chat-1");
+		const second = bridge.bind(s.id, "bot-1", "chat-1");
+		expect(second.botId).toBe(first.botId);
+		expect(second.chatId).toBe(first.chatId);
+	});
+});
+
+describe("RemoteChatBridge startup bot-missing detection", () => {
+	it("emits remote.bot-missing when a stored binding references a missing bot config", () => {
+		// Create a session with a binding to bot-1, then delete the bot
+		// config, then re-construct the bridge to trigger the startup scan.
+		const s = getSessionStorage().create({ projectId: null });
+		bridge.bind(s.id, "bot-1", "chat-1");
+		imbotService.removeConfig();
+
+		const emitted: unknown[] = [];
+		const nextService = new MockIMBotService();
+		nextService.removeConfig();
+		const nextBridge = new RemoteChatBridge(nextService as unknown as IMBotService);
+		nextBridge.on("remote.bot-missing", (payload) => emitted.push(payload));
+		// The emit happens INSIDE the constructor (via loadBindingsFromStorage);
+		// to capture it we listen on the same channel via broadcastEvent mock.
+		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
+			"remote-chat:bot-missing",
+			expect.objectContaining({
+				botId: "bot-1",
+				conversationIds: expect.arrayContaining([s.id]),
+			}),
+		);
+		// Binding is retained (spec: "startup with missing bot preserves
+		// binding as recoverable") — grep by getBinding.
+		expect(nextBridge.getBinding(s.id)).toMatchObject({ botId: "bot-1" });
+	});
+
+	it("does not emit remote.bot-missing when all bindings have live bot configs", () => {
+		const s = getSessionStorage().create({ projectId: null });
+		bridge.bind(s.id, "bot-1", "chat-1");
+		mocks.broadcastEvent.mockClear();
+		const nextService = new MockIMBotService();
+		void new RemoteChatBridge(nextService as unknown as IMBotService);
+		expect(mocks.broadcastEvent).not.toHaveBeenCalledWith(
+			"remote-chat:bot-missing",
+			expect.anything(),
 		);
 	});
 });
