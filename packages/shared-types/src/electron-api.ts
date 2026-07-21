@@ -247,6 +247,14 @@ export interface RecoveryBundleExportOptions {
 	includeChatContent?: boolean;
 	/** Optional app version marker (defaults to service's own reader). */
 	appVersion?: string;
+	/**
+	 * Pack the bundle directory into a `.zip` next to it and remove the
+	 * source directory. When true, `RecoveryBundleExportResult.zipPath`
+	 * is populated. Requires the `adm-zip` runtime dependency; throws
+	 * `ZipDependencyMissingError` (code: `recovery.zip-dependency-missing`)
+	 * if it's not installed.
+	 */
+	packAsZip?: boolean;
 }
 
 export interface RecoveryBundleEntry {
@@ -266,11 +274,22 @@ export interface RecoveryBundleManifest {
 }
 
 export interface RecoveryBundleExportResult {
-	/** App-managed absolute path to the bundle directory. */
+	/**
+	 * App-managed absolute path to the bundle directory. When `packAsZip`
+	 * is true and the pack succeeds, this directory is deleted after the
+	 * zip is written and `zipPath` points to the archive.
+	 */
 	bundleDir: string;
 	/** Path to `bundle-manifest.json` inside `bundleDir`. */
 	manifestPath: string;
 	manifest: RecoveryBundleManifest;
+	/**
+	 * App-managed absolute path to the `.zip` when `packAsZip` was
+	 * requested. Absent otherwise. The zip contains the same tree as
+	 * `bundleDir` (session archives + project archives + diagnostic +
+	 * bundle-manifest.json at the top level).
+	 */
+	zipPath?: string;
 }
 
 /**
