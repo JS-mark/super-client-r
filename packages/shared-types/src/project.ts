@@ -178,6 +178,16 @@ export interface SessionTombstone {
 	reason: "user-delete" | "project-remove" | "migration";
 	remoteBinding?: RemoteBinding;
 	restoreHint?: string;
+	/**
+	 * Count of remote IM messages received AFTER the session was
+	 * tombstoned — populated by `RemoteChatBridge.reportInactiveReceived`
+	 * (spec: remote-session-lifecycle.md §5). Useful for detecting
+	 * "peer is still sending, we should notify or force-unbind".
+	 * Absent when zero (never replayed).
+	 */
+	replayCount?: number;
+	/** Timestamp of the most recent replay after tombstoning. */
+	lastReplayAt?: number;
 }
 
 export interface SessionImportSource {
