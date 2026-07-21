@@ -4,7 +4,7 @@
 > 覆盖矩阵：[refactor-traceability-matrix](./refactor-traceability-matrix.md) ·
 > 执行门禁：[refactor-execution-gates](./refactor-execution-gates.md)
 >
-> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-18（收口 loop R1–R4 完成）。
+> 本文只记录当前实现进度和证据，不替代功能 plan。状态更新日期：2026-07-21（Remaining Gaps 中 Remote lifecycle / Settings recovery UI / Privacy·export·backup / Full structured event stream / Product event renderer wiring 5 项在 2026-07-19~07-21 会话中全部落地；稳定基线 **133 files / 1163 tests / 0 failed**；剩 Compatibility cleanup + Dev runtime smoke + Context management 深化）。
 
 ## Current Status
 
@@ -1314,15 +1314,17 @@
 
 ## Remaining Gaps
 
+> **2026-07-21 会话清空**：以下 5 个 gap 在本会话中完成并从表中移除，详见对应 closeout 章节：
+> - **Remote lifecycle** — 7/7 子工作流完成（broadcast wiring、delete-from-main、purgeTombstone guard、tombstone shape、typed binding errors、session.archive、project.archive cascade、listBindings + RemoteSessionsPanel UI）
+> - **Settings recovery UI** — 4/4 子工作流完成（wizard state machine + per-step actions、物理 cleanup、relink-with-path-change、backup/export bundle）
+> - **Privacy/export/backup** — zip 打包已加（`packAsZip` 选项通过 adm-zip，dynamic-require + typed fallback）；完整迁移包由 recovery bundle 提供
+> - **Full structured event stream** — table/tree/sources/artifact 4 种 native producer + E1 streaming(open-fence 状态机 + 行边界 throttle + re-classify)完成
+> - **Product event renderer wiring** — `StreamPartRenderer` 已有全部 typed part handler，producer 与 renderer 端 typed part 全通链路
+
 | Gap | Why it remains open |
 | --- | --- |
-| Remote lifecycle | duplicate webhook replay drop 已有 focused test；remote-bound delete ordering 已改为先 tombstone 后 unbind；bound bot stopped/missing 时已发出 `remote.bot-offline` event/log 并抛出 structured `RemoteBotOfflineError`，且 IPC response 会透传 `remote.botOffline` code/details；deleted/archived/missing session 收到 IM 会发出 `remote.inactive-received` 并阻止普通广播/落盘。remote archive/cleanup 状态机仍缺实现证据。 |
-| Settings recovery UI | 已有 `Project Recovery` 安全入口，覆盖 archived/orphan/legacy import/tombstone/relink/backup 的当前状态和有限操作；完整 wizard、backup/export bundle、物理 cleanup 仍未实现。 |
-| Privacy/export/backup | redaction foundation 已有 focused tests；AgentTrace 已接入 shared redactor；storage 已有最小 session/project archive directory export，renderer/main 已有 `sessions.exportArchive(sessionId)` / `projects.exportArchive(projectId)` / diagnostic export 入口且不接受任意输出路径；diagnostic export minimum 已默认排除聊天正文/payload；session/project archive 默认 `includeChatContent:false`，显式 true 才复制 JSONL；Settings Recovery 已有 session/project/diagnostic export UI 和 Recovery checklist。zip/package 格式、完整迁移包和 cleanup 深水区仍未实现。 |
-| Full structured event stream | llm-loop native fenced code/json/diff producer 已生成 `assistant.part` runtime events 并写入 session storage；table/tree/source/artifact 专用 producer 和 delta batching 尚未完成。 |
-| Product event renderer wiring | Phase 0a storage 写入已接入 `AgentRuntimeIpcBroker`；renderer 已有 runtime event reducer/adapter，`useChat` 已 runtime-first。JSONL replay 已覆盖 approval resolved、ask answered、tool terminal states、run terminal status、plan parts 和 native code/json/diff assistant parts；仍缺更广 structured native parts 的完整 renderer-visible 证据。 |
 | Compatibility cleanup | 旧 workspace/chatMode/direct 兼容 API/type 仍需跟代码实际依赖一起分批收口；文档里保留的历史术语必须继续带 archived/superseded/compatibility 标注。 |
-| Dev runtime smoke follow-up | `pnpm dev` 已验证到 renderer dev server、Electron main window、API server、AgentRuntime registry、IPC 和 internal MCP 初始化；后续仍需真实模型/tool run 的人工 smoke。 |
+| Dev runtime smoke follow-up | `pnpm dev` 已验证到 renderer dev server、Electron main window、API server、AgentRuntime registry、IPC 和 internal MCP 初始化；后续仍需真实模型/tool run 的人工 smoke——尤其是本会话新增的 structured producers streaming 路径、RemoteSessionsPanel UI 和 recovery bundle export 需要在真机环境下走一遍用户操作。 |
 | Context management / token compression | 低风险切片已完成：发送管线会传入裁剪后的 `AgentHistoryMessage[]`，runtime 支持 `PromptPart[]` history，`contextCount`/`contextMode` 已进入策略和 Settings UI，`ProjectRulesReader` 已注入 Agent prompt；`context.compacted` 可回放事件、Context Inspector source breakdown、LLM summarize/provider、metadata-level pin/unpin 和 session-scoped artifact library MVP 已接线。剩余：专用摘要卡片和后续 artifact actions 深化；当前 focused/full tests 已覆盖到沙箱可运行范围。 |
 
 ## Update Rules
