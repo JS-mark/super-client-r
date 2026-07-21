@@ -1808,3 +1808,39 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无。
 - **代码事实更新**:physical purge 不再有可能悄悄清掉未 unbind 的 remote binding;test 基线 = **132 files / 1135 tests**。
 - **下一步可选**:remote lifecycle 剩 5 子项,或转 export zip 打包。
+
+## 2026-07-21 feat: tombstone shape — replayCount + lastReplayAt(remote lifecycle 3/7)
+
+> Remaining Gaps "Remote lifecycle" 的第 3 个子工作流。commit `efbafdf`。
+
+### 落地
+
+按 `remote-session-lifecycle.md §5` 要求扩展 `SessionTombstone`,记录 tombstoned session 上的 remote IM 重放计数。
+
+**Type**:`SessionTombstone` 加 `replayCount?: number` + `lastReplayAt?: number`(absent when zero,保持磁盘 shape 最小)。
+
+**Storage 方法**:`SessionStorageService.recordTombstoneReplay(sessionId)` 用 `findMeta({includeDeleted:true})` 定位、递增两字段、`writeMeta`;返回 `{replayCount, lastReplayAt}` 或 `null`(session missing / 非 tombstoned)。
+
+**Bridge wire-up**:`RemoteChatBridge.reportInactiveReceived` 在 `reason === "deleted"` 时调 `recordTombstoneReplay`。archived(会话仍活)/missing-session(无 meta)不 bump。try/catch 兜底,storage 失败不阻 drop 路径。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1138 tests / 0 failed**(+3) |
+
+### Remaining Gaps 更新
+
+Remote lifecycle **3/7 完成**。剩 4:
+- `SessionStorageService.archive` + IPC
+- `ProjectStorageService.archive` 级联到 remote-bound sessions
+- Binding conflict / bot-missing 类型化错误
+- `remoteChat.listBindings` + `RemoteSessionsPanel` UI
+
+### Retrospective
+
+- **What worked**:范围严格聚焦(1 type 扩展 + 1 storage 方法 + 1 bridge 一处新增调用 + 3 storage 测试 + 3 bridge 断言),bridge 侧只在 `reason === "deleted"` bump,archived/missing 显式不 bump——语义正确性由 reason 分支保证。
+- **What blocked**:无。
+- **代码事实更新**:tombstone 现在带 replayCount/lastReplayAt(可选,零时缺省不写);test 基线 = **132 files / 1138 tests**。
+- **下一步可选**:remote lifecycle 剩 4 子项,或转 export zip 打包。
