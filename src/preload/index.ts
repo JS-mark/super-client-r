@@ -1864,6 +1864,7 @@ const electronAPI: ElectronAPI = {
 		"listDeleted",
 		"restoreDeleted",
 		"purgeTombstone",
+		"archive",
 		"reassignProject",
 		"appendEvent",
 		"readMessages",

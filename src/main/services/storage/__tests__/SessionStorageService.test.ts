@@ -1129,6 +1129,37 @@ describe("rename / updateMeta / delete", () => {
 		expect(sessions.recordTombstoneReplay("nope")).toBeNull();
 	});
 
+	it("archive toggles archived flag on / off", () => {
+		const s = sessions.create({ projectId: null });
+		expect(s.archived).toBeUndefined();
+		const archived = sessions.archive(s.id, true);
+		expect(archived.archived).toBe(true);
+		const unarchived = sessions.archive(s.id, false);
+		expect(unarchived.archived).toBe(false);
+	});
+
+	it("archive is idempotent — no-op when already in target state", () => {
+		const s = sessions.create({ projectId: null });
+		const first = sessions.archive(s.id, true);
+		const firstUpdatedAt = first.updatedAt;
+		// Second call with same target state should return without bumping
+		// updatedAt (mirrors ProjectStorageService.archive contract).
+		const second = sessions.archive(s.id, true);
+		expect(second.archived).toBe(true);
+		expect(second.updatedAt).toBe(firstUpdatedAt);
+	});
+
+	it("archive throws for a missing session", () => {
+		expect(() => sessions.archive("nope", true)).toThrow(/session not found/);
+	});
+
+	it("archived flag survives a getMeta round-trip", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.archive(s.id, true);
+		const meta = sessions.getMeta(s.id);
+		expect(meta.archived).toBe(true);
+	});
+
 	it("purgeTombstone with no remote binding passes without the force flag", () => {
 		// Plain (no-remote) session: existing purge behavior unchanged.
 		const s = sessions.create({ projectId: null });

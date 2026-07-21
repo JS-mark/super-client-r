@@ -154,6 +154,14 @@ export interface SessionMeta {
 	/** Soft-delete marker. Deleted sessions are hidden from normal lists. */
 	deletedAt?: number;
 	tombstone?: SessionTombstone;
+	/**
+	 * Session-level archive flag. Mirrors `Project.archived` semantics:
+	 * archived sessions stay in storage but are hidden from normal lists;
+	 * remote IM to an archived session is dropped with
+	 * `remote.inactive-received` (`RemoteChatBridge.readSessionLifecycleFacts`
+	 * consumes this). Toggled via `SessionStorageService.archive()`.
+	 */
+	archived?: boolean;
 	/** Legacy import provenance for retry/relink/reporting. */
 	importSource?: SessionImportSource;
 	/** JSONL contained a non-trailing malformed line. */
