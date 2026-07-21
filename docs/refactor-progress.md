@@ -1952,3 +1952,50 @@ Remote lifecycle **6/7 完成**。剩最后 1 个子项:
 - **What blocked**:无代码阻塞。首跑遇到 pre-existing EADDRINUSE flake,与本批无关。
 - **代码事实更新**:`project.archive` 现有 session-level 级联(通过 DI sink);remote lifecycle **6/7 完成**;test 基线 = **132 files / 1152 tests**。
 - **下一步可选**:remote lifecycle 最后 1 子项(listBindings + RemoteSessionsPanel UI,最大),或转 export zip。
+
+## 2026-07-21 feat: listBindings + RemoteSessionsPanel UI(remote lifecycle 7/7 — 完成)
+
+> Remaining Gaps "Remote lifecycle" **最后 1 个子工作流 — 7/7 闭环**。commit `a2607f7`。
+
+### 落地
+
+用户现在能在 Settings > Recovery 看到一个新面板列出所有 remote binding + 其分类后的 lifecycle state,按问题严重程度排序(tombstoned/bot-offline/archived 先),逐行 Unbind 按钮。直接补 4/7 typed 错误子项提到的 "recovery banner 缺位" 问题。
+
+**bridge**:`listBindingsWithLifecycle()` 新方法,迭代 `this.bindings` 用现有 `classifyLifecycle` 分类(保证列表与发送/接收时看到的一致)。
+
+**shared-types**:添加 `RemoteLifecycleState` + `RemoteBindingListEntry`(与 main 结构等价 —— shared-types 对 remote-chat 零依赖)。payload 类型(`RemoteOutboundRejected*` 等 5 个)从 preload 移到 shared-types/chat,preload 和 renderer d.ts 现从同源头引用。
+
+**IPC 6-step**:shared-types → bridge 方法 → api-impl → preload createBridge 键 → renderer service wrapper → electron.d.ts 扩展(5 个 `on*` subscribers + `listBindings`)。
+
+**UI**:新 `RemoteSessionsPanel` —
+- Empty 态, Refresh 按钮 + auto-refresh (订阅 4 个 lifecycle broadcast 频道)
+- 每行: bot 名 + platform Tag + state Tag (按严重程度颜色) + danger Unbind (App.useApp() modal.confirm)
+- 排序: tombstoned → error-fatal → bot-offline → error-recoverable → archived → bound-active → bound-idle
+- 挂在 `RecoverySettings` 中 ArchivedProjectsPanel 之后
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **133 files / 1160 tests / 0 failed**(+8: 3 bridge + 5 panel; 另 `RecoverySettings.test` 补 remoteChat stub) |
+
+### Remaining Gaps 更新
+
+**Remote lifecycle 7/7 全部完成 — 从 Remaining Gaps 彻底移除**。本会话落地的 7 个子工作流:
+1. broadcast wiring + delete-from-main
+2. purgeTombstone remote-binding guard
+3. tombstone shape (replayCount / lastReplayAt)
+4. typed binding errors (conflict + bot-missing)
+5. session.archive
+6. project.archive cascade
+7. listBindings + RemoteSessionsPanel
+
+剩 Remaining Gaps: **export zip 打包**(引入 zip 运行时依赖)。
+
+### Retrospective
+
+- **What worked**:前 6 项基础让本项变得很自然 — bridge 方法多 `for` 循环包现有 classifyLifecycle,不重复逻辑。payload 类型从 preload 移到 shared-types 顺便补了 4/7 时遗留的 renderer d.ts 与 preload 之间的 type drift(之前 renderer d.ts 没那 4 个 `on*`)。UI 镜像 `RecoveryWizardPanel` 的 antd mock 模式,Row key 与 IPC 断言都补上。
+- **What blocked**:无代码阻塞。中途 3 个小问题都被类型检查 / 测试拿下: (a) IMBotService.bots 私有 → 改用 `checkBotOnline` 判 online + sentinel bot; (b) renderer electron.d.ts 缺 4 个 on* + listBindings → 同步补齐; (c) RecoverySettings.test 因新面板新增依赖 remoteChat stub → 补 5 个方法。
+- **代码事实更新**: `remoteChat` IPC 现有 `listBindings`;preload / renderer d.ts / shared-types 对 remote lifecycle payload 类型同源;`RemoteSessionsPanel` 给用户提供一个管理 remote binding 的一级入口。test 基线 = **133 files / 1160 tests**。
+- **下一步可选**仅 export zip。remote lifecycle 7/7 完成,Remaining Gaps 排除。
