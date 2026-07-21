@@ -1999,3 +1999,49 @@ Remote lifecycle **6/7 完成**。剩最后 1 个子项:
 - **What blocked**:无代码阻塞。中途 3 个小问题都被类型检查 / 测试拿下: (a) IMBotService.bots 私有 → 改用 `checkBotOnline` 判 online + sentinel bot; (b) renderer electron.d.ts 缺 4 个 on* + listBindings → 同步补齐; (c) RecoverySettings.test 因新面板新增依赖 remoteChat stub → 补 5 个方法。
 - **代码事实更新**: `remoteChat` IPC 现有 `listBindings`;preload / renderer d.ts / shared-types 对 remote lifecycle payload 类型同源;`RemoteSessionsPanel` 给用户提供一个管理 remote binding 的一级入口。test 基线 = **133 files / 1160 tests**。
 - **下一步可选**仅 export zip。remote lifecycle 7/7 完成,Remaining Gaps 排除。
+
+## 2026-07-21 feat: recovery bundle 可选 zip 打包(Remaining Gaps 全部清空)
+
+> Remaining Gaps 里最后一个:**export zip 打包**。commit `688e179`。
+
+### 落地
+
+`recovery.exportBundle` 新增可选 `packAsZip?: boolean`,true 时把 bundle 目录打包成单个 `.zip` 并移除源目录,用户拿到一个可以直接分享的文件而不是目录树。
+
+**范围严格聚焦**:只 recovery bundle 加 zip,单个 export(session/project/diagnostic)仍返回目录 —— 保持基础安装轻量,让 renderer 按调用选择。本批 UI 上"Export recovery bundle"按钮 flip 为 `packAsZip:true`。
+
+**库选型**:`adm-zip`(依赖最少,2 个 transitive deps)。`archiver`(60+ deps)、`jszip`(全内存 buffer)、`yazl`(小众)均比选下。
+
+**依赖处理策略**:package.json 手动 patch(dev 环境 pnpm store v10↔v11 冲突,不重跑 `pnpm install` 以免污染 lockfile),`zipHelper.ts` 用 dynamic `require` + typed `ZipDependencyMissingError`(code `recovery.zip-dependency-missing`)—— `pnpm check` 通过、测试通过、真正 exercise packAsZip 路径的运行时缺 adm-zip 会抛结构化错误而非崩溃。用户之后 `pnpm install` 就能跑。
+
+**Service DI**:`RecoveryBundleService` 加 optional `packZip` dep,默认 = `zipHelper.packDirectoryToZip`,测试注入 stub 避免 test-time 依赖 adm-zip。
+
+**失败处理**:packer 抛错时源 bundleDir 不删除 —— caller 可以降级为目录导出。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **133 files / 1163 tests / 0 failed**(+3:pack happy / skip when off / bundleDir salvaged on throw) |
+
+lint 中途多了 1 个 `no-useless-catch`(纯 rethrow 的 try/catch),已顺手去掉;最终 lint 仍为 2 warnings(pre-existing no-this-alias,与本批无关)。
+
+### Remaining Gaps 最终状态
+
+**全部清空**。本次会话彻底关闭:
+- Full structured event stream(structured producers + streaming E1)
+- Settings recovery UI(wizard state machine + physical cleanup + relink + bundle)
+- Remote lifecycle(broadcast wiring + delete-from-main + purgeTombstone guard + tombstone shape + typed errors + session.archive + project cascade + listBindings + UI)
+- **Export zip 打包**
+
+### 已知未落地
+
+**adm-zip 未 install**:package.json 已声明但 lockfile 未更新。用户需在合并前跑 `pnpm install`(可能触发 store 迁移);未 install 时 packAsZip 路径抛 `ZipDependencyMissingError`,不崩溃、结构化 error 会通过 IPC message 呈现给用户。**这是有意的取舍**:避免动 lockfile 污染本次 diff。
+
+### Retrospective
+
+- **What worked**:zipHelper 的 dynamic require 模式让整个链路(type check / lint / test)在 adm-zip 未安装时仍能通过,把"依赖安装"这个环境问题和"代码正确性"这个代码问题解耦。Service 的 packZip DI 让测试完全不需要 zip 库。Renderer 端只改一行(button 加 packAsZip:true),没有新 UI —— 最小侵入。
+- **What blocked**:pnpm store v10↔v11 版本冲突阻止 `pnpm add adm-zip`。经 AskUserQuestion 决定手工 patch package.json + 让用户之后 install,不重跑 install 污染 lockfile。这是一个环境问题,用文档 + 结构化错误覆盖比强行绕过 lockfile 更稳。
+- **代码事实更新**:package.json 声明 adm-zip runtime 依赖;`recovery.exportBundle` 可选打 zip;RecoveryBundleService 的 `packZip` DI 让测试独立于 zip 库;test 基线 = **133 files / 1163 tests**。
+- **Remaining Gaps 全部清空**;下一步产品方向需要用户重新规划。
