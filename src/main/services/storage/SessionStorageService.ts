@@ -174,8 +174,19 @@ export type ProjectArchiveMetadata = Omit<Project, "cwd"> & {
 	cwd: string;
 };
 
+/**
+ * Called by `delete()` when tombstoning a session that had a remote
+ * binding — so downstream services (e.g. `RemoteChatBridge.unbind`) can
+ * mirror the local delete regardless of which code path triggered it
+ * (renderer chatStore, project remove, migration, purge…). Kept as a
+ * pluggable sink to avoid `SessionStorageService` → `RemoteChatBridge`
+ * hard dependency (the storage layer must remain remote-chat-agnostic).
+ */
+export type RemoteBindingSink = (sessionId: string) => void;
+
 export class SessionStorageService {
 	private readonly userRoot: string;
+	private remoteBindingSink: RemoteBindingSink | undefined;
 
 	constructor(
 		private readonly baseDir: string,
@@ -185,6 +196,16 @@ export class SessionStorageService {
 	) {
 		this.userRoot = join(baseDir, userId);
 		mkdirSync(join(this.userRoot, CASUAL_DIR), { recursive: true });
+	}
+
+	/**
+	 * Inject a callback invoked by `delete()` when tombstoning a session
+	 * whose meta carries `remote` binding. `main.ts` wires this to
+	 * `RemoteChatBridge.unbind` at boot so any delete path unbinds
+	 * remote bindings without relying on renderer chatStore.
+	 */
+	setRemoteBindingSink(sink: RemoteBindingSink | undefined): void {
+		this.remoteBindingSink = sink;
 	}
 
 	// ─── public API ──────────────────────────────────────────────
@@ -327,6 +348,23 @@ export class SessionStorageService {
 			tombstone,
 			updatedAt: deletedAt,
 		});
+		// If this session had a remote binding, mirror the delete downstream
+		// (RemoteChatBridge.unbind) so any code path that reaches here —
+		// renderer chatStore, project remove, migration, purge — unbinds
+		// regardless. The sink is a no-op if not wired (e.g. tests).
+		if (meta.remote && this.remoteBindingSink) {
+			try {
+				this.remoteBindingSink(sessionId);
+			} catch (error) {
+				// Never block delete on downstream failure; the tombstone is
+				// already written, so the local delete is authoritative.
+				// eslint-disable-next-line no-console
+				console.warn(
+					`[SessionStorageService] remoteBindingSink failed for session ${sessionId}:`,
+					error instanceof Error ? error.message : String(error),
+				);
+			}
+		}
 		return { deleted: true, tombstone };
 	}
 
