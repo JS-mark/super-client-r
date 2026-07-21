@@ -1917,3 +1917,38 @@ Remote lifecycle **5/7 完成**。剩 2:
 - **What blocked**:无。
 - **代码事实更新**:renderer 现在有 `window.electron.sessions.archive(sid, archived)`;`SessionMeta.archived` 是官方字段(非 `as any` 补丁);test 基线 = **132 files / 1147 tests**。
 - **下一步可选**:remote lifecycle 剩 2 子项(project cascade / listBindings + UI),或转 export zip 打包。
+
+## 2026-07-21 feat: project.archive 级联到 sessions(remote lifecycle 6/7)
+
+> Remaining Gaps "Remote lifecycle" 第 6 个子工作流。commit `db70955`。
+
+### 落地
+
+Project archive/unarchive 时自动同步 project 下所有非 tombstoned sessions 的 `archived` flag——让 sidebar 过滤、`RemoteChatBridge.readSessionLifecycleFacts`(早就在读 meta.archived)、以及未来的 `RemoteSessionsPanel` 看到一致的"project 与其 sessions 一起归档"状态。
+
+**新方法**:`SessionStorageService.archiveByProject(projectId, archived)`——批量翻转,per-session idempotent,返回 `{affectedSessionIds}`。
+
+**DI sink**:`ProjectStorageService.setArchiveSessionsSink(fn)`(镜像 delete-side `RemoteBindingSink` 模式)。`archive()` 在 registry 提交**之后**且**仅在状态真翻转时**才调 sink。sink 错误吞掉不阻 registry write(project 状态权威,session cascade 收敛可重跑)。
+
+**main.ts** 在两个 storage 初始化后立即接线。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1152 tests / 0 failed**(+5:2 archiveByProject + 3 sink) |
+
+首跑遇到已知 pre-existing EADDRINUSE flake(serverFixture 并行 worker 端口 3000 竞争,与本批改动无关),重跑绿。
+
+### Remaining Gaps 更新
+
+Remote lifecycle **6/7 完成**。剩最后 1 个子项:
+- `remoteChat.listBindings` IPC + `RemoteSessionsPanel` UI(最大、用户可见)
+
+### Retrospective
+
+- **What worked**:直接复用 delete-side `RemoteBindingSink` pattern(project → sink → session storage,零硬依赖),`archiveByProject` 是纯 storage 层批处理。状态实际翻转时才调 sink——避免无谓 side-effect(no-op 时 sink 不触发,测试专门覆盖这个点)。sink 错误吞掉 + 项目状态权威保证 registry 一致性。
+- **What blocked**:无代码阻塞。首跑遇到 pre-existing EADDRINUSE flake,与本批无关。
+- **代码事实更新**:`project.archive` 现有 session-level 级联(通过 DI sink);remote lifecycle **6/7 完成**;test 基线 = **132 files / 1152 tests**。
+- **下一步可选**:remote lifecycle 最后 1 子项(listBindings + RemoteSessionsPanel UI,最大),或转 export zip。
