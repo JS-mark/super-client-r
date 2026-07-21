@@ -1844,3 +1844,44 @@ Remote lifecycle **3/7 完成**。剩 4:
 - **What blocked**:无。
 - **代码事实更新**:tombstone 现在带 replayCount/lastReplayAt(可选,零时缺省不写);test 基线 = **132 files / 1138 tests**。
 - **下一步可选**:remote lifecycle 剩 4 子项,或转 export zip 打包。
+
+## 2026-07-21 feat: 类型化 binding 错误 — conflict + bot-missing(remote lifecycle 4/7)
+
+> Remaining Gaps "Remote lifecycle" 的第 4 个子工作流。commit `b69ed22`。
+
+### 落地
+
+`RemoteChatBridge.bind()` 里的 plain `new Error(...)` 替换成结构化错误,让 renderer 能做定向恢复 UI(冲突时跳到已绑定会话、bot-missing 时显示恢复 banner),而不是通用错误 toast。
+
+| 场景 | 错误类 | code | payload |
+| --- | --- | --- | --- |
+| bind 时 `(botId, chatId)` 已被绑定到别的 conversation | `RemoteBindingConflictError` | `remote.binding-conflict` | `{requestedConversationId, existingConversationId, botId, chatId}` |
+| bind 时 botId 在 imbot 里不存在 | `RemoteBotMissingError` | `remote.bot-missing` | `{botId, conversationId}` |
+| **启动**时发现 stored binding 的 bot config 消失 | 同类 `RemoteBotMissingPayload` 通过 `remote.bot-missing` event → broadcast | 同上 | `{botId, conversationIds[]}`(按 botId 分组) |
+
+**Startup 保留 binding**:spec "startup with missing bot preserves binding as recoverable"。`loadBindingsFromStorage` 遇到 bot-missing 时保留 binding + emit event(不删除)。
+
+**Broadcast wiring**:`remote.bot-missing` → `remote-chat:bot-missing`。preload 加 `onBotMissing` subscriber(第 5 个 lifecycle 通道)。
+
+**Constructor 顺序修复**:`wireLifecycleBroadcasts` 现在在 `loadBindingsFromStorage` **之前**运行,保证启动时的 bot-missing event 能被 broadcast(否则会被 no-listener 窗口吞掉)。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1143 tests / 0 failed**(+5) |
+
+### Remaining Gaps 更新
+
+Remote lifecycle **4/7 完成**。剩 3:
+- `SessionStorageService.archive` + IPC(镜像 project.archive)
+- `ProjectStorageService.archive` 级联到 remote-bound sessions
+- `remoteChat.listBindings` + `RemoteSessionsPanel` UI
+
+### Retrospective
+
+- **What worked**:范围小(2 个 error 类 + 修 bind() 抛出点 + startup 扫描 + broadcast wiring + preload key + 5 测试),但直接修 2 个真实 UX 问题(冲突 UI / 缺 bot 恢复)。构造函数顺序 bug 在写 broadcast wiring 时立刻发现(不然启动时的 bot-missing 会静默丢失),把 loadBindingsFromStorage 挪到 wireLifecycleBroadcasts 之后修好。测试对 MockIMBotService 加了 `removeConfig()` 助手,模拟 bot 配置被删的场景。
+- **What blocked**:无。
+- **代码事实更新**:bind() 现在抛类型化错误(向后兼容——继承 Error,message 相同);preload 现在暴露 5 个 lifecycle 通道(此前 4 个);test 基线 = **132 files / 1143 tests**。
+- **下一步可选**:remote lifecycle 剩 3 子项,或转 export zip 打包。
