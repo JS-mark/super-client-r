@@ -22,6 +22,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useSessionListStore } from "../../stores/sessionListStore";
 import { ArchivedProjectsPanel } from "./ArchivedProjectsPanel";
+import { RemoteSessionsPanel } from "./RemoteSessionsPanel";
 import { RecoveryWizardPanel } from "./RecoveryWizardPanel";
 import { SettingSection } from "./SettingSection";
 
@@ -964,6 +965,14 @@ export function RecoverySettings() {
 					</Text>
 					<ArchivedProjectsPanel />
 				</div>
+			</SettingSection>
+
+			<SettingSection
+				title={t("settingsNav.recovery.remoteBindingsTitle", "Remote Sessions", {
+					ns: "settings",
+				})}
+			>
+				<RemoteSessionsPanel />
 			</SettingSection>
 
 			<SettingSection
