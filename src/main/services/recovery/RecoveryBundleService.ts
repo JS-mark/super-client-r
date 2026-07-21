@@ -26,7 +26,7 @@
  *   - Refuses paths containing `..` in ids (the exporters already validate
  *     ids, but we defence-in-depth reject them here too).
  */
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
 	RecoveryBundleEntry,
@@ -36,6 +36,7 @@ import type {
 } from "@super-client/shared-types/electron-api";
 import type { DiagnosticExportService } from "../diagnostics/DiagnosticExportService";
 import type { SessionStorageService } from "../storage/SessionStorageService";
+import { packDirectoryToZip } from "./zipHelper";
 
 export interface RecoveryBundleServiceDeps {
 	userRoot: string;
@@ -46,6 +47,12 @@ export interface RecoveryBundleServiceDeps {
 	diagnosticExport: Pick<DiagnosticExportService, "export">;
 	appVersion?: () => string | undefined;
 	now?: () => Date;
+	/**
+	 * Injectable zip packer. Defaults to `packDirectoryToZip` (adm-zip
+	 * dynamic require). Tests inject a stub to avoid pulling adm-zip at
+	 * test time, and to assert the pack call with a controlled fs.
+	 */
+	packZip?: (sourceDir: string, targetZipPath: string) => void;
 }
 
 const SCHEMA_VERSION = 1 as const;
@@ -160,6 +167,23 @@ export class RecoveryBundleService {
 		const manifestPath = join(bundleDir, "bundle-manifest.json");
 		writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
 
-		return { bundleDir, manifestPath, manifest };
+		// Optional zip pack: write `<bundleDir>.zip` and remove the source
+		// directory. On failure (adm-zip missing / IO error), the packer
+		// throws naturally and bundleDir stays on disk so the caller can
+		// salvage as a directory export.
+		let zipPath: string | undefined;
+		if (options.packAsZip === true) {
+			zipPath = `${bundleDir}.zip`;
+			const packer = this.deps.packZip ?? packDirectoryToZip;
+			packer(bundleDir, zipPath);
+			rmSync(bundleDir, { recursive: true, force: true });
+		}
+
+		return {
+			bundleDir,
+			manifestPath,
+			manifest,
+			...(zipPath !== undefined && { zipPath }),
+		};
 	}
 }

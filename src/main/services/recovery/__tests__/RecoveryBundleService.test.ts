@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectStorageService } from "../../storage/ProjectStorageService";
 import { SessionStorageService } from "../../storage/SessionStorageService";
 import { DiagnosticExportService } from "../../diagnostics/DiagnosticExportService";
@@ -123,5 +123,85 @@ describe("RecoveryBundleService", () => {
 		expect(() =>
 			bundle.exportBundle({ projectIds: ["foo/bar"] }),
 		).toThrow(/unsafe/);
+	});
+});
+
+describe("RecoveryBundleService packAsZip", () => {
+	// These tests inject a stub packZip so they don't require adm-zip to be
+	// installed. The stub records the invocation and touches the target
+	// path so the "source dir removed after pack" flow is observable.
+	function makeBundle(packZip: (src: string, tgt: string) => void) {
+		return new RecoveryBundleService({
+			userRoot: sessions.getUserRoot(),
+			sessionStorage: sessions,
+			diagnosticExport: diagnostic,
+			appVersion: () => "0.0.0-test",
+			packZip,
+		});
+	}
+
+	it("packs the bundle dir into a zip and removes the source dir", () => {
+		const s = sessions.create({ projectId: null });
+		const packSpy = vi.fn((_src: string, targetZip: string) => {
+			// Stand in for adm-zip's writeZip: create an empty file at
+			// the target path so callers relying on existsSync see it.
+			require("node:fs").writeFileSync(targetZip, "STUB-ZIP", "utf-8");
+		});
+		const b = makeBundle(packSpy);
+		const result = b.exportBundle({
+			sessionIds: [s.id],
+			packAsZip: true,
+		});
+		expect(packSpy).toHaveBeenCalledOnce();
+		expect(packSpy).toHaveBeenCalledWith(
+			result.bundleDir,
+			`${result.bundleDir}.zip`,
+		);
+		expect(result.zipPath).toBe(`${result.bundleDir}.zip`);
+		expect(existsSync(result.zipPath!)).toBe(true);
+		// Source dir removed after pack.
+		expect(existsSync(result.bundleDir)).toBe(false);
+	});
+
+	it("does NOT pack or remove the source dir when packAsZip is falsy", () => {
+		const s = sessions.create({ projectId: null });
+		const packSpy = vi.fn();
+		const b = makeBundle(packSpy);
+		const result = b.exportBundle({ sessionIds: [s.id] });
+		expect(packSpy).not.toHaveBeenCalled();
+		expect(result.zipPath).toBeUndefined();
+		expect(existsSync(result.bundleDir)).toBe(true);
+	});
+
+	it("leaves the bundle dir intact when the pack throws", () => {
+		const s = sessions.create({ projectId: null });
+		const packSpy = vi.fn(() => {
+			throw new Error("adm-zip missing");
+		});
+		const b = makeBundle(packSpy);
+		let caught: unknown;
+		let capturedBundleDir: string | undefined;
+		try {
+			// Peek at the bundleDir via a Proxy would be ideal; simpler:
+			// just look for the freshly-created dir under exports/bundles/.
+			b.exportBundle({ sessionIds: [s.id], packAsZip: true });
+		} catch (error) {
+			caught = error;
+		}
+		expect(caught).toBeInstanceOf(Error);
+		expect((caught as Error).message).toContain("adm-zip missing");
+		// One bundle dir was created before the failed pack; it must still
+		// exist so the caller can salvage as a directory export.
+		const bundlesRoot = join(sessions.getUserRoot(), "exports", "bundles");
+		const listed = existsSync(bundlesRoot)
+			? require("node:fs").readdirSync(bundlesRoot)
+			: [];
+		expect(listed.length).toBeGreaterThan(0);
+		capturedBundleDir = join(bundlesRoot, listed[0]);
+		expect(existsSync(capturedBundleDir)).toBe(true);
+		// Source data still there.
+		expect(
+			existsSync(join(capturedBundleDir, "bundle-manifest.json")),
+		).toBe(true);
 	});
 });

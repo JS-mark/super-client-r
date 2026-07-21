@@ -833,6 +833,11 @@ export function RecoverySettings() {
 				includeDiagnostic: true,
 				// Chat content is opt-in — matches the archive default.
 				includeChatContent: false,
+				// Pack the bundle directory into a .zip for easier sharing.
+				// If adm-zip isn't installed at runtime this rejects with a
+				// typed `recovery.zip-dependency-missing` error, surfaced to
+				// the user via the error message below.
+				packAsZip: true,
 			});
 			if (!result.success || !result.data) {
 				throw new Error(result.error ?? "exportBundle failed");
