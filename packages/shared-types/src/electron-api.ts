@@ -490,9 +490,15 @@ export interface ElectronAPIMigrated {
 		 * Physically remove a tombstoned session's on-disk artifacts (meta,
 		 * jsonl, attachments, tool-outputs, content-refs). Irreversible;
 		 * refuses to purge a live (non-tombstoned) session. Idempotent.
+		 *
+		 * Also refuses if the tombstone still carries `remoteBinding`
+		 * unless `forceIgnoreRemoteBinding` is set — the binding should be
+		 * unbound (via `delete()` sink, which normally runs) before
+		 * physical cleanup per deletion-retention-matrix.md §Cleanup.
 		 */
 		purgeTombstone: (
 			sessionId: string,
+			opts?: { forceIgnoreRemoteBinding?: boolean },
 		) => Promise<IPCResponse<{ purged: boolean; removedPaths?: string[] }>>;
 		/** §9.10 (C1) 锁前可改 projectId；锁后报错。 */
 		reassignProject: (
