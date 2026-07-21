@@ -1726,3 +1726,50 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无代码阻塞。`SessionStorageService.userRoot` 是 private,需加 `getUserRoot()` public getter 给 peer service 复合路径——合理的最小侵入改动。
 - **代码事实更新**:Recovery UI 4 子工作流全成;`SessionStorageService` 新增 `getUserRoot()` 供 peer services 用;test 基线 = **132 files / 1125 tests**。
 - **下一步可选**:export zip 打包(引入 zip 库),或 remote lifecycle 状态机。
+
+## 2026-07-20 feat: remote lifecycle listener 接线 + delete-from-main
+
+> Remaining Gaps "Remote lifecycle" 的第 1 个子工作流(共 7 个)。commit `95924dd`。
+
+### 落地
+
+**broadcast 接线**:`RemoteChatBridge.wireLifecycleBroadcasts()` 在 constructor 订阅自己的 4 个 lifecycle events,重新 broadcast 到 renderer(此前只有 tests 订阅、production 无消费者):
+
+| EventEmitter event | Broadcast channel |
+| --- | --- |
+| `remote.outbound-rejected` | `remote-chat:outbound-rejected` |
+| `remote.duplicate-dropped` | `remote-chat:duplicate-dropped` |
+| `remote.inactive-received` | `remote-chat:inactive-received` |
+| `remote.bot-offline` | `remote-chat:bot-offline` |
+
+**Preload API 扩展**:`window.electron.remoteChat` 加 4 个 `on*` subscriber(镜像 `onIMMessage` 模式),`createBridge` 自动派生 IPC channel。**Renderer 本轮无强制改动**,只暴露 API 给未来的 `RemoteSessionsPanel` 用。
+
+**delete-from-main**:`SessionStorageService` 加 `setRemoteBindingSink(fn)` DI 点。`delete()` 写 tombstone 后,若 `meta.remote` 存在则调 sink(try/catch 兜底,sink 错误不阻 delete)。`main.ts` 在 `setRemoteChatBridge` 后注入 `sid => bridge.unbind(sid)`。renderer chatStore 的 unbind 保留作 defense-in-depth(bridge.unbind 幂等)。
+
+**关键设计**:`SessionStorageService` 对 `RemoteChatBridge` **零硬依赖**(sink 是函数值,不是 import 类型),保持 storage 层 remote-chat-agnostic。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1132 tests / 0 failed**(+7:4 broadcast + 3 sink) |
+
+3 个原 `expect(broadcastEvent).not.toHaveBeenCalled()` 断言经收窄为 `not.toHaveBeenCalledWith("remote-chat:im-message", ...)` —— 原意是"入站消息未转发",而非"broadcastEvent 从未被调用";现在 lifecycle 也 broadcast 了,所以要按 channel 区分。
+
+### Remaining Gaps 更新
+
+"Remote lifecycle" 项的**第 1 个子工作流**完成。**剩 6 个独立子项**(留后续):
+- `SessionStorageService.archive` + IPC(镜像 Project.archive)
+- `ProjectStorageService.archive` 级联到 remote-bound sessions
+- Tombstone shape 扩展(`replayCount`/`lastReplayAt`,per `remote-session-lifecycle.md §5`)
+- Binding conflict / bot-missing 类型化错误(`RemoteBindingConflictError`)
+- `remoteChat.listBindings` IPC + `RemoteSessionsPanel` UI
+- Physical purge guard(`purgeTombstone` 拒 `tombstone.remoteBinding` 未 unbind)
+
+### Retrospective
+
+- **What worked**:探查阶段 subagent 明确列出 remote lifecycle 是 7 个正交子项,经 AskUserQuestion 收敛到"最小完整切片 = listener 接线 + delete-from-main"——避免重蹈把 4/7 塞一轮的糊弄。broadcast wiring 是纯增量(不改 emit 逻辑),`SessionStorageService.setRemoteBindingSink` 保持 storage 层无硬依赖(测试可 stub 或 skip)。`createBridge` 的 `onFoo` → `namespace:foo` channel derivation 让 broadcast 侧的 channel 名和 preload 侧完美对齐,零手写 IPC 布线。
+- **What blocked**:无代码阻塞。3 个原 `broadcastEvent NOT called` 断言在 wiring 后失败——这是断言意图收窄问题(原本想说的是"入站消息未转发",不是"broadcastEvent 从未被调用");按 channel 收窄断言解决,现有测试语义仍完整。
+- **代码事实更新**:`RemoteChatBridge` 现在 broadcast 4 个 lifecycle channels 到 renderer;`SessionStorageService.delete` 通过 sink 自动 unbind remote binding,不依赖 renderer chatStore 路径;test 基线 = **132 files / 1132 tests**。
+- **下一步可选**:remote lifecycle 剩 6 个子项(见 Remaining Gaps 更新),或转 export zip 打包(引入 zip 库)。
