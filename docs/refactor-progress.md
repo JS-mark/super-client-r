@@ -1773,3 +1773,38 @@ R1 subagent-B 报 `useChat.ts:404` 的 `throw new Error(response.error...)` 是�
 - **What blocked**:无代码阻塞。3 个原 `broadcastEvent NOT called` 断言在 wiring 后失败——这是断言意图收窄问题(原本想说的是"入站消息未转发",不是"broadcastEvent 从未被调用");按 channel 收窄断言解决,现有测试语义仍完整。
 - **代码事实更新**:`RemoteChatBridge` 现在 broadcast 4 个 lifecycle channels 到 renderer;`SessionStorageService.delete` 通过 sink 自动 unbind remote binding,不依赖 renderer chatStore 路径;test 基线 = **132 files / 1132 tests**。
 - **下一步可选**:remote lifecycle 剩 6 个子项(见 Remaining Gaps 更新),或转 export zip 打包(引入 zip 库)。
+
+## 2026-07-21 feat: purgeTombstone remote-binding guard(remote lifecycle 2/7)
+
+> Remaining Gaps "Remote lifecycle" 的第 2 个子工作流。commit `f34dbe8`。
+
+### 落地
+
+`SessionStorageService.purgeTombstone` 默认拒 tombstone 上仍有 `remoteBinding` 的情况——把 `deletion-retention-matrix.md:49` 的 invariant("Remote bindings must be unbound before physical cleanup")在 storage 层钉死。
+
+**Why the guard sits at purge**:`delete()` 已调 `remoteBindingSink`(1/7 sub-workflow 落地)清 live binding,但 tombstone.remoteBinding 保留供审计。到 purge 时如果仍带 remoteBinding,说明:sink 没接 / caller 绕过 delete 直接写 tombstone / tombstone 早于 sink 接线——都不该静默丢证据。
+
+**API**:`purgeTombstone(sessionId, opts?: { forceIgnoreRemoteBinding?: boolean })`。默认拒;显式 force 覆盖(用于 bot 永久离线 / relay 退役场景)。**向后兼容**:现有 callers 不传 opts,行为收紧。
+
+### 验证
+
+| 命令 | 结果 |
+| --- | --- |
+| 5 门禁 | 全绿 |
+| `pnpm test:run` | **132 files / 1135 tests / 0 failed**(+3 guard / force / no-binding-passes) |
+
+### Remaining Gaps 更新
+
+"Remote lifecycle" 项 **2/7 子工作流** 完成。剩 5 个:
+- `SessionStorageService.archive` + IPC
+- `ProjectStorageService.archive` 级联到 remote-bound sessions
+- Tombstone shape 扩展(`replayCount`/`lastReplayAt`)
+- Binding conflict / bot-missing 类型化错误
+- `remoteChat.listBindings` + `RemoteSessionsPanel` UI
+
+### Retrospective
+
+- **What worked**:范围极小(1 个方法 + 1 个类型 + 3 个测试),风险最低,但直接销上一个安全 invariant。设计选项 A(默认拒 + force override)胜过 B(通过 sink 查询 bridge——太复杂,还给 storage 层加 remote 依赖)——保持 storage 层对 remote-chat 零硬依赖。opts 参数向后兼容(现有测试无 opts 通过)。
+- **What blocked**:无。
+- **代码事实更新**:physical purge 不再有可能悄悄清掉未 unbind 的 remote binding;test 基线 = **132 files / 1135 tests**。
+- **下一步可选**:remote lifecycle 剩 5 子项,或转 export zip 打包。
