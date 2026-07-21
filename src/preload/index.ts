@@ -569,6 +569,18 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 			conversationId: string,
 		) => Promise<IPCResponse<RemoteChatMessage[]>>;
 		onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
+		onOutboundRejected: (
+			callback: (payload: RemoteOutboundRejectedPayload) => void,
+		) => () => void;
+		onDuplicateDropped: (
+			callback: (payload: RemoteDuplicateDroppedPayload) => void,
+		) => () => void;
+		onInactiveReceived: (
+			callback: (payload: RemoteInactiveReceivedPayload) => void,
+		) => () => void;
+		onBotOffline: (
+			callback: (payload: RemoteBotOfflinePayload) => void,
+		) => () => void;
 	};
 
 	// Network API（代理 + 请求日志）
@@ -1598,6 +1610,47 @@ export interface RemoteChatMessage {
 	timestamp: number;
 }
 
+// ─── Remote lifecycle event payloads (broadcast → renderer) ─────────
+// These mirror the payload shapes emitted by RemoteChatBridge; renderer
+// subscribes via `window.electron.remoteChat.on{OutboundRejected,
+// DuplicateDropped,InactiveReceived,BotOffline}`.
+export interface RemoteOutboundRejectedPayload {
+	conversationId: string;
+	code: string;
+	reason?: string;
+	state: string;
+	botId?: string;
+	chatId?: string;
+	platform?: IMPlatform;
+}
+
+export interface RemoteDuplicateDroppedPayload {
+	conversationId: string;
+	messageId: string;
+	direction: "incoming" | "outgoing";
+	platform: IMPlatform;
+}
+
+export type RemoteInactiveReceiveReason =
+	| "deleted"
+	| "archived"
+	| "missing-session";
+
+export interface RemoteInactiveReceivedPayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: IMPlatform;
+	reason: RemoteInactiveReceiveReason;
+}
+
+export interface RemoteBotOfflinePayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: IMPlatform;
+}
+
 // ============ Network 相关类型 ============
 
 export interface ProxyConfig {
@@ -1949,6 +2002,10 @@ const electronAPI: ElectronAPI = {
 		"sendMessage",
 		"getRemoteMessages",
 		"onIMMessage",
+		"onOutboundRejected",
+		"onDuplicateDropped",
+		"onInactiveReceived",
+		"onBotOffline",
 	]),
 	remoteDevice: createBridge<ElectronAPI["remoteDevice"]>("remoteDevice", [
 		"listDevices",

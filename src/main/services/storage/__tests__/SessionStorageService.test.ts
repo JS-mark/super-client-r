@@ -12,7 +12,7 @@ import {
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProjectStorageService } from "../ProjectStorageService";
 import { SessionStorageService } from "../SessionStorageService";
 
@@ -1036,6 +1036,61 @@ describe("rename / updateMeta / delete", () => {
 		sessions.delete(s.id);
 		expect(sessions.purgeTombstone(s.id).purged).toBe(true);
 		expect(sessions.purgeTombstone(s.id).purged).toBe(false);
+	});
+
+	it("delete invokes remoteBindingSink when the session has a remote binding", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.updateMeta(s.id, {
+			remote: {
+				botId: "bot-1",
+				chatId: "chat-1",
+				botName: "Bot",
+				platform: "telegram",
+				boundAt: Date.now(),
+			},
+		} as Parameters<typeof sessions.updateMeta>[1]);
+		const sink = vi.fn();
+		sessions.setRemoteBindingSink(sink);
+
+		const result = sessions.delete(s.id);
+
+		expect(result.deleted).toBe(true);
+		expect(sink).toHaveBeenCalledTimes(1);
+		expect(sink).toHaveBeenCalledWith(s.id);
+	});
+
+	it("delete does NOT invoke remoteBindingSink for a session without a remote binding", () => {
+		const s = sessions.create({ projectId: null });
+		const sink = vi.fn();
+		sessions.setRemoteBindingSink(sink);
+
+		sessions.delete(s.id);
+
+		expect(sink).not.toHaveBeenCalled();
+	});
+
+	it("delete swallows sink errors so the local tombstone still commits", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.updateMeta(s.id, {
+			remote: {
+				botId: "bot-1",
+				chatId: "chat-1",
+				botName: "Bot",
+				platform: "telegram",
+				boundAt: Date.now(),
+			},
+		} as Parameters<typeof sessions.updateMeta>[1]);
+		const sink = vi.fn(() => {
+			throw new Error("bridge unreachable");
+		});
+		sessions.setRemoteBindingSink(sink);
+
+		const result = sessions.delete(s.id);
+
+		// Delete completes even though the sink threw.
+		expect(result.deleted).toBe(true);
+		expect(result.tombstone?.id).toBe(s.id);
+		expect(sink).toHaveBeenCalledOnce();
 	});
 });
 

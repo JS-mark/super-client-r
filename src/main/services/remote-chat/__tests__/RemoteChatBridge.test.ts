@@ -195,7 +195,14 @@ describe("RemoteChatBridge duplicate remote message handling", () => {
 			platform: "telegram",
 			timestamp: 10,
 		});
-		expect(mocks.broadcastEvent).toHaveBeenCalledTimes(1);
+		// Only ONE im-message broadcast (first delivery); the replay is
+		// dropped before broadcast. The duplicate-dropped path itself
+		// broadcasts on a separate lifecycle channel, so the total call
+		// count is 2 — this assertion narrows to the im-message channel.
+		const imBroadcasts = mocks.broadcastEvent.mock.calls.filter(
+			(args: unknown[]) => args[0] === "remote-chat:im-message",
+		);
+		expect(imBroadcasts).toHaveLength(1);
 		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
 			"remote-chat:im-message",
 			expect.objectContaining({
@@ -231,7 +238,14 @@ describe("RemoteChatBridge inactive remote receive handling", () => {
 			platform: "telegram",
 			reason: "deleted",
 		};
-		expect(mocks.broadcastEvent).not.toHaveBeenCalled();
+		// The inbound IM must NOT surface as a chat message. The bridge is
+		// allowed to broadcast a `remote-chat:inactive-received` lifecycle
+		// event on this path (that's how renderer learns the drop happened),
+		// but nothing on the im-message channel.
+		expect(mocks.broadcastEvent).not.toHaveBeenCalledWith(
+			"remote-chat:im-message",
+			expect.anything(),
+		);
 		expect(bridge.getRemoteMessages(session.id)).toEqual([]);
 		expect(events).toEqual([payload]);
 		expect(mocks.logger.warn).toHaveBeenCalledWith(
@@ -258,7 +272,14 @@ describe("RemoteChatBridge inactive remote receive handling", () => {
 			platform: "telegram",
 			reason: "archived",
 		};
-		expect(mocks.broadcastEvent).not.toHaveBeenCalled();
+		// The inbound IM must NOT surface as a chat message. The bridge is
+		// allowed to broadcast a `remote-chat:inactive-received` lifecycle
+		// event on this path (that's how renderer learns the drop happened),
+		// but nothing on the im-message channel.
+		expect(mocks.broadcastEvent).not.toHaveBeenCalledWith(
+			"remote-chat:im-message",
+			expect.anything(),
+		);
 		expect(bridge.getRemoteMessages(session.id)).toEqual([]);
 		expect(events).toEqual([payload]);
 		expect(mocks.logger.warn).toHaveBeenCalledWith(
@@ -286,7 +307,14 @@ describe("RemoteChatBridge inactive remote receive handling", () => {
 			platform: "telegram",
 			reason: "missing-session",
 		};
-		expect(mocks.broadcastEvent).not.toHaveBeenCalled();
+		// The inbound IM must NOT surface as a chat message. The bridge is
+		// allowed to broadcast a `remote-chat:inactive-received` lifecycle
+		// event on this path (that's how renderer learns the drop happened),
+		// but nothing on the im-message channel.
+		expect(mocks.broadcastEvent).not.toHaveBeenCalledWith(
+			"remote-chat:im-message",
+			expect.anything(),
+		);
 		expect(
 			existsSync(
 				join(
@@ -463,5 +491,86 @@ describe("RemoteChatBridge outbound lifecycle rejection", () => {
 			}),
 		);
 		expect(imbotService.sendMessage).not.toHaveBeenCalled();
+	});
+});
+
+describe("RemoteChatBridge lifecycle broadcast wiring", () => {
+	it("broadcasts remote-chat:outbound-rejected on outbound rejection", async () => {
+		const session = getSessionStorage().create({ projectId: null });
+		bridge.bind(session.id, "bot-1", "chat-1");
+		getSessionStorage().updateMeta(session.id, {
+			archived: true,
+		} as Parameters<ReturnType<typeof getSessionStorage>["updateMeta"]>[1]);
+
+		try {
+			await bridge.sendMessage(session.id, "hi");
+		} catch {
+			// expected
+		}
+
+		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
+			"remote-chat:outbound-rejected",
+			expect.objectContaining({
+				conversationId: session.id,
+				code: "remote.archived",
+				state: "archived",
+			}),
+		);
+	});
+
+	it("broadcasts remote-chat:inactive-received when IM arrives for a tombstoned session", () => {
+		const session = getSessionStorage().create({ projectId: null });
+		bridge.bind(session.id, "bot-1", "chat-1");
+		getSessionStorage().delete(session.id);
+		mocks.broadcastEvent.mockClear();
+
+		imbotService.emit("raw-message", "bot-1", createIncomingIMMessage());
+
+		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
+			"remote-chat:inactive-received",
+			expect.objectContaining({
+				conversationId: session.id,
+				reason: "deleted",
+			}),
+		);
+	});
+
+	it("broadcasts remote-chat:duplicate-dropped when a replayed IM message id is dropped", () => {
+		const session = getSessionStorage().create({ projectId: null });
+		bridge.bind(session.id, "bot-1", "chat-1");
+		const message = createIncomingIMMessage();
+		imbotService.emit("raw-message", "bot-1", message);
+		mocks.broadcastEvent.mockClear();
+		// Replay same message id → duplicate-dropped path.
+		imbotService.emit("raw-message", "bot-1", message);
+
+		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
+			"remote-chat:duplicate-dropped",
+			expect.objectContaining({
+				conversationId: session.id,
+				direction: "incoming",
+			}),
+		);
+	});
+
+	it("broadcasts remote-chat:bot-offline when sendMessage hits a stopped bot", async () => {
+		const session = getSessionStorage().create({ projectId: null });
+		bridge.bind(session.id, "bot-1", "chat-1");
+		imbotService.setBotStatus("stopped");
+		mocks.broadcastEvent.mockClear();
+
+		try {
+			await bridge.sendMessage(session.id, "hi");
+		} catch {
+			// expected — RemoteBotOfflineError
+		}
+
+		expect(mocks.broadcastEvent).toHaveBeenCalledWith(
+			"remote-chat:bot-offline",
+			expect.objectContaining({
+				conversationId: session.id,
+				botId: "bot-1",
+			}),
+		);
 	});
 });

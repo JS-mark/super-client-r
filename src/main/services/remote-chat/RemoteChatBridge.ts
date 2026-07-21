@@ -73,6 +73,13 @@ export interface RemoteOutboundRejectedPayload {
 	platform?: RemoteBinding["platform"];
 }
 
+export interface RemoteDuplicateDroppedPayload {
+	conversationId: string;
+	messageId: string;
+	direction: RemoteChatMessage["direction"];
+	platform: RemoteBinding["platform"];
+}
+
 /**
  * Thrown for outbound rejections that are NOT bot-offline (archived /
  * tombstoned / fatal). Bot-offline still throws `RemoteBotOfflineError` for
@@ -117,7 +124,30 @@ export class RemoteChatBridge extends EventEmitter {
 		this.imbotService = imbotService;
 		this.setupIMListener();
 		this.loadBindingsFromStorage();
+		this.wireLifecycleBroadcasts();
 		logger.info("[RemoteChatBridge] Initialized");
+	}
+
+	/**
+	 * Subscribe to our own lifecycle EventEmitter events and re-broadcast
+	 * them to the renderer via `broadcastEvent`. These channels are
+	 * additive — nothing else changes about when/how events are emitted.
+	 * Renderer consumers subscribe via
+	 * `window.electron.remoteChat.on{OutboundRejected,DuplicateDropped,InactiveReceived,BotOffline}`.
+	 */
+	private wireLifecycleBroadcasts(): void {
+		this.on("remote.outbound-rejected", (payload: RemoteOutboundRejectedPayload) => {
+			broadcastEvent("remote-chat:outbound-rejected", payload);
+		});
+		this.on("remote.duplicate-dropped", (payload: RemoteDuplicateDroppedPayload) => {
+			broadcastEvent("remote-chat:duplicate-dropped", payload);
+		});
+		this.on("remote.inactive-received", (payload: RemoteInactiveReceivedPayload) => {
+			broadcastEvent("remote-chat:inactive-received", payload);
+		});
+		this.on("remote.bot-offline", (payload: RemoteBotOfflinePayload) => {
+			broadcastEvent("remote-chat:bot-offline", payload);
+		});
 	}
 
 	/**
@@ -504,7 +534,7 @@ export class RemoteChatBridge extends EventEmitter {
 		conversationId: string,
 		msg: RemoteChatMessage,
 	): void {
-		const payload = {
+		const payload: RemoteDuplicateDroppedPayload = {
 			conversationId,
 			messageId: msg.id,
 			direction: msg.direction,

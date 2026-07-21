@@ -626,6 +626,12 @@ app.whenReady().then(async () => {
 		// setRemoteChatBridge is now imported from service-holders at the top
 		const remoteChatBridge = new RemoteChatBridge(imbotService);
 		setRemoteChatBridge(remoteChatBridge);
+		// Wire the storage-side delete → remote-unbind sink so any delete
+		// path (renderer chatStore, project remove, migration, purge)
+		// unbinds the remote binding, not just the renderer chatStore one.
+		getSessionStorage().setRemoteBindingSink((sessionId) => {
+			remoteChatBridge.unbind(sessionId);
+		});
 		logger.info("Remote Chat Bridge initialized");
 
 		// 创建远程控制事件服务
