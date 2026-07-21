@@ -558,6 +558,22 @@ export class RemoteChatBridge extends EventEmitter {
 		};
 		this.emit("remote.inactive-received", payload);
 		logger.warn("[RemoteChatBridge] remote.inactive-received", payload);
+		// For deleted (tombstoned) sessions, bump the tombstone replay
+		// counter so downstream tooling can detect "peer keeps sending".
+		// archived sessions are still live meta, not tombstoned — the
+		// counter only applies to tombstones. missing-session has no meta
+		// at all so there's nothing to update. See remote-session-lifecycle.md §5.
+		if (reason === "deleted") {
+			try {
+				getSessionStorage().recordTombstoneReplay(conversationId);
+			} catch (error) {
+				logger.warn(
+					`[RemoteChatBridge] recordTombstoneReplay failed for ${conversationId}: ${
+						error instanceof Error ? error.message : String(error)
+					}`,
+				);
+			}
+		}
 	}
 
 	private reportBotOffline(

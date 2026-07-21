@@ -252,6 +252,25 @@ describe("RemoteChatBridge inactive remote receive handling", () => {
 			"[RemoteChatBridge] remote.inactive-received",
 			payload,
 		);
+		// Replay counter bumped on the tombstone (spec §5).
+		const listedTombstones = getSessionStorage().listDeleted();
+		const tombstoned = listedTombstones.find((m) => m.id === session.id);
+		expect(tombstoned?.tombstone?.replayCount).toBe(1);
+		expect(typeof tombstoned?.tombstone?.lastReplayAt).toBe("number");
+
+		// A second inbound to the same tombstoned session bumps to 2.
+		imbotService.emit("raw-message", "bot-1", {
+			botType: "telegram",
+			chatId: "chat-1",
+			messageId: "platform-message-99",
+			senderId: "u1",
+			senderName: "User One",
+			content: "second replay",
+			timestamp: 20,
+		});
+		const listedAgain = getSessionStorage().listDeleted();
+		const tombstonedAgain = listedAgain.find((m) => m.id === session.id);
+		expect(tombstonedAgain?.tombstone?.replayCount).toBe(2);
 	});
 
 	it("drops incoming IM for an archived bound session without broadcast or persistence", () => {

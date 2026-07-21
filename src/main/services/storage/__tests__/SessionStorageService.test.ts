@@ -1109,6 +1109,26 @@ describe("rename / updateMeta / delete", () => {
 		expect(sessions.listDeleted().map((m) => m.id)).not.toContain(s.id);
 	});
 
+	it("recordTombstoneReplay increments replayCount + lastReplayAt on a tombstone", () => {
+		const s = sessions.create({ projectId: null });
+		sessions.delete(s.id);
+		const first = sessions.recordTombstoneReplay(s.id);
+		expect(first).not.toBeNull();
+		expect(first?.replayCount).toBe(1);
+		expect(typeof first?.lastReplayAt).toBe("number");
+		const second = sessions.recordTombstoneReplay(s.id);
+		expect(second?.replayCount).toBe(2);
+	});
+
+	it("recordTombstoneReplay returns null for a live (non-tombstoned) session", () => {
+		const s = sessions.create({ projectId: null });
+		expect(sessions.recordTombstoneReplay(s.id)).toBeNull();
+	});
+
+	it("recordTombstoneReplay returns null for a missing session id", () => {
+		expect(sessions.recordTombstoneReplay("nope")).toBeNull();
+	});
+
 	it("purgeTombstone with no remote binding passes without the force flag", () => {
 		// Plain (no-remote) session: existing purge behavior unchanged.
 		const s = sessions.create({ projectId: null });

@@ -389,6 +389,37 @@ export class SessionStorageService {
 	}
 
 	/**
+	 * Increment the tombstone's replayCount + lastReplayAt for a
+	 * tombstoned session — called by RemoteChatBridge when an inbound IM
+	 * arrives for a deleted remote-bound session (spec:
+	 * remote-session-lifecycle.md §5). No-op if the session is not
+	 * tombstoned or missing (defense-in-depth; the bridge already checks
+	 * meta.deletedAt before calling).
+	 */
+	recordTombstoneReplay(sessionId: string): {
+		replayCount: number;
+		lastReplayAt: number;
+	} | null {
+		const meta = this.findMeta(sessionId, { includeDeleted: true });
+		if (!meta || !meta.deletedAt || !meta.tombstone) return null;
+		const now = Date.now();
+		const nextTombstone: SessionTombstone = {
+			...meta.tombstone,
+			replayCount: (meta.tombstone.replayCount ?? 0) + 1,
+			lastReplayAt: now,
+		};
+		this.writeMeta({
+			...meta,
+			tombstone: nextTombstone,
+			updatedAt: now,
+		});
+		return {
+			replayCount: nextTombstone.replayCount ?? 0,
+			lastReplayAt: nextTombstone.lastReplayAt ?? now,
+		};
+	}
+
+	/**
 	 * Physically remove a tombstoned session's on-disk artifacts:
 	 * `<sid>.meta.json`, `<sid>.jsonl`, and the per-session subdir
 	 * (`attachments/`, `tool-outputs/`, `tool-outputs/content-refs/`).
