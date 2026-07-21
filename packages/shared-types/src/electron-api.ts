@@ -487,6 +487,16 @@ export interface ElectronAPIMigrated {
 		>;
 		restoreDeleted: (sessionId: string) => Promise<IPCResponse<SessionMeta>>;
 		/**
+		 * Toggle the session's `archived` flag. Mirrors projects.archive.
+		 * Idempotent (returns meta unchanged when already in target state).
+		 * Archived sessions stay in storage but are hidden from normal
+		 * lists and drop inbound remote IM as `remote.inactive-received`.
+		 */
+		archive: (
+			sessionId: string,
+			archived: boolean,
+		) => Promise<IPCResponse<SessionMeta>>;
+		/**
 		 * Physically remove a tombstoned session's on-disk artifacts (meta,
 		 * jsonl, attachments, tool-outputs, content-refs). Irreversible;
 		 * refuses to purge a live (non-tombstoned) session. Idempotent.

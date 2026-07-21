@@ -1592,6 +1592,8 @@ module.exports = {
 		delete: (sessionId: string) => getSessionStorage().delete(sessionId),
 		restoreDeleted: (sessionId: string) =>
 			getSessionStorage().restoreDeleted(sessionId),
+		archive: (sessionId: string, archived: boolean) =>
+			getSessionStorage().archive(sessionId, archived),
 		purgeTombstone: (
 			sessionId: string,
 			opts?: { forceIgnoreRemoteBinding?: boolean },

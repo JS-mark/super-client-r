@@ -389,6 +389,19 @@ export class SessionStorageService {
 	}
 
 	/**
+	 * Toggle the session's archived flag. Mirrors `ProjectStorageService.archive`:
+	 * idempotent — if already in the target state, returns the meta unchanged.
+	 * Only operates on non-tombstoned sessions (archive is orthogonal to delete;
+	 * a tombstoned session can't be "archived" in a meaningful sense — use
+	 * `restoreDeleted` first if the caller needs that).
+	 */
+	archive(sessionId: string, archived: boolean): SessionMeta {
+		const meta = this.getMeta(sessionId);
+		if (!!meta.archived === archived) return meta;
+		return this.updateMeta(sessionId, { archived });
+	}
+
+	/**
 	 * Increment the tombstone's replayCount + lastReplayAt for a
 	 * tombstoned session — called by RemoteChatBridge when an inbound IM
 	 * arrives for a deleted remote-bound session (spec:
