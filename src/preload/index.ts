@@ -8,6 +8,7 @@ import type { LLMErrorContext } from "@super-client/shared-types/chat";
 import type {
 	DiagnosticExportResult,
 	ElectronAPIMigrated,
+	RemoteBindingListEntry,
 } from "@super-client/shared-types/electron-api";
 import { createBridge } from "./bridge";
 
@@ -568,6 +569,7 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 		getRemoteMessages: (
 			conversationId: string,
 		) => Promise<IPCResponse<RemoteChatMessage[]>>;
+		listBindings: () => Promise<IPCResponse<RemoteBindingListEntry[]>>;
 		onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
 		onOutboundRejected: (
 			callback: (payload: RemoteOutboundRejectedPayload) => void,
@@ -2017,6 +2019,7 @@ const electronAPI: ElectronAPI = {
 		"checkBotOnline",
 		"sendMessage",
 		"getRemoteMessages",
+		"listBindings",
 		"onIMMessage",
 		"onOutboundRejected",
 		"onDuplicateDropped",

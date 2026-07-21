@@ -638,6 +638,7 @@ const apiImpl = {
 			getRemoteChatBridge().sendMessage(conversationId, content),
 		getRemoteMessages: (conversationId: string) =>
 			getRemoteChatBridge().getRemoteMessages(conversationId),
+		listBindings: () => getRemoteChatBridge().listBindingsWithLifecycle(),
 	},
 
 	// ─── Remote Device ────────────────────────

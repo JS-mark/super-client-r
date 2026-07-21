@@ -570,6 +570,38 @@ export class RemoteChatBridge extends EventEmitter {
 		}
 	}
 
+	/**
+	 * Snapshot every current binding + its classified lifecycle state. Used
+	 * by the renderer's RemoteSessionsPanel to render the "bindings +
+	 * status" list. The state is a point-in-time classification; renderer
+	 * should re-call after any lifecycle broadcast to stay fresh.
+	 */
+	listBindingsWithLifecycle(): Array<{
+		conversationId: string;
+		binding: RemoteBinding;
+		state: RemoteLifecycleState;
+	}> {
+		const entries: Array<{
+			conversationId: string;
+			binding: RemoteBinding;
+			state: RemoteLifecycleState;
+		}> = [];
+		for (const [conversationId, binding] of this.bindings) {
+			// classifyLifecycle only uses bot for a truthy check that
+			// aligns with checkBotOnline; passing a sentinel object is
+			// equivalent to "bot instance exists" when checkBotOnline is
+			// true, which is the meaningful invariant.
+			const online = this.checkBotOnline(binding.botId);
+			const state = this.classifyLifecycle(
+				conversationId,
+				binding,
+				online ? ({} as SendCapableBot) : undefined,
+			);
+			entries.push({ conversationId, binding, state });
+		}
+		return entries;
+	}
+
 	private classifyLifecycle(
 		conversationId: string,
 		binding: RemoteBinding | undefined,

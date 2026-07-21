@@ -339,6 +339,16 @@ beforeEach(() => {
 					},
 				}),
 			},
+			remoteChat: {
+				listBindings: vi
+					.fn()
+					.mockResolvedValue({ success: true, data: [] }),
+				unbind: vi.fn().mockResolvedValue({ success: true }),
+				onBotMissing: vi.fn(() => () => {}),
+				onBotOffline: vi.fn(() => () => {}),
+				onInactiveReceived: vi.fn(() => () => {}),
+				onOutboundRejected: vi.fn(() => () => {}),
+			},
 		},
 		configurable: true,
 	});

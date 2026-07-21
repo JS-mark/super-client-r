@@ -15,6 +15,7 @@
  */
 
 import type { IPCResponse, RemoteBinding } from "../types/electron";
+import type { RemoteBindingListEntry } from "@super-client/shared-types/electron-api";
 
 export const remoteSessionService = {
 	bind: (
@@ -34,4 +35,15 @@ export const remoteSessionService = {
 
 	checkBotOnline: (botId: string): Promise<IPCResponse<boolean>> =>
 		window.electron.remoteChat.checkBotOnline(botId),
+
+	/**
+	 * Snapshot every current binding + its lifecycle state. Used by the
+	 * RemoteSessionsPanel in Settings > Recovery to surface bot-offline /
+	 * bot-missing / tombstoned bindings so users can unbind or restore.
+	 * Callers should re-fetch after any lifecycle event broadcast
+	 * (onOutboundRejected / onInactiveReceived / onBotOffline / onBotMissing)
+	 * since the state is a point-in-time classification.
+	 */
+	listBindings: (): Promise<IPCResponse<RemoteBindingListEntry[]>> =>
+		window.electron.remoteChat.listBindings(),
 };

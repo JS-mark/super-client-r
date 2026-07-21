@@ -70,6 +70,12 @@ export type {
   RemoteBinding,
   RemoteIMMessage,
   RemoteChatMessage,
+  RemoteOutboundRejectedPayload,
+  RemoteDuplicateDroppedPayload,
+  RemoteInactiveReceivedPayload,
+  RemoteInactiveReceiveReason,
+  RemoteBotOfflinePayload,
+  RemoteBotMissingPayload,
   ConversationSummary,
   ConversationSummaryUpdate,
   EffectiveSessionRuntime,
@@ -126,6 +132,8 @@ export type {
   SessionContentRefReadOptions,
   SessionContentRefReadResult,
   SessionContentRefSource,
+  RemoteBindingListEntry,
+  RemoteLifecycleState,
 } from "@super-client/shared-types/electron-api";
 
 export interface RemoteBotOfflineDetails {
@@ -1185,7 +1193,23 @@ export interface ElectronAPI extends ElectronAPIMigrated {
     getRemoteMessages: (
       conversationId: string,
     ) => Promise<IPCResponse<RemoteChatMessage[]>>;
+    listBindings: () => Promise<IPCResponse<RemoteBindingListEntry[]>>;
     onIMMessage: (callback: (message: RemoteIMMessage) => void) => () => void;
+    onOutboundRejected: (
+      callback: (payload: RemoteOutboundRejectedPayload) => void,
+    ) => () => void;
+    onDuplicateDropped: (
+      callback: (payload: RemoteDuplicateDroppedPayload) => void,
+    ) => () => void;
+    onInactiveReceived: (
+      callback: (payload: RemoteInactiveReceivedPayload) => void,
+    ) => () => void;
+    onBotOffline: (
+      callback: (payload: RemoteBotOfflinePayload) => void,
+    ) => () => void;
+    onBotMissing: (
+      callback: (payload: RemoteBotMissingPayload) => void,
+    ) => () => void;
   };
 
   // Network API（代理 + 请求日志）

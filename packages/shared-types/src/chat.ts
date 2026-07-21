@@ -109,6 +109,56 @@ export interface RemoteChatMessage {
 	timestamp: number;
 }
 
+// ─── Remote lifecycle broadcast payloads ─────────────────────────────
+// Emitted by RemoteChatBridge on its EventEmitter, re-broadcast to the
+// renderer on channels `remote-chat:{outbound-rejected,duplicate-dropped,
+// inactive-received,bot-offline,bot-missing}`. Renderer subscribes via
+// `window.electron.remoteChat.on{OutboundRejected,DuplicateDropped,
+// InactiveReceived,BotOffline,BotMissing}`.
+
+export interface RemoteOutboundRejectedPayload {
+	conversationId: string;
+	code: string;
+	reason?: string;
+	state: string;
+	botId?: string;
+	chatId?: string;
+	platform?: IMPlatform;
+}
+
+export interface RemoteDuplicateDroppedPayload {
+	conversationId: string;
+	messageId: string;
+	direction: "incoming" | "outgoing";
+	platform: IMPlatform;
+}
+
+export type RemoteInactiveReceiveReason =
+	| "deleted"
+	| "archived"
+	| "missing-session";
+
+export interface RemoteInactiveReceivedPayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: IMPlatform;
+	reason: RemoteInactiveReceiveReason;
+}
+
+export interface RemoteBotOfflinePayload {
+	conversationId: string;
+	botId: string;
+	chatId: string;
+	platform: IMPlatform;
+}
+
+export interface RemoteBotMissingPayload {
+	botId: string;
+	conversationId?: string;
+	conversationIds?: string[];
+}
+
 /** 发送远程消息请求 */
 export interface SendRemoteMessageRequest {
 	conversationId: string;

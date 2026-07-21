@@ -273,6 +273,40 @@ export interface RecoveryBundleExportResult {
 	manifest: RecoveryBundleManifest;
 }
 
+/**
+ * Remote session lifecycle state, as classified by
+ * `RemoteSessionLifecycle.computeRemoteLifecycle`. Structural duplicate
+ * of the main-process type so shared-types stays remote-chat-agnostic.
+ */
+export type RemoteLifecycleState =
+	| "unbound"
+	| "bound-idle"
+	| "bound-active"
+	| "bot-offline"
+	| "archived"
+	| "tombstoned"
+	| "error-recoverable"
+	| "error-fatal";
+
+/**
+ * Single row returned by `remoteChat.listBindings()`. Carries the
+ * binding shape inline (structurally equivalent to preload's
+ * `RemoteBinding`) so shared-types doesn't have to import preload
+ * types. The `state` is the classifier's verdict at snapshot time —
+ * the renderer should re-fetch after any lifecycle event to stay fresh.
+ */
+export interface RemoteBindingListEntry {
+	conversationId: string;
+	binding: {
+		botId: string;
+		chatId: string;
+		botName: string;
+		platform: string;
+		boundAt: number;
+	};
+	state: RemoteLifecycleState;
+}
+
 /** 已迁移到 shared-types 的 ElectronAPI namespace 子集。 */
 export interface ElectronAPIMigrated {
 	runtime: {

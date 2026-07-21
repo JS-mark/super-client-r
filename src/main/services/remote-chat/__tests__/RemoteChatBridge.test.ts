@@ -692,3 +692,35 @@ describe("RemoteChatBridge startup bot-missing detection", () => {
 		);
 	});
 });
+
+describe("RemoteChatBridge listBindingsWithLifecycle", () => {
+	it("returns every current binding with a classified lifecycle state", () => {
+		const s1 = getSessionStorage().create({ projectId: null });
+		const s2 = getSessionStorage().create({ projectId: null });
+		bridge.bind(s1.id, "bot-1", "chat-1");
+		bridge.bind(s2.id, "bot-1", "chat-2");
+
+		const entries = bridge.listBindingsWithLifecycle();
+		expect(entries).toHaveLength(2);
+		const ids = entries.map((e) => e.conversationId).sort();
+		expect(ids).toEqual([s1.id, s2.id].sort());
+		// Both are live + bound + bot running → bound-idle.
+		for (const entry of entries) {
+			expect(entry.binding.botId).toBe("bot-1");
+			expect(entry.state).toBe("bound-idle");
+		}
+	});
+
+	it("classifies a tombstoned binding as tombstoned in the list", () => {
+		const s = getSessionStorage().create({ projectId: null });
+		bridge.bind(s.id, "bot-1", "chat-1");
+		getSessionStorage().delete(s.id);
+		const entries = bridge.listBindingsWithLifecycle();
+		const entry = entries.find((e) => e.conversationId === s.id);
+		expect(entry?.state).toBe("tombstoned");
+	});
+
+	it("returns an empty array when there are no bindings", () => {
+		expect(bridge.listBindingsWithLifecycle()).toEqual([]);
+	});
+});
