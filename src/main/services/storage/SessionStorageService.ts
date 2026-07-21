@@ -402,6 +402,29 @@ export class SessionStorageService {
 	}
 
 	/**
+	 * Bulk-flip the archived flag on every non-tombstoned session belonging
+	 * to `projectId`. Used by `ProjectStorageService.archive` to cascade the
+	 * project-level archive state down to its sessions (via a DI sink so
+	 * ProjectStorageService stays session-storage-agnostic).
+	 *
+	 * Idempotent per-session (skip when already in target state). Returns
+	 * the ids of sessions actually mutated.
+	 */
+	archiveByProject(
+		projectId: string,
+		archived: boolean,
+	): { affectedSessionIds: string[] } {
+		const sessions = this.list(projectId);
+		const affected: string[] = [];
+		for (const meta of sessions) {
+			if (!!meta.archived === archived) continue;
+			this.updateMeta(meta.id, { archived });
+			affected.push(meta.id);
+		}
+		return { affectedSessionIds: affected };
+	}
+
+	/**
 	 * Increment the tombstone's replayCount + lastReplayAt for a
 	 * tombstoned session — called by RemoteChatBridge when an inbound IM
 	 * arrives for a deleted remote-bound session (spec:

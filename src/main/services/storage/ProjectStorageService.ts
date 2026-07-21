@@ -55,12 +55,35 @@ export interface ListOrphansEntry {
 	sessionCount: number;
 }
 
+/**
+ * Called by `archive()` when the project's archived flag actually flips.
+ * Wires the project-level state change down to sessions (e.g.
+ * `SessionStorageService.archiveByProject`) so archived projects hide
+ * their sessions from normal lists too and inbound remote IM drops via
+ * `remote.inactive-received`. Kept as a pluggable sink to keep this
+ * service session-storage-agnostic (no circular dependency).
+ */
+export type ArchiveSessionsSink = (
+	projectId: string,
+	archived: boolean,
+) => void;
+
 export class ProjectStorageService {
 	private readonly userRoot: string;
+	private archiveSessionsSink: ArchiveSessionsSink | undefined;
 
 	constructor(baseDir: string, userId: string = "default") {
 		this.userRoot = join(baseDir, userId);
 		mkdirSync(this.userRoot, { recursive: true });
+	}
+
+	/**
+	 * Inject the session-cascade sink invoked whenever `archive()` flips
+	 * the project's archived state. `main.ts` wires this at boot to
+	 * `SessionStorageService.archiveByProject(projectId, archived)`.
+	 */
+	setArchiveSessionsSink(sink: ArchiveSessionsSink | undefined): void {
+		this.archiveSessionsSink = sink;
 	}
 
 	// ─── public API ──────────────────────────────────────────────
@@ -234,6 +257,21 @@ export class ProjectStorageService {
 		const next = [...list];
 		next[idx] = updated;
 		this.writeRegistry(next);
+		// Cascade the project's archived state to its sessions (via sink).
+		// Sink errors are logged but do NOT block the project registry write
+		// — the project state is authoritative; session cascade is
+		// convergent and can be re-triggered later.
+		if (this.archiveSessionsSink) {
+			try {
+				this.archiveSessionsSink(id, archived);
+			} catch (error) {
+				// eslint-disable-next-line no-console
+				console.warn(
+					`[ProjectStorageService] archiveSessionsSink failed for project ${id}:`,
+					error instanceof Error ? error.message : String(error),
+				);
+			}
+		}
 		return updated;
 	}
 

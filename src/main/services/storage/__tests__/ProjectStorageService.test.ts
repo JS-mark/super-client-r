@@ -12,7 +12,7 @@ import {
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashCwd } from "../cwd";
 import { ProjectStorageService } from "../ProjectStorageService";
 
@@ -456,5 +456,41 @@ describe("orphan recovery", () => {
 		expect(() =>
 			svc.relinkOrphan("deadbeefdeadbeef", "/a/nowhere"),
 		).toThrow(/not found/);
+	});
+});
+
+describe("archive session cascade sink", () => {
+	it("invokes the sink when archive() actually flips the project state", () => {
+		const p = svc.add("/a/b");
+		const sink = vi.fn();
+		svc.setArchiveSessionsSink(sink);
+		svc.archive(p.id, true);
+		expect(sink).toHaveBeenCalledTimes(1);
+		expect(sink).toHaveBeenCalledWith(p.id, true);
+		// Unarchive path also flips.
+		svc.archive(p.id, false);
+		expect(sink).toHaveBeenCalledTimes(2);
+		expect(sink).toHaveBeenLastCalledWith(p.id, false);
+	});
+
+	it("does NOT invoke the sink on a no-op archive (state unchanged)", () => {
+		const p = svc.add("/a/b");
+		svc.archive(p.id, true);
+		const sink = vi.fn();
+		svc.setArchiveSessionsSink(sink);
+		// Already archived — second call is a no-op, sink must not fire.
+		svc.archive(p.id, true);
+		expect(sink).not.toHaveBeenCalled();
+	});
+
+	it("archive() swallows sink errors and still commits the registry", () => {
+		const p = svc.add("/a/b");
+		svc.setArchiveSessionsSink(() => {
+			throw new Error("session cascade unreachable");
+		});
+		// Registry write should still succeed.
+		const result = svc.archive(p.id, true);
+		expect(result.archived).toBe(true);
+		expect(svc.list().find((x) => x.id === p.id)?.archived).toBe(true);
 	});
 });
