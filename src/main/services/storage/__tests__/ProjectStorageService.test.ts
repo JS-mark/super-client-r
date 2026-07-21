@@ -457,6 +457,18 @@ describe("orphan recovery", () => {
 			svc.relinkOrphan("deadbeefdeadbeef", "/a/nowhere"),
 		).toThrow(/not found/);
 	});
+
+	it("relinkOrphan refuses empty or whitespace-only newCwd", () => {
+		// Prep a real orphan so the guard is hit BEFORE the not-found path.
+		const p = svc.add("/a/b");
+		svc.remove(p.id, { keepFiles: true });
+		// Without the guard, `normalizeCwd("")` would silently resolve to
+		// `process.cwd()` and register under a surprising hash.
+		expect(() => svc.relinkOrphan(p.id, "")).toThrow(/newCwd/);
+		expect(() => svc.relinkOrphan(p.id, "   ")).toThrow(/newCwd/);
+		// The orphan storage dir must still be intact (no rename attempted).
+		expect(existsSync(projectDir(p.id))).toBe(true);
+	});
 });
 
 describe("archive session cascade sink", () => {

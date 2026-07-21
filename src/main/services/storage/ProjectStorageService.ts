@@ -466,6 +466,14 @@ export class ProjectStorageService {
 		) {
 			throw new Error(`refusing to relink orphan with unsafe id: ${projectId}`);
 		}
+		// Reject empty / whitespace-only newCwd. `normalizeCwd` would silently
+		// `path.resolve("")` to `process.cwd()`, producing a legal but almost
+		// certainly unintended registration under a surprising hash.
+		if (typeof newCwd !== "string" || newCwd.trim() === "") {
+			throw new Error(
+				"refusing to relink orphan: newCwd must be a non-empty path",
+			);
+		}
 		if (this.list().some((p) => p.id === projectId)) {
 			throw new Error(
 				`project ${projectId} is registered; not an orphan (relink is for unregistered dirs only)`,
