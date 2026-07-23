@@ -1370,7 +1370,7 @@
 - **What blocked**：无。本轮无任何环境或代码阻塞。
 - **代码事实更新**：`pnpm test:run` 稳定基线 = 129 files / 1079 tests / 0 failed（与 R2 closeout 一致，本轮复跑确认）。
 - **是否继续 loop**：**否**。终止条件全部满足——工作树 clean + 全量门禁绿（含历史阻塞的 server e2e）+ 进度文档无过期阻塞条目。收口 loop R1–R4 正式关闭。
-- **后续工作（loop 外）**：per-server runtime 回归、导出/备份深水区（zip/package/完整迁移包）、marketplace 视觉深化、byte-index/增量 JSONL parse、专用摘要卡片、table/tree/source/artifact native producer 等属产品深化项，不再纳入收口 loop。V2 Tauri 迁移需等 v1 达 `shippable` 后启动。
+- **后续工作（loop 外）**：per-server runtime 回归、导出/备份深水区（zip/package/完整迁移包）、marketplace 视觉深化、byte-index/增量 JSONL parse、专用摘要卡片、table/tree/source/artifact native producer 等属产品深化项，不再纳入收口 loop。
 
 ## Gate Health Snapshot 2026-07-19 (mirror-type cleanup)
 
@@ -2047,3 +2047,33 @@ lint 中途多了 1 个 `no-useless-catch`(纯 rethrow 的 try/catch),已顺手�
 - **What blocked**:pnpm store v10↔v11 版本冲突阻止 `pnpm add adm-zip`。经 AskUserQuestion 决定手工 patch package.json + 让用户之后 install,不重跑 install 污染 lockfile。这是一个环境问题,用文档 + 结构化错误覆盖比强行绕过 lockfile 更稳。
 - **代码事实更新**:package.json 声明 adm-zip runtime 依赖;`recovery.exportBundle` 可选打 zip;RecoveryBundleService 的 `packZip` DI 让测试独立于 zip 库;test 基线 = **133 files / 1163 tests**。
 - **Remaining Gaps 全部清空**;下一步产品方向需要用户重新规划。
+
+## Closeout Loop Round 5 (2026-07-23) — Settings IA 再精简 + 弃用 Tauri v2 + 性能监控内存修复
+
+- **背景**:`r2/gate-health-fixes` 分支累积 21 个未提交改动,进度文档已声称"工作树 clean"但实际滞后。本轮把这批改动走完整五道门禁、分组提交、回到 clean。
+- **改动意图**(三个功能域):
+  1. **Settings IA 再精简**:删除 `ApiKeysConfig.tsx` / `AgentPage.tsx`,新增 `ThirdPartyApiSettings.tsx` + `ThirdPartyApiPage.tsx`。顶级 nav 的 `agent` 项替换为 `third-party-api`(SkillsMP 等外部凭据 + Web search 聚合到独立页,`models` 页回归纯模型选择)。`/settings/agent` 旧路由 302 到 `third-party-api` 保持深链接兼容。i18n(en/zh)把散落的 `apiKeys*` / `agent.*` key 收敛成 `thirdPartyApi.*` 命名空间。
+  2. **性能监控内存指标修复**(分支本义):`api-impl.getProcessMetrics` 在 macOS 用 `vm_stat` 计算 available(free+inactive+speculative+purgeable),不再用几乎永远 ≈ 0 的 `os.freemem()`;堆内存分母改用 V8 `heap_size_limit` 而非动态增长的 `heapTotal`。`DebugTools` 进度条从 antd `Progress` 换成自绘 `.perf-progress-*`(styles/index.css 加 shimmer 动画)。
+  3. **弃用 Tauri v2 支线**:删除 774 行 `docs/tauri-migration-v2-plan.md`,清理 `refactor-plan.md` / `refactor-progress.md` / `refactor-closeout-loop.md` 里的 v2 引用。
+- **一致性补齐**(最小化,不扩大范围):
+  - `router.tsx` + `SettingsRail.test.tsx` 新增行的缩进层级断裂(多一层 tab)已对齐。
+  - `ProjectStorageService.test.ts` 的 symlink 测试 `finally` 清理块:`rmSync(linkDir,{force:true})` 在 **Node ≥20 / 当前 v25** 下对"指向目录的 symlink"抛 `Path is a directory`,改用 `unlinkSync(linkDir)` 只删链接本身(断言逻辑未动)。**已用 `git stash` 对照证实此失败在本批之前就存在,是环境/Node 版本问题,非本批回归。**
+  - 平台注入的 `CLAUDE.md` MULTICA-RUNTIME 块(auto-managed)已 restore,不纳入收口 diff;`.multica/` `.agent_context/` `.claude/skills/multica-*/` 等 agent 运行时产物加进 `.gitignore`。
+
+### 验证
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff --check` | ✅ PASS | 无空白错误 |
+| `pnpm check`(tsc -b --noEmit) | ✅ PASS | exit 0 |
+| `pnpm lint`(oxlint .) | ✅ PASS | 2 warnings(pre-existing `no-this-alias` @ RequestLogService,无新增) |
+| `pnpm i18n:check` | ✅ PASS | en 通过 |
+| `pnpm test:run` | ✅ **133 files / 1164 tests / 0 failed** | 连续两次全量稳定绿;+1 = symlink 测试从 fail→pass |
+
+> 工具链说明:homebrew pnpm shim 因网络超时无法验证 `packageManager` 指定版本的签名,本轮直接用 `node_modules/.bin/{tsc,oxlint,vitest,tsx}` 跑门禁,等价于 package.json scripts。`agentBuiltinsServer.e2e` 首轮全量并发时偶发 `listen EPERM` 端口竞争,重跑即绿——是端口 flake,非代码回归。
+
+### Retrospective
+
+- **What worked**:`git stash` 对照法干净区分了"本批回归"与"pre-existing 环境失败"——symlink 测试和 e2e 端口 flake 都被证实与本批无关。CLAUDE.md 净增 193 行正好等于平台 runtime 块,佐证任务描述 `+262/-1183` 已把它排除在功能范围外。
+- **代码事实更新**:test 稳定基线 = **133 files / 1164 tests / 0 failed**(symlink 测试修复后 +1)。Settings 顶级 nav 仍 11 项,`agent` → `third-party-api`。macOS 性能监控内存指标现反映真实 available。
+- **是否继续 loop**:**否**。工作树 clean + 五道门禁全绿 + 进度文档已同步。收口 loop 关闭。

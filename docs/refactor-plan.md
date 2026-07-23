@@ -53,7 +53,6 @@
 | [refactor-execution-gates.md](./refactor-execution-gates.md) | 执行门禁 | 定义 ready / implemented / verified / shippable 的证据要求；开始实现或声称完成前必须读。 |
 | [refactor-traceability-matrix.md](./refactor-traceability-matrix.md) | 覆盖矩阵 | 把用户需求、GAP-1~GAP-16、负责文档、No-Go gate 和剩余证据串起来。 |
 | [refactor-progress.md](./refactor-progress.md) | 进度记录 | 独立记录当前实现进度、最近验证命令、已完成证据和剩余 gap；不要把功能细节塞回总计划。 |
-| [tauri-migration-v2-plan.md](./tauri-migration-v2-plan.md) | **v2 后续计划 / 暂不执行** | v1 `shippable` 后再启动的 Electron → Tauri 2.x 迁移计划。首发 macOS，保留全部能力，不使用 Node sidecar，采用 Tauri + Rust-native backend 的阶段化迁移。 |
 | [workspace-session-index.md](./workspace-session-index.md) | 兼容入口 | 保留给旧链接；实际入口应跳转到本文。 |
 | [superpowers/plans/2026-06-20-chat-composer-redesign.md](./superpowers/plans/2026-06-20-chat-composer-redesign.md) | 功能级 plan | Composer 视觉与交互改造，不属于数据模型主线。 |
 | [superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md](./superpowers/plans/2026-06-20-claude-sidebar-quick-actions.md) | 功能级 plan | Sidebar quick actions / global search 计划，不属于数据模型主线。 |
@@ -72,14 +71,6 @@
 ## 4. 当前主线 Roadmap
 
 主线来自 [project-session-redesign-plan.md](./project-session-redesign-plan.md)，本文只保留执行索引和优先级。
-
-### V2 后续计划：Tauri 迁移
-
-[tauri-migration-v2-plan](./tauri-migration-v2-plan.md) 是 v1 完成后的下一代重构计划，
-当前只作为设计与风险记录，不进入本轮实现。v2 的启动条件是 v1 按
-[refactor-execution-gates](./refactor-execution-gates.md) 达到 `shippable`。迁移目标是最新稳定
-Tauri 2.x，首发 macOS，并保留 Agent、MCP、PTY、本地 API、插件、Remote IM、更新等全部现有能力。
-v2 不使用 Node sidecar，生产 Tauri 构建不打包 Node runtime；后端能力按 Rust-native service 分阶段重写。
 
 当前有两条并行但不冲突的执行线：
 
