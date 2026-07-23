@@ -40,3 +40,6 @@ tsconfig.*.tsbuildinfo
 # Local agent/tool working state
 .codebase-memory/
 .zcode/
+.multica/
+.agent_context/
+.claude/skills/multica-*/
