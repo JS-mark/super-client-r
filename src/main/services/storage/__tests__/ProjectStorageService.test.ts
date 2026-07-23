@@ -7,6 +7,7 @@ import {
 	mkdirSync,
 	readFileSync,
 	symlinkSync,
+	unlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -80,7 +81,10 @@ describe("add", () => {
 				[linkDir, realDir].sort(),
 			);
 		} finally {
-			rmSync(linkDir, { force: true });
+			// unlinkSync removes the symlink entry itself; rmSync without
+			// `recursive` throws "Path is a directory" on Node ≥20 when the
+			// path is a symlink pointing at a directory.
+			unlinkSync(linkDir);
 			rmSync(realDir, { recursive: true, force: true });
 		}
 	});
