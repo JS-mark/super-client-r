@@ -16,7 +16,6 @@ import {
 	Col,
 	message,
 	Popconfirm,
-	Progress,
 	Row,
 	Skeleton,
 	Tabs,
@@ -554,11 +553,18 @@ export const PerformanceMonitorTab: React.FC = () => {
 										{formatMemory(metrics.systemTotal)}
 									</span>
 								</div>
-								<Progress
-									percent={systemMemPercent}
-									status={systemMemPercent > 80 ? "exception" : "active"}
-									strokeColor={progressColor(systemMemPercent)}
-								/>
+								<div
+									className="perf-progress-track"
+									style={{ backgroundColor: token.colorFillTertiary }}
+								>
+									<div
+										className="perf-progress-fill"
+										style={{
+											width: `${systemMemPercent}%`,
+											backgroundColor: progressColor(systemMemPercent),
+										}}
+									/>
+								</div>
 							</div>
 							<div>
 								<div
@@ -573,11 +579,18 @@ export const PerformanceMonitorTab: React.FC = () => {
 										{formatMemory(metrics.heapTotal)}
 									</span>
 								</div>
-								<Progress
-									percent={heapPercent}
-									status={heapPercent > 80 ? "exception" : "active"}
-									strokeColor={progressColor(heapPercent)}
-								/>
+								<div
+									className="perf-progress-track"
+									style={{ backgroundColor: token.colorFillTertiary }}
+								>
+									<div
+										className="perf-progress-fill"
+										style={{
+											width: `${heapPercent}%`,
+											backgroundColor: progressColor(heapPercent),
+										}}
+									/>
+								</div>
 							</div>
 						</div>
 					</Card>
