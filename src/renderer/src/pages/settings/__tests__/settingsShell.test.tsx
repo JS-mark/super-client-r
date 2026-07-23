@@ -26,8 +26,8 @@ vi.mock("../../../components/models/ModelList", () => ({
 	ModelList: () => <div data-testid="models-content">Models!</div>,
 }));
 
-vi.mock("../../../components/settings/ApiKeysConfig", () => ({
-	ApiKeysConfig: () => <div />,
+vi.mock("../../../components/settings/ThirdPartyApiSettings", () => ({
+	ThirdPartyApiSettings: () => <div />,
 }));
 
 // Provide a minimal MainLayout that just renders children (avoid full app shell).
@@ -95,6 +95,7 @@ vi.mock("@ant-design/icons", () => ({
 	BellOutlined: () => <span aria-hidden />,
 	BugOutlined: () => <span aria-hidden />,
 	CloudOutlined: () => <span aria-hidden />,
+	CloudServerOutlined: () => <span aria-hidden />,
 	FolderOutlined: () => <span aria-hidden />,
 	HistoryOutlined: () => <span aria-hidden />,
 	InfoCircleOutlined: () => <span aria-hidden />,

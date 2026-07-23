@@ -10,9 +10,9 @@ export const SETTINGS_NAVIGATION_GROUPS = [
 		fallback: "Models",
 	},
 	{
-		key: "agent",
-		labelKey: "settingsNav.agent",
-		fallback: "Agent",
+		key: "third-party-api",
+		labelKey: "settingsNav.thirdPartyApi",
+		fallback: "Third-party API",
 	},
 	{
 		key: "tools-permissions",

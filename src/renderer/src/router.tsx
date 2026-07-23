@@ -15,13 +15,13 @@ import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
 import AboutPage from "./pages/settings/AboutPage";
 import AdvancedPage from "./pages/settings/AdvancedPage";
-import AgentPage from "./pages/settings/AgentPage";
 import ApiServicePage from "./pages/settings/ApiServicePage";
 import GeneralPage from "./pages/settings/GeneralPage";
 import KeyboardPage from "./pages/settings/KeyboardPage";
 import ModelsPage from "./pages/settings/ModelsPage";
 import ProjectRecoveryPage from "./pages/settings/ProjectRecoveryPage";
 import ProjectsPage from "./pages/settings/ProjectsPage";
+import ThirdPartyApiPage from "./pages/settings/ThirdPartyApiPage";
 import ToolsPermissionsPage from "./pages/settings/ToolsPermissionsPage";
 import WebhookPage from "./pages/settings/WebhookPage";
 import Skills from "./pages/Skills";
@@ -89,7 +89,8 @@ export const appRoutes: RouteObject[] = [
 			{ index: true, element: <Navigate to="general" replace /> },
 			{ path: "general", element: <GeneralPage /> },
 			{ path: "models", element: <ModelsPage /> },
-			{ path: "agent", element: <AgentPage /> },
+			{ path: "third-party-api", element: <ThirdPartyApiPage /> },
+			{ path: "agent", element: <Navigate to="../third-party-api" replace /> },
 			{ path: "tools-permissions", element: <ToolsPermissionsPage /> },
 			{ path: "projects", element: <ProjectsPage /> },
 			{ path: "project-recovery", element: <ProjectRecoveryPage /> },

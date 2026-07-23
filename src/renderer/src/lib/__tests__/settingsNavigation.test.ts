@@ -11,7 +11,7 @@ import {
 const REQUIRED_ORDER = [
 	"general",
 	"models",
-	"agent",
+	"third-party-api",
 	"tools-permissions",
 	"projects",
 	"project-recovery",
