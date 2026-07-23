@@ -59,7 +59,7 @@
 6. `worktree preflight + paged reads`（GitInfoService preflight / gitService / worktreePreflightDisplay / NewConversationModal / ProjectContextMenu / SessionStorageService readMessagesPage / chatStore paging）
 7. `Settings 壳 + 独立市场`（SettingsRail / settingsShell / IndependentMarketNotice / 各 settings page wrapper）
 8. `i18n`（locales en/zh）
-9. `docs`（refactor-progress / refactor-plan / requirements / design / git-worktree-preflight / tauri-migration / context-management-plan）
+9. `docs`（refactor-progress / refactor-plan / requirements / design / git-worktree-preflight / context-management-plan）
 
 > 注意：删除的 `ProjectArchiveManager.tsx` 应跟 `ArchivedProjectsPanel.tsx`（新）放在同一 commit（Export/Recovery 组）。
 
