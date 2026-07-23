@@ -32,6 +32,8 @@ import { promises as fsPromises } from "fs";
 import os from "os";
 import { basename, dirname, extname, join, relative, sep } from "path";
 import * as path from "path";
+import { execSync } from "child_process";
+import v8 from "v8";
 import { glob } from "tinyglobby";
 
 import { registerAPI } from "./register";
@@ -318,6 +320,47 @@ function mergeBuiltinPresets(): void {
 	storeManager.setAgentTeams([...BUILTIN_TEAMS, ...userTeams]);
 
 	storeManager.setBuiltinAgentVersion(BUILTIN_VERSION);
+}
+
+// ════════════════════════════════════════════
+// System memory helpers
+// ════════════════════════════════════════════
+
+// macOS 上 `os.freemem()` 与 Chromium 的 `process.getSystemMemoryInfo().free`
+// 都只统计真正空闲页(free_count),不包含 inactive / speculative / purgeable
+// 这些"可被立即回收"的页,导致进度条几乎永远 ≈ 100% 触发红色告警。
+// 用 vm_stat 计算 macOS 的 available = free + inactive + speculative + purgeable。
+// 结果缓存 1s,避免频繁 execSync。
+let macMemCache: { at: number; totalMB: number; freeMB: number } | null = null;
+
+function readMacAvailableMB(): { totalMB: number; freeMB: number } {
+	const now = Date.now();
+	if (macMemCache && now - macMemCache.at < 1000) {
+		return { totalMB: macMemCache.totalMB, freeMB: macMemCache.freeMB };
+	}
+	try {
+		const out = execSync("/usr/bin/vm_stat", { encoding: "utf8" });
+		const pageSizeMatch = out.match(/page size of (\d+) bytes/);
+		const pageSize = pageSizeMatch ? Number(pageSizeMatch[1]) : 4096;
+		const pages = (label: string): number => {
+			const m = out.match(new RegExp(`${label}:\\s+(\\d+)\\.`));
+			return m ? Number(m[1]) : 0;
+		};
+		const availablePages =
+			pages("Pages free") +
+			pages("Pages inactive") +
+			pages("Pages speculative") +
+			pages("Pages purgeable");
+		const totalMB = Math.round(os.totalmem() / 1024 / 1024);
+		const freeMB = Math.round((availablePages * pageSize) / 1024 / 1024);
+		macMemCache = { at: now, totalMB, freeMB };
+		return { totalMB, freeMB };
+	} catch {
+		return {
+			totalMB: Math.round(os.totalmem() / 1024 / 1024),
+			freeMB: Math.round(os.freemem() / 1024 / 1024),
+		};
+	}
 }
 
 // ════════════════════════════════════════════
@@ -890,12 +933,29 @@ const apiImpl = {
 		getProcessMetrics: () => {
 			const mem = process.memoryUsage();
 			const cpuUsage = process.cpuUsage();
+			// 系统内存:
+			//   - macOS: 用 vm_stat 计算 available (free + inactive + speculative + purgeable)
+			//     Chromium 的 `getSystemMemoryInfo().free` 与 Node 的 `os.freemem()` 只算真正空闲页,
+			//     结果在 macOS 上几乎永远 ≈ 0 (系统会把闲置页做磁盘缓存),让进度条永远飘红。
+			//   - Linux (Node 18+): os.freemem() 已经返回 MemAvailable,可直接用
+			//   - Windows: os.freemem() 返回可用物理内存
+			const { totalMB: systemTotalMB, freeMB: systemFreeMB } =
+				process.platform === "darwin"
+					? readMacAvailableMB()
+					: {
+							totalMB: Math.round(os.totalmem() / 1024 / 1024),
+							freeMB: Math.round(os.freemem() / 1024 / 1024),
+						};
+			// 堆内存分母用 V8 的 heap_size_limit(V8 允许老生代增长到的上限,通常 ≈ 4 GB),
+			// 而不是 mem.heapTotal——后者是"当前已分配"的堆,会随需要动态增长,
+			// heapUsed / heapTotal 几乎永远接近 1,失去警戒意义。
+			const heapStats = v8.getHeapStatistics();
 			return {
 				heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
-				heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+				heapTotal: Math.round(heapStats.heap_size_limit / 1024 / 1024),
 				rss: Math.round(mem.rss / 1024 / 1024),
-				systemTotal: Math.round(os.totalmem() / 1024 / 1024),
-				systemFree: Math.round(os.freemem() / 1024 / 1024),
+				systemTotal: systemTotalMB,
+				systemFree: systemFreeMB,
 				cpuCores: os.cpus().length,
 				cpuModel: os.cpus()[0]?.model || "N/A",
 				cpuUser: cpuUsage.user,
