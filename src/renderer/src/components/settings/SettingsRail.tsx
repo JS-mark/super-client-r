@@ -3,12 +3,12 @@ import {
 	BellOutlined,
 	BugOutlined,
 	CloudOutlined,
+	CloudServerOutlined,
 	FolderOutlined,
 	HistoryOutlined,
 	InfoCircleOutlined,
 	KeyOutlined,
 	LeftOutlined,
-	RobotOutlined,
 	SettingOutlined,
 	ToolOutlined,
 } from "@ant-design/icons";
@@ -44,8 +44,8 @@ export function getSettingsNavigationIcon(
 			return <SettingOutlined />;
 		case "models":
 			return <CloudOutlined />;
-		case "agent":
-			return <RobotOutlined />;
+		case "third-party-api":
+			return <CloudServerOutlined />;
 		case "tools-permissions":
 			return <ToolOutlined />;
 		case "projects":

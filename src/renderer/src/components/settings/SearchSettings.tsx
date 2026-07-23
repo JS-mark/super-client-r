@@ -27,7 +27,16 @@ import { getProviderInfo } from "./SearchProviders";
 const { useToken } = theme;
 const { Text } = Typography;
 
-export function SearchSettings() {
+export interface SearchSettingsProps {
+	/**
+	 * When true, hides the built-in title/description row so the caller can
+	 * provide its own section header. Used when SearchSettings is embedded
+	 * inside a larger page (e.g. `/settings/third-party-api`).
+	 */
+	embedded?: boolean;
+}
+
+export function SearchSettings({ embedded = false }: SearchSettingsProps = {}) {
 	const { t } = useTranslation();
 	const { message } = App.useApp();
 	const { token } = useToken();
@@ -147,27 +156,46 @@ export function SearchSettings() {
 
 	return (
 		<div className="animate-fade-in">
-			{/* Header */}
-			<div className="flex items-center justify-between mb-6">
-				<div>
-					<Text strong className="text-base" style={{ color: token.colorText }}>
-						{t("search.title", { ns: "settings" })}
-					</Text>
-					<div
-						className="text-xs mt-1"
-						style={{ color: token.colorTextTertiary }}
-					>
-						{t("search.description", { ns: "settings" })}
+			{/* Header (hidden when embedded — parent supplies its own section header). */}
+			{!embedded && (
+				<div className="flex items-center justify-between mb-6">
+					<div>
+						<Text
+							strong
+							className="text-base"
+							style={{ color: token.colorText }}
+						>
+							{t("search.title", { ns: "settings" })}
+						</Text>
+						<div
+							className="text-xs mt-1"
+							style={{ color: token.colorTextTertiary }}
+						>
+							{t("search.description", { ns: "settings" })}
+						</div>
 					</div>
+					<Button
+						type="primary"
+						icon={<PlusOutlined />}
+						onClick={handleAddConfig}
+					>
+						{t("search.addConfig", { ns: "settings" })}
+					</Button>
 				</div>
-				<Button
-					type="primary"
-					icon={<PlusOutlined />}
-					onClick={handleAddConfig}
-				>
-					{t("search.addConfig", { ns: "settings" })}
-				</Button>
-			</div>
+			)}
+
+			{/* Add button (embedded mode — parent header takes over the title area). */}
+			{embedded && configs.length > 0 && (
+				<div className="flex justify-end mb-3">
+					<Button
+						icon={<PlusOutlined />}
+						onClick={handleAddConfig}
+						className="rounded-lg!"
+					>
+						{t("search.addConfig", { ns: "settings" })}
+					</Button>
+				</div>
+			)}
 
 			{/* Config list */}
 			{configs.length === 0 ? (
