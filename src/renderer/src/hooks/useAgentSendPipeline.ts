@@ -656,9 +656,6 @@ export function useAgentSendPipeline(
 				const overrideModelId = effective?.model.id;
 				const resolutionSource =
 					effective?.source ?? "agent-settings-default";
-				console.info(
-					`[useChat] agent model resolution: source=${resolutionSource} provider=${effective?.provider.preset ?? "(none)"} model=${effective?.model.id ?? "(runtime default)"}`,
-				);
 				agentLog.info("Agent model resolved", {
 					requestId,
 					resolutionSource,
@@ -806,7 +803,6 @@ export function useAgentSendPipeline(
 					toolCount: runtimeTools.length,
 				});
 			} catch (error: unknown) {
-				console.error("[useChat] Failed to send agent message:", error);
 				const errorMsg =
 					error instanceof Error ? error.message : String(error);
 				agentLog.error(
@@ -863,7 +859,7 @@ export function useAgentSendPipeline(
 					skillSystemPrompt = await getSkillSystemPrompt(skillId);
 				}
 			} catch {
-				console.warn("[useChat] Failed to load skill/command prompt");
+				agentLog.warn("Failed to load skill/command prompt");
 			}
 			await sendAgentMessage(content, undefined, {
 				skillContext: skillSystemPrompt ?? undefined,

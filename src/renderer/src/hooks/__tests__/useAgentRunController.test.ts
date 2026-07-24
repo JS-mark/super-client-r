@@ -48,7 +48,7 @@ describe("agent run watchdog helpers", () => {
 
     expect(onTimeout).toHaveBeenCalledWith({ requestId: "req_1" });
     expect(warn).toHaveBeenCalledWith(
-      "[useChat] stream watchdog timeout, force-resetting sessionStatus",
+      "stream watchdog timeout, force-resetting sessionStatus",
       { requestId: "req_1" },
     );
     expect(refs.currentRequestIdRef.current).toBeNull();

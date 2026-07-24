@@ -36,6 +36,9 @@ export type {
   ToolCallMode,
   ToolPermissionMode,
 } from "../components/chat/ChatSettingsModal";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("useChat");
 export { DEFAULT_SESSION_SETTINGS } from "../components/chat/ChatSettingsModal";
 
 export type ChatMode = "agent";
@@ -199,7 +202,7 @@ export function useChat() {
     },
     resolveLegacyApproval: window.electron.llm.toolApprovalResponse,
     onResolveError: (err) => {
-      console.error("[useChat] toolApprovalResponse failed:", err);
+      log.error("toolApprovalResponse failed", err instanceof Error ? err : new Error(String(err)));
     },
   });
 

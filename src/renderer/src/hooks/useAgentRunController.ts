@@ -3,6 +3,9 @@ import type {
   ChatSessionStatus,
   LLMErrorContext,
 } from "@super-client/shared-types/chat";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("ChatAgent");
 
 export type AgentRunRequestType = "agent-sdk" | "runtime" | "legacy";
 
@@ -35,7 +38,7 @@ export interface AgentRunWatchdogDeps {
   watchdogMs?: number;
   setTimeoutFn?: typeof setTimeout;
   clearTimeoutFn?: typeof clearTimeout;
-  warn?: typeof console.warn;
+  warn?: (message: string, meta?: unknown) => void;
 }
 
 export function clearAgentRunWatchdog(
@@ -99,7 +102,7 @@ export function kickAgentRunWatchdog(
     watchdogMs = AGENT_RUN_WATCHDOG_MS,
     setTimeoutFn = setTimeout,
     clearTimeoutFn = clearTimeout,
-    warn = console.warn,
+    warn = (message: string, meta?: unknown) => log.warn(message, meta),
   }: AgentRunWatchdogDeps,
 ): void {
   if (refs.awaitingUserApprovalRef.current) return;
@@ -114,7 +117,7 @@ export function kickAgentRunWatchdog(
     const requestId = refs.currentRequestIdRef.current;
     if (getSessionStatus() === "idle" || !requestId) return;
 
-    warn("[useChat] stream watchdog timeout, force-resetting sessionStatus", {
+    warn("stream watchdog timeout, force-resetting sessionStatus", {
       requestId,
     });
     onTimeout({ requestId });

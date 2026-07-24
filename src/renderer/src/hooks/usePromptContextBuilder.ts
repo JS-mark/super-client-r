@@ -11,6 +11,9 @@ import { useMcpStore } from "../stores/mcpStore";
 import type { SearchConfig } from "../types/search";
 import { buildAgentPromptWithContext } from "./agentPromptContext";
 import type { ProviderModelResolution } from "./useMessageModelResolution";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("usePromptContextBuilder");
 
 let cachedEnvInfo: EnvInfo | undefined;
 
@@ -23,7 +26,7 @@ async function getEnvInfo(): Promise<EnvInfo | undefined> {
 			return cachedEnvInfo;
 		}
 	} catch (err) {
-		console.warn("[usePromptContextBuilder] Failed to fetch env info:", err);
+		log.warn("Failed to fetch env info", { error: err });
 	}
 	return undefined;
 }
@@ -41,14 +44,14 @@ async function getEnvInfoForPrompt(
 		const res = await window.electron.cwd.resolveSessionCwd(conversationId);
 		if (res.success && res.data) workspaceDir = res.data;
 	} catch (err) {
-		console.warn("[usePromptContextBuilder] resolveSessionCwd failed:", err);
+		log.warn("resolveSessionCwd failed", { error: err });
 	}
 
 	try {
 		const res = await window.electron.cwd.resolveProjectRoot(conversationId);
 		if (res.success && res.data) projectRoot = res.data;
 	} catch (err) {
-		console.warn("[usePromptContextBuilder] resolveProjectRoot failed:", err);
+		log.warn("resolveProjectRoot failed", { error: err });
 	}
 
 	return {

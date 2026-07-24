@@ -19,11 +19,14 @@
 import { useCallback, useEffect } from "react";
 import type { MutableRefObject } from "react";
 import { sanitizeAssistantContent } from "../lib/assistantContent";
+import { createLogger } from "../services/logService";
 import type { AssistantStreamBufferHandle } from "./useAssistantStreamBuffer";
 import type {
 	AgentRunRequestSnapshot,
 	AgentRunRequestType,
 } from "./useAgentRunController";
+
+const log = createLogger("ChatAgent");
 
 export interface AgentRunStopperInterrupters {
 	runtimeInterrupt: (requestId: string) => Promise<unknown>;
@@ -67,7 +70,8 @@ export function stopAgentRun(deps: AgentRunStopperDeps): void {
 		messageStoreApi,
 		clearWatchdog,
 		getCurrentConversationId,
-		logError = (msg, err) => console.error(msg, err),
+		logError = (msg, err) =>
+			log.error(msg, err instanceof Error ? err : new Error(String(err))),
 	} = deps;
 
 	// (1) Snapshot & clear the request bookkeeping FIRST so any late stream

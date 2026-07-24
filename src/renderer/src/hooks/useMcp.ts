@@ -11,6 +11,9 @@ import type {
 	McpServerConfig,
 	McpTool,
 } from "../types/electron";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("useMcp");
 
 export function useMcp() {
 	const [loading, setLoading] = useState(false);
@@ -65,7 +68,7 @@ export function useMcp() {
 			});
 			setServers(serversWithStatus);
 		} catch (error) {
-			console.error("Failed to load servers:", error);
+			log.error("Failed to load servers", error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			setLoading(false);
 		}
@@ -83,7 +86,7 @@ export function useMcp() {
 				});
 			}
 		} catch (error) {
-			console.error("Failed to load statuses:", error);
+			log.error("Failed to load statuses", error instanceof Error ? error : new Error(String(error)));
 		}
 	}, [updateInStore]);
 
@@ -211,7 +214,7 @@ export function useMcp() {
 		try {
 			return await mcpClient.getAllTools();
 		} catch (error) {
-			console.error("Failed to get all tools:", error);
+			log.error("Failed to get all tools", error instanceof Error ? error : new Error(String(error)));
 			return [];
 		}
 	}, []);
@@ -225,7 +228,7 @@ export function useMcp() {
 			const definitions = await mcpClient.getBuiltinDefinitions();
 			setBuiltinDefinitions(definitions);
 		} catch (error) {
-			console.error("Failed to load builtin definitions:", error);
+			log.error("Failed to load builtin definitions", error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			setLoadingBuiltin(false);
 		}
@@ -262,7 +265,7 @@ export function useMcp() {
 			try {
 				return await mcpClient.searchBuiltin(params);
 			} catch (error) {
-				console.error("Failed to search builtin:", error);
+				log.error("Failed to search builtin", error instanceof Error ? error : new Error(String(error)));
 				return [];
 			}
 		},
@@ -329,7 +332,7 @@ export function useMcp() {
 				setMarketItems(items);
 				return items;
 			} catch (error) {
-				console.error("Failed to load popular items:", error);
+				log.error("Failed to load popular items", error instanceof Error ? error : new Error(String(error)));
 				return [];
 			} finally {
 				setMarketLoading(false);
@@ -346,7 +349,7 @@ export function useMcp() {
 				const items = await mcpClient.getTopRatedMarketItems(limit);
 				return items;
 			} catch (error) {
-				console.error("Failed to load top rated items:", error);
+				log.error("Failed to load top rated items", error instanceof Error ? error : new Error(String(error)));
 				return [];
 			} finally {
 				setMarketLoading(false);
@@ -363,7 +366,7 @@ export function useMcp() {
 				const items = await mcpClient.getNewestMarketItems(limit);
 				return items;
 			} catch (error) {
-				console.error("Failed to load newest items:", error);
+				log.error("Failed to load newest items", error instanceof Error ? error : new Error(String(error)));
 				return [];
 			} finally {
 				setMarketLoading(false);
@@ -379,7 +382,7 @@ export function useMcp() {
 			setMarketTags(tags);
 			return tags;
 		} catch (error) {
-			console.error("Failed to load market tags:", error);
+			log.error("Failed to load market tags", error instanceof Error ? error : new Error(String(error)));
 			return [];
 		}
 	}, [setMarketTags]);
@@ -420,7 +423,7 @@ export function useMcp() {
 		try {
 			return await mcpClient.getMarketReadme(marketItem);
 		} catch (error) {
-			console.error("Failed to get readme:", error);
+			log.error("Failed to get readme", error instanceof Error ? error : new Error(String(error)));
 			return "";
 		}
 	}, []);
