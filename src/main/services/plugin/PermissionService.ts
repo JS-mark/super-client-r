@@ -3,10 +3,12 @@
  * 管理插件的权限授予、撤销和检查
  */
 
+import { logger } from "../../utils/logger";
 import { storeManager } from "../../store/StoreManager";
 import type { PluginPermission } from "./types";
 
 const STORAGE_KEY = "pluginPermissions";
+const log = logger.withContext("PermissionService");
 
 export class PermissionService {
 	private permissions = new Map<string, Set<PluginPermission>>();
@@ -29,9 +31,9 @@ export class PermissionService {
 				}
 			}
 		} catch (error) {
-			console.error(
-				"[PermissionService] Failed to load permissions from storage:",
-				error,
+			log.error(
+				"Failed to load permissions from storage",
+				error instanceof Error ? error : new Error(String(error)),
 			);
 		}
 	}

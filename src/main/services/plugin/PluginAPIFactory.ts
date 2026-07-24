@@ -53,7 +53,12 @@ function createEventEmitter<T>(): EventEmitter<T> {
 				try {
 					listener(data);
 				} catch (error) {
-					console.error("[PluginAPI] Event listener error:", error);
+					logger.error(
+						"Event listener error",
+						error instanceof Error ? error : new Error(String(error)),
+						undefined,
+						"PluginAPI",
+					);
 				}
 			}
 		},

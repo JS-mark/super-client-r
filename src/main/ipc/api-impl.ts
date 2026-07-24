@@ -102,6 +102,9 @@ import {
 	setFloatWidgetVisible,
 	getLogViewerOpener,
 } from "./service-holders";
+import { logger } from "../utils/logger";
+
+const log = logger.withContext("PluginHandlers");
 
 // ─── Types ─────────────────────────────────
 import type {
@@ -1902,10 +1905,7 @@ export async function initializePluginManager(): Promise<void> {
 		const { llmService: llm } = await import("../services/llm");
 		llm.setChatHookRegistry(pluginManager.chatHookRegistry);
 	} catch (error) {
-		console.warn(
-			"[PluginHandlers] Failed to wire chat hooks to LLM service:",
-			error,
-		);
+		log.warn("Failed to wire chat hooks to LLM service", error);
 	}
 
 	// Register reload listeners on all existing windows so CSS re-injects on HMR/reload
