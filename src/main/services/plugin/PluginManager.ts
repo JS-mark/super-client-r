@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { app, BrowserWindow } from "electron";
+import { logger } from "../../utils/logger";
 import { storeManager } from "../../store/StoreManager";
 import { internalMcpService } from "../mcp/internal/InternalMcpService";
 import { getSkillService } from "../skill/SkillService";
@@ -17,6 +18,8 @@ import type {
 	PluginPermission,
 } from "./types";
 import { UIContributionRegistry } from "./UIContributionRegistry";
+
+const log = logger.withContext("PluginManager");
 
 interface PluginActivationRecord {
 	plugin: Plugin;
@@ -95,9 +98,12 @@ export class PluginManager extends EventEmitter {
 
 			this.isInitialized = true;
 			this.emit("initialized");
-			console.log("[PluginManager] Initialized successfully");
+			log.info("Initialized successfully");
 		} catch (error) {
-			console.error("[PluginManager] Initialization failed:", error);
+			log.error(
+				"Initialization failed",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			this.emit("error", error);
 			throw error;
 		}
@@ -120,9 +126,9 @@ export class PluginManager extends EventEmitter {
 				}
 			}
 		} catch (error) {
-			console.error(
-				"[PluginManager] Failed to load plugins from storage:",
-				error,
+			log.error(
+				"Failed to load plugins from storage",
+				error instanceof Error ? error : new Error(String(error)),
 			);
 		}
 	}
@@ -167,14 +173,17 @@ export class PluginManager extends EventEmitter {
 						}
 					}
 				} catch (error) {
-					console.error(
-						`[PluginManager] Failed to scan plugin at ${pluginPath}:`,
-						error,
+					log.error(
+						`Failed to scan plugin at ${pluginPath}`,
+						error instanceof Error ? error : new Error(String(error)),
 					);
 				}
 			}
 		} catch (error) {
-			console.error("[PluginManager] Failed to scan plugins directory:", error);
+			log.error(
+				"Failed to scan plugins directory",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 		}
 	}
 
@@ -192,8 +201,8 @@ export class PluginManager extends EventEmitter {
 			const installedVersion = installed.manifest?.version;
 			if (installedVersion === sourceVersion) continue; // 版本相同则跳过
 
-			console.log(
-				`[PluginManager] Syncing builtin plugin ${pluginId}: ${installedVersion} → ${sourceVersion}`,
+			log.info(
+				`Syncing builtin plugin ${pluginId}: ${installedVersion} → ${sourceVersion}`,
 			);
 
 			try {
@@ -229,13 +238,11 @@ export class PluginManager extends EventEmitter {
 					(await this.readManifest(targetPath)) ?? installed.manifest;
 				installed.updatedAt = Date.now();
 
-				console.log(
-					`[PluginManager] Builtin plugin ${pluginId} synced to v${sourceVersion}`,
-				);
+				log.info(`Builtin plugin ${pluginId} synced to v${sourceVersion}`);
 			} catch (error) {
-				console.error(
-					`[PluginManager] Failed to sync builtin plugin ${pluginId}:`,
-					error,
+				log.error(
+					`Failed to sync builtin plugin ${pluginId}`,
+					error instanceof Error ? error : new Error(String(error)),
 				);
 			}
 		}
@@ -254,17 +261,17 @@ export class PluginManager extends EventEmitter {
 
 			// 验证必需字段
 			if (!manifest.name || !manifest.version || !manifest.main) {
-				console.warn(
-					`[PluginManager] Invalid manifest at ${pluginPath}: missing required fields`,
+				log.warn(
+					`Invalid manifest at ${pluginPath}: missing required fields`,
 				);
 				return null;
 			}
 
 			return manifest;
 		} catch (error) {
-			console.error(
-				`[PluginManager] Failed to read manifest at ${pluginPath}:`,
-				error,
+			log.error(
+				`Failed to read manifest at ${pluginPath}`,
+				error instanceof Error ? error : new Error(String(error)),
 			);
 			return null;
 		}
@@ -279,9 +286,9 @@ export class PluginManager extends EventEmitter {
 				try {
 					await this.activatePlugin(id);
 				} catch (error) {
-					console.error(
-						`[PluginManager] Failed to auto-activate plugin ${id}:`,
-						error,
+					log.error(
+						`Failed to auto-activate plugin ${id}`,
+						error instanceof Error ? error : new Error(String(error)),
 					);
 					pluginInfo.state = "error";
 					pluginInfo.error = String(error);
@@ -305,7 +312,7 @@ export class PluginManager extends EventEmitter {
 		}
 
 		if (this.activePlugins.has(pluginId)) {
-			console.log(`[PluginManager] Plugin ${pluginId} is already active`);
+			log.info(`Plugin ${pluginId} is already active`);
 			return;
 		}
 
@@ -343,7 +350,7 @@ export class PluginManager extends EventEmitter {
 
 			await this.savePluginsToStorage();
 			this.emit("pluginActivated", pluginId);
-			console.log(`[PluginManager] Plugin ${pluginId} activated successfully`);
+			log.info(`Plugin ${pluginId} activated successfully`);
 		} catch (error) {
 			pluginInfo.state = "error";
 			pluginInfo.error = String(error);
@@ -364,7 +371,7 @@ export class PluginManager extends EventEmitter {
 
 		const activationRecord = this.activePlugins.get(pluginId);
 		if (!activationRecord) {
-			console.log(`[PluginManager] Plugin ${pluginId} is not active`);
+			log.info(`Plugin ${pluginId} is not active`);
 			return;
 		}
 
@@ -423,9 +430,7 @@ export class PluginManager extends EventEmitter {
 			await this.savePluginsToStorage();
 
 			this.emit("pluginDeactivated", pluginId);
-			console.log(
-				`[PluginManager] Plugin ${pluginId} deactivated successfully`,
-			);
+			log.info(`Plugin ${pluginId} deactivated successfully`);
 		} catch (error) {
 			pluginInfo.state = "error";
 			pluginInfo.error = String(error);
@@ -567,11 +572,14 @@ export class PluginManager extends EventEmitter {
 			await this.savePluginsToStorage();
 
 			this.emit("pluginInstalled", pluginId);
-			console.log(`[PluginManager] Plugin ${pluginId} installed successfully`);
+			log.info(`Plugin ${pluginId} installed successfully`);
 
 			return pluginInfo;
 		} catch (error) {
-			console.error("[PluginManager] Failed to install plugin:", error);
+			log.error(
+				"Failed to install plugin",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -601,13 +609,11 @@ export class PluginManager extends EventEmitter {
 			await this.savePluginsToStorage();
 
 			this.emit("pluginUninstalled", pluginId);
-			console.log(
-				`[PluginManager] Plugin ${pluginId} uninstalled successfully`,
-			);
+			log.info(`Plugin ${pluginId} uninstalled successfully`);
 		} catch (error) {
-			console.error(
-				`[PluginManager] Failed to uninstall plugin ${pluginId}:`,
-				error,
+			log.error(
+				`Failed to uninstall plugin ${pluginId}`,
+				error instanceof Error ? error : new Error(String(error)),
 			);
 			throw error;
 		}
@@ -795,9 +801,7 @@ export class PluginManager extends EventEmitter {
 		const themes = pluginInfo.manifest.contributes?.themes;
 		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
 		if (!themeEntry) {
-			console.error(
-				`[PluginManager] Theme ${themeId} not found in plugin ${pluginInfo.id}`,
-			);
+			log.error(`Theme ${themeId} not found in plugin ${pluginInfo.id}`);
 			return;
 		}
 
@@ -807,9 +811,9 @@ export class PluginManager extends EventEmitter {
 		try {
 			css = await fs.readFile(cssPath, "utf-8");
 		} catch (error) {
-			console.error(
-				`[PluginManager] Failed to read skin CSS at ${cssPath}:`,
-				error,
+			log.error(
+				`Failed to read skin CSS at ${cssPath}`,
+				error instanceof Error ? error : new Error(String(error)),
 			);
 			return;
 		}
@@ -822,7 +826,7 @@ export class PluginManager extends EventEmitter {
 				const tokensContent = await fs.readFile(tokensPath, "utf-8");
 				tokens = JSON.parse(tokensContent);
 			} catch (error) {
-				console.warn(`[PluginManager] Failed to read skin tokens:`, error);
+				log.warn(`Failed to read skin tokens`, error);
 			}
 		}
 
@@ -840,9 +844,9 @@ export class PluginManager extends EventEmitter {
 				const key = await win.webContents.insertCSS(css);
 				this.skinCssKeys.set(win.id, key);
 			} catch (error) {
-				console.error(
-					`[PluginManager] Failed to inject CSS into window ${win.id}:`,
-					error,
+				log.error(
+					`Failed to inject CSS into window ${win.id}`,
+					error instanceof Error ? error : new Error(String(error)),
 				);
 			}
 		}
@@ -857,9 +861,7 @@ export class PluginManager extends EventEmitter {
 		}
 
 		this.emit("skinApplied", pluginInfo.id, themeId);
-		console.log(
-			`[PluginManager] Theme ${themeId} from plugin ${pluginInfo.id} applied`,
-		);
+		log.info(`Theme ${themeId} from plugin ${pluginInfo.id} applied`);
 	}
 
 	/**
@@ -881,7 +883,7 @@ export class PluginManager extends EventEmitter {
 		}
 
 		this.emit("skinRemoved");
-		console.log("[PluginManager] Skin removed, restored defaults");
+		log.info("Skin removed, restored defaults");
 	}
 
 	/**
@@ -957,8 +959,8 @@ export class PluginManager extends EventEmitter {
 		const themes = pluginInfo.manifest.contributes?.themes;
 		const themeEntry = themes?.find((t: { id: string }) => t.id === themeId);
 		if (!themeEntry) {
-			console.error(
-				`[PluginManager] Markdown theme ${themeId} not found in plugin ${pluginInfo.id}`,
+			log.error(
+				`Markdown theme ${themeId} not found in plugin ${pluginInfo.id}`,
 			);
 			return;
 		}
@@ -969,9 +971,9 @@ export class PluginManager extends EventEmitter {
 		try {
 			css = await fs.readFile(cssPath, "utf-8");
 		} catch (error) {
-			console.error(
-				`[PluginManager] Failed to read markdown theme CSS at ${cssPath}:`,
-				error,
+			log.error(
+				`Failed to read markdown theme CSS at ${cssPath}`,
+				error instanceof Error ? error : new Error(String(error)),
 			);
 			return;
 		}
@@ -988,8 +990,8 @@ export class PluginManager extends EventEmitter {
 		});
 
 		this.emit("markdownThemeApplied", pluginInfo.id, themeId);
-		console.log(
-			`[PluginManager] Markdown theme ${themeId} from plugin ${pluginInfo.id} applied`,
+		log.info(
+			`Markdown theme ${themeId} from plugin ${pluginInfo.id} applied`,
 		);
 	}
 
@@ -1005,7 +1007,7 @@ export class PluginManager extends EventEmitter {
 		storeManager.deleteConfig("activeMarkdownTheme");
 
 		this.emit("markdownThemeRemoved");
-		console.log("[PluginManager] Markdown theme removed, restored defaults");
+		log.info("Markdown theme removed, restored defaults");
 	}
 
 	/**
@@ -1044,9 +1046,9 @@ export class PluginManager extends EventEmitter {
 
 		const listener = () => {
 			this.reinjectCSSForWindow(win).catch((err) => {
-				console.error(
-					`[PluginManager] Failed to re-inject CSS on reload for window ${win.id}:`,
-					err,
+				log.error(
+					`Failed to re-inject CSS on reload for window ${win.id}`,
+					err instanceof Error ? err : new Error(String(err)),
 				);
 			});
 		};
@@ -1184,7 +1186,7 @@ export class PluginManager extends EventEmitter {
 		this.plugins.set(pluginId, pluginInfo);
 		await this.savePluginsToStorage();
 		this.emit("pluginInstalled", pluginId);
-		console.log(`[PluginManager] Dev plugin ${pluginId} installed (symlink)`);
+		log.info(`Dev plugin ${pluginId} installed (symlink)`);
 		return pluginInfo;
 	}
 
@@ -1213,7 +1215,7 @@ export class PluginManager extends EventEmitter {
 			await this.activatePlugin(pluginId);
 		}
 
-		console.log(`[PluginManager] Dev plugin ${pluginId} reloaded`);
+		log.info(`Dev plugin ${pluginId} reloaded`);
 	}
 
 	/**
@@ -1285,9 +1287,9 @@ export class PluginManager extends EventEmitter {
 			try {
 				await this.deactivatePlugin(pluginId);
 			} catch (error) {
-				console.error(
-					`[PluginManager] Failed to deactivate plugin ${pluginId} during dispose:`,
-					error,
+				log.error(
+					`Failed to deactivate plugin ${pluginId} during dispose`,
+					error instanceof Error ? error : new Error(String(error)),
 				);
 			}
 		}
