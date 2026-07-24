@@ -1,6 +1,9 @@
 import TelegramBotAPI from "node-telegram-bot-api";
+import { logger } from "../../../utils/logger";
 import { BaseBot } from "./BaseBot";
 import type { IMBotConfig, IMMessage } from "../types";
+
+const log = logger.withContext("TelegramBot");
 
 /**
  * Telegram 机器人实现
@@ -45,17 +48,20 @@ export class TelegramBot extends BaseBot {
 
 		// 监听错误
 		this.bot.on("polling_error", (error) => {
-			console.error("[TelegramBot] Polling error:", error);
+			log.error(
+				"Polling error",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 		});
 
-		console.log(`[TelegramBot] Started: ${this.config.name}`);
+		log.info(`Started: ${this.config.name}`);
 	}
 
 	async stop(): Promise<void> {
 		if (this.bot) {
 			await this.bot.stopPolling();
 			this.bot = null;
-			console.log(`[TelegramBot] Stopped: ${this.config.name}`);
+			log.info(`Stopped: ${this.config.name}`);
 		}
 	}
 
@@ -69,7 +75,10 @@ export class TelegramBot extends BaseBot {
 				parse_mode: "Markdown",
 			});
 		} catch (error) {
-			console.error("[TelegramBot] Failed to send message:", error);
+			log.error(
+				"Failed to send message",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -77,7 +86,7 @@ export class TelegramBot extends BaseBot {
 	async broadcast(message: string): Promise<void> {
 		const chatId = this.config.telegram?.chatId;
 		if (!chatId) {
-			console.warn("[TelegramBot] No chatId configured for broadcast");
+			log.warn("No chatId configured for broadcast");
 			return;
 		}
 

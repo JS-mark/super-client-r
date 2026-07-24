@@ -1,8 +1,11 @@
 import { DWClient, TOPIC_ROBOT } from "dingtalk-stream";
 import type { DWClientDownStream } from "dingtalk-stream";
 import axios from "axios";
+import { logger } from "../../../utils/logger";
 import { BaseBot } from "./BaseBot";
 import type { IMBotConfig, IMMessage } from "../types";
+
+const log = logger.withContext("DingTalkBot");
 
 const DINGTALK_TOKEN_URL = "https://oapi.dingtalk.com/gettoken";
 const DINGTALK_SEND_URL =
@@ -43,7 +46,10 @@ export class DingTalkBot extends BaseBot {
 					const message = this.convertMessage(data);
 					this.emit("message", message);
 				} catch (error) {
-					console.error("[DingTalkBot] Failed to parse message:", error);
+					log.error(
+						"Failed to parse message",
+						error instanceof Error ? error : new Error(String(error)),
+					);
 				}
 
 				// 确认消息已收到，避免服务端重试
@@ -54,14 +60,14 @@ export class DingTalkBot extends BaseBot {
 		);
 
 		await this.client.connect();
-		console.log(`[DingTalkBot] Started: ${this.config.name}`);
+		log.info(`Started: ${this.config.name}`);
 	}
 
 	async stop(): Promise<void> {
 		if (this.client) {
 			this.client.disconnect();
 			this.client = null;
-			console.log(`[DingTalkBot] Stopped: ${this.config.name}`);
+			log.info(`Stopped: ${this.config.name}`);
 		}
 	}
 
@@ -85,7 +91,10 @@ export class DingTalkBot extends BaseBot {
 				},
 			);
 		} catch (error) {
-			console.error("[DingTalkBot] Failed to send message:", error);
+			log.error(
+				"Failed to send message",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -93,7 +102,7 @@ export class DingTalkBot extends BaseBot {
 	async broadcast(message: string): Promise<void> {
 		const { webhookUrl } = this.config.dingtalk || {};
 		if (!webhookUrl) {
-			console.warn("[DingTalkBot] No webhookUrl configured for broadcast");
+			log.warn("No webhookUrl configured for broadcast");
 			return;
 		}
 
@@ -103,7 +112,10 @@ export class DingTalkBot extends BaseBot {
 				text: { content: message },
 			});
 		} catch (error) {
-			console.error("[DingTalkBot] Failed to broadcast:", error);
+			log.error(
+				"Failed to broadcast",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}

@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { logger } from "../../utils/logger";
 import { BaseBot } from "./bots/BaseBot";
 import { TelegramBot } from "./bots/TelegramBot";
 import { DingTalkBot } from "./bots/DingTalkBot";
@@ -7,6 +8,8 @@ import { CommandRegistry } from "./CommandRegistry";
 import type { RemoteDeviceService } from "../remote/RemoteDeviceService";
 import type { RemoteDevice } from "../remote/types";
 import type { IMBotConfig, IMMessage, IMCommand, BotStatus } from "./types";
+
+const log = logger.withContext("IMBot");
 
 /**
  * IM 机器人管理服务
@@ -69,7 +72,7 @@ export class IMBotService extends EventEmitter {
 		this.bots.set(config.id, bot);
 		this.botConfigs.set(config.id, config);
 
-		console.log(`[IMBot] Started: ${config.name} (${config.type})`);
+		log.info(`Started: ${config.name} (${config.type})`);
 	}
 
 	/**
@@ -85,7 +88,7 @@ export class IMBotService extends EventEmitter {
 		this.bots.delete(botId);
 		this.botConfigs.delete(botId);
 
-		console.log(`[IMBot] Stopped: ${botId}`);
+		log.info(`Stopped: ${botId}`);
 	}
 
 	/**
@@ -351,7 +354,7 @@ export class IMBotService extends EventEmitter {
 			}
 		});
 
-		console.log("[IMBot] Built-in commands registered");
+		log.info("Built-in commands registered");
 	}
 
 	/**
@@ -382,7 +385,10 @@ export class IMBotService extends EventEmitter {
 			try {
 				await bot.broadcast(message);
 			} catch (error) {
-				console.error("[IMBot] Failed to broadcast:", error);
+				log.error(
+					"Failed to broadcast",
+					error instanceof Error ? error : new Error(String(error)),
+				);
 			}
 		}
 	}
@@ -396,10 +402,13 @@ export class IMBotService extends EventEmitter {
 				try {
 					await this.startBot(config);
 				} catch (error) {
-					console.error(`[IMBot] Failed to start bot ${config.name}:`, error);
+					log.error(
+						`Failed to start bot ${config.name}`,
+						error instanceof Error ? error : new Error(String(error)),
+					);
 				}
 			}
 		}
-		console.log(`[IMBot] Loaded ${configs.length} bot configurations`);
+		log.info(`Loaded ${configs.length} bot configurations`);
 	}
 }

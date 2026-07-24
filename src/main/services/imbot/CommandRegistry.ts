@@ -1,4 +1,7 @@
+import { logger } from "../../utils/logger";
 import type { IMCommand, CommandHandler, CommandContext } from "./types";
+
+const log = logger.withContext("CommandRegistry");
 
 /**
  * 命令注册和路由系统
@@ -31,8 +34,8 @@ export class CommandRegistry {
 		const subcommands = this.commands.get(command)!;
 		subcommands.set(subcommand, handler);
 
-		console.log(
-			`[CommandRegistry] Registered: /${command}${subcommand ? ` ${subcommand}` : ""}`,
+		log.info(
+			`Registered: /${command}${subcommand ? ` ${subcommand}` : ""}`,
 		);
 	}
 
@@ -70,7 +73,10 @@ export class CommandRegistry {
 		try {
 			return await handler(command, context);
 		} catch (error) {
-			console.error("[CommandRegistry] Command execution error:", error);
+			log.error(
+				"Command execution error",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			return `❌ 执行失败: ${error instanceof Error ? error.message : String(error)}`;
 		}
 	}

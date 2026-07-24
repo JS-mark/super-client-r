@@ -1,6 +1,9 @@
 import * as lark from "@larksuiteoapi/node-sdk";
+import { logger } from "../../../utils/logger";
 import { BaseBot } from "./BaseBot";
 import type { IMBotConfig, IMMessage } from "../types";
+
+const log = logger.withContext("LarkBot");
 
 /**
  * 飞书机器人实现
@@ -42,7 +45,10 @@ export class LarkBot extends BaseBot {
 						this.emit("message", message);
 					}
 				} catch (error) {
-					console.error("[LarkBot] Failed to process message:", error);
+					log.error(
+						"Failed to process message",
+						error instanceof Error ? error : new Error(String(error)),
+					);
 				}
 			},
 		});
@@ -55,7 +61,7 @@ export class LarkBot extends BaseBot {
 		});
 
 		await this.wsClient.start({ eventDispatcher });
-		console.log(`[LarkBot] Started: ${this.config.name}`);
+		log.info(`Started: ${this.config.name}`);
 	}
 
 	async stop(): Promise<void> {
@@ -64,7 +70,7 @@ export class LarkBot extends BaseBot {
 			this.wsClient = null;
 		}
 		this.client = null;
-		console.log(`[LarkBot] Stopped: ${this.config.name}`);
+		log.info(`Stopped: ${this.config.name}`);
 	}
 
 	async sendMessage(chatId: string, content: string): Promise<void> {
@@ -84,7 +90,10 @@ export class LarkBot extends BaseBot {
 				},
 			});
 		} catch (error) {
-			console.error("[LarkBot] Failed to send message:", error);
+			log.error(
+				"Failed to send message",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -92,7 +101,7 @@ export class LarkBot extends BaseBot {
 	async broadcast(message: string): Promise<void> {
 		const chatIds = this.config.lark?.chatIds;
 		if (!chatIds || chatIds.length === 0) {
-			console.warn("[LarkBot] No chatIds configured for broadcast");
+			log.warn("No chatIds configured for broadcast");
 			return;
 		}
 
@@ -100,7 +109,10 @@ export class LarkBot extends BaseBot {
 			try {
 				await this.sendMessage(chatId, message);
 			} catch (error) {
-				console.error(`[LarkBot] Failed to broadcast to ${chatId}:`, error);
+				log.error(
+					`Failed to broadcast to ${chatId}`,
+					error instanceof Error ? error : new Error(String(error)),
+				);
 			}
 		}
 	}
