@@ -23,6 +23,9 @@ import type {
 	RemoteLifecycleState,
 } from "@super-client/shared-types/electron-api";
 import { remoteSessionService } from "../../services/remoteSessionService";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("RemoteSessionsPanel");
 
 const { Text } = Typography;
 
@@ -60,7 +63,7 @@ export function RemoteSessionsPanel() {
 				setEntries(result.data);
 			}
 		} catch (error) {
-			console.warn("[RemoteSessionsPanel] listBindings failed:", error);
+			log.warn("listBindings failed", { error: error });
 		} finally {
 			setLoading(false);
 		}
@@ -123,7 +126,7 @@ export function RemoteSessionsPanel() {
 						);
 						void loadEntries();
 					} catch (error) {
-						console.warn("[RemoteSessionsPanel] unbind failed:", error);
+						log.warn("unbind failed", { error: error });
 						message.error(
 							t("settingsNav.recovery.remoteUnbindError", "Unbind failed", {
 								ns: "settings",

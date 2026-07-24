@@ -10,6 +10,9 @@ import {
 import type { SearchConfig } from "../../types/search";
 import { searchService } from "../../services/search/searchService";
 import { SEARCH_PROVIDERS } from "../settings/SearchProviders";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("SearchEnginePanel");
 
 export interface SearchEnginePanelProps {
 	selectedEngine: string;
@@ -53,7 +56,7 @@ export function SearchEnginePanel({
 					setSearchConfigs(result.data.configs);
 				}
 			} catch (error) {
-				console.error("Failed to load search configs:", error);
+				log.error("Failed to load search configs", error instanceof Error ? error : new Error(String(error)));
 			}
 		})();
 	}, []);
@@ -249,7 +252,7 @@ export function useSearchEngine() {
 				}
 			}
 		} catch (error) {
-			console.error("Failed to load search configs:", error);
+			log.error("Failed to load search configs", error instanceof Error ? error : new Error(String(error)));
 		}
 	}, []);
 

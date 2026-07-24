@@ -12,6 +12,9 @@ import {
 	useAttachmentStore,
 } from "../../stores/attachmentStore";
 import { FileIcon, formatFileSize } from "./FileIcon";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("FileUpload");
 
 async function persistFileViaIpc(
 	file: File,
@@ -429,7 +432,7 @@ export function FileUploadButton({
 				}
 			} catch (error) {
 				const errorMsg = error instanceof Error ? error.message : String(error);
-				console.error("Failed to upload file:", error);
+				log.error("Failed to upload file", error instanceof Error ? error : new Error(String(error)));
 				message.error(
 					t("attachment.upload.error", "上传失败：{{error}}", {
 						error: errorMsg,

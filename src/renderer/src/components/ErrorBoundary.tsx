@@ -6,6 +6,9 @@
 import { Button, Result } from "antd";
 import i18n from "i18next";
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("ErrorBoundary");
 
 interface Props {
 	children: ReactNode;
@@ -46,8 +49,10 @@ export class ErrorBoundary extends Component<Props, State> {
 		// Call custom error handler if provided
 		this.props.onError?.(error, errorInfo);
 
-		// Log error to console
-		console.error("ErrorBoundary caught an error:", error, errorInfo);
+		// Log the caught error through the renderer logger
+		log.error("ErrorBoundary caught an error", error, {
+			componentStack: errorInfo.componentStack,
+		});
 	}
 
 	handleReset = (): void => {
