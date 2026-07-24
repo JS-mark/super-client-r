@@ -1,15 +1,14 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal } from "@xterm/xterm";
-import { Modal } from "antd";
 import {
-	createElement,
 	type ForwardedRef,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
 	useRef,
 } from "react";
+import { confirmDangerousCommand } from "./confirmDangerousCommand";
 import type { DeviceTerminalRef } from "./DeviceTerminal";
 import { checkDangerousCommand } from "./dangerousCommands";
 import { LineEditor } from "./terminalLineEditor";
@@ -297,47 +296,10 @@ export function useDeviceTerminalSession(
 								`\x1b[38;2;${rgb}m⚠ [${danger.category}] ${danger.description}\x1b[0m`,
 							);
 							isAwaitingConfirmRef.current = true;
-							Modal.confirm({
-								title: "⚠️ 危险命令确认",
-								content: createElement(
-									"div",
-									null,
-									createElement(
-										"p",
-										{ style: { marginBottom: 8 } },
-										"将要执行以下命令：",
-									),
-									createElement(
-										"pre",
-										{
-											style: {
-												background: "#1e1e2e",
-												color: "#cdd6f4",
-												padding: "8px 12px",
-												borderRadius: 6,
-												fontFamily: "monospace",
-												fontSize: 13,
-											},
-										},
-										cmd,
-									),
-									createElement(
-										"p",
-										{
-											style: {
-												marginTop: 8,
-												color:
-													danger.level === "danger" ? "#f38ba8" : "#f9e2af",
-												fontWeight: 500,
-											},
-										},
-										`⚠ ${danger.category}: ${danger.description}`,
-									),
-								),
-								okText: "确认执行",
-								cancelText: "取消",
-								okButtonProps: { danger: true },
-								onOk: () => {
+							confirmDangerousCommand({
+								command: cmd,
+								danger,
+								onConfirm: () => {
 									isAwaitingConfirmRef.current = false;
 									executeCmd(cmd);
 								},
