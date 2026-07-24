@@ -395,12 +395,10 @@ export class LLMService {
 			pending.resolve({ approved, payload });
 			this.pendingApprovals.delete(toolCallId);
 		} else {
-			console.warn(
-				"[LLMService] resolveToolApproval: no pending approval for",
+			log.warn("resolveToolApproval: no pending approval", {
 				toolCallId,
-				"| map keys:",
-				[...this.pendingApprovals.keys()],
-			);
+				mapKeys: [...this.pendingApprovals.keys()],
+			});
 		}
 	}
 

@@ -12,6 +12,9 @@ import type {
 	WebhookType,
 } from "../../ipc/types";
 import { storeManager } from "../../store/StoreManager";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("WebhookService");
 
 interface WebhookMessage {
 	title: string;
@@ -217,7 +220,10 @@ export class WebhookService extends EventEmitter {
 			try {
 				await this.sendToWebhook(message, config);
 			} catch (error) {
-				console.error(`Webhook send failed for ${config.name}:`, error);
+				log.error(
+					`Webhook send failed for ${config.name}`,
+					error instanceof Error ? error : new Error(String(error)),
+				);
 				this.emit("error", config.id, error);
 			}
 		}

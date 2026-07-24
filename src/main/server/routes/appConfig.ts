@@ -1,4 +1,7 @@
 import { request, summary, tags, description } from "koa-swagger-decorator";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("AppConfig");
 
 // node-auth 服务端地址（开发环境）
 const NODE_AUTH_BASE_URL =
@@ -18,9 +21,7 @@ export class AppConfigController {
 				"X-Locale": ctx.get("X-Locale") || "en-US",
 			};
 
-			console.log(
-				`[AppConfig] Proxying to ${NODE_AUTH_BASE_URL}/v1/app/init-config`,
-			);
+			log.info(`Proxying to ${NODE_AUTH_BASE_URL}/v1/app/init-config`);
 
 			const response = await fetch(`${NODE_AUTH_BASE_URL}/v1/app/init-config`, {
 				method: "GET",
@@ -28,8 +29,8 @@ export class AppConfigController {
 			});
 
 			if (!response.ok) {
-				console.error(
-					`[AppConfig] Proxy error: ${response.status} ${response.statusText}`,
+				log.error(
+					`Proxy error: ${response.status} ${response.statusText}`,
 				);
 				ctx.status = response.status;
 				ctx.body = {
@@ -54,7 +55,10 @@ export class AppConfigController {
 
 			ctx.body = data;
 		} catch (error) {
-			console.error("[AppConfig] Proxy failed:", error);
+			log.error(
+				"Proxy failed",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			ctx.status = 500;
 			ctx.body = {
 				error: "Failed to fetch app config",

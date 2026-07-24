@@ -21,6 +21,14 @@ const mocks = vi.hoisted(() => ({
 	logger: {
 		info: vi.fn(),
 		error: vi.fn(),
+		warn: vi.fn(),
+		debug: vi.fn(),
+		withContext: vi.fn(() => ({
+			info: vi.fn(),
+			error: vi.fn(),
+			warn: vi.fn(),
+			debug: vi.fn(),
+		})),
 	},
 }));
 

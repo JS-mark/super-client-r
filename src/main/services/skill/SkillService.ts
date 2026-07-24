@@ -15,6 +15,9 @@ import type {
 	SkillValidationResult,
 } from "../../ipc/types";
 import { validateSkill as runValidation } from "./SkillValidator";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("SkillService");
 
 export interface SkillConfig {
 	id: string;
@@ -64,7 +67,10 @@ export class SkillService extends EventEmitter {
 				}
 			}
 		} catch (error) {
-			console.error("Failed to initialize skill service:", error);
+			log.error(
+				"Failed to initialize skill service",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -429,7 +435,10 @@ export class SkillService extends EventEmitter {
 				return manifest;
 			}
 		} catch (error) {
-			console.error(`Failed to install skill from ${source}:`, error);
+			log.error(
+				`Failed to install skill from ${source}`,
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			throw error;
 		}
 	}
@@ -465,7 +474,10 @@ export class SkillService extends EventEmitter {
 			// 删除 skill 目录
 			await fs.rm(skill.path, { recursive: true, force: true });
 		} catch (error) {
-			console.error(`Failed to remove skill directory ${skill.path}:`, error);
+			log.error(
+				`Failed to remove skill directory ${skill.path}`,
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			// 继续执行，即使删除失败
 		}
 
@@ -664,8 +676,8 @@ export class SkillService extends EventEmitter {
 		this.skills.set(config.id, config);
 		this.dynamicHandlers.set(config.id, config.handlers);
 		this.dynamicOwners.set(config.id, ownerId);
-		console.log(
-			`[SkillService] Dynamic skill registered: ${config.id} (owner: ${ownerId})`,
+		log.info(
+			`Dynamic skill registered: ${config.id} (owner: ${ownerId})`,
 		);
 	}
 
@@ -678,8 +690,8 @@ export class SkillService extends EventEmitter {
 				this.skills.delete(skillId);
 				this.dynamicHandlers.delete(skillId);
 				this.dynamicOwners.delete(skillId);
-				console.log(
-					`[SkillService] Dynamic skill unregistered: ${skillId} (owner: ${ownerId})`,
+				log.info(
+					`Dynamic skill unregistered: ${skillId} (owner: ${ownerId})`,
 				);
 			}
 		}
