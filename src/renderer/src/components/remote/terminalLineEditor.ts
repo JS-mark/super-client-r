@@ -189,4 +189,56 @@ export class LineEditor {
 		this.cursorPos = 0;
 		this.historyIndex = -1;
 	}
+
+	/**
+	 * 分发不涉及终端副作用的纯行编辑输入：光标移动（方向键 / Home / End /
+	 * Ctrl+A / Ctrl+E）、行内删除（Delete / Ctrl+U / Ctrl+K / Ctrl+W）、
+	 * 历史导航（↑↓）以及多字符粘贴。
+	 *
+	 * 返回需要写入终端的 ANSI 序列（可能为空串，表示已处理但无输出）；
+	 * 返回 `null` 表示该输入不属于上述类别，调用方需继续逐字符处理
+	 * （Enter / Backspace / Tab / Ctrl+C / Ctrl+L / 普通字符输入）。
+	 */
+	handleControlInput(data: string): string | null {
+		// Escape sequences (arrows, Home, End, Delete)
+		if (data.startsWith("\x1b[") || data.startsWith("\x1bO")) {
+			const code = data.startsWith("\x1b[") ? data.slice(2) : data[2];
+			switch (code) {
+				case "A": // Up — previous history
+					return this.historyPrev();
+				case "B": // Down — next history
+					return this.historyNext();
+				case "C": // Right
+					return this.moveRight();
+				case "D": // Left
+					return this.moveLeft();
+				case "H": // Home
+				case "1~":
+					return this.moveHome();
+				case "F": // End
+				case "4~":
+					return this.moveEnd();
+				case "3~": // Delete
+					return this.deleteForward();
+				default:
+					// 未识别的转义序列：已消费但无输出（与原组件一致）
+					return "";
+			}
+		}
+		// Ctrl+A (Home)
+		if (data === "\x01") return this.moveHome();
+		// Ctrl+E (End)
+		if (data === "\x05") return this.moveEnd();
+		// Ctrl+U (clear before cursor)
+		if (data === "\x15") return this.clearBeforeCursor();
+		// Ctrl+K (clear after cursor)
+		if (data === "\x0b") return this.clearAfterCursor();
+		// Ctrl+W (delete previous word)
+		if (data === "\x17") return this.deleteWord();
+		// Pasted text (multi-char, not escape, not newline)
+		if (data.length > 1 && !data.includes("\r") && !data.includes("\n")) {
+			return this.insertText(data);
+		}
+		return null;
+	}
 }
