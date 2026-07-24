@@ -269,66 +269,10 @@ export function useDeviceTerminalSession(
 				return;
 			}
 
-			// Escape sequences (arrows, Home, End, Delete)
-			if (data.startsWith("\x1b[") || data.startsWith("\x1bO")) {
-				const code = data.startsWith("\x1b[") ? data.slice(2) : data[2];
-				switch (code) {
-					case "A": // Up — previous history
-						terminal.write(editor.historyPrev());
-						break;
-					case "B": // Down — next history
-						terminal.write(editor.historyNext());
-						break;
-					case "C": // Right
-						terminal.write(editor.moveRight());
-						break;
-					case "D": // Left
-						terminal.write(editor.moveLeft());
-						break;
-					case "H": // Home
-					case "1~":
-						terminal.write(editor.moveHome());
-						break;
-					case "F": // End
-					case "4~":
-						terminal.write(editor.moveEnd());
-						break;
-					case "3~": // Delete
-						terminal.write(editor.deleteForward());
-						break;
-				}
-				return;
-			}
-
-			// Ctrl+A (Home)
-			if (data === "\x01") {
-				terminal.write(editor.moveHome());
-				return;
-			}
-			// Ctrl+E (End)
-			if (data === "\x05") {
-				terminal.write(editor.moveEnd());
-				return;
-			}
-			// Ctrl+U (clear before cursor)
-			if (data === "\x15") {
-				terminal.write(editor.clearBeforeCursor());
-				return;
-			}
-			// Ctrl+K (clear after cursor)
-			if (data === "\x0b") {
-				terminal.write(editor.clearAfterCursor());
-				return;
-			}
-			// Ctrl+W (delete previous word)
-			if (data === "\x17") {
-				terminal.write(editor.deleteWord());
-				return;
-			}
-
-			// Pasted text (multi-char, not escape, not newline)
-			if (data.length > 1 && !data.includes("\r") && !data.includes("\n")) {
-				terminal.write(editor.insertText(data));
+			// 纯行编辑输入（光标移动 / 行内删除 / 历史导航 / 粘贴）委托 LineEditor
+			const controlOutput = editor.handleControlInput(data);
+			if (controlOutput !== null) {
+				terminal.write(controlOutput);
 				return;
 			}
 

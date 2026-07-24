@@ -234,6 +234,80 @@ describe("LineEditor", () => {
 		});
 	});
 
+	describe("handleControlInput", () => {
+		it("方向键映射到光标/历史操作", () => {
+			const ed = new LineEditor();
+			ed.insertText("abc");
+			expect(ed.handleControlInput("\x1b[D")).toBe("\x1b[D"); // Left
+			expect(ed.cursorPos).toBe(2);
+			expect(ed.handleControlInput("\x1b[C")).toBe("\x1b[C"); // Right
+			expect(ed.cursorPos).toBe(3);
+		});
+
+		it("Home/End 转义序列（含 1~ / 4~ 变体）", () => {
+			const ed = new LineEditor();
+			ed.insertText("abcd");
+			expect(ed.handleControlInput("\x1b[H")).toBe("\x1b[4D");
+			expect(ed.cursorPos).toBe(0);
+			expect(ed.handleControlInput("\x1b[4~")).toBe("\x1b[4C");
+			expect(ed.cursorPos).toBe(4);
+			expect(ed.handleControlInput("\x1b[1~")).toBe("\x1b[4D");
+			expect(ed.cursorPos).toBe(0);
+		});
+
+		it("Delete 转义序列", () => {
+			const ed = new LineEditor();
+			ed.insertText("abc");
+			ed.cursorPos = 0;
+			expect(ed.handleControlInput("\x1b[3~")).toBe("\x1b[Kbc\x1b[2D");
+			expect(ed.line).toBe("bc");
+		});
+
+		it("\\x1bO 前缀方向键也被识别", () => {
+			const ed = new LineEditor();
+			ed.insertText("ab");
+			// \x1bOD -> code=data[2]='D' -> Left
+			expect(ed.handleControlInput("\x1bOD")).toBe("\x1b[D");
+			expect(ed.cursorPos).toBe(1);
+		});
+
+		it("未识别的转义序列返回空串（已消费）", () => {
+			const ed = new LineEditor();
+			ed.insertText("ab");
+			expect(ed.handleControlInput("\x1b[Z")).toBe("");
+			expect(ed.line).toBe("ab");
+		});
+
+		it("Ctrl 快捷键映射（A/E/U/K/W）", () => {
+			const ed = new LineEditor();
+			ed.insertText("foo bar");
+			expect(ed.handleControlInput("\x01")).toBe("\x1b[7D"); // Ctrl+A -> Home
+			expect(ed.cursorPos).toBe(0);
+			expect(ed.handleControlInput("\x05")).toBe("\x1b[7C"); // Ctrl+E -> End
+			expect(ed.cursorPos).toBe(7);
+			expect(ed.handleControlInput("\x17")).toBe("\x1b[3D\x1b[K"); // Ctrl+W
+			expect(ed.line).toBe("foo ");
+		});
+
+		it("多字符粘贴通过 handleControlInput 插入", () => {
+			const ed = new LineEditor();
+			expect(ed.handleControlInput("hello world")).toBe("hello world");
+			expect(ed.line).toBe("hello world");
+		});
+
+		it("对 Enter/Backspace/Tab/普通字符返回 null（交由调用方逐字符处理）", () => {
+			const ed = new LineEditor();
+			expect(ed.handleControlInput("\r")).toBeNull();
+			expect(ed.handleControlInput("\x7f")).toBeNull();
+			expect(ed.handleControlInput("\t")).toBeNull();
+			expect(ed.handleControlInput("a")).toBeNull();
+			expect(ed.handleControlInput("\x03")).toBeNull(); // Ctrl+C
+			expect(ed.handleControlInput("\x0c")).toBeNull(); // Ctrl+L
+			// 含换行的多字符不当作粘贴
+			expect(ed.handleControlInput("ab\r")).toBeNull();
+		});
+	});
+
 	describe("reset", () => {
 		it("清空行但保留历史", () => {
 			const ed = new LineEditor();
