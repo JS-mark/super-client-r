@@ -15,6 +15,7 @@ import type {
 	SkillValidationResult,
 } from "../../ipc/types";
 import { validateSkill as runValidation } from "./SkillValidator";
+import { SkillDownloader } from "./SkillDownloader";
 import { logger } from "../../utils/logger";
 
 const log = logger.withContext("SkillService");
@@ -41,10 +42,12 @@ export class SkillService extends EventEmitter {
 		Record<string, (input: Record<string, unknown>) => Promise<unknown>>
 	> = new Map();
 	private dynamicOwners: Map<string, string> = new Map();
+	private downloader: SkillDownloader;
 
-	constructor(skillsDir: string) {
+	constructor(skillsDir: string, downloader?: SkillDownloader) {
 		super();
 		this.skillsDir = skillsDir;
+		this.downloader = downloader ?? new SkillDownloader();
 	}
 
 	/**
@@ -377,63 +380,17 @@ export class SkillService extends EventEmitter {
 
 	/**
 	 * 安装 skill
+	 *
+	 * source 支持：
+	 *   - 本地目录路径
+	 *   - http(s) URL（指向 zip 归档）
 	 */
 	async installSkill(source: string): Promise<SkillManifest> {
 		try {
-			// 检查 source 是本地路径还是 URL
-			let skillPath: string;
-
 			if (source.startsWith("http://") || source.startsWith("https://")) {
-				// TODO: 实现从 URL 下载
-				throw new Error("Installing from URL is not yet implemented");
-			} else {
-				// 本地路径
-				const sourcePath = path.resolve(source);
-
-				// 执行校验
-				const validation = await this.validateSkill(source);
-				if (!validation.valid) {
-					const summary = validation.issues
-						.filter((i) => i.severity === "error")
-						.map((i) => i.fallbackMessage)
-						.join("; ");
-					throw new Error(`Skill validation failed: ${summary}`);
-				}
-
-				const manifest = validation.manifest!;
-
-				// 创建目标目录
-				skillPath = path.join(this.skillsDir, manifest.id);
-				await fs.mkdir(skillPath, { recursive: true });
-
-				// 复制文件
-				const entries = await fs.readdir(sourcePath, { withFileTypes: true });
-				for (const entry of entries) {
-					const src = path.join(sourcePath, entry.name);
-					const dest = path.join(skillPath, entry.name);
-
-					if (entry.isDirectory()) {
-						await fs.mkdir(dest, { recursive: true });
-						// 递归复制目录内容
-						await this.copyDirectory(src, dest);
-					} else {
-						await fs.copyFile(src, dest);
-					}
-				}
-
-				// 注册 skill
-				const config: SkillConfig = {
-					id: manifest.id,
-					manifest,
-					path: skillPath,
-					enabled: true,
-				};
-
-				this.skills.set(manifest.id, config);
-				this.emit("installed", manifest);
-
-				return manifest;
+				return await this.installFromUrl(source);
 			}
+			return await this.installFromDirectory(path.resolve(source));
 		} catch (error) {
 			log.error(
 				`Failed to install skill from ${source}`,
@@ -441,6 +398,78 @@ export class SkillService extends EventEmitter {
 			);
 			throw error;
 		}
+	}
+
+	/**
+	 * 从 URL 下载 zip、解压到临时目录后走本地安装链路。
+	 * 无论成功与否都清理下载的临时目录，不留残留文件。
+	 */
+	private async installFromUrl(url: string): Promise<SkillManifest> {
+		const { dir, cleanup } = await this.downloader.downloadAndExtract(url);
+		try {
+			return await this.installFromDirectory(dir);
+		} finally {
+			await cleanup();
+		}
+	}
+
+	/**
+	 * 从本地目录安装：校验 → 复制到 skills 目录 → 注册。
+	 * 若复制过程中出错，回滚删除已创建的目标目录，避免残留半成品。
+	 */
+	private async installFromDirectory(
+		sourcePath: string,
+	): Promise<SkillManifest> {
+		// 执行校验（含结构 / 内容 / 安全）
+		const validation = await this.validateSkill(sourcePath);
+		if (!validation.valid) {
+			const summary = validation.issues
+				.filter((i) => i.severity === "error")
+				.map((i) => i.fallbackMessage)
+				.join("; ");
+			throw new Error(`Skill validation failed: ${summary}`);
+		}
+
+		const manifest = validation.manifest!;
+
+		// 创建目标目录
+		const skillPath = path.join(this.skillsDir, manifest.id);
+		await fs.mkdir(skillPath, { recursive: true });
+
+		try {
+			// 复制文件
+			const entries = await fs.readdir(sourcePath, { withFileTypes: true });
+			for (const entry of entries) {
+				const src = path.join(sourcePath, entry.name);
+				const dest = path.join(skillPath, entry.name);
+
+				if (entry.isDirectory()) {
+					await fs.mkdir(dest, { recursive: true });
+					await this.copyDirectory(src, dest);
+				} else {
+					await fs.copyFile(src, dest);
+				}
+			}
+		} catch (error) {
+			// 回滚：删除半成品目录，保持安装原子性
+			await fs
+				.rm(skillPath, { recursive: true, force: true })
+				.catch(() => {});
+			throw error;
+		}
+
+		// 注册 skill
+		const config: SkillConfig = {
+			id: manifest.id,
+			manifest,
+			path: skillPath,
+			enabled: true,
+		};
+
+		this.skills.set(manifest.id, config);
+		this.emit("installed", manifest);
+
+		return manifest;
 	}
 
 	/**
