@@ -34,6 +34,9 @@ import type {
 	SubagentRunSummary,
 	SubagentTaskStatus,
 } from "@super-client/shared-types/subagent";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("jsonl");
 
 // ─────────────────────────────────────────────────────────────────────
 // Serialize
@@ -90,10 +93,7 @@ export function parseEventsWithReport(content: string): ParseEventsReport {
 				events.push(parsed);
 			} else {
 				droppedUnknownLines += 1;
-				console.warn(
-					"[jsonl] dropped event without recognised type field:",
-					parsed,
-				);
+				log.warn("dropped event without recognised type field", { parsed });
 			}
 		} catch (err) {
 			const isTrailing =
@@ -101,11 +101,11 @@ export function parseEventsWithReport(content: string): ParseEventsReport {
 				lines.slice(i + 1).every((next) => next.trim().length === 0);
 			if (isTrailing) malformedTrailingLine = true;
 			else malformedMiddleLines += 1;
-			console.warn(
+			log.warn(
 				isTrailing
-					? "[jsonl] dropped malformed trailing line (likely a partial write):"
-					: "[jsonl] dropped malformed middle line:",
-				err instanceof Error ? err.message : String(err),
+					? "dropped malformed trailing line (likely a partial write)"
+					: "dropped malformed middle line",
+				{ error: err instanceof Error ? err.message : String(err) },
 			);
 		}
 	}
@@ -261,10 +261,9 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 			case "assistant.part_delta": {
 				const idx = assistantPartIndex.get(e.messageId);
 				if (idx === undefined) {
-					console.warn(
-						"[jsonl] assistant.part_delta without preceding part_start:",
-						e.messageId,
-						e.partId,
+					log.warn(
+						"assistant.part_delta without preceding part_start",
+						{ messageId: e.messageId, partId: e.partId },
 					);
 					break;
 				}
@@ -280,10 +279,9 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 			case "assistant.part_done": {
 				const idx = assistantPartIndex.get(e.messageId);
 				if (idx === undefined) {
-					console.warn(
-						"[jsonl] assistant part patch without preceding part_start:",
-						e.messageId,
-						e.partId,
+					log.warn(
+						"assistant part patch without preceding part_start",
+						{ messageId: e.messageId, partId: e.partId },
 					);
 					break;
 				}
@@ -304,10 +302,9 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 			case "assistant.part_error": {
 				const idx = assistantPartIndex.get(e.messageId);
 				if (idx === undefined) {
-					console.warn(
-						"[jsonl] assistant.part_error without preceding part_start:",
-						e.messageId,
-						e.partId,
+					log.warn(
+						"assistant.part_error without preceding part_start",
+						{ messageId: e.messageId, partId: e.partId },
 					);
 					break;
 				}
@@ -379,10 +376,9 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 				}
 				const idx = toolCallIndex.get(e.toolCallId);
 				if (idx === undefined) {
-					console.warn(
-						"[jsonl] tool_result without preceding tool_call:",
-						e.toolCallId,
-					);
+					log.warn("tool_result without preceding tool_call", {
+						toolCallId: e.toolCallId,
+					});
 					break;
 				}
 				const target = messages[idx];
@@ -409,10 +405,9 @@ export function eventsToMessages(events: SessionEvent[]): Message[] {
 				}
 				const idx = toolCallIndex.get(e.toolCallId);
 				if (idx === undefined) {
-					console.warn(
-						"[jsonl] tool_error without preceding tool_call:",
-						e.toolCallId,
-					);
+					log.warn("tool_error without preceding tool_call", {
+						toolCallId: e.toolCallId,
+					});
 					break;
 				}
 				const target = messages[idx];

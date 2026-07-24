@@ -348,8 +348,9 @@ describe("eventsToMessages", () => {
 			];
 			expect(eventsToMessages(events)).toEqual([]);
 			expect(warn).toHaveBeenCalledWith(
+				expect.any(String),
 				expect.stringContaining("tool_result"),
-				"tc-orphan",
+				expect.objectContaining({ toolCallId: "tc-orphan" }),
 			);
 		} finally {
 			warn.mockRestore();
