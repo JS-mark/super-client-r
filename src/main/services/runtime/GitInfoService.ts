@@ -18,6 +18,9 @@ import type {
 	WorktreePreflightLevel,
 	WorktreePreflightResult,
 } from "@super-client/shared-types/git";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("GitInfoService");
 
 const execFileAsync = promisify(execFile);
 
@@ -96,10 +99,7 @@ export class GitInfoService {
 		} catch (err) {
 			// 注意：ENOENT 表示 git 不在 PATH 上（macOS GUI 启动常见），不是
 			// "不是 git 仓库"。打 warn 方便后续排查；UI 仍然降级为 isRepo:false。
-			console.warn(
-				`[GitInfoService] rev-parse failed for cwd=${cwd}`,
-				err,
-			);
+			log.warn(`rev-parse failed for cwd=${cwd}`, err);
 			return { isRepo: false };
 		}
 
@@ -351,10 +351,7 @@ export class GitInfoService {
 			return names.map((name) => ({ name, current: name === head }));
 		} catch (err) {
 			// 同上：ENOENT 多半是 PATH 没找到 git。
-			console.warn(
-				`[GitInfoService] listBranches failed for cwd=${cwd}`,
-				err,
-			);
+			log.warn(`listBranches failed for cwd=${cwd}`, err);
 			return [];
 		}
 	}
@@ -491,7 +488,7 @@ export class GitInfoService {
 			}
 			return commits;
 		} catch (err) {
-			console.warn(`[GitInfoService] listCommits failed for cwd=${cwd}`, err);
+			log.warn(`listCommits failed for cwd=${cwd}`, err);
 			return [];
 		}
 	}

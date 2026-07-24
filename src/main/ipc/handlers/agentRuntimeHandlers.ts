@@ -36,6 +36,9 @@ import { listBuiltinTools } from "../../services/agent/runtime/tools/BuiltinTool
 import { getAgentTraceCollector } from "../../services/agent/trace/AgentTraceCollector";
 import { getSessionRuntimeResolver } from "../../services/runtime/SessionRuntimeResolver";
 import { getSessionStorage } from "../../services/storage/SessionStorageService";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("AgentRuntimeIpcBroker");
 
 // ─────────────────────────────────────────────────────────────────────
 // Channels（按 spec §6.1 定义；新增到 channels.ts 之外，因为它们是 streaming
@@ -96,9 +99,9 @@ function getBroker(): AgentRuntimeIpcBroker {
 			resolver: new MainSessionContextResolver(),
 			storage: getSessionStorage(),
 			onError: (err, ctx) => {
-				console.error(
-					`[AgentRuntimeIpcBroker] error for request ${ctx.requestId}:`,
-					err,
+				log.error(
+					`error for request ${ctx.requestId}`,
+					err instanceof Error ? err : new Error(String(err)),
 				);
 			},
 		});

@@ -6,6 +6,9 @@ import {
 	tags,
 } from "koa-swagger-decorator";
 import { storeManager } from "../../store";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("SkillsMP");
 
 const SKILLSMP_API_BASE = "https://skillsmp.com/api/v1";
 
@@ -47,8 +50,8 @@ export class SkillsController {
 			const url = `${SKILLSMP_API_BASE}/skills/search?${params.toString()}`;
 			const apiKey = getSkillsMpApiKey();
 
-			console.log(`[SkillsMP] Requesting: ${url}`);
-			console.log(`[SkillsMP] API Key present: ${apiKey ? "yes" : "no"}`);
+			log.info(`Requesting: ${url}`);
+			log.info(`API Key present: ${apiKey ? "yes" : "no"}`);
 
 			const response = await fetch(url, {
 				method: "GET",
@@ -61,11 +64,11 @@ export class SkillsController {
 				},
 			});
 
-			console.log(`[SkillsMP] Response status: ${response.status}`);
+			log.info(`Response status: ${response.status}`);
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error(`[SkillsMP] Error response: ${errorText}`);
+				log.error(`Error response: ${errorText}`);
 				ctx.status = response.status;
 				ctx.body = {
 					error: `SkillsMP API error: ${response.statusText}`,
@@ -77,7 +80,10 @@ export class SkillsController {
 			const data = await response.json();
 			ctx.body = data;
 		} catch (error) {
-			console.error("[SkillsMP] Failed to fetch skills:", error);
+			log.error(
+				"Failed to fetch skills",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			ctx.status = 500;
 			ctx.body = {
 				error: "Failed to fetch skills",
@@ -128,7 +134,10 @@ export class SkillsController {
 			const data = await response.json();
 			ctx.body = data;
 		} catch (error) {
-			console.error("Failed to search skills:", error);
+			log.error(
+				"Failed to search skills",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 			ctx.status = 500;
 			ctx.body = { error: "Failed to search skills" };
 		}

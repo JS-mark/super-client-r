@@ -4,6 +4,9 @@ import type {
 	SearchResult,
 } from "../../ipc/types";
 import { mcpService } from "../mcp/McpService";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("SearchService");
 
 class SearchService {
 	async execute(request: SearchExecuteRequest): Promise<SearchExecuteResponse> {
@@ -311,9 +314,7 @@ class SearchService {
 			this.findMcpServerByKeyword("exa");
 		if (!serverId) {
 			// Fallback to direct Exa REST API if no MCP server found
-			console.warn(
-				"[SearchService] No MCP server found for Exa, falling back to REST API",
-			);
+			log.warn("No MCP server found for Exa, falling back to REST API");
 			return this.searchExa(request, maxResults);
 		}
 		return this.searchViaMcp(serverId, request, maxResults);
@@ -348,8 +349,8 @@ class SearchService {
 			);
 		}
 
-		console.log(
-			`[SearchService] Calling MCP tool: server=${serverId}, tool=${searchTool.name}`,
+		log.info(
+			`Calling MCP tool: server=${serverId}, tool=${searchTool.name}`,
 		);
 
 		// Build args based on the tool's input schema

@@ -21,6 +21,9 @@ import {
 	setAgentRuntimeRegistry,
 } from "./AgentRuntimeRegistry";
 import { ClaudeCodeAgentRuntime } from "./ClaudeCodeAgentRuntime";
+import { logger } from "../../../utils/logger";
+
+const log = logger.withContext("AgentRuntime");
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -42,7 +45,7 @@ export function bootstrapAgentRuntime(): AgentRuntimeBootstrapResult {
 		retentionDays: 7,
 	});
 	void persister.init().catch((err) => {
-		console.warn("[AgentTracePersister] init failed:", err);
+		log.warn("AgentTracePersister init failed", err);
 	});
 	const collector = new AgentTraceCollector({
 		config: {
@@ -59,7 +62,7 @@ export function bootstrapAgentRuntime(): AgentRuntimeBootstrapResult {
 
 	// 2) Registry
 	const registry = new AgentRuntimeRegistry();
-	registry.setLogger((msg) => console.warn("[AgentRuntimeRegistry]", msg));
+	registry.setLogger((msg) => log.warn(`[AgentRuntimeRegistry] ${msg}`));
 
 	// 3) ClaudeCodeAgentRuntime ("llm-loop") — the sole production runtime.
 	//    Built on the unified LLMService.chatCompletion path so any model
