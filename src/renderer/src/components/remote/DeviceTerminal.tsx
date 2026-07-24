@@ -14,6 +14,7 @@ import "./DeviceTerminal.css";
 import { Modal } from "antd";
 import type { CommandResult } from "@/types/electron";
 import { checkDangerousCommand } from "./dangerousCommands";
+import { LineEditor } from "./terminalLineEditor";
 
 export interface DeviceTerminalProps {
 	deviceId: string;
@@ -80,15 +81,11 @@ export const DeviceTerminal = forwardRef<
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
-	const lineBufferRef = useRef("");
+	const editorRef = useRef(new LineEditor());
 	const isExecutingRef = useRef(false);
 	const disabledRef = useRef(disabled);
 	const deviceIdRef = useRef(deviceId);
 	const currentRequestIdRef = useRef<string | null>(null);
-	const cursorPosRef = useRef(0);
-	const historyRef = useRef<string[]>([]);
-	const historyIndexRef = useRef(-1);
-	const savedLineRef = useRef("");
 	const isAwaitingConfirmRef = useRef(false);
 	const cwdRef = useRef<string | undefined>(undefined);
 
@@ -108,8 +105,8 @@ export const DeviceTerminal = forwardRef<
 				if (term) {
 					term.clear();
 					term.write("\x1b[2J\x1b[H");
-					lineBufferRef.current = "";
-					cursorPosRef.current = 0;
+					editorRef.current.line = "";
+					editorRef.current.cursorPos = 0;
 					writePrompt();
 				}
 			},
@@ -249,6 +246,7 @@ export const DeviceTerminal = forwardRef<
 		// Handle input
 		terminal.onData((data) => {
 			if (disabledRef.current || isAwaitingConfirmRef.current) return;
+			const editor = editorRef.current;
 
 			// During execution, only handle Ctrl+C and Ctrl+L
 			if (isExecutingRef.current) {
@@ -270,163 +268,66 @@ export const DeviceTerminal = forwardRef<
 				return;
 			}
 
-			// Helper: redraw from cursor to end of line
-			const redrawFromCursor = () => {
-				const line = lineBufferRef.current;
-				const pos = cursorPosRef.current;
-				terminal.write("\x1b[K");
-				const tail = line.slice(pos);
-				if (tail) {
-					terminal.write(tail);
-					terminal.write(`\x1b[${tail.length}D`);
-				}
-			};
-
-			// Helper: replace entire input line
-			const replaceLine = (newLine: string, newPos?: number) => {
-				const oldPos = cursorPosRef.current;
-				if (oldPos > 0) terminal.write(`\x1b[${oldPos}D`);
-				terminal.write("\x1b[K");
-				terminal.write(newLine);
-				lineBufferRef.current = newLine;
-				cursorPosRef.current = newPos ?? newLine.length;
-				const back = newLine.length - cursorPosRef.current;
-				if (back > 0) terminal.write(`\x1b[${back}D`);
-			};
-
 			// Escape sequences (arrows, Home, End, Delete)
 			if (data.startsWith("\x1b[") || data.startsWith("\x1bO")) {
 				const code = data.startsWith("\x1b[") ? data.slice(2) : data[2];
 				switch (code) {
-					case "A": {
-						// Up — previous history
-						const h = historyRef.current;
-						if (!h.length) break;
-						if (historyIndexRef.current === -1) {
-							savedLineRef.current = lineBufferRef.current;
-							historyIndexRef.current = h.length - 1;
-						} else if (historyIndexRef.current > 0) {
-							historyIndexRef.current--;
-						} else break;
-						replaceLine(h[historyIndexRef.current]);
+					case "A": // Up — previous history
+						terminal.write(editor.historyPrev());
 						break;
-					}
-					case "B": {
-						// Down — next history
-						if (historyIndexRef.current === -1) break;
-						if (historyIndexRef.current < historyRef.current.length - 1) {
-							historyIndexRef.current++;
-							replaceLine(historyRef.current[historyIndexRef.current]);
-						} else {
-							historyIndexRef.current = -1;
-							replaceLine(savedLineRef.current);
-						}
+					case "B": // Down — next history
+						terminal.write(editor.historyNext());
 						break;
-					}
 					case "C": // Right
-						if (cursorPosRef.current < lineBufferRef.current.length) {
-							cursorPosRef.current++;
-							terminal.write("\x1b[C");
-						}
+						terminal.write(editor.moveRight());
 						break;
 					case "D": // Left
-						if (cursorPosRef.current > 0) {
-							cursorPosRef.current--;
-							terminal.write("\x1b[D");
-						}
+						terminal.write(editor.moveLeft());
 						break;
 					case "H": // Home
 					case "1~":
-						if (cursorPosRef.current > 0) {
-							terminal.write(`\x1b[${cursorPosRef.current}D`);
-							cursorPosRef.current = 0;
-						}
+						terminal.write(editor.moveHome());
 						break;
 					case "F": // End
-					case "4~": {
-						const move = lineBufferRef.current.length - cursorPosRef.current;
-						if (move > 0) {
-							terminal.write(`\x1b[${move}C`);
-							cursorPosRef.current = lineBufferRef.current.length;
-						}
+					case "4~":
+						terminal.write(editor.moveEnd());
 						break;
-					}
-					case "3~": {
-						// Delete
-						const pos = cursorPosRef.current;
-						if (pos < lineBufferRef.current.length) {
-							const line = lineBufferRef.current;
-							lineBufferRef.current = line.slice(0, pos) + line.slice(pos + 1);
-							redrawFromCursor();
-						}
+					case "3~": // Delete
+						terminal.write(editor.deleteForward());
 						break;
-					}
 				}
 				return;
 			}
 
 			// Ctrl+A (Home)
 			if (data === "\x01") {
-				if (cursorPosRef.current > 0) {
-					terminal.write(`\x1b[${cursorPosRef.current}D`);
-					cursorPosRef.current = 0;
-				}
+				terminal.write(editor.moveHome());
 				return;
 			}
 			// Ctrl+E (End)
 			if (data === "\x05") {
-				const move = lineBufferRef.current.length - cursorPosRef.current;
-				if (move > 0) {
-					terminal.write(`\x1b[${move}C`);
-					cursorPosRef.current = lineBufferRef.current.length;
-				}
+				terminal.write(editor.moveEnd());
 				return;
 			}
 			// Ctrl+U (clear before cursor)
 			if (data === "\x15") {
-				if (cursorPosRef.current > 0) {
-					const tail = lineBufferRef.current.slice(cursorPosRef.current);
-					terminal.write(`\x1b[${cursorPosRef.current}D`);
-					lineBufferRef.current = tail;
-					cursorPosRef.current = 0;
-					redrawFromCursor();
-				}
+				terminal.write(editor.clearBeforeCursor());
 				return;
 			}
 			// Ctrl+K (clear after cursor)
 			if (data === "\x0b") {
-				lineBufferRef.current = lineBufferRef.current.slice(
-					0,
-					cursorPosRef.current,
-				);
-				terminal.write("\x1b[K");
+				terminal.write(editor.clearAfterCursor());
 				return;
 			}
 			// Ctrl+W (delete previous word)
 			if (data === "\x17") {
-				const pos = cursorPosRef.current;
-				if (pos > 0) {
-					const line = lineBufferRef.current;
-					let i = pos - 1;
-					while (i > 0 && line[i - 1] === " ") i--;
-					while (i > 0 && line[i - 1] !== " ") i--;
-					const deleted = pos - i;
-					lineBufferRef.current = line.slice(0, i) + line.slice(pos);
-					cursorPosRef.current = i;
-					terminal.write(`\x1b[${deleted}D`);
-					redrawFromCursor();
-				}
+				terminal.write(editor.deleteWord());
 				return;
 			}
 
 			// Pasted text (multi-char, not escape, not newline)
 			if (data.length > 1 && !data.includes("\r") && !data.includes("\n")) {
-				const pos = cursorPosRef.current;
-				const line = lineBufferRef.current;
-				lineBufferRef.current = line.slice(0, pos) + data + line.slice(pos);
-				cursorPosRef.current = pos + data.length;
-				terminal.write(data);
-				if (pos < line.length) redrawFromCursor();
+				terminal.write(editor.insertText(data));
 				return;
 			}
 
@@ -434,24 +335,13 @@ export const DeviceTerminal = forwardRef<
 				switch (char) {
 					case "\r": // Enter
 					case "\n": {
-						const cmd = lineBufferRef.current.trim();
-						lineBufferRef.current = "";
-						cursorPosRef.current = 0;
+						const cmd = editor.commit();
 						terminal.writeln("");
 
 						if (!cmd) {
 							writePrompt();
 							break;
 						}
-
-						// Add to history (deduplicate consecutive)
-						const history = historyRef.current;
-						if (!history.length || history[history.length - 1] !== cmd) {
-							history.push(cmd);
-							if (history.length > 500) history.splice(0, history.length - 500);
-						}
-						historyIndexRef.current = -1;
-						savedLineRef.current = "";
 
 						// Check dangerous command
 						const danger = checkDangerousCommand(cmd);
@@ -517,29 +407,20 @@ export const DeviceTerminal = forwardRef<
 						}
 						break;
 					}
-					case "\x7f": {
-						// Backspace
-						const pos = cursorPosRef.current;
-						if (pos > 0) {
-							const line = lineBufferRef.current;
-							lineBufferRef.current = line.slice(0, pos - 1) + line.slice(pos);
-							cursorPosRef.current = pos - 1;
-							terminal.write("\b");
-							redrawFromCursor();
-						}
+					case "\x7f": // Backspace
+						terminal.write(editor.backspace());
 						break;
-					}
 					case "\t": {
 						// Tab — completion
-						const tabLine = lineBufferRef.current;
-						const tabPos = cursorPosRef.current;
+						const tabLine = editor.line;
+						const tabPos = editor.cursorPos;
 						window.electron.remoteDevice
 							.tabComplete(deviceIdRef.current, tabLine, tabPos)
 							.then((result) => {
 								if (!result.data?.matches.length) return;
 								if (
-									lineBufferRef.current !== tabLine ||
-									cursorPosRef.current !== tabPos ||
+									editor.line !== tabLine ||
+									editor.cursorPos !== tabPos ||
 									isExecutingRef.current
 								)
 									return;
@@ -550,30 +431,19 @@ export const DeviceTerminal = forwardRef<
 								if (matches.length === 1) {
 									const match = matches[0];
 									const suffix = match.slice(currentWord.length) + " ";
-									lineBufferRef.current =
-										tabLine.slice(0, tabPos) + suffix + tabLine.slice(tabPos);
-									cursorPosRef.current = tabPos + suffix.length;
-									terminal.write(suffix);
-									if (tabPos < tabLine.length) redrawFromCursor();
+									terminal.write(editor.insertText(suffix));
 								} else {
 									const common = findCommonPrefix(matches);
 									const newChars = common.slice(currentWord.length);
 
 									if (newChars) {
-										lineBufferRef.current =
-											tabLine.slice(0, tabPos) +
-											newChars +
-											tabLine.slice(tabPos);
-										cursorPosRef.current = tabPos + newChars.length;
-										terminal.write(newChars);
-										if (tabPos < tabLine.length) redrawFromCursor();
+										terminal.write(editor.insertText(newChars));
 									} else {
 										terminal.writeln("");
 										terminal.writeln(matches.join("  "));
 										writePrompt();
-										terminal.write(lineBufferRef.current);
-										const back =
-											lineBufferRef.current.length - cursorPosRef.current;
+										terminal.write(editor.line);
+										const back = editor.line.length - editor.cursorPos;
 										if (back > 0) terminal.write(`\x1b[${back}D`);
 									}
 								}
@@ -581,28 +451,20 @@ export const DeviceTerminal = forwardRef<
 						break;
 					}
 					case "\x03": // Ctrl+C
-						lineBufferRef.current = "";
-						cursorPosRef.current = 0;
-						historyIndexRef.current = -1;
+						editor.reset();
 						terminal.writeln("^C");
 						writePrompt();
 						break;
 					case "\x0c": // Ctrl+L
 						terminal.clear();
 						terminal.write("\x1b[2J\x1b[H");
-						lineBufferRef.current = "";
-						cursorPosRef.current = 0;
+						editor.line = "";
+						editor.cursorPos = 0;
 						writePrompt();
 						break;
 					default:
 						if (char >= " ") {
-							const pos = cursorPosRef.current;
-							const line = lineBufferRef.current;
-							lineBufferRef.current =
-								line.slice(0, pos) + char + line.slice(pos);
-							cursorPosRef.current = pos + 1;
-							terminal.write(char);
-							if (pos < line.length) redrawFromCursor();
+							terminal.write(editor.insertText(char));
 						}
 						break;
 				}
