@@ -15,6 +15,7 @@
 import { message } from "antd";
 import { create } from "zustand";
 import type { ChatMode, SessionMeta } from "@super-client/shared-types/project";
+import { createLogger } from "../services/logService";
 import { gitService } from "../services/gitService";
 import { remoteSessionService } from "../services/remoteSessionService";
 import type {
@@ -26,6 +27,8 @@ import type { Message } from "./chatMessageStore";
 import { useFileArtifactStore } from "./fileArtifactStore";
 import { useProjectStore } from "./projectStore";
 import { useSessionListStore } from "./sessionListStore";
+
+const log = createLogger("chatStore");
 
 // R-3 step 2: re-export message-related types for backward-compat with existing
 // `import type { Message } from "../stores/chatStore"` callsites. New code
@@ -131,7 +134,7 @@ async function readSessionMessages(
 		);
 		if (res.success && res.data) return res.data;
 	} catch (err) {
-		console.error("[chatStore] sessions.readMessages failed:", err);
+		log.error("sessions.readMessages failed", err instanceof Error ? err : new Error(String(err)));
 	}
 	return [];
 }
@@ -167,7 +170,7 @@ async function readSessionMessagesPage(
 			total: fallback.length,
 		};
 	} catch (err) {
-		console.error("[chatStore] sessions.readMessagesPage failed:", err);
+		log.error("sessions.readMessagesPage failed", err instanceof Error ? err : new Error(String(err)));
 	}
 	return { messages: [], hasMore: false, total: 0 };
 }
@@ -283,10 +286,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 				chatMode: "agent",
 			});
 			if (!res.success || !res.data) {
-				console.error(
-					"[chatStore] sessions.create failed:",
-					res.error ?? "unknown",
-				);
+				log.error("sessions.create failed", undefined, {
+						error: res.error ?? "unknown",
+					});
 				return null;
 			}
 			const meta = res.data;
@@ -316,7 +318,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			useSessionListStore.getState().setCurrent(meta.id);
 			return meta.id;
 		} catch (error) {
-			console.error("[chatStore] Failed to create conversation:", error);
+			log.error("Failed to create conversation", error instanceof Error ? error : new Error(String(error)));
 		}
 		return null;
 	},
@@ -362,12 +364,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 					}
 				} catch (err) {
 					message.warning("对话已创建，但绑定 IM bot 失败");
-					console.warn("[chatStore] remoteChat.bind failed:", err);
+					log.warn("remoteChat.bind failed", { error: err });
 				}
 			}
 			return newId;
 		} catch (error) {
-			console.error("[chatStore] createConversationAdvanced failed:", error);
+			log.error("createConversationAdvanced failed", error instanceof Error ? error : new Error(String(error)));
 			message.error("创建对话失败");
 			return null;
 		}
@@ -405,7 +407,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			useChatMessageStore.getState().setMessages(page.messages);
 			useChatMessageStore.getState().setHasOlderMessages(page.hasMore);
 		} catch (error) {
-			console.error("[chatStore] Failed to load messages:", error);
+			log.error("Failed to load messages", error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			useChatMessageStore.getState().setLoadingMessages(false);
 		}
@@ -431,7 +433,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			store.setMessages([...page.messages, ...store.messages]);
 			store.setHasOlderMessages(page.hasMore);
 		} catch (error) {
-			console.error("[chatStore] Failed to load older messages:", error);
+			log.error("Failed to load older messages", error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			useChatMessageStore.getState().setLoadingOlderMessages(false);
 		}
@@ -471,10 +473,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 				try {
 					await remoteSessionService.unbind(conversationId);
 				} catch (err) {
-					console.warn(
-						"[chatStore] remote unbind failed; continuing local cleanup:",
-						err,
-					);
+					log.warn("remote unbind failed; continuing local cleanup", {
+							error: err,
+						});
 				}
 			}
 			useFileArtifactStore.getState().clearForConversation(conversationId);
@@ -499,13 +500,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 					useChatMessageStore.getState().setMessages(page.messages);
 					useChatMessageStore.getState().setHasOlderMessages(page.hasMore);
 				} catch (err) {
-					console.error("[chatStore] failed to load next messages:", err);
+					log.error("failed to load next messages", err instanceof Error ? err : new Error(String(err)));
 				} finally {
 					useChatMessageStore.getState().setLoadingMessages(false);
 				}
 			}
 		} catch (error) {
-			console.error("[chatStore] Failed to delete conversation:", error);
+			log.error("Failed to delete conversation", error instanceof Error ? error : new Error(String(error)));
 		}
 	},
 
@@ -567,7 +568,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			messageStore.setMessages(page.messages);
 			messageStore.setHasOlderMessages(page.hasMore);
 		} catch (err) {
-			console.error("[chatStore] failed to load fallback messages:", err);
+			log.error("failed to load fallback messages", err instanceof Error ? err : new Error(String(err)));
 			messageStore.setMessages([]);
 		} finally {
 			useChatMessageStore.getState().setLoadingMessages(false);
@@ -584,7 +585,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 				),
 			}));
 		} catch (error) {
-			console.error("[chatStore] Failed to rename conversation:", error);
+			log.error("Failed to rename conversation", error instanceof Error ? error : new Error(String(error)));
 		}
 	},
 
@@ -636,9 +637,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 				}),
 			}));
 		} catch (error) {
-			console.error(
-				"[chatStore] Failed to update conversation metadata:",
-				error,
+			log.error(
+				"Failed to update conversation metadata",
+				error instanceof Error ? error : new Error(String(error)),
 			);
 		}
 	},
@@ -667,7 +668,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			message.success("已派生到本地");
 			return res.data.id;
 		} catch (error) {
-			console.error("[chatStore] forkConversationLocal failed:", error);
+			log.error("forkConversationLocal failed", error instanceof Error ? error : new Error(String(error)));
 			message.error("派生失败");
 			return null;
 		}
@@ -728,7 +729,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 			message.success("已派生到新工作树");
 			return newId;
 		} catch (error) {
-			console.error("[chatStore] forkConversationWorktree failed:", error);
+			log.error("forkConversationWorktree failed", error instanceof Error ? error : new Error(String(error)));
 			message.error("派生到工作树失败");
 			return null;
 		}

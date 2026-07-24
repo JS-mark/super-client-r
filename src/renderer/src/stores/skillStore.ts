@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { skillService } from "../services/skillService";
+import { createLogger } from "../services/logService";
 import type { Skill } from "../types/skills";
+
+const log = createLogger("skillStore");
 
 interface SkillState {
 	installedSkills: Skill[];
@@ -68,7 +71,7 @@ export const useSkillStore = create<SkillState>()(
 						isLoading: false,
 					});
 				} catch (error) {
-					console.error("Failed to fetch market skills", error);
+					log.error("Failed to fetch market skills", error instanceof Error ? error : new Error(String(error)));
 					set({ isLoading: false });
 				}
 			},

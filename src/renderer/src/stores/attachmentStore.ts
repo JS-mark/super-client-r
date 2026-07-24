@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("attachmentStore");
 
 export type AttachmentType =
 	| "image"
@@ -141,7 +144,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 						set({ attachments: result.data.attachments });
 					}
 				} catch (error) {
-					console.error("Failed to load attachments:", error);
+					log.error("Failed to load attachments", error instanceof Error ? error : new Error(String(error)));
 				} finally {
 					set({ isLoading: false });
 				}
@@ -193,7 +196,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 					}
 					return null;
 				} catch (error) {
-					console.error("Failed to upload file:", error);
+					log.error("Failed to upload file", error instanceof Error ? error : new Error(String(error)));
 					get().clearUploadProgress(tempId);
 					return null;
 				}
@@ -213,7 +216,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 					}
 					return false;
 				} catch (error) {
-					console.error("Failed to delete attachment:", error);
+					log.error("Failed to delete attachment", error instanceof Error ? error : new Error(String(error)));
 					return false;
 				}
 			},
@@ -228,7 +231,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 					);
 					return result.success;
 				} catch (error) {
-					console.error("Failed to open attachment:", error);
+					log.error("Failed to open attachment", error instanceof Error ? error : new Error(String(error)));
 					return false;
 				}
 			},
@@ -244,7 +247,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 					}
 					return null;
 				} catch (error) {
-					console.error("Failed to read file content:", error);
+					log.error("Failed to read file content", error instanceof Error ? error : new Error(String(error)));
 					return null;
 				}
 			},

@@ -1,4 +1,7 @@
 import { create } from "zustand";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("SkinStore");
 
 interface SkinState {
 	activeSkinPluginId: string | null;
@@ -52,7 +55,7 @@ export const useSkinStore = create<SkinState>()((set) => ({
 			}
 			set(updates);
 		} catch (error) {
-			console.error("[SkinStore] Failed to initialize:", error);
+			log.error("Failed to initialize", error instanceof Error ? error : new Error(String(error)));
 		}
 	},
 }));
