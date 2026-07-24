@@ -63,6 +63,9 @@ import {
 import type { ProjectStorageService } from "./ProjectStorageService";
 import { isBlockedPath } from "../../utils/pathSafety";
 import { redactPath, type PrivacyRedactionContext } from "../privacy/redaction";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("SessionStorageService");
 
 const CASUAL_DIR = "casual-sessions";
 const PROJECTS_DIR = "projects";
@@ -368,11 +371,9 @@ export class SessionStorageService {
 			} catch (error) {
 				// Never block delete on downstream failure; the tombstone is
 				// already written, so the local delete is authoritative.
-				// eslint-disable-next-line no-console
-				console.warn(
-					`[SessionStorageService] remoteBindingSink failed for session ${sessionId}:`,
-					error instanceof Error ? error.message : String(error),
-				);
+				log.warn(`remoteBindingSink failed for session ${sessionId}`, {
+					error: error instanceof Error ? error.message : String(error),
+				});
 			}
 		}
 		return { deleted: true, tombstone };

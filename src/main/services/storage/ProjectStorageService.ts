@@ -32,6 +32,9 @@ import type {
 } from "@super-client/shared-types/project";
 import { hashCwd, normalizeCwd } from "./cwd";
 import { isBlockedPath } from "../../utils/pathSafety";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("ProjectStorageService");
 
 /** 物理目录布局（per user）：
  *
@@ -265,11 +268,9 @@ export class ProjectStorageService {
 			try {
 				this.archiveSessionsSink(id, archived);
 			} catch (error) {
-				// eslint-disable-next-line no-console
-				console.warn(
-					`[ProjectStorageService] archiveSessionsSink failed for project ${id}:`,
-					error instanceof Error ? error.message : String(error),
-				);
+				log.warn(`archiveSessionsSink failed for project ${id}`, {
+					error: error instanceof Error ? error.message : String(error),
+				});
 			}
 		}
 		return updated;
