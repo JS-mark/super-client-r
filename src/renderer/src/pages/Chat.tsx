@@ -44,6 +44,9 @@ import {
 	findPlanExecuteTurnMessageIds,
 } from "../lib/planExecute";
 import { createPlanDecisionSessionEvents } from "../lib/planEventPersistence";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("Chat");
 
 const { useToken } = theme;
 
@@ -111,7 +114,7 @@ function persistPlanDecisionEvents(
 	);
 	for (const event of events) {
 		window.electron.sessions.appendEvent(sessionId, event).catch((err) => {
-			console.warn("[Chat] Failed to persist plan decision event:", err);
+			log.warn("Failed to persist plan decision event", { error: err });
 		});
 	}
 }

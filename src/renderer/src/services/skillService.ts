@@ -1,4 +1,7 @@
 import type { Skill } from "../types/skills";
+import { createLogger } from "./logService";
+
+const log = createLogger("SkillService");
 
 // 模拟的 Skill 市场数据，参考 https://skillsmp.com/zh
 // 在实际生产环境中，这里应该调用 https://skillsmp.com/api/v1/skills/search 或读取 GitHub 仓库的 marketplace.json
@@ -22,7 +25,10 @@ const getProxyUrl = async (path: string) => {
 			if (!result.success) throw new Error(result.error);
 			serverPort = result.data!;
 		} catch (e) {
-			console.error("Failed to get server port", e);
+			log.error(
+				"Failed to get server port",
+				e instanceof Error ? e : new Error(String(e)),
+			);
 			return null;
 		}
 	}
@@ -39,7 +45,10 @@ const getApiKey = async (): Promise<string | null> => {
 		apiKey = result.data!;
 		return apiKey;
 	} catch (e) {
-		console.error("Failed to get API key", e);
+		log.error(
+			"Failed to get API key",
+			e instanceof Error ? e : new Error(String(e)),
+		);
 		return null;
 	}
 };
@@ -68,7 +77,7 @@ export const skillService = {
 			if (!url) throw new Error("Proxy URL not available");
 
 			const key = await getApiKey();
-			console.log("[SkillService] Fetching:", url);
+			log.debug("Fetching", { url });
 
 			const response = await fetch(url, {
 				headers: {
@@ -78,11 +87,11 @@ export const skillService = {
 				},
 			});
 
-			console.log("[SkillService] Response status:", response.status);
+			log.debug("Response status", { status: response.status });
 
 			if (response.ok) {
 				const result = await response.json();
-				console.log("[SkillService] Response data:", result);
+				log.debug("Response data", { result });
 
 				// 处理 SkillsMP API 格式: { success: true, data: { skills: [...], pagination: {...} } }
 				let skills: Skill[] = [];
@@ -113,21 +122,23 @@ export const skillService = {
 					skills = result.skills;
 					total = result.total || skills.length;
 				} else {
-					console.warn("[SkillService] Unexpected response format:", result);
+					log.warn("Unexpected response format", { result });
 				}
 
 				return { skills, total };
 			} else {
 				const errorText = await response.text();
-				console.warn(
-					"[SkillService] API request failed:",
-					response.status,
-					response.statusText,
+				log.warn("API request failed", {
+					status: response.status,
+					statusText: response.statusText,
 					errorText,
-				);
+				});
 			}
 		} catch (error) {
-			console.error("[SkillService] Failed to fetch market skills:", error);
+			log.error(
+				"Failed to fetch market skills",
+				error instanceof Error ? error : new Error(String(error)),
+			);
 		}
 
 		// 降级使用 Mock 数据

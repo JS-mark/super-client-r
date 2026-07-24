@@ -28,6 +28,9 @@ import type {
 	AgentTeam,
 } from "@super-client/shared-types/agent-sdk";
 import { httpJson, sseStream } from "../localApiClient";
+import { createLogger } from "../logService";
+
+const log = createLogger("agentSDKService");
 
 // ─── In-renderer SSE dispatcher for /v1/agent/query ─────────────────────────
 
@@ -41,7 +44,7 @@ function dispatchStreamEvent(event: AgentSDKStreamEvent): void {
 		try {
 			cb(event);
 		} catch (err) {
-			console.error("[agentSDKService] stream listener threw:", err);
+			log.error("stream listener threw", err instanceof Error ? err : new Error(String(err)));
 		}
 	}
 }
@@ -114,7 +117,7 @@ export async function interruptQuery(requestId: string): Promise<boolean> {
 		try {
 			controller.abort();
 		} catch (err) {
-			console.error("[agentSDKService] abort threw:", err);
+			log.error("abort threw", err instanceof Error ? err : new Error(String(err)));
 		}
 		activeStreams.delete(requestId);
 	}
@@ -129,7 +132,7 @@ export async function interruptQuery(requestId: string): Promise<boolean> {
 		);
 		return data?.interrupted ?? !!controller;
 	} catch (err) {
-		console.error("[agentSDKService] interrupt HTTP failed:", err);
+		log.error("interrupt HTTP failed", err instanceof Error ? err : new Error(String(err)));
 		return !!controller; // local abort already happened
 	}
 }
@@ -207,7 +210,7 @@ export async function resolvePermission(
 		});
 		return true;
 	} catch (err) {
-		console.error("[agentSDKService] approval HTTP failed:", err);
+		log.error("approval HTTP failed", err instanceof Error ? err : new Error(String(err)));
 		throw err instanceof Error ? err : new Error(String(err));
 	}
 }

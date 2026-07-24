@@ -12,6 +12,9 @@
  */
 
 import type { Tiktoken } from "js-tiktoken/lite";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("tokenizer");
 
 type TiktokenLoader = (encoding: "cl100k_base") => Tiktoken;
 
@@ -37,7 +40,7 @@ async function loadEncoder(): Promise<Tiktoken> {
 		})().catch((err) => {
 			// 加载失败：清空 promise 以便后续重试，但下一次也只能走 fallback
 			encoderPromise = null;
-			console.warn("[tokenizer] failed to load js-tiktoken:", err);
+			log.warn("failed to load js-tiktoken", { error: err });
 			throw err;
 		});
 	}
