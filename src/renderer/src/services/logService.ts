@@ -78,7 +78,11 @@ export function createLogger(
 		meta?: unknown,
 		error?: Error,
 	) => {
-		window.electron.log.rendererLog({
+		// The IPC bridge may be absent during early boot / teardown / tests.
+		// Logging must never throw, so degrade silently when it isn't wired up.
+		const log = window.electron?.log;
+		if (!log?.rendererLog) return;
+		log.rendererLog({
 			level,
 			message,
 			module,
