@@ -14,6 +14,9 @@
 
 import { create } from "zustand";
 import type { ChatMode, SessionMeta } from "@super-client/shared-types/project";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("sessionListStore");
 
 interface SessionListState {
 	casual: SessionMeta[];
@@ -57,7 +60,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 				set({ loaded: true });
 			}
 		} catch (err) {
-			console.warn("[sessionListStore] loadCasual failed:", err);
+			log.warn("loadCasual failed", { error: err });
 			set({ loaded: true });
 		}
 	},
@@ -74,7 +77,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 				set({ loaded: true });
 			}
 		} catch (err) {
-			console.warn(`[sessionListStore] loadProject(${projectId}) failed:`, err);
+			log.warn(`loadProject(${projectId}) failed`, { error: err });
 			set({ loaded: true });
 		}
 	},
@@ -90,7 +93,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 			}
 			return null;
 		} catch (err) {
-			console.warn("[sessionListStore] create failed:", err);
+			log.warn("create failed", { error: err });
 			return null;
 		}
 	},
@@ -107,7 +110,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 			}
 			return true;
 		} catch (err) {
-			console.warn("[sessionListStore] delete failed:", err);
+			log.warn("delete failed", { error: err });
 			return false;
 		}
 	},
@@ -119,7 +122,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 				upsertInBucket(res.data);
 			}
 		} catch (err) {
-			console.warn("[sessionListStore] rename failed:", err);
+			log.warn("rename failed", { error: err });
 		}
 	},
 
@@ -130,7 +133,7 @@ export const useSessionListStore = create<SessionListState>()((set, get) => ({
 				upsertInBucket(res.data);
 			}
 		} catch (err) {
-			console.warn("[sessionListStore] updateMeta failed:", err);
+			log.warn("updateMeta failed", { error: err });
 		}
 	},
 

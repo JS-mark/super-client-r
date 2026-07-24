@@ -16,6 +16,9 @@ import type {
 	Project,
 	ProjectSettings,
 } from "@super-client/shared-types/project";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("projectStore");
 
 interface ProjectState {
 	projects: Project[];
@@ -75,7 +78,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 				set({ loaded: true });
 			}
 		} catch (err) {
-			console.warn("[projectStore] load failed:", err);
+			log.warn("load failed", { error: err });
 			set({ loaded: true });
 		}
 	},
@@ -94,7 +97,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			}
 			return null;
 		} catch (err) {
-			console.warn("[projectStore] add failed:", err);
+			log.warn("add failed", { error: err });
 			return null;
 		}
 	},
@@ -111,7 +114,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			});
 			return project;
 		} catch (err) {
-			console.warn("[projectStore] pickAndAdd failed:", err);
+			log.warn("pickAndAdd failed", { error: err });
 			return null;
 		}
 	},
@@ -126,7 +129,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 				}));
 			}
 		} catch (err) {
-			console.warn("[projectStore] rename failed:", err);
+			log.warn("rename failed", { error: err });
 		}
 	},
 
@@ -140,7 +143,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 				}));
 			}
 		} catch (err) {
-			console.warn("[projectStore] pin failed:", err);
+			log.warn("pin failed", { error: err });
 		}
 	},
 
@@ -154,7 +157,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 				}));
 			}
 		} catch (err) {
-			console.warn("[projectStore] markFirstRunSeen failed:", err);
+			log.warn("markFirstRunSeen failed", { error: err });
 		}
 	},
 
@@ -173,7 +176,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 				}));
 			}
 		} catch (err) {
-			console.warn("[projectStore] archive failed:", err);
+			log.warn("archive failed", { error: err });
 		}
 	},
 
@@ -190,7 +193,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			});
 			return project;
 		} catch (err) {
-			console.warn("[projectStore] createWorktree failed:", err);
+			log.warn("createWorktree failed", { error: err });
 			throw err;
 		}
 	},
@@ -207,7 +210,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			}
 			return res.success && res.data ? res.data : null;
 		} catch (err) {
-			console.warn("[projectStore] remove failed:", err);
+			log.warn("remove failed", { error: err });
 			return null;
 		}
 	},
@@ -225,7 +228,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			}));
 			return settings;
 		} catch (err) {
-			console.warn("[projectStore] loadSettings failed:", err);
+			log.warn("loadSettings failed", { error: err });
 			set((state) => ({
 				settingsByProject: { ...state.settingsByProject, [id]: {} },
 			}));
@@ -247,7 +250,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 			}
 			return null;
 		} catch (err) {
-			console.warn("[projectStore] saveSettings failed:", err);
+			log.warn("saveSettings failed", { error: err });
 			return null;
 		}
 	},
