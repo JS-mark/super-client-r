@@ -8,6 +8,9 @@ import {
 	type SettingsNavigationKey,
 } from "../lib/settingsNavigation";
 import { type AppInfo, appService } from "../services/appService";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("Settings");
 
 function isSettingsNavigationKey(
 	value: string,
@@ -38,7 +41,15 @@ const Settings: React.FC = () => {
 	}, [searchParams, navigate]);
 
 	useEffect(() => {
-		appService.getInfo().then(setAppInfo).catch(console.error);
+		appService
+			.getInfo()
+			.then(setAppInfo)
+			.catch((error) =>
+				log.error(
+					"Failed to load app info",
+					error instanceof Error ? error : new Error(String(error)),
+				),
+			);
 
 		const handleNavigate = (_event: unknown, ...args: unknown[]) => {
 			const path = args[0] as string;
