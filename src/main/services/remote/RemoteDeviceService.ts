@@ -16,6 +16,9 @@ import type {
 	RemoteDeviceMode,
 	RelayConfig,
 } from "./types";
+import { logger } from "../../utils/logger";
+
+const log = logger.withContext("RemoteDevice");
 
 /**
  * 远程设备管理服务
@@ -90,14 +93,14 @@ export class RemoteDeviceService extends EventEmitter {
 		this.wss = new WebSocketServer({ port });
 
 		this.wss.on("connection", (ws: WebSocket, req) => {
-			console.log("[RemoteDevice] Device connected:", req.socket.remoteAddress);
+			log.info("Device connected", { value: req.socket.remoteAddress });
 
 			ws.on("message", (data: Buffer) => {
 				try {
 					const message: WSMessage = JSON.parse(data.toString());
 					this.handleDeviceMessage(ws, message);
 				} catch (error) {
-					console.error("[RemoteDevice] Failed to parse message:", error);
+					log.error("Failed to parse message", error instanceof Error ? error : new Error(String(error)));
 				}
 			});
 
@@ -109,11 +112,11 @@ export class RemoteDeviceService extends EventEmitter {
 			});
 
 			ws.on("error", (error) => {
-				console.error("[RemoteDevice] WebSocket error:", error);
+				log.error("WebSocket error", error instanceof Error ? error : new Error(String(error)));
 			});
 		});
 
-		console.log(`[RemoteDevice] WebSocket server started on port ${port}`);
+		log.info(`WebSocket server started on port ${port}`);
 	}
 
 	/**
@@ -130,7 +133,7 @@ export class RemoteDeviceService extends EventEmitter {
 			}
 			this.deviceConnections.clear();
 
-			console.log("[RemoteDevice] WebSocket server stopped");
+			log.info("WebSocket server stopped");
 		}
 	}
 
@@ -152,18 +155,18 @@ export class RemoteDeviceService extends EventEmitter {
 		if (!this.relayConfig?.relayUrl || !this.relayConfig?.relayKey) return;
 
 		const { relayUrl, relayKey } = this.relayConfig;
-		console.log(`[RemoteDevice] Connecting to relay: ${relayUrl}`);
+		log.info(`Connecting to relay: ${relayUrl}`);
 
 		try {
 			this.relayWs = new WebSocket(relayUrl);
 		} catch (error) {
-			console.error("[RemoteDevice] Failed to create relay WebSocket:", error);
+			log.error("Failed to create relay WebSocket", error instanceof Error ? error : new Error(String(error)));
 			this.scheduleRelayReconnect();
 			return;
 		}
 
 		this.relayWs.on("open", () => {
-			console.log("[RemoteDevice] Connected to relay, sending auth...");
+			log.info("Connected to relay, sending auth...");
 			this.relayWs!.send(
 				JSON.stringify({
 					type: "relay_auth",
@@ -178,12 +181,12 @@ export class RemoteDeviceService extends EventEmitter {
 				const message: WSMessage = JSON.parse(data.toString());
 				this.handleRelayMessage(message);
 			} catch (error) {
-				console.error("[RemoteDevice] Failed to parse relay message:", error);
+				log.error("Failed to parse relay message", error instanceof Error ? error : new Error(String(error)));
 			}
 		});
 
 		this.relayWs.on("close", () => {
-			console.log("[RemoteDevice] Relay connection closed");
+			log.info("Relay connection closed");
 			this.relayWs = null;
 			if (this.mode === "relay") {
 				this.scheduleRelayReconnect();
@@ -191,7 +194,7 @@ export class RemoteDeviceService extends EventEmitter {
 		});
 
 		this.relayWs.on("error", (error) => {
-			console.error("[RemoteDevice] Relay WebSocket error:", error);
+			log.error("Relay WebSocket error", error instanceof Error ? error : new Error(String(error)));
 		});
 	}
 
@@ -202,15 +205,17 @@ export class RemoteDeviceService extends EventEmitter {
 		switch (message.type) {
 			case "relay_auth_ack":
 				if (message.success) {
-					console.log("[RemoteDevice] Relay auth successful (controller)");
+					log.info("Relay auth successful (controller)");
 				} else {
-					console.error("[RemoteDevice] Relay auth failed:", message.error);
+					log.error("Relay auth failed", undefined, {
+							error: message.error,
+						});
 				}
 				break;
 			case "relay_device_disconnected":
 				if (message.deviceId) {
-					console.log(
-						`[RemoteDevice] Relay: device disconnected: ${message.deviceId}`,
+					log.info(
+						`Relay: device disconnected: ${message.deviceId}`,
 					);
 					this.handleDeviceDisconnect(message.deviceId as string);
 				}
@@ -235,7 +240,7 @@ export class RemoteDeviceService extends EventEmitter {
 			this.relayWs = null;
 		}
 		this.relayConfig = null;
-		console.log("[RemoteDevice] Relay connection stopped");
+		log.info("Relay connection stopped");
 	}
 
 	/**
@@ -243,7 +248,7 @@ export class RemoteDeviceService extends EventEmitter {
 	 */
 	private scheduleRelayReconnect(): void {
 		if (this.relayReconnectTimer) return;
-		console.log("[RemoteDevice] Scheduling relay reconnect in 5s...");
+		log.info("Scheduling relay reconnect in 5s...");
 		this.relayReconnectTimer = setTimeout(() => {
 			this.relayReconnectTimer = null;
 			if (this.mode === "relay") {
@@ -327,7 +332,7 @@ export class RemoteDeviceService extends EventEmitter {
 				this.handleGetCwdResult(message as WSGetCwdResultMessage);
 				break;
 			default:
-				console.warn("[RemoteDevice] Unknown message type:", message.type);
+				log.warn("Unknown message type", { value: message.type });
 		}
 	}
 
@@ -343,7 +348,7 @@ export class RemoteDeviceService extends EventEmitter {
 		// 验证 Token
 		const device = this.devices.get(deviceId);
 		if (!device || device.authentication.token !== token) {
-			console.warn(`[RemoteDevice] Invalid token for device: ${deviceId}`);
+			log.warn(`Invalid token for device: ${deviceId}`);
 			if (this.mode === "relay") {
 				this.sendToDevice(deviceId, {
 					type: "register_ack",
@@ -393,8 +398,8 @@ export class RemoteDeviceService extends EventEmitter {
 
 		// 触发事件
 		this.emit("device-online", device);
-		console.log(
-			`[RemoteDevice] Device registered: ${device.name} (${deviceId})`,
+		log.info(
+			`Device registered: ${device.name} (${deviceId})`,
 		);
 	}
 
@@ -488,8 +493,8 @@ export class RemoteDeviceService extends EventEmitter {
 			}
 
 			this.emit("device-offline", device);
-			console.log(
-				`[RemoteDevice] Device disconnected: ${device.name} (${deviceId})`,
+			log.info(
+				`Device disconnected: ${device.name} (${deviceId})`,
 			);
 		}
 	}
@@ -667,8 +672,8 @@ export class RemoteDeviceService extends EventEmitter {
 		};
 
 		this.devices.set(newDevice.id, newDevice);
-		console.log(
-			`[RemoteDevice] Device registered: ${newDevice.name} (${newDevice.id})`,
+		log.info(
+			`Device registered: ${newDevice.name} (${newDevice.id})`,
 		);
 
 		return newDevice;
@@ -691,7 +696,7 @@ export class RemoteDeviceService extends EventEmitter {
 		}
 
 		this.devices.delete(deviceId);
-		console.log(`[RemoteDevice] Device removed: ${device.name} (${deviceId})`);
+		log.info(`Device removed: ${device.name} (${deviceId})`);
 
 		return true;
 	}
@@ -717,7 +722,7 @@ export class RemoteDeviceService extends EventEmitter {
 		for (const device of devices) {
 			this.devices.set(device.id, { ...device, status: "offline" });
 		}
-		console.log(`[RemoteDevice] Loaded ${devices.length} devices from storage`);
+		log.info(`Loaded ${devices.length} devices from storage`);
 	}
 
 	/**
