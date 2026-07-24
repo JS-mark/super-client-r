@@ -3,10 +3,12 @@ import { Dropdown, Tooltip, message, theme } from "antd";
 import type { MenuProps } from "antd";
 import * as React from "react";
 import { fileActionService } from "../../services/fileActionService";
+import { createLogger } from "../../services/logService";
 import { useProjectStore } from "../../stores/projectStore";
 import type { FileOpenTarget } from "../../types/electron";
 
 const { useToken } = theme;
+const log = createLogger("IdeAppSwitcher");
 
 interface BadgeStyle {
 	bg: string;
@@ -72,13 +74,11 @@ const AppIcon: React.FC<{ target: FileOpenTarget; size?: number }> = ({
 		let cancelled = false;
 		setIconUrl(null);
 		setFailed(false);
-		console.log(
-			`[IdeAppSwitcher] AppIcon mount for target=${target.id} appPath=${target.appPath ?? "(none)"}`,
+		log.debug(
+			`AppIcon mount for target=${target.id} appPath=${target.appPath ?? "(none)"}`,
 		);
 		if (!target.appPath) {
-			console.warn(
-				`[IdeAppSwitcher] AppIcon: no appPath for target ${target.id}`,
-			);
+			log.warn(`AppIcon: no appPath for target ${target.id}`);
 			return () => {
 				cancelled = true;
 			};
@@ -87,8 +87,8 @@ const AppIcon: React.FC<{ target: FileOpenTarget; size?: number }> = ({
 			try {
 				const resp = await fileActionService.getAppIcon(target.appPath!);
 				if (cancelled) return;
-				console.log(
-					`[IdeAppSwitcher] getAppIcon resp for ${target.id}: success=${resp.success} dataLen=${resp.data?.length ?? 0}`,
+				log.debug(
+					`getAppIcon resp for ${target.id}: success=${resp.success} dataLen=${resp.data?.length ?? 0}`,
 				);
 				if (resp.success && resp.data) {
 					setIconUrl(resp.data);
@@ -96,10 +96,7 @@ const AppIcon: React.FC<{ target: FileOpenTarget; size?: number }> = ({
 					setFailed(true);
 				}
 			} catch (err) {
-				console.warn(
-					`[IdeAppSwitcher] getAppIcon threw for ${target.id}:`,
-					err,
-				);
+				log.warn(`getAppIcon threw for ${target.id}`, { error: err });
 				if (!cancelled) setFailed(true);
 			}
 		})();

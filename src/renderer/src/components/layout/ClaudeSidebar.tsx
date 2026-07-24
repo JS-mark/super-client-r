@@ -45,6 +45,9 @@ import { useProjectStore, useSortedProjects } from "../../stores/projectStore";
 import { ProjectContextMenu } from "../project/ProjectContextMenu";
 import { ProjectSettingsModal } from "../project/ProjectSettingsModal";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("ClaudeSidebar");
 
 const { useToken } = theme;
 
@@ -469,7 +472,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 				setProjectsOpen(true);
 			}
 		} catch (err) {
-			console.error("Failed to create project:", err);
+			log.error("Failed to create project", err instanceof Error ? err : new Error(String(err)));
 			message.error("创建项目失败");
 		}
 	}, []);
@@ -501,7 +504,7 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 					.setCurrent(getProjectIdFromConversation(conv));
 				await useChatStore.getState().switchConversation(conversationId);
 			} catch (err) {
-				console.error("Failed to switch conversation:", err);
+				log.error("Failed to switch conversation", err instanceof Error ? err : new Error(String(err)));
 			}
 			navigate("/chat");
 		},

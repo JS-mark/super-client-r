@@ -25,6 +25,9 @@ import { ArchivedProjectsPanel } from "./ArchivedProjectsPanel";
 import { RemoteSessionsPanel } from "./RemoteSessionsPanel";
 import { RecoveryWizardPanel } from "./RecoveryWizardPanel";
 import { SettingSection } from "./SettingSection";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("RecoverySettings");
 
 const { Text } = Typography;
 const { useToken } = theme;
@@ -192,7 +195,7 @@ export function RecoverySettings() {
 				setLegacyInfo(legacyResult.data);
 			}
 		} catch (error) {
-			console.warn("[RecoverySettings] refresh failed:", error);
+			log.warn("refresh failed", { error: error });
 			message.error(
 				t(
 					"settingsNav.recovery.refreshError",
@@ -227,7 +230,7 @@ export function RecoverySettings() {
 					}),
 				);
 			} catch (error) {
-				console.warn("[RecoverySettings] orphan restore failed:", error);
+				log.warn("orphan restore failed", { error: error });
 				message.error(
 					t("settingsNav.recovery.orphanRestoreError", "Restore failed", {
 						ns: "settings",
@@ -259,7 +262,7 @@ export function RecoverySettings() {
 				}),
 			);
 		} catch (error) {
-			console.warn("[RecoverySettings] archived restore failed:", error);
+			log.warn("archived restore failed", { error: error });
 			message.error(
 				t("settingsNav.recovery.archivedRestoreError", "Restore failed", {
 					ns: "settings",
@@ -321,7 +324,7 @@ export function RecoverySettings() {
 							),
 						);
 					} catch (error) {
-						console.warn("[RecoverySettings] deleteOrphan failed:", error);
+						log.warn("deleteOrphan failed", { error: error });
 						message.error(
 							t("settingsNav.recovery.deleteOrphanError", "Delete failed", {
 								ns: "settings",
@@ -369,7 +372,7 @@ export function RecoverySettings() {
 							),
 						);
 					} catch (error) {
-						console.warn("[RecoverySettings] purgeTombstone failed:", error);
+						log.warn("purgeTombstone failed", { error: error });
 						message.error(
 							t("settingsNav.recovery.purgeTombstoneError", "Purge failed", {
 								ns: "settings",
@@ -449,7 +452,7 @@ export function RecoverySettings() {
 							),
 						);
 					} catch (error) {
-						console.warn("[RecoverySettings] relinkOrphan failed:", error);
+						log.warn("relinkOrphan failed", { error: error });
 						message.error(
 							t("settingsNav.recovery.relinkError", "Relink failed", {
 								ns: "settings",
@@ -496,7 +499,7 @@ export function RecoverySettings() {
 						),
 					);
 				} catch (error) {
-					console.warn("[RecoverySettings] legacyData.purge failed:", error);
+					log.warn("legacyData.purge failed", { error: error });
 					message.error(
 						t("settingsNav.recovery.legacyPurgeError", "Delete failed", {
 							ns: "settings",
@@ -693,7 +696,7 @@ export function RecoverySettings() {
 					),
 				);
 			} catch (error) {
-				console.warn("[RecoverySettings] session export failed:", error);
+				log.warn("session export failed", { error: error });
 				setExportFeedback({ type: "error", kind: "session", targetId: sessionId });
 				message.error(
 					t(
@@ -744,7 +747,7 @@ export function RecoverySettings() {
 					),
 				);
 			} catch (error) {
-				console.warn("[RecoverySettings] project export failed:", error);
+				log.warn("project export failed", { error: error });
 				setExportFeedback({ type: "error", kind: "project", targetId: projectId });
 				message.error(
 					t(
@@ -797,7 +800,7 @@ export function RecoverySettings() {
 				),
 			);
 		} catch (error) {
-			console.warn("[RecoverySettings] diagnostic export failed:", error);
+			log.warn("diagnostic export failed", { error: error });
 			setExportFeedback({
 				type: "error",
 				kind: "diagnostic",
@@ -853,7 +856,7 @@ export function RecoverySettings() {
 				),
 			);
 		} catch (error) {
-			console.warn("[RecoverySettings] bundle export failed:", error);
+			log.warn("bundle export failed", { error: error });
 			message.error(
 				t("settingsNav.recovery.bundleExportError", "Bundle export failed", {
 					ns: "settings",

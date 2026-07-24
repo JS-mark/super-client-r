@@ -13,6 +13,9 @@ import { FloatWidgetSettings } from "./FloatWidgetSettings";
 import { NetworkSettings } from "./NetworkSettings";
 import { SettingSection } from "./SettingSection";
 import { ThemeSettings } from "./ThemeSettings";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("GeneralSettings");
 
 const { useToken } = theme;
 
@@ -49,7 +52,7 @@ export const GeneralSettings: React.FC = () => {
 			const path = await withRetry(() => appService.getUserDataPath());
 			setUserDataPath(path);
 		} catch (e) {
-			console.error("Failed to load general settings:", e);
+			log.error("Failed to load general settings", e instanceof Error ? e : new Error(String(e)));
 		} finally {
 			setLoading(false);
 		}

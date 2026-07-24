@@ -11,6 +11,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { type ApiStatus, apiService } from "../../services/apiService";
 import { appService } from "../../services/appService";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("ApiServiceSettings");
 
 const { useToken } = theme;
 
@@ -42,7 +45,7 @@ export const ApiServiceSettings: React.FC = () => {
       setApiKey(key || "");
       form.setFieldsValue({ port: status.port || DEFAULT_PORT });
     } catch (e) {
-      console.error("Failed to load API status:", e);
+      log.error("Failed to load API status", e instanceof Error ? e : new Error(String(e)));
     } finally {
       setLoading(false);
     }

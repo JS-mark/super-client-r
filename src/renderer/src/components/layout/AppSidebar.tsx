@@ -63,6 +63,9 @@ import { ProjectContextMenu } from "../project/ProjectContextMenu";
 import { ProjectSettingsModal } from "../project/ProjectSettingsModal";
 import { SessionContextMenu } from "./SessionContextMenu";
 import { SidebarResizeHandle } from "./SidebarResizeHandle";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("AppSidebar");
 
 const { useToken } = theme;
 
@@ -334,7 +337,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 				message.success(`项目已添加：${project.name}`);
 			}
 		} catch (err) {
-			console.error("Failed to create project:", err);
+			log.error("Failed to create project", err instanceof Error ? err : new Error(String(err)));
 			message.error("创建项目失败");
 		}
 	}, []);
@@ -362,7 +365,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 			try {
 				await useChatStore.getState().switchConversation(conversationId);
 			} catch (err) {
-				console.error("Failed to switch conversation:", err);
+				log.error("Failed to switch conversation", err instanceof Error ? err : new Error(String(err)));
 			}
 			navigate("/chat");
 		},
@@ -382,7 +385,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 		try {
 			await window.electron.theme.set(next);
 		} catch (err) {
-			console.error("Failed to sync theme:", err);
+			log.error("Failed to sync theme", err instanceof Error ? err : new Error(String(err)));
 		}
 	}, []);
 

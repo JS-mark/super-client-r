@@ -16,6 +16,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { appService } from "../../services/appService";
 import { SearchSettings } from "./SearchSettings";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("ThirdPartyApiSettings");
 
 const { useToken } = theme;
 
@@ -131,7 +134,7 @@ export const ThirdPartyApiSettings: React.FC = () => {
 					return next;
 				});
 			} catch (e) {
-				console.error("Failed to load third-party API configs:", e);
+				log.error("Failed to load third-party API configs", e instanceof Error ? e : new Error(String(e)));
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
@@ -169,7 +172,7 @@ export const ThirdPartyApiSettings: React.FC = () => {
 				);
 				setTimeout(() => patchState(provider.id, { justSaved: false }), 1600);
 			} catch (e) {
-				console.error("Failed to save API key:", e);
+				log.error("Failed to save API key", e instanceof Error ? e : new Error(String(e)));
 				patchState(provider.id, { saving: false });
 				message.error(
 					t("thirdPartyApi.saveError", "Failed to save", { ns: "settings" }),
@@ -202,7 +205,7 @@ export const ThirdPartyApiSettings: React.FC = () => {
 			try {
 				await appService.openExternal(url);
 			} catch (e) {
-				console.error("Failed to open docs:", e);
+				log.error("Failed to open docs", e instanceof Error ? e : new Error(String(e)));
 			}
 		},
 		[],

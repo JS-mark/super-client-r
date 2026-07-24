@@ -16,6 +16,9 @@ import { Alert, Button, Modal, Typography, message } from "antd";
 import { LiteList as List } from "@/components/ui/LiteList";
 import { useEffect, useState } from "react";
 import { useChatStore } from "../../stores/chatStore";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("LegacyImportPrompt");
 
 const { Text } = Typography;
 
@@ -52,7 +55,7 @@ export function LegacyImportPrompt() {
 				setInfo(d);
 				setOpen(true);
 			} catch (err) {
-				console.warn("[LegacyImportPrompt] detect failed:", err);
+				log.warn("detect failed", { error: err });
 			}
 		})();
 		return () => {

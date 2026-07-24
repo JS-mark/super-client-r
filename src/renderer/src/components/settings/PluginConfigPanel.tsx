@@ -1,6 +1,9 @@
 import { Form, Input, InputNumber, Select, Switch, theme } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { pluginService } from "../../services/pluginService";
+import { createLogger } from "../../services/logService";
+
+const log = createLogger("PluginConfigPanel");
 
 const { useToken } = theme;
 
@@ -52,7 +55,7 @@ export function PluginConfigPanel({
 			try {
 				await pluginService.setStorage(pluginId, `config.${key}`, value);
 			} catch (error) {
-				console.error("Failed to save plugin config:", error);
+				log.error("Failed to save plugin config", error instanceof Error ? error : new Error(String(error)));
 			}
 		},
 		[pluginId],
