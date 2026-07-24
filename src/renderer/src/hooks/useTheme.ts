@@ -9,6 +9,9 @@ import {
 	type ThemeMode,
 	useThemeStore,
 } from "../stores/themeStore";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("useTheme");
 
 export function useTheme() {
 	const { mode, actualTheme, systemTheme, setMode, getEffectiveTheme, isDark } =
@@ -23,7 +26,7 @@ export function useTheme() {
 					useThemeStore.getState().setMode(response.data as ThemeMode);
 				}
 			} catch (error) {
-				console.error("Failed to load theme from main:", error);
+				log.error("Failed to load theme from main", error instanceof Error ? error : new Error(String(error)));
 			}
 		};
 		loadThemeFromMain();
@@ -53,7 +56,7 @@ export function useTheme() {
 		try {
 			await window.electron.theme.set(newMode);
 		} catch (error) {
-			console.error("Failed to sync theme to main:", error);
+			log.error("Failed to sync theme to main", error instanceof Error ? error : new Error(String(error)));
 		}
 	};
 

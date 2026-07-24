@@ -13,6 +13,9 @@ import type {
 	SkillTool,
 } from "../types/electron";
 import type { Skill } from "../types/skills";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("useSkill");
 
 export function useSkill() {
 	const [skills, setSkills] = useState<SkillManifest[]>([]);
@@ -43,7 +46,7 @@ export function useSkill() {
 			const data = await skillClient.listSkills();
 			setSkills(data);
 		} catch (error) {
-			console.error("Failed to load skills:", error);
+			log.error("Failed to load skills", error instanceof Error ? error : new Error(String(error)));
 		} finally {
 			setLoading(false);
 		}
@@ -107,7 +110,7 @@ export function useSkill() {
 			const data = await skillClient.getAllTools();
 			setTools(data);
 		} catch (error) {
-			console.error("Failed to load tools:", error);
+			log.error("Failed to load tools", error instanceof Error ? error : new Error(String(error)));
 		}
 	}, []);
 
@@ -145,7 +148,7 @@ export function useSkill() {
 			try {
 				await fetchMarketSkills(page, limit, domain);
 			} catch (error) {
-				console.error("Failed to load market skills:", error);
+				log.error("Failed to load market skills", error instanceof Error ? error : new Error(String(error)));
 			}
 		},
 		[fetchMarketSkills],
@@ -157,7 +160,7 @@ export function useSkill() {
 			try {
 				return await skillService.getSkillDetails(id);
 			} catch (error) {
-				console.error("Failed to get skill details:", error);
+				log.error("Failed to get skill details", error instanceof Error ? error : new Error(String(error)));
 				return undefined;
 			}
 		},

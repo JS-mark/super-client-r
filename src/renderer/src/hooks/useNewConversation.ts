@@ -16,6 +16,9 @@ import {
 } from "../stores/chatStore";
 import { useChatMessageStore } from "../stores/chatMessageStore";
 import type { ConversationSummary } from "../types/electron";
+import { createLogger } from "../services/logService";
+
+const log = createLogger("useNewConversation");
 
 const peerProjectId = getProjectIdFromConversation;
 
@@ -86,7 +89,7 @@ export function useNewConversation(
 				try {
 					await state.switchConversation(reusable.id);
 				} catch (err) {
-					console.error("Failed to reuse empty conversation:", err);
+					log.error("Failed to reuse empty conversation", err instanceof Error ? err : new Error(String(err)));
 				}
 				navigate("/chat");
 				return;
@@ -103,7 +106,7 @@ export function useNewConversation(
 					await state.createConversation(undefined, "agent");
 				}
 			} catch (err) {
-				console.error("Failed to create conversation:", err);
+				log.error("Failed to create conversation", err instanceof Error ? err : new Error(String(err)));
 			}
 			navigate("/chat");
 		},

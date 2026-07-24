@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { EffectiveSessionRuntime } from "@super-client/shared-types/chat";
+import { createLogger } from "../services/logService";
 import { runtimeService } from "../services/runtimeService";
 import {
 	getProjectIdFromConversation,
@@ -12,6 +13,8 @@ import type {
 	ModelProvider,
 	ProviderModel,
 } from "../types/models";
+
+const log = createLogger("useMessageModelResolution");
 
 export interface ProviderModelResolution {
 	provider: ModelProvider;
@@ -223,7 +226,7 @@ export function useMessageModelResolution(
 				if (res.success && res.data) return res.data;
 				return null;
 			} catch (err) {
-				console.warn("[useMessageModelResolution] resolveEffectiveRuntime failed:", err);
+				log.warn("resolveEffectiveRuntime failed", { error: err });
 				return null;
 			}
 		}, []);
@@ -239,9 +242,9 @@ export function useMessageModelResolution(
 					sourceForRuntimeModel(runtime.model, localEffective),
 				);
 			}
-			console.warn(
-				"[useMessageModelResolution] resolver returned model not present in useModelStore; falling back",
-				runtime.model,
+			log.warn(
+				"resolver returned model not present in useModelStore; falling back",
+				{ model: runtime.model },
 			);
 		}
 		return localEffective;

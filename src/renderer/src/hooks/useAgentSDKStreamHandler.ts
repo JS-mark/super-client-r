@@ -115,7 +115,6 @@ export function handleAgentSDKStreamEvent(
 			break;
 
 		case "status":
-			console.debug("[useChat] Agent SDK status:", event.status);
 			agentLog.info("Agent SDK status event", {
 				requestId: event.requestId,
 				status: event.status,
