@@ -5,14 +5,71 @@
  */
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { app, type BrowserWindow } from "electron";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { app, dialog, type BrowserWindow } from "electron";
 import { logger } from "../utils/logger";
 import { pathService } from "./pathService";
 import { getSkillService } from "./skill/SkillService";
 
 // 协议名称
 const PROTOCOL_SCHEME = "superclient";
+
+/** 协议参数里视为敏感、不得明文入日志的 key（大小写不敏感）。 */
+const SENSITIVE_PARAM_KEYS = new Set([
+	"code",
+	"token",
+	"access_token",
+	"refresh_token",
+	"id_token",
+	"state",
+	"client_secret",
+	"secret",
+	"password",
+]);
+
+/**
+ * 脱敏协议参数用于日志：命中敏感 key 的值打码，其余保留。
+ * 授权回调里的 code/token/state 绝不明文落日志。
+ */
+export function redactParams(
+	params: Record<string, string>,
+): Record<string, string> {
+	const out: Record<string, string> = {};
+	for (const [k, v] of Object.entries(params)) {
+		out[k] = SENSITIVE_PARAM_KEYS.has(k.toLowerCase()) && v ? "***" : v;
+	}
+	return out;
+}
+
+/**
+ * 把用户提供的 skill 名规范成安全的单段文件名（不含扩展名）。
+ * 拒绝路径分隔符、`..`、绝对路径；无效时返回 null。
+ */
+export function sanitizeSkillName(raw: string | undefined): string | null {
+	if (!raw) return null;
+	const name = raw.trim();
+	if (!name) return null;
+	// 不允许任何路径语义：分隔符、`..`、绝对路径、盘符
+	if (
+		name.includes("/") ||
+		name.includes("\\") ||
+		name.includes("\0") ||
+		name === "." ||
+		name === ".." ||
+		isAbsolute(name)
+	) {
+		return null;
+	}
+	return name;
+}
+
+/**
+ * 校验 filePath 规范化后仍落在 baseDir 内（防 `..` 穿越）。
+ */
+export function isInsideDir(baseDir: string, filePath: string): boolean {
+	const rel = relative(resolve(baseDir), resolve(filePath));
+	return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+}
 
 // 协议动作类型
 export type ProtocolAction =
@@ -66,7 +123,7 @@ export async function handleProtocolData(
 ): Promise<void> {
 	logger.info("Handling protocol action", {
 		action: data.action,
-		params: data.params,
+		params: redactParams(data.params),
 	});
 
 	switch (data.action) {
@@ -85,6 +142,38 @@ export async function handleProtocolData(
 }
 
 /**
+ * 远程 skill 导入前的用户确认弹窗。
+ * 无主窗口时（无 UI 上下文）保守拒绝，不静默落盘。
+ */
+async function confirmRemoteSkillImport(
+	url: string,
+	mainWindow?: BrowserWindow | null,
+): Promise<boolean> {
+	if (!mainWindow) return false;
+
+	let host = url;
+	try {
+		host = new URL(url).host || url;
+	} catch {
+		// 无法解析的 url 直接拒绝
+		return false;
+	}
+
+	const { response } = await dialog.showMessageBox(mainWindow, {
+		type: "warning",
+		buttons: ["取消", "导入"],
+		defaultId: 0,
+		cancelId: 0,
+		title: "导入外部 Skill",
+		message: "确认导入来自外部来源的 Skill？",
+		detail: `来源：${host}\n\nSkill 会被保存到本地并由应用加载执行。请确认你信任该来源。`,
+		noLink: true,
+	});
+
+	return response === 1;
+}
+
+/**
  * 处理 skill 导入
  * superclient://import-skill?url=https://example.com/skill.json
  */
@@ -99,6 +188,17 @@ async function handleImportSkill(
 		return;
 	}
 
+	// 安全：远程 skill 会落盘并被 skill 服务加载/执行，属于代码执行入口。
+	// 从任意 url 拉取前必须经用户显式确认，避免恶意深链静默植入 skill。
+	if (!(await confirmRemoteSkillImport(url, mainWindow))) {
+		logger.warn("Skill import cancelled by user", { url });
+		mainWindow?.webContents.send("protocol:skill-imported", {
+			success: false,
+			error: "cancelled",
+		});
+		return;
+	}
+
 	try {
 		// 下载 skill 配置
 		const response = await fetch(url);
@@ -107,7 +207,14 @@ async function handleImportSkill(
 		}
 
 		const skillConfig = (await response.json()) as { name?: string };
-		const skillName = name || skillConfig?.name || "imported-skill";
+
+		// 安全：skill 名只能来自可信来源且必须是安全的单段文件名。
+		// 优先用 url 显式 name，其次用下载内容里的 name；两者都要过 sanitize，
+		// 拒绝 `../`、绝对路径等穿越语义，否则 `name=../../x` 可写出 skills 目录。
+		const skillName =
+			sanitizeSkillName(name) ||
+			sanitizeSkillName(skillConfig?.name) ||
+			"imported-skill";
 
 		// 保存到 skills 目录
 		const skillsDir = join(pathService.getPaths().base, "skills");
@@ -116,6 +223,12 @@ async function handleImportSkill(
 		}
 
 		const skillPath = join(skillsDir, `${skillName}.json`);
+
+		// 双保险：规范化后的落点必须仍在 skillsDir 内。
+		if (!isInsideDir(skillsDir, skillPath)) {
+			throw new Error("Resolved skill path escapes skills directory");
+		}
+
 		writeFileSync(skillPath, JSON.stringify(skillConfig, null, 2));
 
 		// 重新加载 skill 服务
