@@ -21,6 +21,7 @@ import type {
 } from "../ipc/types";
 import type { RemoteControlEvent } from "../services/remote/types";
 import { ensureModelDefaults } from "../services/llm/modelNormalizer";
+import { encryptedKeyStore } from "./encryptedKeyStore";
 
 export type SearchProviderType =
 	| "zhipu"
@@ -535,26 +536,86 @@ export class StoreManager {
 
 	// ============ 搜索配置相关 ============
 
-	getSearchConfigs(): SearchConfig[] {
+	// E1 密钥安全改造：搜索配置的 apiKey 同样加密分表存储，getSearchConfigs
+	// 对外一律脱敏；主进程内部按 configId 用 getSearchConfigApiKey 解密取用。
+
+	private searchKeyRef(id: string): string {
+		return `searchConfig:${id}`;
+	}
+
+	private getRawSearchConfigs(): SearchConfig[] {
 		return this.configStore.get("searchConfigs") || [];
 	}
 
+	/** 对外返回的搜索配置——apiKey 一律脱敏为空串（密钥不出主进程）。 */
+	getSearchConfigs(): SearchConfig[] {
+		return this.getRawSearchConfigs().map((c) => ({ ...c, apiKey: "" }));
+	}
+
+	/** 主进程内部按 configId 解密取用搜索密钥；回退历史明文字段。 */
+	getSearchConfigApiKey(id: string): string {
+		const fromStore = encryptedKeyStore.getKey(this.searchKeyRef(id));
+		if (fromStore) return fromStore;
+		const legacy = this.getRawSearchConfigs().find((c) => c.id === id);
+		return legacy?.apiKey ?? "";
+	}
+
 	saveSearchConfig(config: SearchConfig): void {
-		const configs = this.getSearchConfigs();
+		const configs = this.getRawSearchConfigs();
 		const existingIndex = configs.findIndex((c) => c.id === config.id);
 
-		if (existingIndex >= 0) {
-			configs[existingIndex] = config;
-		} else {
-			configs.push(config);
+		// 空 apiKey 视为"不修改密钥"。
+		if (config.apiKey) {
+			encryptedKeyStore.setKey(this.searchKeyRef(config.id), config.apiKey);
 		}
-
-		this.configStore.set("searchConfigs", configs);
+		const sanitized: SearchConfig = { ...config, apiKey: "" };
+		if (existingIndex >= 0) {
+			configs[existingIndex] = sanitized;
+		} else {
+			configs.push(sanitized);
+		}
+		this.configStore.set(
+			"searchConfigs",
+			configs.map((c) => ({ ...c, apiKey: "" })),
+		);
 	}
 
 	deleteSearchConfig(id: string): void {
-		const configs = this.getSearchConfigs().filter((c) => c.id !== id);
-		this.configStore.set("searchConfigs", configs);
+		const configs = this.getRawSearchConfigs().filter((c) => c.id !== id);
+		this.configStore.set(
+			"searchConfigs",
+			configs.map((c) => ({ ...c, apiKey: "" })),
+		);
+		encryptedKeyStore.deleteKey(this.searchKeyRef(id));
+	}
+
+	/**
+	 * 明文 → 加密一次性迁移搜索配置密钥；清除 config 里的明文。幂等。
+	 * 加密不可用时不迁移。返回迁移条数。
+	 */
+	migrateSearchConfigKeys(): { migrated: number; available: boolean } {
+		if (!encryptedKeyStore.isAvailable()) {
+			return { migrated: 0, available: false };
+		}
+		const raw = this.getRawSearchConfigs();
+		let migrated = 0;
+		let dirty = false;
+		for (const c of raw) {
+			if (c.apiKey) {
+				if (!encryptedKeyStore.hasKey(this.searchKeyRef(c.id))) {
+					encryptedKeyStore.setKey(this.searchKeyRef(c.id), c.apiKey);
+					migrated++;
+				}
+				dirty = true;
+			}
+		}
+		if (dirty) {
+			this.configStore.set(
+				"searchConfigs",
+				raw.map((c) => ({ ...c, apiKey: "" })),
+			);
+		}
+		return { migrated, available: true };
 	}
 
 	setDefaultSearchProvider(provider: SearchProviderType | null): void {
@@ -564,10 +625,11 @@ export class StoreManager {
 			this.configStore.set("defaultSearchProvider", provider);
 		}
 
-		// Update isDefault flag on configs
-		const configs = this.getSearchConfigs();
+		// Update isDefault flag on configs（保持 apiKey 脱敏，密钥只在 keystore）
+		const configs = this.getRawSearchConfigs();
 		const updatedConfigs = configs.map((c) => ({
 			...c,
+			apiKey: "",
 			isDefault: c.provider === provider,
 		}));
 		this.configStore.set("searchConfigs", updatedConfigs);
@@ -602,10 +664,18 @@ export class StoreManager {
 	}
 
 	// ============ Model Provider 相关 ============
+	//
+	// E1 密钥安全改造：provider 的 apiKey **不再明文写入 config store**。
+	// 密钥经 safeStorage 加密后由 EncryptedKeyStore 分表落盘，主 config 里
+	// `apiKey` 字段仅作占位（对渲染端一律返回空串——密钥不出主进程）。
+	// 主进程内部按 providerId 用 `getModelProviderApiKey()` 解密取用。
 
-	getModelProviders(): ModelProvider[] {
+	/**
+	 * 从原始 config 记录里读出 provider 数组（含历史明文 apiKey），仅供内部
+	 * 迁移/解密逻辑使用，不直接对外暴露。
+	 */
+	private getRawModelProviders(): ModelProvider[] {
 		const raw = this.configStore.get("modelProviders") || [];
-		// Migrate old data: ensure all models have new required fields
 		return raw.map((provider: ModelProvider) => ({
 			...provider,
 			models: provider.models.map((m) =>
@@ -614,33 +684,126 @@ export class StoreManager {
 		}));
 	}
 
+	/**
+	 * 返回给渲染端 / IPC 层的 provider 列表——apiKey 一律脱敏为空串，
+	 * 密钥永不离开主进程。
+	 */
+	getModelProviders(): ModelProvider[] {
+		return this.getRawModelProviders().map((provider) => ({
+			...provider,
+			apiKey: "",
+		}));
+	}
+
 	getModelProvider(id: string): ModelProvider | undefined {
 		return this.getModelProviders().find((p) => p.id === id);
 	}
 
-	saveModelProvider(provider: ModelProvider): void {
-		const providers = this.getModelProviders();
+	/**
+	 * 主进程内部按 providerId 解密取用真实 apiKey。渲染端拿不到此方法。
+	 * 优先从加密 keystore 读；找不到再回退到历史明文字段（迁移前的旧数据）。
+	 */
+	getModelProviderApiKey(id: string): string {
+		const fromStore = encryptedKeyStore.getKey(this.providerKeyRef(id));
+		if (fromStore) return fromStore;
+		const legacy = this.getRawModelProviders().find((p) => p.id === id);
+		return legacy?.apiKey ?? "";
+	}
 
+	private providerKeyRef(id: string): string {
+		return `modelProvider:${id}`;
+	}
+
+	/**
+	 * 保存 provider。返回加密可用性，供上层（渲染端）在密钥无法加密落盘时
+	 * 向用户提示「仅内存不落盘」降级。空 apiKey 视为"不修改密钥"。
+	 */
+	saveModelProvider(provider: ModelProvider): {
+		encryptionAvailable: boolean;
+		keyPersisted: boolean;
+	} {
+		const providers = this.getRawModelProviders();
 		const existingIndex = providers.findIndex((p) => p.id === provider.id);
 
-		if (existingIndex >= 0) {
-			providers[existingIndex] = provider;
-		} else {
-			providers.push(provider);
+		// 空 apiKey 视为"不修改密钥"：沿用已存的密钥（渲染端保存时通常不回传
+		// 明文，只有用户明确输入了新 key 才更新）。
+		const incomingKey = provider.apiKey ?? "";
+		if (incomingKey) {
+			encryptedKeyStore.setKey(this.providerKeyRef(provider.id), incomingKey);
 		}
 
-		this.configStore.set("modelProviders", providers);
+		// 无论如何，写入 config 的记录都不含明文 apiKey。
+		const sanitized: ModelProvider = { ...provider, apiKey: "" };
+		if (existingIndex >= 0) {
+			providers[existingIndex] = sanitized;
+		} else {
+			providers.push(sanitized);
+		}
+		// 保底：清除任何历史残留的明文字段。
+		this.configStore.set(
+			"modelProviders",
+			providers.map((p) => ({ ...p, apiKey: "" })),
+		);
+
+		const encryptionAvailable = encryptedKeyStore.isAvailable();
+		return {
+			encryptionAvailable,
+			// 只有实际写了新密钥且加密可用时才算"已加密落盘"。
+			keyPersisted: incomingKey ? encryptionAvailable : true,
+		};
 	}
 
 	deleteModelProvider(id: string): void {
-		const providers = this.getModelProviders().filter((p) => p.id !== id);
-		this.configStore.set("modelProviders", providers);
+		const providers = this.getRawModelProviders().filter((p) => p.id !== id);
+		this.configStore.set(
+			"modelProviders",
+			providers.map((p) => ({ ...p, apiKey: "" })),
+		);
+		encryptedKeyStore.deleteKey(this.providerKeyRef(id));
 
 		// Clear active selection if it references the deleted provider
 		const active = this.getActiveModelSelection();
 		if (active?.providerId === id) {
 			this.configStore.delete("activeModelSelection" as keyof AppConfig);
 		}
+	}
+
+	/**
+	 * 明文 → 加密一次性迁移：把 config store 里历史明文 apiKey 读出、加密写入
+	 * keystore，并把 config 里的明文字段清空。幂等——重复调用无副作用。
+	 *
+	 * 加密不可用时（safeStorage 不可用）不迁移、不清明文（否则会丢失用户密钥），
+	 * 返回 available=false 供上层提示。
+	 */
+	migrateModelProviderKeys(): {
+		migrated: number;
+		available: boolean;
+	} {
+		const available = encryptedKeyStore.isAvailable();
+		if (!available) {
+			return { migrated: 0, available: false };
+		}
+		const raw = this.getRawModelProviders();
+		let migrated = 0;
+		let dirty = false;
+		for (const p of raw) {
+			if (p.apiKey) {
+				// 只有当 keystore 尚无该密钥时才写入，避免覆盖更新过的值。
+				if (!encryptedKeyStore.hasKey(this.providerKeyRef(p.id))) {
+					encryptedKeyStore.setKey(this.providerKeyRef(p.id), p.apiKey);
+					migrated++;
+				}
+				dirty = true;
+			}
+		}
+		if (dirty) {
+			// 原子重写 config：清除全部明文 apiKey 字段。
+			this.configStore.set(
+				"modelProviders",
+				raw.map((p) => ({ ...p, apiKey: "" })),
+			);
+		}
+		return { migrated, available: true };
 	}
 
 	getActiveModelSelection(): ActiveModelSelection | undefined {

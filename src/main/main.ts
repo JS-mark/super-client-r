@@ -30,7 +30,7 @@ import {
 } from "./ipc/service-holders";
 import { initializePluginManager } from "./ipc/api-impl";
 import { setupWindowEventListeners } from "./ipc/window-events";
-import { localServer } from "./server";
+import { localServer, migrateServerApiKey } from "./server";
 import { logDatabaseService } from "./services/log";
 import { pathService } from "./services/pathService";
 import {
@@ -492,6 +492,35 @@ app.whenReady().then(async () => {
 	appConfigService.initialize().catch((error) => {
 		logger.warn("Failed to initialize app config, using defaults", error);
 	});
+
+	// E1 密钥安全改造：把历史明文 apiKey（modelProviders / server sk- key）一次性
+	// 迁移到 safeStorage 加密的分表存储，并从 config 磁盘移除明文。幂等；
+	// 加密不可用时不迁移、不清明文（避免丢失用户密钥）。
+	try {
+		const providerMig = storeManager.migrateModelProviderKeys();
+		if (providerMig.migrated > 0) {
+			logger.info(
+				`Encrypted key migration: moved ${providerMig.migrated} provider key(s) to encrypted store`,
+			);
+		}
+		if (!providerMig.available) {
+			logger.warn(
+				"safeStorage encryption unavailable; provider keys stay plaintext-in-config until encryption is available (memory-only fallback for new keys)",
+			);
+		}
+		const searchMig = storeManager.migrateSearchConfigKeys();
+		if (searchMig.migrated > 0) {
+			logger.info(
+				`Encrypted key migration: moved ${searchMig.migrated} search config key(s) to encrypted store`,
+			);
+		}
+		migrateServerApiKey();
+	} catch (error) {
+		logger.error(
+			"Encrypted key migration failed",
+			error instanceof Error ? error : new Error(String(error)),
+		);
+	}
 
 	// E-7: ConversationStorageService 仍被 main 端 5 个 runtime 服务（SessionRuntimeResolver
 	// / AttachmentContextResolver / ApprovalGrantStore / RemoteChatBridge / conversationCwd）
