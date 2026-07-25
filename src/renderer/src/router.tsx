@@ -10,6 +10,7 @@ import ErrorPage from "./pages/Error";
 import FloatWidget from "./pages/FloatWidget";
 import Login from "./pages/Login";
 import McpMarket from "./pages/McpMarket";
+import Models from "./pages/Models";
 import PluginPage from "./pages/PluginPage";
 import Plugins from "./pages/Plugins";
 import Settings from "./pages/Settings";
@@ -49,6 +50,12 @@ export const appRoutes: RouteObject[] = [
 		element: <Chat />,
 		errorElement: <ErrorPage />,
 		handle: { title: APP_ROUTE_TITLES.chat },
+	},
+	{
+		path: APP_ROUTE_PATHS.models,
+		element: <Models />,
+		errorElement: <ErrorPage />,
+		handle: { title: APP_ROUTE_TITLES.models },
 	},
 	{
 		path: APP_ROUTE_PATHS.skills,
