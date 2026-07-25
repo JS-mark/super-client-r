@@ -15,7 +15,10 @@ interface ModelState {
 	// Actions
 	loadProviders: () => Promise<void>;
 	loadActiveModel: () => Promise<void>;
-	saveProvider: (provider: ModelProvider) => Promise<void>;
+	saveProvider: (provider: ModelProvider) => Promise<{
+		encryptionAvailable: boolean;
+		keyPersisted: boolean;
+	} | null>;
 	deleteProvider: (id: string) => Promise<void>;
 	setActiveModel: (selection: ActiveModelSelection | null) => Promise<void>;
 	updateModelConfig: (
@@ -71,14 +74,17 @@ export const useModelStore = create<ModelState>()(
 					set((state) => {
 						const providers = [...state.providers];
 						const idx = providers.findIndex((p) => p.id === provider.id);
+						// E1: 密钥不出主进程——本地 store 里也不保留明文 apiKey。
+						const sanitized = { ...provider, apiKey: "" };
 						if (idx >= 0) {
-							providers[idx] = provider;
+							providers[idx] = sanitized;
 						} else {
-							providers.push(provider);
+							providers.push(sanitized);
 						}
 						return { providers };
 					});
 				}
+				return result.data ?? null;
 			},
 
 			deleteProvider: async (id: string) => {

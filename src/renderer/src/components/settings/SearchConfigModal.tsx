@@ -150,7 +150,9 @@ export function SearchConfigModal({
 					form.setFieldsValue({
 						provider: editingConfig.provider,
 						name: editingConfig.name,
-						apiKey: editingConfig.apiKey,
+						// E1: 密钥不出主进程，getConfigs 返回的 apiKey 恒为空。编辑时
+						// 留空表示沿用已保存密钥，仅当用户输入新值才更新。
+						apiKey: "",
 						apiUrl: editingConfig.apiUrl,
 						enabled: editingConfig.enabled,
 					});

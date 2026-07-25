@@ -39,7 +39,12 @@ export interface ValidateConfigResponse {
 export interface SearchExecuteRequest {
 	provider: string;
 	query: string;
-	apiKey: string;
+	/**
+	 * E1：优先传 configId 让主进程按已保存配置解密取用密钥（密钥不出主进程）。
+	 * apiKey 仅用于「未保存配置的一次性校验」。
+	 */
+	configId?: string;
+	apiKey?: string;
 	apiUrl?: string;
 	maxResults?: number;
 	config?: Record<string, unknown>;

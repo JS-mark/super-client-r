@@ -13,7 +13,13 @@ class SearchService {
 		const startTime = Date.now();
 		const maxResults = request.maxResults ?? 5;
 
-		const results = await this.dispatchSearch(request, maxResults);
+		// 归一化：内部各 provider 期望 apiKey 为 string（密钥由主进程 IPC 层按
+		// configId 解密后注入；未保存配置的一次性校验直接带 apiKey）。
+		const normalized: SearchExecuteRequest = {
+			...request,
+			apiKey: request.apiKey ?? "",
+		};
+		const results = await this.dispatchSearch(normalized, maxResults);
 
 		return {
 			results,
@@ -164,7 +170,7 @@ class SearchService {
 		maxResults: number,
 	): Promise<SearchResult[]> {
 		// apiKey format: "API_KEY:CX_ID" or config.cx provided separately
-		let apiKey = request.apiKey;
+		let apiKey = request.apiKey ?? "";
 		let cx = (request.config?.cx as string) ?? "";
 		if (!cx && apiKey.includes(":")) {
 			const parts = apiKey.split(":");

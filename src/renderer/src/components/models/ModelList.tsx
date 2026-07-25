@@ -168,7 +168,9 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 				preset: selectedProvider.preset,
 				name: selectedProvider.name,
 				baseUrl: selectedProvider.baseUrl,
-				apiKey: selectedProvider.apiKey,
+				// E1: 密钥不出主进程，listProviders 返回的 apiKey 恒为空。编辑时
+				// 留空表示"沿用已保存的密钥"，仅当用户输入新值才更新。
+				apiKey: "",
 				apiFormat:
 					selectedProvider.apiFormat ??
 					defaultApiFormatForPreset(selectedProvider.preset),
@@ -366,8 +368,16 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			};
 
 			try {
-				await saveProvider(provider);
-				message.success(t("messages.saveSuccess", { ns: "models" }));
+				const status = await saveProvider(provider);
+				// E1: safeStorage 不可用时密钥无法加密落盘，仅内存保留——绝不
+				// 静默明文落盘。这里明确提示用户当前处于"仅内存不落盘"降级。
+				if (values.apiKey && status && !status.encryptionAvailable) {
+					message.warning(
+						t("messages.encryptionUnavailable", { ns: "models" }),
+					);
+				} else {
+					message.success(t("messages.saveSuccess", { ns: "models" }));
+				}
 				if (isAdding) {
 					setIsAdding(false);
 					setSelectedProviderId(provider.id);
@@ -690,7 +700,13 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 										label={t("form.apiKey", { ns: "models" })}
 										help={t("form.apiKeyHelp", { ns: "models" })}
 									>
-										<Input.Password placeholder="sk-..." />
+										<Input.Password
+											placeholder={
+												!isAdding && selectedProvider
+													? t("form.apiKeySavedPlaceholder", { ns: "models" })
+													: "sk-..."
+											}
+										/>
 									</Form.Item>
 
 									<Form.Item

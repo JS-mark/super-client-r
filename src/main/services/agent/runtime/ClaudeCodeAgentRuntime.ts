@@ -469,7 +469,9 @@ export class ClaudeCodeAgentRuntime implements AgentRuntime {
 				requestId: req.requestId,
 				conversationId: req.conversationId,
 				baseUrl: provider?.baseUrl ?? "",
-				apiKey: provider?.apiKey ?? "",
+				// E1: getModelProviders() 返回脱敏后的记录（apiKey=""），主进程
+				// 内部按 providerId 解密取用真实密钥。
+				apiKey: provider ? storeManager.getModelProviderApiKey(provider.id) : "",
 				model: modelId,
 				providerPreset: provider?.preset,
 				apiFormat: provider?.apiFormat,

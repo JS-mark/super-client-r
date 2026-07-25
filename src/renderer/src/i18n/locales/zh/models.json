@@ -44,6 +44,7 @@
 		"apiKey": "API Key",
 		"apiKeyHelp": "您的 API 密钥用于认证",
 		"apiKeyPlaceholder": "sk-...",
+		"apiKeySavedPlaceholder": "已保存（如需更换请输入新密钥）",
 		"baseUrl": "Base URL",
 		"baseUrlHelp": "API 端点 URL",
 		"baseUrlPlaceholder": "https://api.example.com/v1",
@@ -58,6 +59,7 @@
 	"messages": {
 		"saveSuccess": "服务商保存成功",
 		"saveError": "保存服务商失败",
+		"encryptionUnavailable": "已保存，但当前系统无法加密存储密钥，密钥仅保留在内存中、重启后需重新输入",
 		"deleteSuccess": "服务商删除成功",
 		"deleteError": "删除服务商失败",
 		"testSuccess": "连接测试成功",

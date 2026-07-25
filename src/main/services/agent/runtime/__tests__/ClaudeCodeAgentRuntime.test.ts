@@ -35,13 +35,15 @@ vi.mock("../../../../server/config", () => ({
 
 vi.mock("../../../../store/StoreManager", () => ({
 	storeManager: {
+		// E1: getModelProviders 返回脱敏记录（apiKey=""），真实密钥经
+		// getModelProviderApiKey 在主进程内解密取用。
 		getModelProviders: () => [
 			{
 				id: "prov-1",
 				name: "Test Provider",
 				preset: "openai",
 				baseUrl: "https://prov.test/v1",
-				apiKey: "sk-prov",
+				apiKey: "",
 				apiFormat: "chat-completions",
 				enabled: true,
 				tested: true,
@@ -50,6 +52,8 @@ vi.mock("../../../../store/StoreManager", () => ({
 				updatedAt: 0,
 			},
 		],
+		getModelProviderApiKey: (id: string) =>
+			id === "prov-1" ? "sk-prov" : "",
 	},
 }));
 
