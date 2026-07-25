@@ -207,6 +207,27 @@ export class SubagentEventBridge {
 	}
 
 	/**
+	 * Cancel phase: user-initiated stop. Emits a terminal `subagent.updated`
+	 * carrying `status: "cancelled"` + `endedAt`, then drops the registration
+	 * so a subsequent `fail()` / `complete()` from the unwinding Task handler
+	 * becomes a no-op (no double terminal state).
+	 *
+	 * We reuse `updated` rather than adding a new product-event type: the
+	 * materializer + jsonl reducers already map the `cancelled` status to a
+	 * terminal `complete` part state, and inspector/card UIs already render a
+	 * `cancelled` chip. Returns `false` when the run was unknown (already
+	 * finished / never spawned) so callers can report an accurate result.
+	 */
+	cancel(subagentRunId: string): boolean {
+		const reg = this.runs.get(subagentRunId);
+		if (!reg) return false;
+		const endedAt = this.now();
+		this.update(subagentRunId, { status: "cancelled", endedAt });
+		this.runs.delete(subagentRunId);
+		return true;
+	}
+
+	/**
 	 * Fail phase: emits `subagent.failed` and drops the registration.
 	 * Safe to call even when spawn() was not (defensive: the Task tool may
 	 * throw before we ever registered), in which case it silently no-ops.

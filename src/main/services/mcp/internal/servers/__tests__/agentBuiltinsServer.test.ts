@@ -18,11 +18,17 @@ import {
 } from "../agentBuiltinsServer";
 import { SubagentEventBridge } from "../../../../agent/runtime/SubagentEventBridge";
 import { setSubagentEventBridge } from "../../../../agent/runtime/subagentBridgeRegistry";
+import {
+	_resetSubagentControlRegistryForTest,
+	cancelSubagentControl,
+	hasSubagentControl,
+} from "../../../../agent/runtime/subagentControlRegistry";
 
 const TMP = mkdtempSync(join(tmpdir(), "agent-builtins-test-"));
 afterAll(() => rmSync(TMP, { recursive: true, force: true }));
 afterEach(() => {
 	setSubagentEventBridge(null);
+	_resetSubagentControlRegistryForTest();
 	vi.unstubAllGlobals();
 });
 
@@ -503,6 +509,110 @@ describe("Task handler (HTTP recursion)", () => {
 			summary: "done",
 			toolCallCount: 2,
 		});
+	});
+
+	it("unregisters the control handle after a natural finish (finished runs can't be stopped)", async () => {
+		const emitted: AgentProductEvent[] = [];
+		setSubagentEventBridge(
+			new SubagentEventBridge({
+				emitSubagentEvent: (event) => emitted.push(event),
+				now: () => 1,
+			}),
+		);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockResolvedValue(
+				sseResponse([
+					{ event: "chunk", data: { content: "ok" } },
+					{ event: "done", data: {} },
+				]),
+			),
+		);
+		const server = createAgentBuiltinsServer();
+		await server.handlers.get("Task")!({
+			description: "inspect",
+			prompt: "Find things.",
+			_taskDepth: 0,
+			_provider: { baseUrl: "https://provider.test", apiKey: "sk", model: "m" },
+			_scpPort: 3000,
+			_scpApiKey: "api-key",
+			_parentRequestId: "parent-1",
+			_parentConversationId: "conv-1",
+		});
+		const spawned = emitted.find((e) => e.type === "subagent.spawned");
+		expect(spawned).toBeTruthy();
+		// finally-block unregistered the handle, so it can't be stopped anymore.
+		expect(hasSubagentControl(spawned!.subagentRunId!)).toBe(false);
+		expect(cancelSubagentControl(spawned!.subagentRunId!)).toBe(false);
+	});
+
+	it("cancel aborts the in-flight sub-stream and returns 'stopped by user' without emitting subagent.failed", async () => {
+		const emitted: AgentProductEvent[] = [];
+		setSubagentEventBridge(
+			new SubagentEventBridge({
+				emitSubagentEvent: (event) => emitted.push(event),
+				now: () => 1,
+			}),
+		);
+
+		// A fetch that only settles when its AbortSignal fires — models a
+		// long-running subagent stream we then stop mid-flight.
+		let abortCbInstalled: (() => void) | null = null;
+		const fetchMock = vi.fn(
+			(_url: string, init?: { signal?: AbortSignal }) =>
+				new Promise<Response>((_resolve, reject) => {
+					const signal = init?.signal;
+					if (!signal) return; // stop POST has no signal — ignore it here
+					const onAbort = () => {
+						reject(
+							Object.assign(new Error("aborted"), { name: "AbortError" }),
+						);
+					};
+					if (signal.aborted) onAbort();
+					else signal.addEventListener("abort", onAbort, { once: true });
+					abortCbInstalled = onAbort;
+				}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+
+		const server = createAgentBuiltinsServer();
+		const runPromise = server.handlers.get("Task")!({
+			description: "inspect",
+			prompt: "Find things.",
+			_taskDepth: 0,
+			_provider: { baseUrl: "https://provider.test", apiKey: "sk", model: "m" },
+			_scpPort: 3000,
+			_scpApiKey: "api-key",
+			_parentRequestId: "parent-1",
+			_parentConversationId: "conv-1",
+		});
+
+		// Wait a tick so spawn + registerSubagentControl have run.
+		await new Promise((r) => setTimeout(r, 0));
+		expect(abortCbInstalled).not.toBeNull();
+
+		// Find the spawned run id and cancel it via the control registry.
+		const spawned = emitted.find((e) => e.type === "subagent.spawned");
+		expect(spawned).toBeTruthy();
+		const subagentRunId = spawned!.subagentRunId!;
+		expect(hasSubagentControl(subagentRunId)).toBe(true);
+
+		const stopped = cancelSubagentControl(subagentRunId);
+		expect(stopped).toBe(true);
+
+		const result = await runPromise;
+		expect(result.isError).toBe(true);
+		expect(textOf(result)).toMatch(/stopped by user/i);
+		// No subagent.failed on top of a user cancel.
+		expect(emitted.some((e) => e.type === "subagent.failed")).toBe(false);
+		// The abort also fired a best-effort /v1/llm/stop POST (signal-less).
+		expect(
+			fetchMock.mock.calls.some((call) =>
+				String(call[0]).includes("/v1/llm/stop"),
+			),
+		).toBe(true);
+		// Control handle cleaned up in finally.
+		expect(hasSubagentControl(subagentRunId)).toBe(false);
 	});
 
 	// Note: the unit tests above cover both the depth-cap error path
