@@ -2077,3 +2077,36 @@ lint 中途多了 1 个 `no-useless-catch`(纯 rethrow 的 try/catch),已顺手�
 - **What worked**:`git stash` 对照法干净区分了"本批回归"与"pre-existing 环境失败"——symlink 测试和 e2e 端口 flake 都被证实与本批无关。CLAUDE.md 净增 193 行正好等于平台 runtime 块,佐证任务描述 `+262/-1183` 已把它排除在功能范围外。
 - **代码事实更新**:test 稳定基线 = **133 files / 1164 tests / 0 failed**(symlink 测试修复后 +1)。Settings 顶级 nav 仍 11 项,`agent` → `third-party-api`。macOS 性能监控内存指标现反映真实 available。
 - **是否继续 loop**:**否**。工作树 clean + 五道门禁全绿 + 进度文档已同步。收口 loop 关闭。
+
+## SUP-17 自动更新收口 (2026-07-25)
+
+electron-updater 此前只接了后端(`updateService` check/download/install + 6 事件、`update:*` channel、preload `update` API 经 registerAPI/createBridge 自动对齐、main.ts 生产环境启动自动 checkForUpdates),但 **renderer 侧没有任何状态机与事件订阅**,自动检查发现新版本用户完全看不到;设置页只有一个 `message.info` 的一次性按钮。本次把它收口成完整用户流程。
+
+### 改动
+
+- **后端安全 (SUP-8)**:`updateService.initialize` 新增 `enforceHttpsFeed()`,校验 `autoUpdater.getFeedURL()` 强制 https,非 https 源记录 error(防未签名 + 无签名校验下的更新链替换)。新增 `updateService.test.ts`(9 用例:https 校验、check/download/install 转发、6 事件转发)。
+- **前端流程 (SUP-17)**:新增 `updateStore`(zustand)状态机 `idle/checking/available/not-available/downloading/downloaded/error`,订阅 main→renderer 事件;`App.tsx` 挂载即订阅(store 幂等守卫),使生产环境自动检查结果对用户可见。`GeneralSettings` 更新区改为四态文案 + 下载进度条 + 下载/重启安装/重试按钮,并在有可安装更新时给出未签名首启指引(Gatekeeper/SmartScreen,对齐 REG-02)。en/zh i18n 补齐四态/进度/按钮/首启指引 key。
+
+### 验证
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff --check` | ✅ PASS | 无空白错误 |
+| `pnpm check`(tsc -b --noEmit) | ✅ PASS | exit 0 |
+| `pnpm lint`(oxlint .) | ✅ PASS | 2 warnings(pre-existing `no-this-alias` @ RequestLogService,无新增) |
+| `pnpm i18n:check` | ✅ PASS | en 通过 |
+| `pnpm test:run` | ✅ **147 files / 1309 tests / 0 failed** | 全量绿,含此前沙箱受阻的 server e2e |
+
+### REG-08 更新通道可用性结论(未签名场景,如实记录)
+
+- **配置事实**:`package.json` build 段**无任何签名/公证配置**(无 sign/notarize/identity/certificate/afterSign/hardenedRuntime)。mac target 含 `dmg` + `zip`,win 为 `nsis`,publish provider = GitHub(天然 https)。
+- **macOS**:electron-updater 增量自更新走 `zip`(已配置,dmg 不参与更新),**技术链路可走通**;但下载解压出的 .app **未签名/未公证**,Gatekeeper 在首次替换启动时会以 quarantine 属性拦截,需用户手动放行(右键打开 / 系统设置允许)。已在 UI 提供首启指引。
+- **Windows**:nsis 安装包未做 Authenticode 签名,自更新下载后运行安装时 **SmartScreen 会提示未知发布者**,需用户「更多信息 → 仍要运行」。链路可走通,拦截为一次性。已在 UI 提供指引。
+- **内测已知限制**:两平台自更新**技术上可端到端走通**,代价是每次更新用户需手动绕过系统首启拦截;正式发布前需补 Authenticode 签名 + macOS 公证才能消除该摩擦。这是内测期既定取舍(SUP-8),非缺陷。QA 的自动更新端到端(REG-08)由 QA 独立执行,本任务不重复。
+
+### 提交
+
+- `e048d2e feat(update): enforce https update feed + updateService tests`
+- `ac127f1 feat(update): wire full auto-update user flow with four-state UI`
+
+> CLAUDE.md 的 MULTICA-RUNTIME 块(auto-managed;do not edit)不纳入本任务 diff。
