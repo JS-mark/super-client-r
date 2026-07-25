@@ -51,6 +51,9 @@
 		"baseUrlRequired": "Base URL is required",
 		"apiFormat": "API Format",
 		"apiFormatHelp": "Wire format used to talk to this provider. Defaults are inferred from provider type.",
+		"saveUntestedTitle": "Connection not tested",
+		"saveUntestedContent": "This provider hasn't passed a connection test, so we can't confirm the configuration works. Save anyway? You can come back to test it at any time.",
+		"saveUntestedOk": "Save anyway",
 		"bailianAnthropicHint": {
 			"title": "Alibaba Cloud Bailian · Anthropic Messages mode",
 			"body": "Use Bailian's bare (lower-case) model names (e.g. qwen3-max, qwen3-coder-plus, glm-5, deepseek-v4-pro, MiniMax-M2.5). Don't include a vendor prefix (e.g. MiniMax/MiniMax-M2.7, ZHIPU/GLM-5). Keep Base URL on /compatible-mode/v1 — at runtime it auto-switches to /apps/anthropic/v1 for the Anthropic wire; Test Connection / Fetch Models continue to use the OpenAI-compat path."
