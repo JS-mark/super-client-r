@@ -336,7 +336,21 @@
 		"notAvailable": "You are using the latest version",
 		"error": "Failed to check for updates: {{error}}",
 		"downloading": "Downloading update...",
-		"downloaded": "Update downloaded, restart to install"
+		"downloaded": "Update downloaded, restart to install",
+		"checking": "Checking for updates...",
+		"idle": "Check for the latest application updates",
+		"availableHint": "A new version {{latest}} is ready to download",
+		"downloadingHint": "Downloading {{percent}}%",
+		"downloadedHint": "Version {{latest}} downloaded and ready to install",
+		"downloadBtn": "Download",
+		"installBtn": "Restart & Install",
+		"retryBtn": "Retry",
+		"unsigned": {
+			"title": "Unsigned build notice",
+			"desc": "This beta build is not code-signed yet. The system may block it on first launch.",
+			"mac": "macOS: right-click the app and choose Open, then confirm in the dialog (or allow it in System Settings → Privacy & Security).",
+			"win": "Windows: if SmartScreen appears, click \"More info\" then \"Run anyway\"."
+		}
 	},
 	"userDataPathPlaceholder": "User data directory path",
 	"userDataPathHint": "Application data storage path, cannot be changed",
