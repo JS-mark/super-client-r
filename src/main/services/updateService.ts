@@ -18,6 +18,10 @@ class UpdateService {
 		autoUpdater.autoInstallOnAppQuit = true;
 		autoUpdater.logger = null; // We use our own logger
 
+		// 安全基线（SUP-8）：内测期暂缓完整签名/公证，未签名 + electron-updater
+		// 无签名校验存在更新链替换风险，因此把更新源强制约束为 https。
+		this.enforceHttpsFeed();
+
 		autoUpdater.on("checking-for-update", () => {
 			logger.info("Checking for update...");
 			this.sendToRenderer(UPDATE_CHANNELS.CHECKING);
@@ -81,6 +85,29 @@ class UpdateService {
 
 	quitAndInstall(): void {
 		autoUpdater.quitAndInstall();
+	}
+
+	/**
+	 * 强制更新源使用 https。
+	 *
+	 * 未签名安装包 + electron-updater 无签名校验的组合下，明文/可篡改的
+	 * 更新源是更新链替换攻击的入口。读取 electron-updater 解析出的 feed URL，
+	 * 若发现非 https（http/file 等）则记录告警——正式渠道（GitHub Releases）
+	 * 天然是 https，这里作为回归护栏，防止后续误配私有 http 源。
+	 */
+	private enforceHttpsFeed(): void {
+		try {
+			const feedUrl = autoUpdater.getFeedURL();
+			// 打包前 / 未配置 provider 时 getFeedURL 可能返回 undefined，跳过。
+			if (!feedUrl) return;
+			if (!/^https:\/\//i.test(feedUrl)) {
+				logger.error(
+					`Update feed URL is not https, refusing insecure update source: ${feedUrl}`,
+				);
+			}
+		} catch (error) {
+			logger.warn("Failed to inspect update feed URL", error as Error);
+		}
 	}
 
 	private sendToRenderer(channel: string, data?: unknown): void {
