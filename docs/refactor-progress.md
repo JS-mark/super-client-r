@@ -2078,6 +2078,34 @@ lint 中途多了 1 个 `no-useless-catch`(纯 rethrow 的 try/catch),已顺手�
 - **代码事实更新**:test 稳定基线 = **133 files / 1164 tests / 0 failed**(symlink 测试修复后 +1)。Settings 顶级 nav 仍 11 项,`agent` → `third-party-api`。macOS 性能监控内存指标现反映真实 available。
 - **是否继续 loop**:**否**。工作树 clean + 五道门禁全绿 + 进度文档已同步。收口 loop 关闭。
 
+## SUP-15 界面收口 (2026-07-25) — 主导航收敛为 4 核心页 + /models 死链修复
+
+- **背景**:SUP-9 高保真产出后解除阻塞。本任务是实打实的 UI 收口开发(非纯提交收口):把主导航收敛为 **Chat · Models · Skills · Settings**,杂页内测隐藏且可逆。入场时工作树仅有平台注入的 `CLAUDE.md`(auto-managed),无待提交的功能改动。
+- **代码事实(取代旧断言)**:`router.tsx` **原本没有 `/models` 路由**——`Models.tsx` 页存在却无法从任何入口到达,且 `go-to-models` 快捷键(mod+2)`navigate("/models")` 是**死链**。`ClaudeSidebar` 的 `CLAUDE_QUICK_MENU_IDS` 硬编码为 `chat/skills/mcp/bookmarks/plugins/imbot`(缺 models、含 4 个杂页);`getEffectiveMenuItems` 强制开启 `skills/mcp/plugins`。`DEFAULT_MENU_CONFIG` 无 `models` 项。
+- **改动(三个功能域,三个 commit)**:
+  1. **`feat(nav): add reachable /models route`**(`5ffd61e`):`routeConfig.ts` 加 `models:"/models"` + 标题;`router.tsx` 注册 `<Models/>` 路由。顺带修复 mod+2 死链。
+  2. **`feat(nav): collapse primary navigation to 4 core pages`**(`d69714b`):`types/menu.ts` DEFAULT_MENU_CONFIG 在 chat 后插入 `models`(图标 `DeploymentUnitOutlined`);`menuConfig.ts` 新增 `CORE_NAVIGATION_MENU_IDS = [chat,models,skills]` 常量 + `getCoreNavigationItems()`(按固定顺序返回,免疫历史安装的 localStorage 菜单顺序漂移);`getEffectiveMenuItems` 改为只强制开启核心 3 项,`mcp/plugins` 回归各自配置值(不再强制进主导航)。杂页页面/路由/菜单项配置**全部保留**,隐藏是路由/开关级、可逆。MCP 降为二级(Models 页 MCP 标签 + `/mcp` 路由直达)。menuConfig.test.ts 更新断言。
+  3. **`feat(nav): render only 4 core pages in both sidebars`**(`3922c26`):`ClaudeSidebar` quickMenuItems 改用 `getCoreNavigationItems`(替代 CLAUDE_QUICK_MENU_IDS);`AppSidebar`(rollback fallback)加 Models QuickAction、溢出"更多"菜单去掉杂页只留 Settings+主题。Settings 仍由底部 user row 承载。
+- **未做/边界**:i18n `menu.models` key(en/zh)本就存在,无需新增(符合产品"i18n 不作为第一版验收范围")。主题切换保持现状。4 核心页视觉细节接入(TitleBar 只读模型)此前 E3/SUP-2 已落地,本任务聚焦导航收口,无重复改动。
+
+### 验证
+
+| 命令 | 结果 | 备注 |
+| --- | --- | --- |
+| `git diff --check` | ✅ PASS | 无空白错误 |
+| `pnpm check`(tsc -b --noEmit) | ✅ PASS | exit 0 |
+| `pnpm lint`(oxlint .) | ✅ PASS | 0 errors / 2 warnings(pre-existing `no-this-alias` @ RequestLogService,无新增) |
+| `pnpm i18n:check` | ✅ PASS | en 通过 |
+| `pnpm test:run` | ✅ **145 files / 1286 tests / 0 failed** | 已在 committed state(stash CLAUDE.md 后)复验,连续绿 |
+
+> 测试稳定基线从上一轮 133/1164 升到 **145/1286**——差额来自本仓在 SUP-15 之前的其他批次(本任务只新增 menuConfig 的 4 个测试用例)。committed state 复验方法:`git stash --include-untracked` 暂存平台注入的 CLAUDE.md,五道门禁全绿后 `git stash pop` 还原。
+
+### Retrospective
+
+- **What worked**:先用只读侦察确认"Models 页存在但无路由"这一核心死链,避免盲改;`getCoreNavigationItems()` 用固定顺序常量而非依赖 localStorage 菜单顺序,规避了 menuStore persist `merge` 把新 default 项 append 到末尾导致的顺序漂移。
+- **代码事实更新**:主导航现固定 Chat·Models·Skills(+底部 Settings);`/models` 路由已存在且可达;杂页仅从主导航隐藏,代码/路由/配置保留可逆。test 基线 = **145 files / 1286 tests / 0 failed**。
+- **平台注入 CLAUDE.md**:auto-managed MULTICA-RUNTIME 块(net +193 行),非仓库内容,不纳入本任务任何 commit,工作树留存该项属预期。
+
 ## SUP-17 自动更新收口 (2026-07-25)
 
 electron-updater 此前只接了后端(`updateService` check/download/install + 6 事件、`update:*` channel、preload `update` API 经 registerAPI/createBridge 自动对齐、main.ts 生产环境启动自动 checkForUpdates),但 **renderer 侧没有任何状态机与事件订阅**,自动检查发现新版本用户完全看不到;设置页只有一个 `message.info` 的一次性按钮。本次把它收口成完整用户流程。
