@@ -3,6 +3,7 @@ import {
 	AppstoreOutlined,
 	BarsOutlined,
 	ClusterOutlined,
+	DeploymentUnitOutlined,
 	DesktopOutlined,
 	DownOutlined,
 	FolderAddOutlined,
@@ -39,7 +40,6 @@ import {
 	PROJECT_MENU_IDS,
 	findMenuItem,
 	getEffectiveMenuItems,
-	getVisibleMenuItems,
 	isMenuItemEnabled,
 } from "../../lib/menuConfig";
 import {
@@ -184,6 +184,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 		PROJECT_MENU_IDS,
 		true,
 	);
+	const modelsMenuItem = findMenuItem(effectiveMenuItems, "models");
+	const modelsMenuEnabled = modelsMenuItem?.enabled ?? false;
 	const skillsMenuItem = findMenuItem(effectiveMenuItems, "skills");
 	const skillsMenuEnabled = skillsMenuItem?.enabled ?? false;
 
@@ -342,6 +344,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 		}
 	}, []);
 
+	const handleModels = useCallback(() => {
+		navigate(modelsMenuItem?.path ?? "/models");
+	}, [navigate, modelsMenuItem?.path]);
+
 	const handleSkills = useCallback(() => {
 		navigate(skillsMenuItem?.path ?? "/skills");
 	}, [navigate, skillsMenuItem?.path]);
@@ -389,27 +395,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 		}
 	}, []);
 
+	// 第一版界面收口：溢出菜单不再暴露杂页（MCP / Plugins / Bookmarks /
+	// 工作区 / IMBot 等），只保留 Settings 与主题切换。杂页路由与代码保留，
+	// 内测版仅从主导航隐藏（可逆）。
 	const overflowMenuItems: MenuProps["items"] = useMemo(() => {
-		const legacyIds = new Set([
-			"mcp",
-			"skills",
-			"plugins",
-			"bookmarks",
-			"workspaces",
-			"imbot",
-		]);
-		const legacy = getVisibleMenuItems(effectiveMenuItems, legacyIds).map(
-			(m) => ({
-				key: m.id,
-				label: t(m.label, { ns: "menu" }),
-				onClick: () => navigate(m.path),
-			}),
-		);
 		const items: MenuProps["items"] = [];
-		if (legacy.length > 0) {
-			items.push(...legacy);
-			items.push({ type: "divider" });
-		}
 		items.push({
 			key: "settings",
 			label: t("settings", "设置", { ns: "menu" }),
@@ -430,7 +420,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 			onClick: handleThemeCycle,
 		});
 		return items;
-	}, [effectiveMenuItems, navigate, t, themeMode, handleThemeCycle]);
+	}, [navigate, t, themeMode, handleThemeCycle]);
 
 	const userMenuItems: MenuProps["items"] = useMemo(
 		() => [
@@ -492,6 +482,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = () => {
 						label="新建任务"
 						shortcut={`${modKey()}N`}
 						onClick={handleNewTask}
+					/>
+				)}
+				{modelsMenuEnabled && (
+					<QuickAction
+						icon={<DeploymentUnitOutlined style={{ fontSize: 13 }} />}
+						label={t(modelsMenuItem?.label ?? "models", { ns: "menu" })}
+						onClick={handleModels}
 					/>
 				)}
 				{skillsMenuEnabled && (
