@@ -6,5 +6,6 @@
 	"signInGithub": "使用 GitHub 登录",
 	"development": "开发环境",
 	"mockLogin": "模拟登录 (Dev)",
-	"terms": "继续即表示您同意我们的服务条款和隐私政策"
+	"terms": "继续即表示您同意我们的服务条款和隐私政策",
+	"currentModelReadonly": "当前模型：{{model}}（在 Chat 中切换）"
 }

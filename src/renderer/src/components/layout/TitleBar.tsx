@@ -16,6 +16,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { useInspectorPanelStore } from "../../stores/inspectorPanelStore";
 import { useTerminalPanelStore } from "../../stores/terminalPanelStore";
 import { BranchPill } from "./BranchPill";
+import { CurrentModelIndicator } from "./CurrentModelIndicator";
 import { IdeAppSwitcher } from "./IdeAppSwitcher";
 import { ProjectPill } from "./ProjectPill";
 
@@ -322,8 +323,11 @@ export const TitleBar: React.FC = () => {
 			</div>
 
 			{/* 右侧：IDE 应用切换 + 会话设置 + 窗口控制
-			    模型切换不在 TitleBar — 通过 ComposerStatusBar / Cmd+M / 大 composer 中切换 */}
+			    模型切换不在 TitleBar — 通过 ComposerStatusBar / Cmd+M / 大 composer 中切换。
+			    非 Chat / 非 Settings 页仅展示只读的当前模型指示位。 */}
 			<div className="flex items-center gap-1 pr-1" style={NO_DRAG}>
+				{!isChatRoute && !isSettingsRoute && <CurrentModelIndicator />}
+
 				{isChatRoute && currentConversation && (
 					<IdeAppSwitcher
 						conversationId={currentConversationId ?? undefined}

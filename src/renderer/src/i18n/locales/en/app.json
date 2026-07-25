@@ -6,5 +6,6 @@
 	"signInGithub": "Sign in with GitHub",
 	"development": "Development",
 	"mockLogin": "Mock Login (Dev)",
-	"terms": "By continuing, you agree to our Terms of Service and Privacy Policy"
+	"terms": "By continuing, you agree to our Terms of Service and Privacy Policy",
+	"currentModelReadonly": "Current model: {{model}} (switch it in Chat)"
 }
