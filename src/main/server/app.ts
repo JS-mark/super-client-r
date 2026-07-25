@@ -180,8 +180,11 @@ export class LocalServer {
 			(this.app as any).port = this.port;
 
 			return new Promise<void>((resolve, reject) => {
-				this.server = this.app.listen(this.port, () => {
-					log.info(`Server started on port ${this.port}`);
+				// 安全：仅绑定回环地址，本地 API（LLM 代理 / MCP / 配置）不对局域网开放。
+				// 跨设备访问由 Remote Device 服务（独立 WebSocket 端口 + relay + 鉴权）承担，
+				// 不通过放开本地 HTTP server 的监听地址来实现。
+				this.server = this.app.listen(this.port, SERVER_CONFIG.HOST, () => {
+					log.info(`Server started on ${SERVER_CONFIG.HOST}:${this.port}`);
 					this.isRunning = true;
 					this.broadcastStatus();
 					resolve();

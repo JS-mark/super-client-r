@@ -4,6 +4,11 @@ import { encryptedKeyStore } from "../store/encryptedKeyStore";
 
 export const SERVER_CONFIG = {
 	PORT: 3000,
+	/**
+	 * 监听地址。仅绑回环，本地 API 不对局域网/公网开放。
+	 * 跨设备访问由 Remote Device 服务（独立端口 + relay + 鉴权）承担。
+	 */
+	HOST: "127.0.0.1",
 	/** 无需认证的公开路径 */
 	PUBLIC_PATHS: [
 		"/health",
