@@ -105,9 +105,19 @@ interface ModelListProps {
 	addTrigger?: number;
 }
 
+/**
+ * 产品决策：未测试连接允许保存，但需二次确认（不强制先测通，避免用户被卡死）。
+ * 仅当本次编辑没有一个成功的测试结果时，才需要在保存前弹确认。
+ */
+export function shouldConfirmUntestedSave(
+	testResult: { success: boolean } | null | undefined,
+): boolean {
+	return testResult?.success !== true;
+}
+
 export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 	const { t, i18n } = useTranslation();
-	const { message } = App.useApp();
+	const { message, modal } = App.useApp();
 	const { token } = useToken();
 	const providers = useModelStore((s) => s.providers);
 	const loadProviders = useModelStore((s) => s.loadProviders);
@@ -332,7 +342,7 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 		}
 	}, [form, message, t, selectedModelIds.length]);
 
-	const handleSave = useCallback(
+	const persistProvider = useCallback(
 		async (values: {
 			preset: ModelProviderPreset;
 			name: string;
@@ -396,6 +406,30 @@ export const ModelList: React.FC<ModelListProps> = ({ addTrigger }) => {
 			t,
 			isAdding,
 		],
+	);
+
+	// 已测通直接保存；未测通走二次确认（见 shouldConfirmUntestedSave）。
+	const handleSave = useCallback(
+		(values: {
+			preset: ModelProviderPreset;
+			name: string;
+			baseUrl: string;
+			apiKey: string;
+			apiFormat?: ApiFormat;
+		}) => {
+			if (!shouldConfirmUntestedSave(testResult)) {
+				void persistProvider(values);
+				return;
+			}
+			modal.confirm({
+				title: t("form.saveUntestedTitle", { ns: "models" }),
+				content: t("form.saveUntestedContent", { ns: "models" }),
+				okText: t("form.saveUntestedOk", { ns: "models" }),
+				cancelText: t("cancel", { ns: "models" }),
+				onOk: () => persistProvider(values),
+			});
+		},
+		[testResult, persistProvider, modal, t],
 	);
 
 	const handleDelete = useCallback(
