@@ -2,6 +2,7 @@ import {
 	ApiOutlined,
 	AppstoreOutlined,
 	ClusterOutlined,
+	DeploymentUnitOutlined,
 	DownOutlined,
 	FolderAddOutlined,
 	FolderOutlined,
@@ -20,8 +21,8 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
 	PROJECT_MENU_IDS,
+	getCoreNavigationItems,
 	getEffectiveMenuItems,
-	getVisibleMenuItems,
 	isMenuItemEnabled,
 } from "../../lib/menuConfig";
 import {
@@ -51,25 +52,18 @@ const log = createLogger("ClaudeSidebar");
 
 const { useToken } = theme;
 
-const CLAUDE_QUICK_MENU_IDS = new Set([
-	"chat",
-	"skills",
-	"mcp",
-  "bookmarks",
-  "plugins",
-	"imbot",
-]);
-
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 	MessageOutlined,
 	ApiOutlined,
 	AppstoreOutlined,
+	DeploymentUnitOutlined,
 	RocketOutlined,
 	StarOutlined,
 	ClusterOutlined,
 };
 
 const MENU_ICON_BY_ID: Record<string, string> = {
+	models: "DeploymentUnitOutlined",
 	skills: "RocketOutlined",
 	mcp: "ApiOutlined",
 	plugins: "AppstoreOutlined",
@@ -273,8 +267,10 @@ export function ClaudeSidebar(_props: ClaudeSidebarProps): React.ReactElement {
 		() => getEffectiveMenuItems(menuItems, { unifiedNavigation }),
 		[menuItems, unifiedNavigation],
 	);
+	// 第一版界面收口：主导航快捷区仅渲染 4 核心页的前三项
+	// （Chat · Models · Skills）；Settings 由底部 user row 承载。
 	const quickMenuItems = useMemo(
-		() => getVisibleMenuItems(effectiveMenuItems, CLAUDE_QUICK_MENU_IDS),
+		() => getCoreNavigationItems(effectiveMenuItems),
 		[effectiveMenuItems],
 	);
 	const chatMenuEnabled = isMenuItemEnabled(effectiveMenuItems, "chat", true);
