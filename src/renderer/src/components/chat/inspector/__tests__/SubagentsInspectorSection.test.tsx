@@ -45,7 +45,28 @@ vi.mock("antd", () => {
 			</span>
 		);
 	}
+	function Button({
+		children,
+		onClick,
+		"data-testid": testId,
+		"aria-label": ariaLabel,
+		icon,
+	}: {
+		children?: React.ReactNode;
+		onClick?: (e: React.MouseEvent) => void;
+		"data-testid"?: string;
+		"aria-label"?: string;
+		icon?: React.ReactNode;
+	}) {
+		return (
+			<button type="button" data-testid={testId} aria-label={ariaLabel} onClick={onClick}>
+				{icon}
+				{children}
+			</button>
+		);
+	}
 	return {
+		Button,
 		Tag,
 		theme: {
 			useToken: () => ({
@@ -61,6 +82,7 @@ vi.mock("antd", () => {
 
 vi.mock("@ant-design/icons", () => ({
 	RobotOutlined: () => <span aria-hidden="true" data-icon="robot" />,
+	StopOutlined: () => <span aria-hidden="true" data-icon="stop" />,
 }));
 
 // ---------- hook mock ----------
@@ -195,5 +217,96 @@ describe("SubagentsInspectorSection", () => {
 		];
 		render(<SubagentsInspectorSection />);
 		expect(container?.textContent ?? "").toContain("Subagent");
+	});
+
+	it("shows a stop button only for live rows when onStop is provided", () => {
+		entriesMock.current = [
+			{
+				subagentRunId: "sr-running",
+				taskGoal: "busy",
+				status: "running",
+				startedAt: 10,
+				hasError: false,
+			},
+			{
+				subagentRunId: "sr-done",
+				taskGoal: "done",
+				status: "completed",
+				startedAt: 5,
+				endedAt: 20,
+				hasError: false,
+			},
+		];
+		render(<SubagentsInspectorSection onStop={() => {}} />);
+		const stops = container?.querySelectorAll(
+			"[data-testid='subagents-inspector-stop']",
+		);
+		// Only the running row is stoppable.
+		expect(stops?.length).toBe(1);
+	});
+
+	it("does not render stop buttons when onStop is omitted", () => {
+		entriesMock.current = [
+			{
+				subagentRunId: "sr-running",
+				taskGoal: "busy",
+				status: "running",
+				startedAt: 10,
+				hasError: false,
+			},
+		];
+		render(<SubagentsInspectorSection />);
+		const stops = container?.querySelectorAll(
+			"[data-testid='subagents-inspector-stop']",
+		);
+		expect(stops?.length).toBe(0);
+	});
+
+	it("stop click fires onStop with the entry and does NOT trigger onSelect", () => {
+		const onStop = vi.fn();
+		const onSelect = vi.fn();
+		entriesMock.current = [
+			{
+				subagentRunId: "sr-running",
+				taskGoal: "busy",
+				status: "running",
+				startedAt: 10,
+				hasError: false,
+			},
+		];
+		render(<SubagentsInspectorSection onStop={onStop} onSelect={onSelect} />);
+		const stopBtn = container?.querySelector<HTMLButtonElement>(
+			"[data-testid='subagents-inspector-stop']",
+		);
+		expect(stopBtn).toBeTruthy();
+		act(() => {
+			stopBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onStop).toHaveBeenCalledTimes(1);
+		expect(onStop.mock.calls[0][0].subagentRunId).toBe("sr-running");
+		expect(onSelect).not.toHaveBeenCalled();
+	});
+
+	it("row click (not on stop) fires onSelect with the entry", () => {
+		const onSelect = vi.fn();
+		entriesMock.current = [
+			{
+				subagentRunId: "sr-1",
+				taskGoal: "goal",
+				status: "completed",
+				startedAt: 10,
+				endedAt: 20,
+				hasError: false,
+			},
+		];
+		render(<SubagentsInspectorSection onSelect={onSelect} />);
+		const row = container?.querySelector<HTMLDivElement>(
+			"[data-testid='subagents-inspector-row']",
+		);
+		act(() => {
+			row?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		});
+		expect(onSelect).toHaveBeenCalledTimes(1);
+		expect(onSelect.mock.calls[0][0].subagentRunId).toBe("sr-1");
 	});
 });

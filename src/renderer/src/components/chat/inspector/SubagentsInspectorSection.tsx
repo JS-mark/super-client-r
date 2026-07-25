@@ -14,8 +14,8 @@
  *     wires up the click but do not implement navigation ourselves).
  */
 
-import { RobotOutlined } from "@ant-design/icons";
-import { Tag, theme } from "antd";
+import { RobotOutlined, StopOutlined } from "@ant-design/icons";
+import { Button, Tag, theme } from "antd";
 import { useTranslation } from "react-i18next";
 import {
 	useSubagentsInspectorData,
@@ -24,6 +24,12 @@ import {
 import type { SubagentTaskStatus } from "@super-client/shared-types/subagent";
 
 const { useToken } = theme;
+
+/** Statuses that are still live and therefore stoppable. */
+const STOPPABLE_STATUSES: ReadonlySet<SubagentTaskStatus> = new Set([
+	"spawned",
+	"running",
+]);
 
 /** AntD Tag color per status. Values map to antd built-in preset colors. */
 const STATUS_COLOR: Record<SubagentTaskStatus, string> = {
@@ -42,11 +48,17 @@ function formatDurationSeconds(startedAt: number, endedAt: number): number {
 export interface SubagentsInspectorSectionProps {
 	conversationId?: string;
 	onSelect?: (entry: SubagentInspectorEntry) => void;
+	/**
+	 * Stop a still-running subagent. When provided, live rows
+	 * (spawned/running) render a stop button. Omit to render read-only.
+	 */
+	onStop?: (entry: SubagentInspectorEntry) => void;
 }
 
 export function SubagentsInspectorSection({
 	conversationId,
 	onSelect,
+	onStop,
 }: SubagentsInspectorSectionProps) {
 	const { t } = useTranslation("chat");
 	const { token } = useToken();
@@ -149,6 +161,23 @@ export function SubagentsInspectorSection({
 									seconds: durationSec,
 								})}
 							</span>
+						)}
+						{onStop && STOPPABLE_STATUSES.has(entry.status) && (
+							<Button
+								type="text"
+								size="small"
+								danger
+								icon={<StopOutlined />}
+								data-testid="subagents-inspector-stop"
+								aria-label={t("subagentsInspector.stop", "Stop subagent")}
+								title={t("subagentsInspector.stop", "Stop subagent")}
+								style={{ flexShrink: 0, padding: "0 4px", height: 20 }}
+								onClick={(e) => {
+									// Don't let the stop click bubble to the row's onSelect.
+									e.stopPropagation();
+									onStop(entry);
+								}}
+							/>
 						)}
 					</div>
 				);

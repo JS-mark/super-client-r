@@ -11,7 +11,7 @@ import {
 	PaperClipOutlined,
 } from "@ant-design/icons";
 import { Button, Collapse, Empty, Skeleton, Tag, theme } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "../../stores/chatStore";
 import { useChatMessageStore } from "../../stores/chatMessageStore";
@@ -19,6 +19,9 @@ import { useFileArtifactStore } from "../../stores/fileArtifactStore";
 import { useAttachmentStore } from "../../stores/attachmentStore";
 import { fileActionService } from "../../services/fileActionService";
 import { runtimeService } from "../../services/runtimeService";
+import { agentRuntimeClient } from "../../services/agent/agentRuntimeClient";
+import { createLogger } from "../../services/logService";
+import type { SubagentInspectorEntry } from "../../hooks/useSubagentsInspectorData";
 import { useCodexBranchSection } from "./CodexBranchSection";
 import { ContextInspectorSection } from "./inspector/ContextInspectorSection";
 import { SubagentsInspectorSection } from "./inspector/SubagentsInspectorSection";
@@ -35,6 +38,22 @@ export interface CodexEnvironmentInspectorProps {
 }
 
 const { useToken } = theme;
+
+const log = createLogger("CodexEnvironmentInspector");
+
+/**
+ * Scroll the parent transcript's SubagentPartCard into view (查看产物).
+ * The card renders `data-part-id="subagent-card-<runId>"`; we locate it and
+ * scroll it into the center of the viewport. Returns whether it was found.
+ */
+function scrollToSubagentCard(subagentRunId: string): boolean {
+	const el = document.querySelector<HTMLElement>(
+		`[data-part-id="subagent-card-${subagentRunId}"]`,
+	);
+	if (!el) return false;
+	el.scrollIntoView({ behavior: "smooth", block: "center" });
+	return true;
+}
 
 function pickFileIcon(extOrName: string | undefined): React.ReactNode {
 	const ext = (extOrName ?? "").toLowerCase().replace(/^\./, "");
@@ -92,6 +111,21 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 	const { t } = useTranslation("chat");
 	const currentConversationId = useChatStore((s) => s.currentConversationId);
 	const messages = useChatMessageStore((s) => s.messages);
+
+	// SUP-16 subagent: 查看产物 → 滚到父转录里的 SubagentPartCard；
+	// 停止 → 调 stop-subagent（发 cancelled 生命周期 + 中断在途子流）。
+	const handleSubagentSelect = useCallback((entry: SubagentInspectorEntry) => {
+		scrollToSubagentCard(entry.subagentRunId);
+	}, []);
+
+	const handleSubagentStop = useCallback((entry: SubagentInspectorEntry) => {
+		void agentRuntimeClient.stopSubagent(entry.subagentRunId).catch((err) => {
+			log.error(
+				"stopSubagent failed",
+				err instanceof Error ? err : new Error(String(err)),
+			);
+		});
+	}, []);
 
 	// Subscribe to artifact store so re-renders happen on store changes.
 	const artifactsMap = useFileArtifactStore((s) => s.artifacts);
@@ -427,6 +461,8 @@ export function CodexEnvironmentInspector(_: CodexEnvironmentInspectorProps) {
 							children: (
 								<SubagentsInspectorSection
 									conversationId={currentConversationId ?? undefined}
+									onSelect={handleSubagentSelect}
+									onStop={handleSubagentStop}
 								/>
 							),
 						},
