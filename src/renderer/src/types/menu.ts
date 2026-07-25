@@ -51,6 +51,15 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
       action: "navigate",
     },
     {
+      id: "models",
+      label: "models",
+      path: "/models",
+      iconType: "default",
+      iconContent: "DeploymentUnitOutlined",
+      enabled: true,
+      action: "navigate",
+    },
+    {
       id: "skills",
       label: "skills",
       path: "/skills",
