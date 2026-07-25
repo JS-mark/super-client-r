@@ -31,7 +31,11 @@ import {
 } from "../../services/agent/runtime/AgentRuntimeIpcBroker";
 import { getAgentRuntimeRegistry } from "../../services/agent/runtime/AgentRuntimeRegistry";
 import { SubagentEventBridge } from "../../services/agent/runtime/SubagentEventBridge";
-import { setSubagentEventBridge } from "../../services/agent/runtime/subagentBridgeRegistry";
+import {
+	getSubagentEventBridge,
+	setSubagentEventBridge,
+} from "../../services/agent/runtime/subagentBridgeRegistry";
+import { cancelSubagentControl } from "../../services/agent/runtime/subagentControlRegistry";
 import { listBuiltinTools } from "../../services/agent/runtime/tools/BuiltinToolRegistry";
 import { getAgentTraceCollector } from "../../services/agent/trace/AgentTraceCollector";
 import { getSessionRuntimeResolver } from "../../services/runtime/SessionRuntimeResolver";
@@ -61,6 +65,7 @@ export const AGENT_RUNTIME_CHANNELS = {
 	FORK_NATIVE_SESSION: "agent-runtime:fork-native-session",
 	LIST_RUNTIMES: "agent-runtime:list-runtimes",
 	LIST_BUILTIN_TOOLS: "agent-runtime:list-builtin-tools",
+	STOP_SUBAGENT: "agent-runtime:stop-subagent",
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────
@@ -183,6 +188,42 @@ export function registerAgentRuntimeHandlers(): void {
 				return {
 					success: false,
 					error: err instanceof Error ? err.message : "interrupt failed",
+				};
+			}
+		},
+	);
+
+	// agent-runtime:stop-subagent — SUP-16 subagent minimal "stop".
+	// Two-step, order matters:
+	//   1. bridge.cancel() emits the terminal `cancelled` lifecycle event so
+	//      the transcript/inspector flip to a cancelled chip immediately.
+	//   2. cancelSubagentControl() aborts the in-flight sub-stream so no work
+	//      keeps running (the Task handler's finally unregisters the handle).
+	// `stopped` is true when either the lifecycle was still live or the work
+	// was still running — i.e. the stop actually did something.
+	ipcMain.handle(
+		AGENT_RUNTIME_CHANNELS.STOP_SUBAGENT,
+		async (_event: IpcMainInvokeEvent, args: { subagentRunId: string }) => {
+			try {
+				const subagentRunId = args?.subagentRunId;
+				if (!subagentRunId) {
+					return { success: false, error: "subagentRunId is required" };
+				}
+				// Ensure the broker (and thus the bridge) is constructed.
+				getBroker();
+				const bridge = getSubagentEventBridge();
+				const lifecycleCancelled = bridge
+					? bridge.cancel(subagentRunId)
+					: false;
+				const workCancelled = cancelSubagentControl(subagentRunId);
+				return {
+					success: true,
+					data: { stopped: lifecycleCancelled || workCancelled },
+				};
+			} catch (err) {
+				return {
+					success: false,
+					error: err instanceof Error ? err.message : "stopSubagent failed",
 				};
 			}
 		},

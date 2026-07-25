@@ -109,6 +109,16 @@ export function onStreamEvent(
 	return window.electron.agentRuntime.onStreamEvent(callback);
 }
 
+/**
+ * 停止一个运行中的 subagent（SUP-16 最小版：列表 / 启停 / 查看产物）。
+ * 返回是否命中并停止了一个仍在运行的 run。
+ */
+export async function stopSubagent(subagentRunId: string): Promise<boolean> {
+	const r = await window.electron.agentRuntime.stopSubagent({ subagentRunId });
+	const data = unwrap(r);
+	return data.stopped;
+}
+
 /** 列举注册的 runtime descriptors（UI 选择器 / 调试页用）。 */
 export async function listRuntimes(): Promise<AgentRuntimeDescriptor[]> {
 	const r = await window.electron.agentRuntime.listRuntimes();
@@ -160,6 +170,7 @@ export const agentRuntimeClient = {
 	resolvePermission,
 	resolveToolApproval,
 	interrupt,
+	stopSubagent,
 	onStreamEvent,
 	listRuntimes,
 	listBuiltinTools,
