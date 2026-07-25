@@ -336,7 +336,21 @@
 		"notAvailable": "当前已是最新版本",
 		"error": "检查更新失败：{{error}}",
 		"downloading": "正在下载更新...",
-		"downloaded": "更新已下载，重启以安装"
+		"downloaded": "更新已下载，重启以安装",
+		"checking": "正在检查更新...",
+		"idle": "检查最新的应用更新",
+		"availableHint": "新版本 {{latest}} 可供下载",
+		"downloadingHint": "下载中 {{percent}}%",
+		"downloadedHint": "版本 {{latest}} 已下载，可立即安装",
+		"downloadBtn": "下载",
+		"installBtn": "重启并安装",
+		"retryBtn": "重试",
+		"unsigned": {
+			"title": "未签名版本提示",
+			"desc": "内测版本尚未进行代码签名，首次启动时系统可能会拦截。",
+			"mac": "macOS：右键点击应用选择「打开」，在弹窗中确认（或前往 系统设置 → 隐私与安全性 中允许运行）。",
+			"win": "Windows：若出现 SmartScreen 提示，点击「更多信息」再点「仍要运行」。"
+		}
 	},
 	"userDataPathPlaceholder": "用户数据目录路径",
 	"userDataPathHint": "应用数据存储路径，不能更改",

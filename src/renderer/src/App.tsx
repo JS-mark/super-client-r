@@ -19,6 +19,7 @@ import {
 import { useSkinStore } from "./stores/skinStore";
 import { initSystemThemeDetection, useThemeStore } from "./stores/themeStore";
 import { useProjectStore } from "./stores/projectStore";
+import { useUpdateStore } from "./stores/updateStore";
 
 const ANTD_LOCALES: Record<string, typeof zhCN> = {
 	zh: zhCN,
@@ -81,6 +82,11 @@ function App() {
 	useEffect(() => {
 		void useProjectStore.getState().load();
 	}, []);
+
+	// SUP-17: 全局订阅自动更新事件，使 main 进程的自动检查结果对用户可见
+	// （生产环境启动时会自动 checkForUpdates）。store 内有幂等守卫，
+	// 与设置页的订阅不冲突。
+	useEffect(() => useUpdateStore.getState().subscribe(), []);
 
 	// 同步 body 背景色到当前主题（确保 Error 等全屏页面背景正确）
 	// 浮窗路由 (#/float) 需要保持透明，否则 body 白底会盖在透明窗口上，
