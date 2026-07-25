@@ -542,6 +542,7 @@
 		"toolsCount": "{{count}} 次工具调用",
 		"durationSeconds": "{{seconds}} 秒",
 		"fallbackName": "子代理",
+		"stop": "停止子代理",
 		"status": {
 			"spawned": "已创建",
 			"running": "运行中",

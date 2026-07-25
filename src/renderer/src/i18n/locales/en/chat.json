@@ -542,6 +542,7 @@
 		"toolsCount": "{{count}} tools",
 		"durationSeconds": "{{seconds}}s",
 		"fallbackName": "Subagent",
+		"stop": "Stop subagent",
 		"status": {
 			"spawned": "spawned",
 			"running": "running",
