@@ -1982,6 +1982,7 @@ const electronAPI: ElectronAPI = {
 		"listBuiltinTools",
 		"listNativeSessions",
 		"forkNativeSession",
+		"stopSubagent",
 		"onStreamEvent",
 	]),
 	// AgentTrace 调试通道（手工 wiring；channel 名 `debug:agent-traces:*` 不符

@@ -756,6 +756,14 @@ export interface ElectronAPIMigrated {
 			sessionId: string;
 			atMessageId?: string;
 		}) => Promise<IPCResponse<{ sessionId: string }>>;
+		/**
+		 * 停止一个运行中的 subagent（SUP-16 最小版）。发射 `cancelled` 生命
+		 * 周期事件并中断在途子流（无残留）。`stopped` 表示是否命中一个仍在
+		 * 运行 / 仍在跟踪的 run。
+		 */
+		stopSubagent: (args: {
+			subagentRunId: string;
+		}) => Promise<IPCResponse<{ stopped: boolean }>>;
 		/** 流式事件订阅；返回取消函数。 */
 		onStreamEvent: (
 			callback: (event: AgentRuntimeStreamEvent) => void,
