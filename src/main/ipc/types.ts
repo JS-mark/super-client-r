@@ -485,7 +485,13 @@ export interface ChatStreamEvent {
 export interface SearchExecuteRequest {
 	provider: string;
 	query: string;
-	apiKey: string;
+	/**
+	 * E1 密钥安全改造：优先用 `configId` 让主进程按已保存的搜索配置解密取用
+	 * 密钥（密钥不出主进程）。`apiKey` 仅用于「未保存的一次性校验」（validate
+	 * config），此时不落盘、不入日志。二者都缺省时按无密钥 provider 处理。
+	 */
+	configId?: string;
+	apiKey?: string;
 	apiUrl?: string;
 	maxResults?: number;
 	config?: Record<string, unknown>;

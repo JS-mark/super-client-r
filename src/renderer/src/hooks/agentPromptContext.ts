@@ -105,10 +105,11 @@ export async function buildAgentPromptWithContext(
 			warnings.push(`Search provider is not configured: ${options.searchEngine}`);
 		} else {
 			try {
+				// E1: 只传 configId，主进程按其解密取用密钥（密钥不出主进程）。
 				const response = await searchService.execute({
 					provider: config.provider,
 					query: options.content,
-					apiKey: config.apiKey,
+					configId: config.id,
 					apiUrl: config.apiUrl,
 					config: config.config,
 					maxResults: options.maxSearchResults ?? 5,

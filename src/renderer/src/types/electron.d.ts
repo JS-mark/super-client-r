@@ -870,7 +870,11 @@ export interface ElectronAPI extends ElectronAPIMigrated {
   model: {
     listProviders: () => Promise<IPCResponse<ModelProvider[]>>;
     getProvider: (id: string) => Promise<IPCResponse<ModelProvider>>;
-    saveProvider: (provider: ModelProvider) => Promise<IPCResponse>;
+    saveProvider: (
+      provider: ModelProvider,
+    ) => Promise<
+      IPCResponse<{ encryptionAvailable: boolean; keyPersisted: boolean }>
+    >;
     deleteProvider: (id: string) => Promise<IPCResponse>;
     testConnection: (
       baseUrl: string,

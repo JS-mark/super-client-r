@@ -18,8 +18,13 @@ export const modelService = {
 
   getProvider: (id: string) => window.electron.model.getProvider(id),
 
-  saveProvider: (provider: ModelProvider) =>
-    window.electron.model.saveProvider(provider),
+  saveProvider: (
+    provider: ModelProvider,
+  ): Promise<{
+    success: boolean;
+    data?: { encryptionAvailable: boolean; keyPersisted: boolean };
+    error?: string;
+  }> => window.electron.model.saveProvider(provider),
 
   deleteProvider: (id: string) => window.electron.model.deleteProvider(id),
 

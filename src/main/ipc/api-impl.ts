@@ -408,7 +408,14 @@ const apiImpl = {
 
 	// ─── Search ───────────────────────────────
 	search: {
-		execute: (request: SearchExecuteRequest) => searchService.execute(request),
+		execute: (request: SearchExecuteRequest) => {
+			// E1: 优先按 configId 在主进程内解密取用密钥；apiKey 仅用于未保存的
+			// 一次性校验。密钥不出主进程。
+			const apiKey = request.configId
+				? storeManager.getSearchConfigApiKey(request.configId)
+				: (request.apiKey ?? "");
+			return searchService.execute({ ...request, apiKey });
+		},
 		getConfigs: () => ({
 			configs: storeManager.getSearchConfigs(),
 			defaultProvider: storeManager.getDefaultSearchProvider(),

@@ -44,6 +44,7 @@
 		"apiKey": "API Key",
 		"apiKeyHelp": "Your API key for authentication",
 		"apiKeyPlaceholder": "sk-...",
+		"apiKeySavedPlaceholder": "Saved (enter a new key only to replace it)",
 		"baseUrl": "Base URL",
 		"baseUrlHelp": "API endpoint URL",
 		"baseUrlPlaceholder": "https://api.example.com/v1",
@@ -58,6 +59,7 @@
 	"messages": {
 		"saveSuccess": "Provider saved successfully",
 		"saveError": "Failed to save provider",
+		"encryptionUnavailable": "Saved, but this system can't encrypt stored keys — the key is kept in memory only and must be re-entered after restart",
 		"deleteSuccess": "Provider deleted successfully",
 		"deleteError": "Failed to delete provider",
 		"testSuccess": "Connection test successful",
