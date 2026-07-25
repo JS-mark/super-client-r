@@ -210,4 +210,47 @@ describe("SubagentEventBridge", () => {
 		bridge.fail("ghost", "err");
 		expect(emit).not.toHaveBeenCalled();
 	});
+
+	it("cancel() emits a terminal updated(cancelled) with endedAt and returns true", () => {
+		const h = harness(1_000);
+		h.bridge.spawn({
+			parentRunId: "p",
+			subagentRunId: "sub-cancel",
+			sessionId: "conv-1",
+			taskGoal: "goal",
+		});
+		h.tick(250);
+		const result = h.bridge.cancel("sub-cancel");
+		expect(result).toBe(true);
+		const updated = h.emitted.find((e) => e.event.type === "subagent.updated");
+		expect(updated).toBeTruthy();
+		if (updated?.event.type === "subagent.updated") {
+			expect(updated.event.payload.patch.status).toBe("cancelled");
+			expect(updated.event.payload.patch.endedAt).toBe(1_250);
+		}
+	});
+
+	it("cancel() drops the run so a later fail()/complete() is a no-op", () => {
+		const h = harness();
+		h.bridge.spawn({
+			parentRunId: "p",
+			subagentRunId: "sub-1",
+			sessionId: "conv-1",
+			taskGoal: "goal",
+		});
+		expect(h.bridge.cancel("sub-1")).toBe(true);
+		const countAfterCancel = h.emitted.length;
+		// Simulate the unwinding Task handler emitting a terminal event.
+		h.bridge.fail("sub-1", "aborted");
+		h.bridge.complete("sub-1");
+		expect(h.emitted).toHaveLength(countAfterCancel);
+		expect(h.bridge.has("sub-1")).toBe(false);
+	});
+
+	it("cancel() on an unknown subagentRunId returns false and emits nothing", () => {
+		const emit = vi.fn();
+		const bridge = new SubagentEventBridge({ emitSubagentEvent: emit });
+		expect(bridge.cancel("ghost")).toBe(false);
+		expect(emit).not.toHaveBeenCalled();
+	});
 });

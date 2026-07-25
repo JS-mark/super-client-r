@@ -25,6 +25,10 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parseSSEStream } from "../../../llm/sseClient";
 import { getSubagentEventBridge } from "../../../agent/runtime/subagentBridgeRegistry";
+import {
+	registerSubagentControl,
+	unregisterSubagentControl,
+} from "../../../agent/runtime/subagentControlRegistry";
 import { mcpService } from "../../McpService";
 import type {
 	InternalMcpServer,
@@ -417,6 +421,13 @@ const taskHandler: InternalToolHandler = async (args) => {
 	// for trace correlation.
 	const subagentRunId = `sub_${parentRequestId || "root"}_${randomUUID()}`;
 	let spawned = false;
+	// SUP-16 stop: abort handle for the in-flight sub-stream. `cancelled`
+	// flips to true only on a user-initiated stop so the catch block can tell
+	// a deliberate cancel apart from a genuine failure (and skip emitting a
+	// `subagent.failed` on top of the already-emitted `cancelled`).
+	const abortController = new AbortController();
+	let cancelled = false;
+	let subRequestId = "";
 	try {
 		const description = String(args.description ?? "").trim();
 		const prompt = String(args.prompt ?? "").trim();
@@ -464,9 +475,42 @@ const taskHandler: InternalToolHandler = async (args) => {
 			spawned = true;
 		}
 
-		const subRequestId = `${parentRequestId || "task"}_d${
-			depth + 1
-		}_${Date.now()}`;
+		subRequestId = `${parentRequestId || "task"}_d${depth + 1}_${Date.now()}`;
+
+		// SUP-16 stop: register a cancel handle so an IPC `stop-subagent` can
+		// tear this run down. `cancel()` is idempotent — it aborts the local
+		// fetch (which trips the HTTP route's `req.on("close")` →
+		// `llmService.stopStream(subRequestId)`, releasing tool approvals and
+		// killing any child process, i.e. no residual work) and best-effort
+		// POSTs /v1/llm/stop so the sub-stream is torn down even if the abort
+		// races the socket. Emitting the `cancelled` lifecycle event is the
+		// bridge's job (see the IPC handler); here we only stop the work.
+		if (spawned) {
+			registerSubagentControl({
+				subagentRunId,
+				sessionId: parentConversationId || undefined,
+				cancel: () => {
+					cancelled = true;
+					try {
+						abortController.abort();
+					} catch {
+						// abort never throws in practice; guard defensively.
+					}
+					// Belt-and-suspenders: also ask the server to stop the
+					// sub-stream by id in case the socket close didn't propagate.
+					void fetch(`http://127.0.0.1:${scpPort}/v1/llm/stop`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${scpApiKey}`,
+						},
+						body: JSON.stringify({ requestId: subRequestId }),
+					}).catch(() => {
+						// best-effort; the abort above is the primary path.
+					});
+				},
+			});
+		}
 
 		const subRequest = {
 			requestId: subRequestId,
@@ -516,6 +560,7 @@ const taskHandler: InternalToolHandler = async (args) => {
 					Authorization: `Bearer ${scpApiKey}`,
 				},
 				body: JSON.stringify(subRequest),
+				signal: abortController.signal,
 			},
 		);
 		if (!res.ok || !res.body) {
@@ -550,10 +595,20 @@ const taskHandler: InternalToolHandler = async (args) => {
 		}
 		return textOk(accumulated || "(subagent returned no text)");
 	} catch (err) {
+		// User-initiated stop: the `cancelled` lifecycle event was already
+		// emitted by the IPC handler via `bridge.cancel()`. Do NOT emit a
+		// `subagent.failed` on top of it — just surface a plain tool error so
+		// the parent transcript shows the tool call ended.
+		if (cancelled) {
+			return textErr("Task: stopped by user");
+		}
 		if (spawned && bridge) {
 			bridge.fail(subagentRunId, (err as Error).message);
 		}
 		return textErr(`Task: ${(err as Error).message}`);
+	} finally {
+		// Always drop the control handle so a finished run can't be "stopped".
+		if (spawned) unregisterSubagentControl(subagentRunId);
 	}
 };
 
