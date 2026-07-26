@@ -1,5 +1,20 @@
 name: Build & Release
 
+# 双端打包发布流水线（内测版 / beta）
+#
+# 触发方式：
+#   1. 推送以 v 开头的 tag（如 v0.1.0-beta.1）    -> 构建 + 创建 GitHub Release
+#   2. 手动 workflow_dispatch                      -> 可仅构建产物，或指定 tag 发布
+#
+# 产物：
+#   - macOS: .dmg + .zip（x64 + arm64）+ latest-mac.yml + *.blockmap
+#   - Windows: .exe (NSIS, x64 + arm64) + latest.yml + *.blockmap
+#   Release 作为 electron-updater 的更新 feed（https，与 SUP-8 基线一致）。
+#
+# 重要：mac / win 各在单个 runner 上一次性构建全部架构，
+#       以保证 electron-updater 的 latest*.yml 元数据同时覆盖两个架构，
+#       避免 matrix 分机构建时元数据互相覆盖导致自动更新只识别单架构。
+
 on:
   push:
     tags:
@@ -11,19 +26,21 @@ on:
         required: false
         default: ''
       tag:
-        description: 'Release tag (leave empty to use latest tag)'
+        description: 'Release tag（留空则仅构建产物、不发布 Release）'
         required: false
         default: ''
 
 permissions:
   contents: write
 
+env:
+  # 内测阶段暂缓签名/公证：显式关闭 electron-builder 的证书自动发现，
+  # 避免 CI runner 误用钥匙串里的证书或因缺证书报错。正式版接签名时移除本行。
+  CSC_IDENTITY_AUTO_DISCOVERY: false
+
 jobs:
   build-mac:
     runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,23 +70,41 @@ jobs:
             npx electron-vite build
           fi
 
-      - name: Package for macOS (${{ matrix.arch }})
-        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+      # ---- 签名/公证预留 hook（内测暂缓，正式版启用）----
+      # 正式版启用步骤：
+      #   1. 在仓库 Settings > Secrets 配置：
+      #        MAC_CSC_LINK        (base64 编码的 .p12 证书)
+      #        MAC_CSC_KEY_PASSWORD(.p12 密码)
+      #        APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID (公证用)
+      #   2. 移除上方 env.CSC_IDENTITY_AUTO_DISCOVERY，改为把上述 secrets
+      #      通过下方 Package 步骤的 env 注入 electron-builder。
+      #   3. package.json build.mac 增加 hardenedRuntime / entitlements / notarize 配置。
+      # 所有密钥仅经 GitHub Actions secrets 注入，绝不写入仓库/日志/硬编码。
 
-      - name: Upload artifacts
+      - name: Package for macOS (x64 + arm64)
+        run: npx electron-builder --mac --x64 --arm64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # 正式版签名时在此注入（示例，当前为空则不生效）：
+          # CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mac-${{ matrix.arch }}
+          name: mac
           path: |
             dist/*.dmg
             dist/*.zip
+            dist/*.blockmap
+            dist/latest-mac.yml
           if-no-files-found: error
 
   build-windows:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -100,19 +135,33 @@ jobs:
             npx electron-vite build
           fi
 
-      - name: Package for Windows (${{ matrix.arch }})
-        run: npx electron-builder --win --${{ matrix.arch }} --publish never
+      # ---- 签名 hook（内测暂缓，正式版启用 Windows Authenticode）----
+      # 正式版启用：仓库 Secrets 配置 WIN_CSC_LINK (base64 .pfx) + WIN_CSC_KEY_PASSWORD，
+      # 并在下方 Package 步骤 env 注入 CSC_LINK / CSC_KEY_PASSWORD。
 
-      - name: Upload artifacts
+      - name: Package for Windows (x64 + arm64)
+        run: npx electron-builder --win --x64 --arm64 --publish never
+        env:
+          # 正式版签名时在此注入：
+          # CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          NODE_OPTIONS: ''
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: win-${{ matrix.arch }}
-          path: dist/*.exe
+          name: win
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
           if-no-files-found: error
 
   release:
     runs-on: ubuntu-latest
     needs: [build-mac, build-windows]
+    # 仅在推 tag 或手动指定 tag 时创建 Release；纯构建（dispatch 不填 tag）跳过。
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -121,7 +170,7 @@ jobs:
           merge-multiple: true
 
       - name: List artifacts
-        run: find artifacts -type f | head -50
+        run: find artifacts -type f | sort
 
       - name: Determine tag
         id: tag
@@ -138,6 +187,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.name }}
           name: ${{ steps.tag.outputs.name }}
           draft: false
+          # 含 '-' 的 tag（如 -beta.1）视为预发布
           prerelease: ${{ contains(steps.tag.outputs.name, '-') }}
           generate_release_notes: true
           files: artifacts/*
