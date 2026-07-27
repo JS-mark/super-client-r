@@ -181,6 +181,14 @@
 		"copyDetails": "Copy details",
 		"copied": "Copied to clipboard",
 		"copyFailed": "Copy failed",
+		"goModels": "Check Models page",
+		"friendly": {
+			"notActivated": "This model isn't activated, or your key lacks access to it. Open the Models page to check the provider's activation status and API key.",
+			"auth": "Invalid or expired API key. Open the Models page to verify this provider's API key.",
+			"quota": "Quota exhausted or rate limited. Check the provider's account balance and request rate, then retry.",
+			"modelNotFound": "Model not found or endpoint mismatch. Open the Models page to check the model id and Base URL.",
+			"unknown": "Request failed. Retry later, or open the Models page to check the provider configuration."
+		},
 		"fields": {
 			"model": "Model",
 			"provider": "Provider",
