@@ -181,6 +181,14 @@
 		"copyDetails": "复制详情",
 		"copied": "已复制到剪贴板",
 		"copyFailed": "复制失败",
+		"goModels": "去 Models 页检查",
+		"friendly": {
+			"notActivated": "当前模型尚未开通或密钥无该模型权限。请前往 Models 页检查该服务商的开通状态与密钥。",
+			"auth": "密钥无效或已过期。请前往 Models 页检查该服务商的 API Key 是否正确。",
+			"quota": "额度不足或触发限流。请检查该服务商的账户余额与调用频率后重试。",
+			"modelNotFound": "模型不存在或请求地址不匹配。请前往 Models 页检查模型名与 Base URL 配置。",
+			"unknown": "请求失败。请稍后重试，或前往 Models 页检查服务商配置。"
+		},
 		"fields": {
 			"model": "模型",
 			"provider": "服务商",

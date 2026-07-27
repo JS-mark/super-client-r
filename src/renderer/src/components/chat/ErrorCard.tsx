@@ -31,10 +31,12 @@ import { App, Button, Tag, Tooltip, theme } from "antd";
 import type * as React from "react";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import type { Message } from "@super-client/shared-types/chat";
 import type { LLMErrorContext } from "@super-client/shared-types/chat";
 import type { TFunction } from "i18next";
 import { useThemeStore } from "../../stores/themeStore";
+import { classifyLLMError } from "./errorClassification";
 
 const { useToken } = theme;
 
@@ -137,6 +139,7 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 	const { t } = useTranslation();
 	const { token } = useToken();
 	const { message: notify } = App.useApp();
+	const navigate = useNavigate();
 	const isDark = useThemeStore((s) => s.actualTheme === "dark");
 
 	const ctx = msg.metadata?.errorContext;
@@ -144,11 +147,23 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 	const summary = msg.metadata?.errorSummary ?? msg.content ?? "";
 	const meta = msg.metadata;
 
-	// Prefer the parsed business-error message — it tells the user *why*
-	// (e.g. "The free quota has been exhausted"). Fall back to the enriched
-	// summary that LLMService produced, which already includes status / model
-	// when no parsed body is available.
-	const headline = ctx?.providerErrorMessage || summary;
+	// The raw upstream / SDK message. Preferred order: parsed provider business
+	// message (e.g. "The product is not activated"), else the enriched summary
+	// LLMService produced (status / model included). Kept as a secondary detail
+	// line so engineers still see the exact upstream text.
+	const rawMessage = ctx?.providerErrorMessage || summary;
+
+	// Classify the failure into a friendly, actionable category. Most upstream
+	// business errors (not-activated / auth / quota / model-not-found) are
+	// config problems the user can fix in the Models page, so we lead with a
+	// friendly Chinese headline + guidance instead of dumping the raw string.
+	const classified = useMemo(
+		() => classifyLLMError(ctx, summary),
+		[ctx, summary],
+	);
+	const headline = t(classified.headlineKey, classified.headlineFallback, {
+		ns: "chat",
+	});
 
 	const [queryOpen, setQueryOpen] = useState(false);
 	const [bodyOpen, setBodyOpen] = useState(false);
@@ -160,9 +175,15 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 		onRetry?.(msg.id);
 	}, [onRetry, msg.id]);
 
+	const handleGoModels = useCallback(() => {
+		navigate("/settings?tab=models");
+	}, [navigate]);
+
 	const handleCopy = useCallback(() => {
+		// Copy the *raw* upstream message (not the friendly headline) so bug
+		// reports carry the exact provider text engineers need to diagnose.
 		const payload = buildCopyPayload(
-			headline,
+			rawMessage,
 			ctx,
 			query,
 			meta?.model,
@@ -178,7 +199,7 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 					t("errorCard.copyFailed", "复制失败", { ns: "chat" }),
 				),
 		);
-	}, [headline, ctx, query, meta?.model, meta?.providerPreset, notify, t]);
+	}, [rawMessage, ctx, query, meta?.model, meta?.providerPreset, notify, t]);
 
 	const danger = isDark ? "#ff7875" : "#ff4d4f";
 	const bg = isDark ? "rgba(255,77,79,0.08)" : "rgba(255,77,79,0.05)";
@@ -261,6 +282,23 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 						>
 							{headline}
 						</div>
+						{/* Secondary line: the exact upstream / SDK message. Shown
+							only when it carries info beyond the friendly headline
+							(i.e. differs from it) so engineers still see the raw
+							cause without re-expanding a collapsible. */}
+						{rawMessage && rawMessage !== headline && (
+							<div
+								style={{
+									marginTop: 4,
+									color: metaColor,
+									fontSize: 12,
+									wordBreak: "break-word",
+									lineHeight: 1.5,
+								}}
+							>
+								{rawMessage}
+							</div>
+						)}
 					</div>
 					<div
 						style={{
@@ -274,6 +312,21 @@ export function ErrorCard({ message: msg, onRetry }: ErrorCardProps) {
 							<Tag color="red" style={{ marginInlineEnd: 0 }}>
 								HTTP {ctx.statusCode}
 							</Tag>
+						)}
+						{/* Config-fixable failures (not-activated / auth / quota /
+							model-not-found) get a one-click jump to the Models
+							page so the user can correct the provider setup. */}
+						{classified.showModelsGuidance && (
+							<Button
+								size="small"
+								type="link"
+								onClick={handleGoModels}
+								style={{ paddingInline: 4 }}
+							>
+								{t("errorCard.goModels", "去 Models 页检查", {
+									ns: "chat",
+								})}
+							</Button>
 						)}
 						{onRetry && (
 							<Tooltip title={t("errorCard.retry", "重试", { ns: "chat" })}>
