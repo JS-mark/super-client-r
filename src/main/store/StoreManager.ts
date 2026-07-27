@@ -213,10 +213,10 @@ export interface AppConfig {
 		name: string;
 		email?: string;
 		avatar?: string;
-		provider: "google" | "github";
+		provider: "google" | "github" | "email";
 	};
 	authTokens?: {
-		accessToken: string;
+		accessToken?: string;
 		refreshToken?: string;
 		expiresAt?: number;
 	};

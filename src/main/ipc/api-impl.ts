@@ -387,6 +387,12 @@ const apiImpl = {
 			conversationStorage.setCurrentUser(user.id);
 			return user;
 		},
+		sendEmailCode: (email: string) => authService.sendEmailCode(email),
+		loginWithEmail: async (email: string, code: string) => {
+			const user = await authService.loginWithEmail(email, code);
+			conversationStorage.setCurrentUser(user.id);
+			return user;
+		},
 		logout: async () => {
 			await authService.logout();
 			conversationStorage.setCurrentUser(null);
