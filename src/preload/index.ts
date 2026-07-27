@@ -230,6 +230,13 @@ export interface ElectronAPI extends ElectronAPIMigrated {
 	// Auth API
 	auth: {
 		login: (provider: "google" | "github") => Promise<IPCResponse<AuthUser>>;
+		sendEmailCode: (
+			email: string,
+		) => Promise<IPCResponse<EmailCodeSendResult>>;
+		loginWithEmail: (
+			email: string,
+			code: string,
+		) => Promise<IPCResponse<AuthUser>>;
 		logout: () => Promise<IPCResponse>;
 		getUser: () => Promise<IPCResponse<AuthUser | null>>;
 	};
@@ -1107,7 +1114,12 @@ export interface AuthUser {
 	name: string;
 	email?: string;
 	avatar?: string;
-	provider: "google" | "github";
+	provider: "google" | "github" | "email";
+}
+
+export interface EmailCodeSendResult {
+	success: boolean;
+	message?: string;
 }
 
 export type ModelProviderPreset =
@@ -1928,6 +1940,8 @@ const electronAPI: ElectronAPI = {
 	]),
 	auth: createBridge<ElectronAPI["auth"]>("auth", [
 		"login",
+		"sendEmailCode",
+		"loginWithEmail",
 		"logout",
 		"getUser",
 	]),
