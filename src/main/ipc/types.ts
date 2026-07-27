@@ -224,10 +224,27 @@ export interface RendererLogEntry {
 
 // ============ Auth 相关类型 ============
 
-export type AuthProvider = "google" | "github";
+export type AuthProvider = "google" | "github" | "email";
 
 export interface AuthLoginRequest {
 	provider: AuthProvider;
+}
+
+/** 邮箱验证码发码请求 */
+export interface EmailCodeSendRequest {
+	email: string;
+}
+
+/** 邮箱验证码发码结果（对应后端 { success, message }） */
+export interface EmailCodeSendResult {
+	success: boolean;
+	message?: string;
+}
+
+/** 邮箱验证码登录请求 */
+export interface EmailLoginRequest {
+	email: string;
+	code: string;
 }
 
 export interface AuthUser {

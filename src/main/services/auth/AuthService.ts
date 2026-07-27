@@ -9,7 +9,12 @@
 
 import crypto from "crypto";
 import { BrowserWindow } from "electron";
-import type { AuthProvider, AuthTokens, AuthUser } from "../../ipc/types";
+import type {
+	AuthProvider,
+	AuthTokens,
+	AuthUser,
+	EmailCodeSendResult,
+} from "../../ipc/types";
 import { storeManager } from "../../store/StoreManager";
 import { logger } from "../../utils/logger";
 
@@ -34,6 +39,13 @@ function sha256(buffer: string): Buffer {
 	return crypto.createHash("sha256").update(buffer).digest();
 }
 
+// 基础邮箱格式校验（主进程侧兜底，渲染进程也会前置校验）
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(email: string): boolean {
+	return EMAIL_REGEX.test(email);
+}
+
 export class AuthService {
 	private authWindow: BrowserWindow | null = null;
 	private tokenExchangeUrl: string = DEFAULT_GITHUB_TOKEN_EXCHANGE_URL;
@@ -52,6 +64,92 @@ export class AuthService {
 			return this.loginWithGoogle();
 		}
 		return this.loginWithGitHub();
+	}
+
+	/**
+	 * 发送邮箱登录验证码（后端 POST /api/email/code）
+	 */
+	async sendEmailCode(email: string): Promise<EmailCodeSendResult> {
+		const normalized = email.trim().toLowerCase();
+		if (!isValidEmail(normalized)) {
+			throw new Error("Invalid email address");
+		}
+
+		const response = await fetch(`${CONFIG_API_BASE_URL}/api/email/code`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Accept: "application/json",
+			},
+			body: JSON.stringify({ email: normalized, purpose: "login" }),
+		});
+
+		if (!response.ok) {
+			const err = await response.text();
+			logger.error("Email code send failed", new Error(err));
+			throw new Error("Failed to send verification code");
+		}
+
+		const result = (await response.json()) as EmailCodeSendResult;
+		logger.info(`Email verification code sent: ${normalized}`);
+		return result;
+	}
+
+	/**
+	 * 邮箱验证码登录（后端 POST /api/email/code/verify）
+	 *
+	 * 方案 A：验码返回 valid:true 后，客户端本地构造 authUser，
+	 * 不依赖后端签发 token（authTokens 留空占位），与 github/google 存储结构一致。
+	 */
+	async loginWithEmail(email: string, code: string): Promise<AuthUser> {
+		const normalized = email.trim().toLowerCase();
+		if (!isValidEmail(normalized)) {
+			throw new Error("Invalid email address");
+		}
+		if (!code.trim()) {
+			throw new Error("Verification code is required");
+		}
+
+		const response = await fetch(
+			`${CONFIG_API_BASE_URL}/api/email/code/verify`,
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Accept: "application/json",
+				},
+				body: JSON.stringify({
+					email: normalized,
+					code: code.trim(),
+					purpose: "login",
+				}),
+			},
+		);
+
+		if (!response.ok) {
+			const err = await response.text();
+			logger.error("Email code verify failed", new Error(err));
+			throw new Error("Failed to verify code");
+		}
+
+		const result = (await response.json()) as { valid?: boolean };
+		if (!result.valid) {
+			throw new Error("Invalid or expired verification code");
+		}
+
+		const user: AuthUser = {
+			id: `email_${normalized}`,
+			name: normalized,
+			email: normalized,
+			provider: "email",
+		};
+
+		storeManager.setConfig("authUser", user);
+		// 方案 A：本版不依赖后端 token，占位保持存储结构一致
+		storeManager.setConfig("authTokens", {} as AuthTokens);
+		logger.info(`Email login successful: ${normalized}`);
+
+		return user;
 	}
 
 	async logout(): Promise<void> {
