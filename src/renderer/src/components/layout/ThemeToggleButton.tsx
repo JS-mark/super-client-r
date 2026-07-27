@@ -93,13 +93,25 @@ export function ThemeToggleButton({ color, hoverBg }: ThemeToggleButtonProps) {
 	const Icon: ComponentType =
 		mode === "auto" ? DesktopIcon : actualTheme === "dark" ? MoonIcon : SunIcon;
 
-	const handleClick = useCallback(() => {
+	const handleClick = useCallback(async () => {
 		const idx = MODE_CYCLE.indexOf(mode);
 		// `indexOf` can return -1 if a future ThemeMode value sneaks in;
 		// fall back to the first cycle entry so the click still does
 		// something useful.
 		const next = MODE_CYCLE[(idx + 1) % MODE_CYCLE.length] ?? MODE_CYCLE[0];
 		setMode(next);
+		// Persist to the main process too. Without this, only the renderer's
+		// zustand/localStorage copy updates while the main-process store keeps
+		// the old mode — then any later `useTheme` mount (e.g. ThemeSettings on
+		// the Settings page) runs `loadThemeFromMain` and rolls the theme back
+		// to the stale value, so switching here and navigating to Settings made
+		// the colors change. Mirror AppSidebar/useTheme so all switch entries
+		// keep the two stores in sync.
+		try {
+			await window.electron.theme.set(next);
+		} catch (err) {
+			console.error("Failed to sync theme:", err);
+		}
 	}, [mode, setMode]);
 
 	const tooltipTitle =

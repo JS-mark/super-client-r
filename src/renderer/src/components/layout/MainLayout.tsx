@@ -124,7 +124,7 @@ export const MainLayout: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <div
-      className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10"
+      className="h-screen overflow-hidden flex bg-linear-to-br from-slate-50 via-blue-50/20 to-purple-50/10 dark:from-[#141414] dark:via-[#141414] dark:to-[#1a1a1f]"
       data-interaction-profile={interactionProfile}
     >
       {/* Sidebar slot — Settings shell replaces the workspace sidebar with
