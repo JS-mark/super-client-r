@@ -1225,6 +1225,29 @@ html.dark .chat-load-older-pill:disabled {
 	box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.12);
 }
 
+/* The inner @ant-design/x Sender wraps an antd borderless `Input.TextArea`.
+   In its keyboard `:focus-visible` state antd paints a rectangular `outline`
+   (activeBorderColor, defaults to #1890ff). Stacked on top of the rounded
+   `.chat-composer-card:focus-within` ring above (which lives on the Sender
+   root element itself), that produced a jarring double blue frame — an outer
+   rounded ring plus an inner square outline (see SUP-23). The card already
+   owns the focus affordance, so strip the inner textarea's own focus
+   outline/shadow and let the card be the single source of the focus ring. */
+.chat-composer-card .ant-input,
+.chat-composer-card textarea.ant-input {
+	outline: none !important;
+	box-shadow: none !important;
+}
+.chat-composer-card .ant-input:focus,
+.chat-composer-card .ant-input:focus-within,
+.chat-composer-card .ant-input:focus-visible,
+.chat-composer-card textarea.ant-input:focus,
+.chat-composer-card textarea.ant-input:focus-visible {
+	outline: none !important;
+	box-shadow: none !important;
+	border-color: transparent !important;
+}
+
 .dark .chat-composer-card {
 	background: rgba(255, 255, 255, 0.02);
 	border-color: rgba(255, 255, 255, 0.08);
