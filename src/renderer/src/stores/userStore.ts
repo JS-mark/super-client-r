@@ -7,7 +7,7 @@ export interface User {
 	name: string;
 	email?: string;
 	avatar?: string;
-	provider?: "google" | "github";
+	provider?: "google" | "github" | "email";
 }
 
 interface UserState {
@@ -17,6 +17,8 @@ interface UserState {
 	error: string | null;
 	login: (user: User) => void;
 	loginWithOAuth: (provider: "google" | "github") => Promise<void>;
+	sendEmailCode: (email: string) => Promise<boolean>;
+	loginWithEmail: (email: string, code: string) => Promise<boolean>;
 	logout: () => Promise<void>;
 	restoreSession: () => Promise<void>;
 }
@@ -56,6 +58,56 @@ export const useUserStore = create<UserState>()(
 						isLoading: false,
 						error: (error as Error).message,
 					});
+				}
+			},
+			sendEmailCode: async (email) => {
+				set({ isLoading: true, error: null });
+				try {
+					const response = await authService.sendEmailCode(email);
+					if (response.success && response.data?.success !== false) {
+						set({ isLoading: false, error: null });
+						return true;
+					}
+					set({
+						isLoading: false,
+						error:
+							response.data?.message ||
+							response.error ||
+							"Failed to send verification code",
+					});
+					return false;
+				} catch (error) {
+					set({
+						isLoading: false,
+						error: (error as Error).message,
+					});
+					return false;
+				}
+			},
+			loginWithEmail: async (email, code) => {
+				set({ isLoading: true, error: null });
+				try {
+					const response = await authService.loginWithEmail(email, code);
+					if (response.success && response.data) {
+						set({
+							user: response.data,
+							isLoggedIn: true,
+							isLoading: false,
+							error: null,
+						});
+						return true;
+					}
+					set({
+						isLoading: false,
+						error: response.error || "Login failed",
+					});
+					return false;
+				} catch (error) {
+					set({
+						isLoading: false,
+						error: (error as Error).message,
+					});
+					return false;
 				}
 			},
 			logout: async () => {
