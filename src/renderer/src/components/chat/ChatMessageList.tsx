@@ -34,6 +34,7 @@ import { MessageContextMenu } from "./MessageContextMenu";
 import { ProviderIcon } from "../models/ProviderIcon";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { AskUserQuestionCard } from "./AskUserQuestionCard";
+import { CompactedSummaryCard } from "./CompactedSummaryCard";
 import { ErrorCard } from "./ErrorCard";
 import {
 	getPlanCardFromPart,
@@ -813,6 +814,21 @@ export function ChatMessageList({
 					for (let i = 0; i < aiMessages.length; i++) {
 						const m = aiMessages[i];
 						if (m.role === "assistant") {
+							// Context-compaction marker: the send pipeline tags
+							// an assistant message with `metadata.contextCompacted`
+							// when the history strategy summarizes older turns.
+							// Render a dedicated CompactedSummaryCard in place of
+							// the normal text so the compaction event is visible
+							// in-line (mirrors the ErrorCard special-case below).
+							if (m.metadata?.contextCompacted) {
+								parts.push(
+									<CompactedSummaryCard
+										key={`${m.id}:compacted`}
+										message={m}
+									/>,
+								);
+								continue;
+							}
 							// When the assistant turn failed mid-stream, useChat
 							// converts the placeholder into a `type:'error'`
 							// message via markMessageAsError. Render the

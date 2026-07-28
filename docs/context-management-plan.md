@@ -12,7 +12,7 @@
 
 ### 当前现状
 
-项目已进入 Context/Memory 分批实现：发送管线会把裁剪后的历史作为 `AgentHistoryMessage[]` 传给 Agent runtime，`ClaudeCodeAgentRuntime` 已能读取 `PromptPart[]` history，并且 cwd 下 `AGENTS.md` / `CLAUDE.md` 会通过 main process `ProjectRulesReader` 注入 system prompt。当前新增了 metadata-level context source / strategy 回放：发送管线会把本轮 history 策略、附件/搜索/历史/tool 来源和本地 compact marker 写回当前 assistant message metadata，Context Inspector 优先读取这些 metadata。`context.compacted` shared event/main materializer/renderer persistence path 已有最小接线；main runtime project-rules snapshot DTO 已接到 `init` / `run.started`，只回传文件名、byteLength、sha256、truncated、injected，不回传正文或绝对路径。LLM summarize seam 和真实 HTTP summarizer provider 已接线但待依赖恢复后复验；metadata-level pin/unpin 已接到 Inspector 和下一轮 send metadata；session-scoped artifact library MVP 已接到 Inspector。
+项目已进入 Context/Memory 分批实现：发送管线会把裁剪后的历史作为 `AgentHistoryMessage[]` 传给 Agent runtime，`ClaudeCodeAgentRuntime` 已能读取 `PromptPart[]` history，并且 cwd 下 `AGENTS.md` / `CLAUDE.md` 会通过 main process `ProjectRulesReader` 注入 system prompt。当前新增了 metadata-level context source / strategy 回放：发送管线会把本轮 history 策略、附件/搜索/历史/tool 来源和本地 compact marker 写回当前 assistant message metadata，Context Inspector 优先读取这些 metadata。`context.compacted` shared event/main materializer/renderer persistence path 已有最小接线；main runtime project-rules snapshot DTO 已接到 `init` / `run.started`，只回传文件名、byteLength、sha256、truncated、injected，不回传正文或绝对路径。LLM summarize seam 和真实 HTTP summarizer provider 已接线，并于 2026-07-18 复验通过（`contextSummarizer` SSE integration test + `useAgentSendPipeline` compact 注入用例）；metadata-level pin/unpin 已接到 Inspector 和下一轮 send metadata；session-scoped artifact library MVP 已接到 Inspector。
 
 **核心缺口：**
 
@@ -22,14 +22,14 @@
 | 类型不匹配 | 已完成：`ClaudeCodeAgentRuntime.buildChatRequest()` 支持 `PromptPart[]` text extraction |
 | contextCount 死代码 | 已完成低风险切片：发送管线读取 `SessionSettings.contextCount` 作为 sliding window |
 | contextMode 未实现 | 已完成低风险切片：`SessionSettings.contextMode` + Settings segmented control + auto/compact/full 策略入口 |
-| contextCompacted 占位 | 已完成 metadata-level 写入、shared/main/renderer `context.compacted` product/session event 最小链路；仍待依赖恢复后复验 |
+| contextCompacted 占位 | 已完成 metadata-level 写入、shared/main/renderer `context.compacted` product/session event 最小链路；已于 2026-07-18 复验通过 |
 | Token 数据仅展示 | `computeContextUsage()` 仍只驱动 UI；发送策略使用 model `contextWindow` + estimateTokens 进行预算判断，尚未使用真实 API usage 回写 |
 
 ### 目标
 
 1. **多轮历史回放**：将对话历史组装为 `AgentHistoryMessage[]` 并传入 `createQuery`
 2. **Token 预算感知**：利用已有的 `contextWindow` 和 token 估算决定发送策略
-3. **自动压缩**：当历史 token 超出预算时，通过可注入 LLM 摘要接缝压缩旧消息；真实 HTTP 摘要调用已接到本地 `/v1/llm/chat/completions`，仍待依赖恢复后复验
+3. **自动压缩**：当历史 token 超出预算时，通过可注入 LLM 摘要接缝压缩旧消息；真实 HTTP 摘要调用已接到本地 `/v1/llm/chat/completions`，已于 2026-07-18 复验通过（SSE integration test + pipeline compact 注入用例）
 4. **用户可控**：激活 `contextCount`（消息数量限制）和 `contextMode`（策略选择）
 
 ---
@@ -281,6 +281,8 @@ Context Mode           [Auto] [Compact] [Full]
 
 ### Task 9: UI 指示器 — 压缩摘要消息视觉标记
 
+**状态：** 已完成（commit 13fe6de，2026-07-18）。
+
 **文件：** 消息渲染组件（检查现有 error message 特殊渲染模式，沿用相同模式）
 
 对 `message.metadata.contextCompacted` 的消息渲染：
@@ -288,7 +290,7 @@ Context Mode           [Auto] [Compact] [Full]
 - 顶部显示琥珀色标签：`⟨⟩ N messages compacted`
 - 正文区域：浅灰背景展示摘要内容
 
-当前已完成的较小切片：Context Inspector 会展示 latest assistant message metadata 中的 history strategy 和 compact event；shared product event 已有最小 `context.compacted` contract，并可经 main materializer 转成带 `metadata.contextCompacted` 的 `assistant_message`；发送链路已接到 renderer product-event persistence helper；LLM summarize 注入接缝和真实 HTTP summarizer provider 已存在。message list 中的专用摘要卡片仍未完成。
+当前已完成的较小切片：Context Inspector 会展示 latest assistant message metadata 中的 history strategy 和 compact event；shared product event 已有最小 `context.compacted` contract，并可经 main materializer 转成带 `metadata.contextCompacted` 的 `assistant_message`；发送链路已接到 renderer product-event persistence helper；LLM summarize 注入接缝和真实 HTTP summarizer provider 已存在。message list 中的专用摘要卡片已完成（`CompactedSummaryCard`，commit 13fe6de）：`ChatMessageList` 对 `role === "assistant"` 且带 `metadata.contextCompacted` 的消息并行渲染专用卡片；组件 focused test 已覆盖（`CompactedSummaryCard.test.tsx`）。
 
 ### Task 9b: Context Inspector metadata source replay
 
@@ -306,29 +308,37 @@ pin/unpin 当前是 metadata-level 最小闭环：Inspector source 行可把 `Me
 
 已知限制：
 
-- `projectRules` source 当前已有 main runtime snapshot DTO，并已接入 assistant metadata / Context Inspector source breakdown；可证明具体规则文件的 filename、byteLength、sha256、truncated、injected，且不回传正文或绝对路径。该链路仍需依赖恢复后复验 focused tests。
-- `context.compacted` product event 当前已有 shared factory + main materializer + JSONL replay 测试，并已接入 renderer send pipeline persistence path；LLM summarize seam / HTTP provider 已接入。后续仍需依赖恢复后复验 focused tests。
+- `projectRules` source 当前已有 main runtime snapshot DTO，并已接入 assistant metadata / Context Inspector source breakdown；可证明具体规则文件的 filename、byteLength、sha256、truncated、injected，且不回传正文或绝对路径。该链路已于 2026-07-18 复验通过。
+- `context.compacted` product event 当前已有 shared factory + main materializer + JSONL replay 测试，并已接入 renderer send pipeline persistence path；LLM summarize seam / HTTP provider 已接入。该链路已于 2026-07-18 复验通过。
 
 ---
 
 ### Task 10: 集成测试 & 边界
 
-**测试补充：**
+**状态：** 自动化已覆盖边界逻辑 + 组件 + HTTP body；GUI 手动 smoke 待用户。
 
-- 空/单条消息列表
-- 滑动窗口消息顺序保持
-- `messageToAgentHistory` 跳过 tool 消息
-- `createSummaryMessage` metadata 正确性
+**测试补充（自动化覆盖映射）：**
 
-**手动 smoke：**
+- 空/单条消息列表 — **已覆盖**：`src/renderer/src/lib/__tests__/contextManager.test.ts` → `applyContextStrategy boundary cases` 中的 “handles an empty message list without compaction or summarization” 与 “leaves a single-message list untouched in compact mode”。
+- 滑动窗口消息顺序保持 — **已覆盖**：同文件 “preserves chronological order of the sliding-window tail (not reversed)”（5 条消息保留尾部 3 条，断言保持原序）；既有 `applies contextCount as a hard sliding window` 覆盖 2 条保留窗口。
+- 摘要消息在返回数组中的位置 — **已覆盖**：同文件 “places the summary message FIRST, followed by retained recent messages in order”（断言 summary 在 index 0，retained tail 保持原序）。
+- `messageToAgentHistory` 跳过 tool 消息 — **已覆盖**：同文件 “skips tool and empty messages”（line 75）。
+- `createSummaryMessage` metadata 正确性 — **已覆盖**：同文件 “creates a summary message with contextCompacted metadata”（line 84）。
+- HTTP summarize body shape — **已覆盖**（T1）：`src/renderer/src/services/agent/__tests__/contextSummarizer.integration.test.ts` 断言 SSE POST body 含 provider/model/system prompt/user history。
+- pipeline compact 注入 — **已覆盖**：`src/renderer/src/hooks/__tests__/useAgentSendPipeline.test.ts` 的 `uses injected LLM summarizer when compacting context` 等 4 个 compact/summarize 用例。
+- 摘要卡片组件 — **已覆盖**（T2）：`src/renderer/src/components/chat/__tests__/CompactedSummaryCard.test.tsx` + `ChatMessageList` 在 `metadata.contextCompacted` 存在时并行渲染分支。
 
-1. `pnpm dev`
-2. 打开有 >10 条消息的会话
-3. Settings 中切换 contextMode = compact，发送消息
-4. 验证 LLM HTTP POST body 包含 history
-5. 验证聊天中出现摘要消息
-6. 切换 contextMode = full，再次发送
-7. 验证全量历史发送
+**手动 smoke（GUI Electron，待用户执行）：**
+
+> 自动化已覆盖：HTTP body shape（T1 integration test）、摘要卡片组件渲染（T2 组件 test）、摘要消息 metadata + 边界逻辑（本任务）。以下步骤需要运行真实 Electron GUI，当前 subagent 环境无法执行，明确标注为「自动化已覆盖，手测待用户」。
+
+1. `pnpm dev` — **手测待用户**（subagent 无法启动 GUI Electron）。
+2. 打开有 >10 条消息的会话 — **手测待用户**（需要 GUI 导航到真实长会话）。
+3. Settings 中切换 contextMode = compact，发送消息 — **手测待用户**（需要 GUI 切换 segmented control + 触发真实 send）。
+4. 验证 LLM HTTP POST body 包含 history — **自动化已覆盖**（T1 `contextSummarizer.integration.test.ts` 断言 body shape）；真实运行下 POST 抓包仍建议用户手测一次。
+5. 验证聊天中出现摘要消息 — **自动化已覆盖**（T2 `CompactedSummaryCard.test.tsx` 组件渲染 + `ChatMessageList` 并行分支）；真实渲染样式建议用户手测一次。
+6. 切换 contextMode = full，再次发送 — **手测待用户**（需要 GUI 切换 + 真实 send）。
+7. 验证全量历史发送 — **自动化已覆盖**（`useAgentSendPipeline.test.ts` 的 `prepareHistoryForRuntime` full 模式用例）；真实运行下端到端发送仍建议用户手测一次。
 
 ---
 
